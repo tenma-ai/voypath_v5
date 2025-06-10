@@ -139,6 +139,17 @@ CREATE TABLE trips (
   CONSTRAINT valid_deadline CHECK (add_place_deadline IS NULL OR start_date IS NULL OR add_place_deadline <= start_date)
 );
 
+-- Member colors lookup table
+CREATE TABLE member_colors (
+  id SERIAL PRIMARY KEY,
+  color_name VARCHAR(50) NOT NULL,
+  hex_color VARCHAR(7) NOT NULL,
+  rgb_color VARCHAR(20) NOT NULL,
+  hsl_color VARCHAR(20) NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Places table
 CREATE TABLE places (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -179,6 +190,10 @@ CREATE TABLE places (
   transport_mode transport_mode,
   travel_time_from_previous INTEGER, -- travel time from previous place (minutes)
   
+  -- Place visualization metadata
+  display_color VARCHAR(7) DEFAULT NULL,
+  member_contribution JSONB DEFAULT '[]'::jsonb,
+  
   -- Metadata
   notes TEXT,
   tags TEXT[],
@@ -204,7 +219,8 @@ CREATE TABLE places (
      latitude >= -90 AND latitude <= 90 AND
      longitude >= -180 AND longitude <= 180)
   ),
-  CONSTRAINT valid_name_length CHECK (char_length(name) >= 1 AND char_length(name) <= 200)
+  CONSTRAINT valid_name_length CHECK (char_length(name) >= 1 AND char_length(name) <= 200),
+  CONSTRAINT valid_display_color CHECK (display_color IS NULL OR display_color ~ '^#[A-Fa-f0-9]{6}$')
 );
 
 -- Trip members table
@@ -224,6 +240,10 @@ CREATE TABLE trip_members (
   can_optimize BOOLEAN DEFAULT true,
   can_invite_members BOOLEAN DEFAULT false,
   
+  -- Member color system
+  assigned_color_index INTEGER DEFAULT NULL,
+  color_assigned_at TIMESTAMPTZ DEFAULT NULL,
+  
   -- Metadata
   nickname TEXT, -- nickname within the trip
   preferences JSONB DEFAULT '{}'::jsonb,
@@ -231,7 +251,8 @@ CREATE TABLE trip_members (
   PRIMARY KEY (trip_id, user_id),
   
   -- Constraints
-  CONSTRAINT valid_nickname_length CHECK (nickname IS NULL OR char_length(nickname) <= 50)
+  CONSTRAINT valid_nickname_length CHECK (nickname IS NULL OR char_length(nickname) <= 50),
+  CONSTRAINT valid_color_index CHECK (assigned_color_index IS NULL OR (assigned_color_index >= 1 AND assigned_color_index <= 20))
 );
 
 -- Messages table
@@ -460,6 +481,29 @@ CREATE TABLE optimization_cache (
   CONSTRAINT valid_hit_count CHECK (hit_count >= 0)
 );
 
+-- Insert 20 refined member colors
+INSERT INTO member_colors (color_name, hex_color, rgb_color, hsl_color) VALUES
+('Ocean Blue', '#0077BE', 'rgb(0,119,190)', 'hsl(202,100%,37%)'),
+('Forest Green', '#228B22', 'rgb(34,139,34)', 'hsl(120,61%,34%)'),
+('Sunset Orange', '#FF6B35', 'rgb(255,107,53)', 'hsl(16,100%,60%)'),
+('Royal Purple', '#7B68EE', 'rgb(123,104,238)', 'hsl(249,80%,67%)'),
+('Cherry Red', '#DC143C', 'rgb(220,20,60)', 'hsl(348,83%,47%)'),
+('Teal', '#008080', 'rgb(0,128,128)', 'hsl(180,100%,25%)'),
+('Amber', '#FFC000', 'rgb(255,192,0)', 'hsl(45,100%,50%)'),
+('Lavender', '#E6E6FA', 'rgb(230,230,250)', 'hsl(240,67%,94%)'),
+('Coral', '#FF7F50', 'rgb(255,127,80)', 'hsl(16,100%,66%)'),
+('Emerald', '#50C878', 'rgb(80,200,120)', 'hsl(140,54%,55%)'),
+('Magenta', '#FF00FF', 'rgb(255,0,255)', 'hsl(300,100%,50%)'),
+('Navy', '#000080', 'rgb(0,0,128)', 'hsl(240,100%,25%)'),
+('Rose', '#FF007F', 'rgb(255,0,127)', 'hsl(330,100%,50%)'),
+('Lime', '#32CD32', 'rgb(50,205,50)', 'hsl(120,61%,50%)'),
+('Indigo', '#4B0082', 'rgb(75,0,130)', 'hsl(275,100%,25%)'),
+('Turquoise', '#40E0D0', 'rgb(64,224,208)', 'hsl(174,72%,56%)'),
+('Crimson', '#DC143C', 'rgb(220,20,60)', 'hsl(348,83%,47%)'),
+('Olive', '#808000', 'rgb(128,128,0)', 'hsl(60,100%,25%)'),
+('Slate', '#708090', 'rgb(112,128,144)', 'hsl(210,13%,50%)'),
+('Maroon', '#800000', 'rgb(128,0,0)', 'hsl(0,100%,25%)');
+
 -- =============================================================================
 -- 4. INDEXES
 -- =============================================================================
@@ -500,11 +544,17 @@ CREATE INDEX idx_places_location_point ON places USING GIST(location_point) WHER
 CREATE INDEX idx_places_name_trgm ON places USING gin(name gin_trgm_ops);
 CREATE INDEX idx_places_address_trgm ON places USING gin(address gin_trgm_ops) WHERE address IS NOT NULL;
 
+-- Member colors table indexes
+CREATE INDEX idx_member_colors_is_active ON member_colors(is_active) WHERE is_active = true;
+CREATE UNIQUE INDEX idx_member_colors_hex_color ON member_colors(hex_color);
+
 -- Trip members table indexes
 CREATE INDEX idx_trip_members_trip_id ON trip_members(trip_id);
 CREATE INDEX idx_trip_members_user_id ON trip_members(user_id);
 CREATE INDEX idx_trip_members_role ON trip_members(role);
 CREATE INDEX idx_trip_members_joined_at ON trip_members(joined_at);
+CREATE INDEX idx_trip_members_color_index ON trip_members(assigned_color_index) WHERE assigned_color_index IS NOT NULL;
+CREATE UNIQUE INDEX idx_trip_members_unique_color_per_trip ON trip_members(trip_id, assigned_color_index) WHERE assigned_color_index IS NOT NULL;
 
 -- Messages table indexes
 CREATE INDEX idx_messages_trip_id ON messages(trip_id);
@@ -565,6 +615,7 @@ CREATE UNIQUE INDEX idx_optimization_cache_lookup ON optimization_cache(trip_id,
 -- Enable RLS on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
+ALTER TABLE member_colors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE places ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trip_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
@@ -602,6 +653,12 @@ CREATE POLICY "Users can view public info of trip members" ON users
       )
     )
   );
+
+-- Member colors table RLS policies
+CREATE POLICY "All authenticated users can view member colors" ON member_colors
+  FOR SELECT
+  TO authenticated
+  USING (is_active = true);
 
 -- Trips table RLS policies
 CREATE POLICY "Trip members can view trips" ON trips
@@ -1429,6 +1486,7 @@ ON CONFLICT (version) DO NOTHING;
 
 -- Enable realtime for key tables
 ALTER PUBLICATION supabase_realtime ADD TABLE trips;
+ALTER PUBLICATION supabase_realtime ADD TABLE member_colors;
 ALTER PUBLICATION supabase_realtime ADD TABLE places;
 ALTER PUBLICATION supabase_realtime ADD TABLE trip_members;
 ALTER PUBLICATION supabase_realtime ADD TABLE messages;
