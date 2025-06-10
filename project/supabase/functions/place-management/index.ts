@@ -95,6 +95,645 @@ interface PlaceListRequest {
   include_trip_info?: boolean;
 }
 
+interface PlaceRatingRequest {
+  place_id: string;
+  rating: number; // 1.0 to 5.0
+  review_text?: string;
+  categories?: string[]; // e.g., ['food', 'atmosphere', 'service']
+  is_anonymous?: boolean;
+}
+
+interface PlaceRatingUpdateRequest {
+  place_id: string;
+  rating?: number;
+  review_text?: string;
+  categories?: string[];
+  is_anonymous?: boolean;
+}
+
+interface PlaceRatingStatsRequest {
+  place_id?: string;
+  trip_id?: string;
+  category?: string;
+  min_rating?: number;
+  max_rating?: number;
+  include_reviews?: boolean;
+  include_rating_distribution?: boolean;
+  include_categories_breakdown?: boolean;
+}
+
+interface PlaceRecommendationRequest {
+  trip_id: string;
+  limit?: number; // Default: 10
+  category?: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+    radius_km?: number; // Default: 5km
+  };
+  price_level?: number; // 1-4
+  include_external?: boolean; // Include external API suggestions
+  recommendation_type?: 'individual' | 'team' | 'hybrid'; // Default: 'hybrid'
+  exclude_existing?: boolean; // Exclude already added places
+}
+
+interface RecommendedPlace {
+  place_name: string;
+  category: string;
+  predicted_rating: number;
+  recommendation_reason: string;
+  confidence_score: number;
+  source: 'internal' | 'external' | 'hybrid';
+  external_data?: {
+    place_id?: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    price_level?: number;
+    rating?: number;
+    user_ratings_total?: number;
+    photos?: string[];
+  };
+  recommendation_factors: {
+    category_preference: number;
+    team_compatibility: number;
+    popularity_score: number;
+    location_relevance: number;
+    price_match: number;
+  };
+}
+
+// TODO-079: Place Image Management interfaces
+interface PlaceImageUploadRequest {
+  place_id: string;
+  image_data: string; // Base64 encoded image data
+  image_name?: string;
+  image_description?: string;
+  is_primary?: boolean; // Set as primary image for the place
+}
+
+interface PlaceImageUpdateRequest {
+  image_id: string;
+  place_id: string;
+  image_name?: string;
+  image_description?: string;
+  is_primary?: boolean;
+}
+
+interface PlaceImageListRequest {
+  place_id?: string;
+  trip_id?: string;
+  user_id?: string;
+  limit?: number;
+  offset?: number;
+  include_metadata?: boolean;
+}
+
+interface PlaceImageDeleteRequest {
+  image_id: string;
+  place_id: string;
+}
+
+// TODO-080: Place Statistics API interfaces
+interface PlaceStatsRequest {
+  stats_type: 'trip' | 'user' | 'global' | 'category' | 'popularity';
+  trip_id?: string;
+  user_id?: string;
+  category?: string;
+  start_date?: string;
+  end_date?: string;
+  limit?: number;
+  include_details?: boolean;
+  time_range?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+}
+
+interface PlaceStatsResponse {
+  success: boolean;
+  stats: {
+    summary: PlaceStatsSummary;
+    category_breakdown?: CategoryStatsBreakdown[];
+    popularity_ranking?: PopularityRanking[];
+    time_series?: TimeSeriesStats[];
+    details?: PlaceStatsDetails;
+  };
+  metadata: {
+    generated_at: string;
+    stats_type: string;
+    data_range: {
+      start_date?: string;
+      end_date?: string;
+      total_records: number;
+    };
+  };
+}
+
+interface PlaceStatsSummary {
+  total_places: number;
+  total_trips: number;
+  total_users: number;
+  average_wish_level: number;
+  average_rating: number;
+  most_popular_category: string;
+  total_estimated_cost: number;
+  total_stay_duration_hours: number;
+}
+
+interface CategoryStatsBreakdown {
+  category: string;
+  place_count: number;
+  percentage: number;
+  average_wish_level: number;
+  average_rating: number;
+  average_cost: number;
+  total_stay_duration: number;
+}
+
+interface PopularityRanking {
+  rank: number;
+  place_id: string;
+  place_name: string;
+  category: string;
+  popularity_score: number;
+  total_added_count: number;
+  average_wish_level: number;
+  average_rating: number;
+  recent_trend: 'rising' | 'stable' | 'declining';
+}
+
+interface TimeSeriesStats {
+  date: string;
+  total_places_added: number;
+  unique_users: number;
+  popular_categories: string[];
+  average_wish_level: number;
+}
+
+interface PlaceStatsDetails {
+  geographic_distribution?: GeographicStats;
+  user_engagement?: UserEngagementStats;
+  cost_analysis?: CostAnalysisStats;
+  temporal_patterns?: TemporalPatternStats;
+}
+
+interface GeographicStats {
+  total_coordinates: number;
+  coverage_area_km2: number;
+  center_point: { latitude: number; longitude: number };
+  geographic_spread: number;
+}
+
+interface UserEngagementStats {
+  active_users: number;
+  average_places_per_user: number;
+  power_users: number; // users with >10 places
+  engagement_score: number;
+}
+
+interface CostAnalysisStats {
+  total_estimated_cost: number;
+  average_cost_per_place: number;
+  cost_distribution_by_level: { level: number; count: number; percentage: number }[];
+  budget_friendly_percentage: number;
+}
+
+interface TemporalPatternStats {
+  peak_adding_hours: number[];
+  seasonal_trends: { season: string; activity_level: number }[];
+  most_active_day_of_week: string;
+}
+
+// External API Integration Interfaces and Functions
+interface GooglePlacesSearchRequest {
+  query: string;
+  location?: { lat: number; lng: number };
+  radius?: number; // meters
+  type?: string; // restaurant, tourist_attraction, etc.
+  language?: string;
+  region?: string;
+}
+
+interface GooglePlaceDetails {
+  place_id: string;
+  name: string;
+  formatted_address: string;
+  geometry: {
+    location: { lat: number; lng: number };
+  };
+  rating?: number;
+  price_level?: number;
+  types: string[];
+  opening_hours?: {
+    open_now: boolean;
+    periods?: Array<{
+      open: { day: number; time: string };
+      close: { day: number; time: string };
+    }>;
+  };
+  photos?: Array<{
+    photo_reference: string;
+    height: number;
+    width: number;
+  }>;
+  reviews?: Array<{
+    rating: number;
+    text: string;
+    time: number;
+  }>;
+}
+
+interface PexelsImageResponse {
+  id: number;
+  width: number;
+  height: number;
+  url: string;
+  photographer: string;
+  photographer_url: string;
+  photographer_id: number;
+  avg_color: string;
+  src: {
+    original: string;
+    large2x: string;
+    large: string;
+    medium: string;
+    small: string;
+    portrait: string;
+    landscape: string;
+    tiny: string;
+  };
+  alt: string;
+}
+
+interface ExternalAPIResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+  source: 'google_places' | 'pexels';
+  quota_used?: boolean;
+  cached?: boolean;
+}
+
+// Google Places API Integration
+async function searchGooglePlaces(request: GooglePlacesSearchRequest): Promise<ExternalAPIResponse> {
+  const apiKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
+  
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'Google Places API key not configured',
+      source: 'google_places'
+    };
+  }
+
+  try {
+    // Text Search API
+    const searchParams = new URLSearchParams({
+      query: request.query,
+      key: apiKey
+    });
+
+    if (request.location) {
+      searchParams.append('location', `${request.location.lat},${request.location.lng}`);
+      searchParams.append('radius', (request.radius || 5000).toString());
+    }
+
+    if (request.type) {
+      searchParams.append('type', request.type);
+    }
+
+    if (request.language) {
+      searchParams.append('language', request.language);
+    }
+
+    if (request.region) {
+      searchParams.append('region', request.region);
+    }
+
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/place/textsearch/json?${searchParams.toString()}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || data.status !== 'OK') {
+      return {
+        success: false,
+        error: data.error_message || `Google Places API error: ${data.status}`,
+        source: 'google_places',
+        quota_used: data.status === 'OVER_QUERY_LIMIT'
+      };
+    }
+
+    return {
+      success: true,
+      data: data.results,
+      source: 'google_places'
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `Google Places API request failed: ${error.message}`,
+      source: 'google_places'
+    };
+  }
+}
+
+async function getGooglePlaceDetails(placeId: string): Promise<ExternalAPIResponse> {
+  const apiKey = Deno.env.get('GOOGLE_PLACES_API_KEY');
+  
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'Google Places API key not configured',
+      source: 'google_places'
+    };
+  }
+
+  try {
+    const fields = [
+      'place_id',
+      'name',
+      'formatted_address',
+      'geometry',
+      'rating',
+      'price_level',
+      'types',
+      'opening_hours',
+      'photos',
+      'reviews'
+    ].join(',');
+
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${apiKey}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || data.status !== 'OK') {
+      return {
+        success: false,
+        error: data.error_message || `Google Places Details API error: ${data.status}`,
+        source: 'google_places',
+        quota_used: data.status === 'OVER_QUERY_LIMIT'
+      };
+    }
+
+    return {
+      success: true,
+      data: data.result,
+      source: 'google_places'
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `Google Places Details API request failed: ${error.message}`,
+      source: 'google_places'
+    };
+  }
+}
+
+// Pexels API Integration
+async function searchPexelsImages(query: string, count: number = 5): Promise<ExternalAPIResponse> {
+  const apiKey = Deno.env.get('PEXELS_API_KEY');
+  
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'Pexels API key not configured',
+      source: 'pexels'
+    };
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${count}&orientation=landscape`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': apiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `Pexels API error: ${response.status} ${response.statusText}`,
+        source: 'pexels'
+      };
+    }
+
+    return {
+      success: true,
+      data: data.photos || [],
+      source: 'pexels'
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: `Pexels API request failed: ${error.message}`,
+      source: 'pexels'
+    };
+  }
+}
+
+// External Data Normalization Functions
+function normalizeGooglePlaceToVoypath(googlePlace: any): Partial<PlaceCreateRequest> {
+  const categories = mapGoogleTypesToCategories(googlePlace.types || []);
+  
+  return {
+    name: googlePlace.name,
+    category: categories[0] || 'other',
+    address: googlePlace.formatted_address,
+    latitude: googlePlace.geometry?.location?.lat,
+    longitude: googlePlace.geometry?.location?.lng,
+    rating: googlePlace.rating,
+    price_level: googlePlace.price_level,
+    opening_hours: normalizeGoogleOpeningHours(googlePlace.opening_hours),
+    external_id: googlePlace.place_id,
+    tags: categories
+  };
+}
+
+function mapGoogleTypesToCategories(googleTypes: string[]): string[] {
+  const typeMapping: Record<string, string> = {
+    'restaurant': 'restaurant',
+    'food': 'restaurant',
+    'meal_takeaway': 'restaurant',
+    'tourist_attraction': 'attraction',
+    'museum': 'museum',
+    'park': 'park',
+    'amusement_park': 'entertainment',
+    'zoo': 'entertainment',
+    'shopping_mall': 'shopping',
+    'store': 'shopping',
+    'lodging': 'accommodation',
+    'hospital': 'medical',
+    'pharmacy': 'medical',
+    'gas_station': 'transport',
+    'train_station': 'transport',
+    'bus_station': 'transport',
+    'airport': 'transport',
+    'bank': 'business',
+    'atm': 'business',
+    'church': 'religious',
+    'mosque': 'religious',
+    'synagogue': 'religious',
+    'temple': 'religious',
+    'school': 'education',
+    'university': 'education',
+    'library': 'education',
+    'gym': 'fitness',
+    'spa': 'wellness',
+    'beauty_salon': 'wellness',
+    'movie_theater': 'entertainment',
+    'night_club': 'nightlife',
+    'bar': 'nightlife',
+    'cafe': 'cafe'
+  };
+
+  const categories: string[] = [];
+  
+  for (const googleType of googleTypes) {
+    if (typeMapping[googleType]) {
+      categories.push(typeMapping[googleType]);
+    }
+  }
+  
+  return categories.length > 0 ? [...new Set(categories)] : ['other'];
+}
+
+function normalizeGoogleOpeningHours(googleHours: any): Record<string, any> | undefined {
+  if (!googleHours || !googleHours.periods) {
+    return undefined;
+  }
+
+  const normalized: Record<string, any> = {};
+
+  for (let day = 0; day < 7; day++) {
+    const dayPeriods = googleHours.periods.filter((period: any) => period.open.day === day);
+    
+    if (dayPeriods.length === 0) {
+      normalized[day] = {
+        is_closed: true,
+        open_time: null,
+        close_time: null
+      };
+    } else {
+      const period = dayPeriods[0]; // Take first period for simplicity
+      normalized[day] = {
+        is_closed: false,
+        open_time: formatTimeFromGoogle(period.open.time),
+        close_time: period.close ? formatTimeFromGoogle(period.close.time) : '23:59'
+      };
+    }
+  }
+
+  return normalized;
+}
+
+function formatTimeFromGoogle(googleTime: string): string {
+  // Google time format: "0900" -> "09:00"
+  if (googleTime.length === 4) {
+    return `${googleTime.substring(0, 2)}:${googleTime.substring(2, 4)}`;
+  }
+  return googleTime;
+}
+
+// API Rate Limiting and Management
+interface APIQuotaManager {
+  google_places: {
+    daily_quota: number;
+    used_today: number;
+    last_reset: string;
+  };
+  pexels: {
+    monthly_quota: number;
+    used_this_month: number;
+    last_reset: string;
+  };
+}
+
+async function checkAPIQuota(apiType: 'google_places' | 'pexels', supabase: any): Promise<boolean> {
+  // Get or create quota record
+  const { data: quota, error } = await supabase
+    .from('api_quotas')
+    .select('*')
+    .eq('api_type', apiType)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error checking API quota:', error);
+    return false; // Conservative approach - deny if quota check fails
+  }
+
+  const now = new Date();
+  const quotaLimits = {
+    google_places: { daily_limit: 1000, reset_period: 'daily' },
+    pexels: { monthly_limit: 20000, reset_period: 'monthly' }
+  };
+
+  if (!quota) {
+    // Create initial quota record
+    await supabase
+      .from('api_quotas')
+      .insert({
+        api_type: apiType,
+        used_count: 0,
+        last_reset: now.toISOString(),
+        quota_limit: quotaLimits[apiType].daily_limit || quotaLimits[apiType].monthly_limit
+      });
+    return true;
+  }
+
+  // Check if quota needs reset
+  const lastReset = new Date(quota.last_reset);
+  const needsReset = quotaLimits[apiType].reset_period === 'daily' 
+    ? now.getDate() !== lastReset.getDate() || now.getMonth() !== lastReset.getMonth()
+    : now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear();
+
+  if (needsReset) {
+    await supabase
+      .from('api_quotas')
+      .update({
+        used_count: 0,
+        last_reset: now.toISOString()
+      })
+      .eq('api_type', apiType);
+    return true;
+  }
+
+  // Check if under quota
+  return quota.used_count < quota.quota_limit;
+}
+
+async function incrementAPIUsage(apiType: 'google_places' | 'pexels', supabase: any): Promise<void> {
+  await supabase
+    .from('api_quotas')
+    .update({
+      used_count: supabase.raw('used_count + 1'),
+      last_used: new Date().toISOString()
+    })
+    .eq('api_type', apiType);
+}
+
 serve(async (req) => {
   // CORS対応
   if (req.method === 'OPTIONS') {
@@ -136,7 +775,15 @@ serve(async (req) => {
     // ルーティング
     switch (method) {
       case 'POST':
-        return await handleCreatePlace(req, supabaseClient, user.id);
+        if (pathSegments.length >= 2 && pathSegments[1] === 'rating') {
+          // POST /place-management/rating (場所評価追加)
+          return await handleCreatePlaceRating(req, supabaseClient, user.id);
+        } else if (pathSegments.length >= 2 && pathSegments[1] === 'images') {
+          // POST /place-management/images (画像アップロード)
+          return await handleUploadPlaceImage(req, supabaseClient, user.id);
+        } else {
+          return await handleCreatePlace(req, supabaseClient, user.id);
+        }
       
       case 'GET':
         if (pathSegments.length >= 2) {
@@ -146,6 +793,36 @@ serve(async (req) => {
           } else if (pathSegments[1] === 'list') {
             // GET /place-management/list (拡張場所一覧)
             return await handlePlacesList(req, supabaseClient, user.id);
+          } else if (pathSegments[1] === 'rating') {
+            if (pathSegments.length >= 3 && pathSegments[2] === 'stats') {
+              // GET /place-management/rating/stats (評価統計)
+              return await handleGetRatingStats(req, supabaseClient, user.id);
+            } else {
+              // GET /place-management/rating?place_id={place_id} (場所評価一覧)
+              return await handleGetPlaceRatings(req, supabaseClient, user.id);
+            }
+          } else if (pathSegments[1] === 'recommend') {
+            // GET /place-management/recommend (場所推薦)
+            return await handleGetPlaceRecommendations(req, supabaseClient, user.id);
+          } else if (pathSegments[1] === 'images') {
+            // GET /place-management/images (画像一覧取得)
+            return await handleGetPlaceImages(req, supabaseClient, user.id);
+          } else if (pathSegments[1] === 'stats') {
+            // GET /place-management/stats (場所統計)
+            return await handleGetPlaceStats(req, supabaseClient, user.id);
+          } else if (pathSegments[1] === 'external') {
+            if (pathSegments.length >= 3) {
+              if (pathSegments[2] === 'google-search') {
+                // GET /place-management/external/google-search (Google Places検索)
+                return await handleGooglePlacesSearch(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'google-details') {
+                // GET /place-management/external/google-details (Google Places詳細)
+                return await handleGooglePlaceDetails(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'pexels-images') {
+                // GET /place-management/external/pexels-images (Pexels画像検索)
+                return await handlePexelsImageSearch(req, supabaseClient, user.id);
+              }
+            }
           } else {
             // GET /place-management/{place_id}
             const placeId = pathSegments[1];
@@ -161,12 +838,28 @@ serve(async (req) => {
         }
       
       case 'PUT':
-        return await handleUpdatePlace(req, supabaseClient, user.id);
+        if (pathSegments.length >= 2 && pathSegments[1] === 'rating') {
+          // PUT /place-management/rating (場所評価更新)
+          return await handleUpdatePlaceRating(req, supabaseClient, user.id);
+        } else if (pathSegments.length >= 2 && pathSegments[1] === 'images') {
+          // PUT /place-management/images (画像情報更新)
+          return await handleUpdatePlaceImage(req, supabaseClient, user.id);
+        } else {
+          return await handleUpdatePlace(req, supabaseClient, user.id);
+        }
       
       case 'DELETE':
         if (pathSegments.length >= 2) {
-          const placeId = pathSegments[1];
-          return await handleDeletePlace(supabaseClient, user.id, placeId);
+          if (pathSegments[1] === 'rating') {
+            // DELETE /place-management/rating?place_id={place_id} (場所評価削除)
+            return await handleDeletePlaceRating(req, supabaseClient, user.id);
+          } else if (pathSegments[1] === 'images') {
+            // DELETE /place-management/images (画像削除)
+            return await handleDeletePlaceImage(req, supabaseClient, user.id);
+          } else {
+            const placeId = pathSegments[1];
+            return await handleDeletePlace(supabaseClient, user.id, placeId);
+          }
         } else {
           throw new Error('Place ID is required for deletion');
         }
@@ -2188,5 +2881,2949 @@ async function broadcastRealtimeDeletionNotification(
     console.log(`Realtime deletion notification broadcasted to trip-${tripId}`);
   } catch (error) {
     console.warn('Failed to broadcast realtime deletion notification:', error);
+  }
+}
+
+// =============================================================================
+// TODO-077: PLACE RATING API HANDLERS
+// =============================================================================
+
+// Handle creating a new place rating
+async function handleCreatePlaceRating(req: Request, supabase: any, userId: string) {
+  const requestData: PlaceRatingRequest = await req.json();
+  
+  // Validation
+  if (!requestData.place_id || !requestData.rating) {
+    throw new Error('place_id and rating are required');
+  }
+  
+  if (requestData.rating < 1.0 || requestData.rating > 5.0) {
+    throw new Error('Rating must be between 1.0 and 5.0');
+  }
+  
+  // Verify place exists and user has access
+  const { data: place, error: placeError } = await supabase
+    .from('places')
+    .select(`
+      *,
+      trip:trips!inner(
+        id, name,
+        trip_members!inner(user_id)
+      )
+    `)
+    .eq('id', requestData.place_id)
+    .eq('trip.trip_members.user_id', userId)
+    .single();
+
+  if (placeError || !place) {
+    return new Response(
+      JSON.stringify({ error: 'Place not found or access denied' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      }
+    );
+  }
+
+  // Check if user already rated this place
+  const existingRating = await getUserRatingForPlace(requestData.place_id, userId, supabase);
+  if (existingRating) {
+    return new Response(
+      JSON.stringify({ 
+        error: 'You have already rated this place. Use PUT to update your rating.',
+        existing_rating: existingRating
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 409,
+      }
+    );
+  }
+
+  // Create rating metadata
+  const ratingData = {
+    user_id: userId,
+    place_id: requestData.place_id,
+    rating: Math.round(requestData.rating * 10) / 10, // Round to 1 decimal
+    review_text: requestData.review_text || null,
+    categories: requestData.categories || [],
+    is_anonymous: requestData.is_anonymous || false,
+    created_at: new Date().toISOString(),
+    helpful_count: 0,
+    reported_count: 0
+  };
+
+  // Store rating in place metadata
+  await storeUserRating(requestData.place_id, ratingData, supabase);
+  
+  // Update place average rating
+  await updatePlaceAverageRating(requestData.place_id, supabase);
+
+  // Usage event tracking
+  await supabase
+    .from('usage_events')
+    .insert({
+      user_id: userId,
+      event_type: 'place_rated',
+      event_category: 'place_management',
+      trip_id: place.trip_id,
+      metadata: {
+        place_id: requestData.place_id,
+        place_name: place.name,
+        rating: requestData.rating,
+        has_review: !!requestData.review_text,
+        categories: requestData.categories || [],
+        is_anonymous: requestData.is_anonymous || false
+      }
+    });
+
+  return new Response(
+    JSON.stringify({ 
+      success: true, 
+      rating: ratingData,
+      message: 'Rating added successfully'
+    }),
+    {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 201,
+    }
+  );
+}
+
+// Handle getting place ratings
+async function handleGetPlaceRatings(req: Request, supabase: any, userId: string) {
+  const url = new URL(req.url);
+  const placeId = url.searchParams.get('place_id');
+  const includeMyRating = url.searchParams.get('include_my_rating') === 'true';
+  const includeStatistics = url.searchParams.get('include_statistics') === 'true';
+  const limit = parseInt(url.searchParams.get('limit') || '20');
+  const offset = parseInt(url.searchParams.get('offset') || '0');
+  
+  if (!placeId) {
+    throw new Error('place_id parameter is required');
+  }
+
+  // Verify place access
+  const { data: place, error: placeError } = await supabase
+    .from('places')
+    .select(`
+      *,
+      trip:trips!inner(
+        id, name,
+        trip_members!inner(user_id)
+      )
+    `)
+    .eq('id', placeId)
+    .eq('trip.trip_members.user_id', userId)
+    .single();
+
+  if (placeError || !place) {
+    return new Response(
+      JSON.stringify({ error: 'Place not found or access denied' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      }
+    );
+  }
+
+  // Get all ratings for this place
+  const allRatings = await getAllRatingsForPlace(placeId, supabase);
+  
+  // Filter and paginate
+  const publicRatings = allRatings
+    .filter(rating => !rating.is_anonymous || rating.user_id === userId)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(offset, offset + limit);
+
+  let myRating = null;
+  if (includeMyRating) {
+    myRating = await getUserRatingForPlace(placeId, userId, supabase);
+  }
+
+  let statistics = {};
+  if (includeStatistics) {
+    statistics = calculateRatingStatistics(allRatings);
+  }
+
+  // Usage event tracking
+  await supabase
+    .from('usage_events')
+    .insert({
+      user_id: userId,
+      event_type: 'place_ratings_viewed',
+      event_category: 'place_management',
+      trip_id: place.trip_id,
+      metadata: {
+        place_id: placeId,
+        place_name: place.name,
+        total_ratings: allRatings.length,
+        include_my_rating: includeMyRating,
+        include_statistics: includeStatistics
+      }
+    });
+
+  const response = {
+    success: true,
+    place_id: placeId,
+    place_name: place.name,
+    ratings: publicRatings,
+    total_count: allRatings.length,
+    returned_count: publicRatings.length,
+    pagination: {
+      limit,
+      offset,
+      has_more: allRatings.length > offset + limit
+    }
+  };
+
+  if (includeMyRating) {
+    response.my_rating = myRating;
+  }
+
+  if (includeStatistics) {
+    response.statistics = statistics;
+  }
+
+  return new Response(
+    JSON.stringify(response),
+    {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    }
+  );
+}
+
+// Handle updating place rating
+async function handleUpdatePlaceRating(req: Request, supabase: any, userId: string) {
+  const requestData: PlaceRatingUpdateRequest = await req.json();
+  
+  if (!requestData.place_id) {
+    throw new Error('place_id is required');
+  }
+  
+  if (requestData.rating && (requestData.rating < 1.0 || requestData.rating > 5.0)) {
+    throw new Error('Rating must be between 1.0 and 5.0');
+  }
+
+  // Verify place access
+  const { data: place, error: placeError } = await supabase
+    .from('places')
+    .select(`
+      *,
+      trip:trips!inner(
+        id, name,
+        trip_members!inner(user_id)
+      )
+    `)
+    .eq('id', requestData.place_id)
+    .eq('trip.trip_members.user_id', userId)
+    .single();
+
+  if (placeError || !place) {
+    return new Response(
+      JSON.stringify({ error: 'Place not found or access denied' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      }
+    );
+  }
+
+  // Check if user has existing rating
+  const existingRating = await getUserRatingForPlace(requestData.place_id, userId, supabase);
+  if (!existingRating) {
+    return new Response(
+      JSON.stringify({ error: 'No existing rating found. Use POST to create a new rating.' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      }
+    );
+  }
+
+  // Update rating data
+  const updatedRating = {
+    ...existingRating,
+    updated_at: new Date().toISOString()
+  };
+
+  if (requestData.rating !== undefined) {
+    updatedRating.rating = Math.round(requestData.rating * 10) / 10;
+  }
+  if (requestData.review_text !== undefined) {
+    updatedRating.review_text = requestData.review_text;
+  }
+  if (requestData.categories !== undefined) {
+    updatedRating.categories = requestData.categories;
+  }
+  if (requestData.is_anonymous !== undefined) {
+    updatedRating.is_anonymous = requestData.is_anonymous;
+  }
+
+  // Update stored rating
+  await updateUserRating(requestData.place_id, updatedRating, supabase);
+  
+  // Update place average rating
+  await updatePlaceAverageRating(requestData.place_id, supabase);
+
+  // Usage event tracking
+  await supabase
+    .from('usage_events')
+    .insert({
+      user_id: userId,
+      event_type: 'place_rating_updated',
+      event_category: 'place_management',
+      trip_id: place.trip_id,
+      metadata: {
+        place_id: requestData.place_id,
+        place_name: place.name,
+        previous_rating: existingRating.rating,
+        new_rating: updatedRating.rating,
+        fields_updated: Object.keys(requestData).filter(key => key !== 'place_id')
+      }
+    });
+
+  return new Response(
+    JSON.stringify({ 
+      success: true, 
+      rating: updatedRating,
+      message: 'Rating updated successfully'
+    }),
+    {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    }
+  );
+}
+
+// Handle deleting place rating
+async function handleDeletePlaceRating(req: Request, supabase: any, userId: string) {
+  const url = new URL(req.url);
+  const placeId = url.searchParams.get('place_id');
+  
+  if (!placeId) {
+    throw new Error('place_id parameter is required');
+  }
+
+  // Verify place access
+  const { data: place, error: placeError } = await supabase
+    .from('places')
+    .select(`
+      *,
+      trip:trips!inner(
+        id, name,
+        trip_members!inner(user_id)
+      )
+    `)
+    .eq('id', placeId)
+    .eq('trip.trip_members.user_id', userId)
+    .single();
+
+  if (placeError || !place) {
+    return new Response(
+      JSON.stringify({ error: 'Place not found or access denied' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      }
+    );
+  }
+
+  // Check if user has existing rating
+  const existingRating = await getUserRatingForPlace(placeId, userId, supabase);
+  if (!existingRating) {
+    return new Response(
+      JSON.stringify({ error: 'No rating found to delete' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      }
+    );
+  }
+
+  // Remove user rating
+  await removeUserRating(placeId, userId, supabase);
+  
+  // Update place average rating
+  await updatePlaceAverageRating(placeId, supabase);
+
+  // Usage event tracking
+  await supabase
+    .from('usage_events')
+    .insert({
+      user_id: userId,
+      event_type: 'place_rating_deleted',
+      event_category: 'place_management',
+      trip_id: place.trip_id,
+      metadata: {
+        place_id: placeId,
+        place_name: place.name,
+        deleted_rating: existingRating.rating,
+        had_review: !!existingRating.review_text
+      }
+    });
+
+  return new Response(
+    JSON.stringify({ 
+      success: true,
+      message: 'Rating deleted successfully'
+    }),
+    {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    }
+  );
+}
+
+// Handle getting rating statistics
+async function handleGetRatingStats(req: Request, supabase: any, userId: string) {
+  const url = new URL(req.url);
+  const placeId = url.searchParams.get('place_id');
+  const tripId = url.searchParams.get('trip_id');
+  const category = url.searchParams.get('category');
+  const includeReviews = url.searchParams.get('include_reviews') === 'true';
+  const includeDistribution = url.searchParams.get('include_rating_distribution') === 'true';
+  const includeCategoriesBreakdown = url.searchParams.get('include_categories_breakdown') === 'true';
+
+  if (!placeId && !tripId) {
+    throw new Error('Either place_id or trip_id parameter is required');
+  }
+
+  let places = [];
+
+  if (placeId) {
+    // Get specific place
+    const { data: place, error: placeError } = await supabase
+      .from('places')
+      .select(`
+        *,
+        trip:trips!inner(
+          id, name,
+          trip_members!inner(user_id)
+        )
+      `)
+      .eq('id', placeId)
+      .eq('trip.trip_members.user_id', userId)
+      .single();
+
+    if (placeError || !place) {
+      return new Response(
+        JSON.stringify({ error: 'Place not found or access denied' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        }
+      );
+    }
+
+    places = [place];
+  } else if (tripId) {
+    // Get trip places
+    const { data: tripPlaces, error: tripError } = await supabase
+      .from('places')
+      .select(`
+        *,
+        trip:trips!inner(
+          id, name,
+          trip_members!inner(user_id)
+        )
+      `)
+      .eq('trip_id', tripId)
+      .eq('trip.trip_members.user_id', userId);
+
+    if (tripError) {
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch trip places' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
+
+    places = tripPlaces || [];
+
+    if (category) {
+      places = places.filter(place => place.category === category);
+    }
+  }
+
+  // Collect all ratings for these places
+  const allRatings = [];
+  const placeRatingsMap = {};
+
+  for (const place of places) {
+    const ratings = await getAllRatingsForPlace(place.id, supabase);
+    allRatings.push(...ratings);
+    placeRatingsMap[place.id] = {
+      place_name: place.name,
+      place_category: place.category,
+      ratings: ratings,
+      statistics: calculateRatingStatistics(ratings)
+    };
+  }
+
+  // Calculate overall statistics
+  const overallStats = calculateRatingStatistics(allRatings);
+  
+  // Calculate category breakdown if requested
+  let categoriesBreakdown = {};
+  if (includeCategoriesBreakdown) {
+    categoriesBreakdown = calculateCategoriesBreakdown(allRatings);
+  }
+
+  // Get sample reviews if requested
+  let sampleReviews = [];
+  if (includeReviews) {
+    sampleReviews = allRatings
+      .filter(rating => rating.review_text && rating.review_text.trim())
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 10)
+      .map(rating => ({
+        place_id: rating.place_id,
+        rating: rating.rating,
+        review_text: rating.review_text,
+        categories: rating.categories,
+        created_at: rating.created_at,
+        is_anonymous: rating.is_anonymous,
+        author_name: rating.is_anonymous ? 'Anonymous' : rating.user_name
+      }));
+  }
+
+  // Usage event tracking
+  await supabase
+    .from('usage_events')
+    .insert({
+      user_id: userId,
+      event_type: 'rating_stats_viewed',
+      event_category: 'place_management',
+      trip_id: tripId,
+      metadata: {
+        place_id: placeId,
+        trip_id: tripId,
+        category: category,
+        total_places: places.length,
+        total_ratings: allRatings.length,
+        include_reviews: includeReviews,
+        include_distribution: includeDistribution,
+        include_categories_breakdown: includeCategoriesBreakdown
+      }
+    });
+
+  const response = {
+    success: true,
+    overall_statistics: overallStats,
+    places_count: places.length,
+    total_ratings_count: allRatings.length
+  };
+
+  if (placeId) {
+    response.place_statistics = placeRatingsMap[placeId];
+  } else {
+    response.places_statistics = placeRatingsMap;
+  }
+
+  if (includeDistribution) {
+    response.rating_distribution = overallStats.rating_distribution;
+  }
+
+  if (includeCategoriesBreakdown) {
+    response.categories_breakdown = categoriesBreakdown;
+  }
+
+  if (includeReviews) {
+    response.sample_reviews = sampleReviews;
+  }
+
+  return new Response(
+    JSON.stringify(response),
+    {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    }
+  );
+}
+
+// =============================================================================
+// RATING HELPER FUNCTIONS
+// =============================================================================
+
+// Store user rating in place metadata
+async function storeUserRating(placeId: string, ratingData: any, supabase: any): Promise<void> {
+  // Get current place ratings metadata
+  const { data: place, error } = await supabase
+    .from('places')
+    .select('metadata')
+    .eq('id', placeId)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to fetch place metadata: ${error.message}`);
+  }
+
+  const metadata = place.metadata || {};
+  const ratings = metadata.user_ratings || {};
+  
+  // Add/update user rating
+  ratings[ratingData.user_id] = ratingData;
+  
+  // Update place metadata
+  const { error: updateError } = await supabase
+    .from('places')
+    .update({ 
+      metadata: { ...metadata, user_ratings: ratings },
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', placeId);
+
+  if (updateError) {
+    throw new Error(`Failed to store rating: ${updateError.message}`);
+  }
+}
+
+// Get user rating for a place
+async function getUserRatingForPlace(placeId: string, userId: string, supabase: any): Promise<any> {
+  const { data: place, error } = await supabase
+    .from('places')
+    .select('metadata')
+    .eq('id', placeId)
+    .single();
+
+  if (error || !place) {
+    return null;
+  }
+
+  const ratings = place.metadata?.user_ratings || {};
+  return ratings[userId] || null;
+}
+
+// Get all ratings for a place
+async function getAllRatingsForPlace(placeId: string, supabase: any): Promise<any[]> {
+  const { data: place, error } = await supabase
+    .from('places')
+    .select('metadata')
+    .eq('id', placeId)
+    .single();
+
+  if (error || !place) {
+    return [];
+  }
+
+  const ratings = place.metadata?.user_ratings || {};
+  return Object.values(ratings);
+}
+
+// Update user rating
+async function updateUserRating(placeId: string, updatedRating: any, supabase: any): Promise<void> {
+  const { data: place, error } = await supabase
+    .from('places')
+    .select('metadata')
+    .eq('id', placeId)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to fetch place metadata: ${error.message}`);
+  }
+
+  const metadata = place.metadata || {};
+  const ratings = metadata.user_ratings || {};
+  
+  // Update user rating
+  ratings[updatedRating.user_id] = updatedRating;
+  
+  // Update place metadata
+  const { error: updateError } = await supabase
+    .from('places')
+    .update({ 
+      metadata: { ...metadata, user_ratings: ratings },
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', placeId);
+
+  if (updateError) {
+    throw new Error(`Failed to update rating: ${updateError.message}`);
+  }
+}
+
+// Remove user rating
+async function removeUserRating(placeId: string, userId: string, supabase: any): Promise<void> {
+  const { data: place, error } = await supabase
+    .from('places')
+    .select('metadata')
+    .eq('id', placeId)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to fetch place metadata: ${error.message}`);
+  }
+
+  const metadata = place.metadata || {};
+  const ratings = metadata.user_ratings || {};
+  
+  // Remove user rating
+  delete ratings[userId];
+  
+  // Update place metadata
+  const { error: updateError } = await supabase
+    .from('places')
+    .update({ 
+      metadata: { ...metadata, user_ratings: ratings },
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', placeId);
+
+  if (updateError) {
+    throw new Error(`Failed to remove rating: ${updateError.message}`);
+  }
+}
+
+// Update place average rating
+async function updatePlaceAverageRating(placeId: string, supabase: any): Promise<void> {
+  const allRatings = await getAllRatingsForPlace(placeId, supabase);
+  
+  let averageRating = null;
+  if (allRatings.length > 0) {
+    const totalRating = allRatings.reduce((sum, rating) => sum + rating.rating, 0);
+    averageRating = Math.round((totalRating / allRatings.length) * 10) / 10; // Round to 1 decimal
+  }
+
+  const { error } = await supabase
+    .from('places')
+    .update({ 
+      rating: averageRating,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', placeId);
+
+  if (error) {
+    console.warn(`Failed to update place average rating: ${error.message}`);
+  }
+}
+
+// Calculate rating statistics
+function calculateRatingStatistics(ratings: any[]) {
+  if (ratings.length === 0) {
+    return {
+      total_ratings: 0,
+      average_rating: 0,
+      rating_distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      reviews_count: 0,
+      anonymous_count: 0
+    };
+  }
+
+  const totalRating = ratings.reduce((sum, rating) => sum + rating.rating, 0);
+  const averageRating = Math.round((totalRating / ratings.length) * 10) / 10;
+  
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  ratings.forEach(rating => {
+    const roundedRating = Math.round(rating.rating);
+    distribution[roundedRating] = (distribution[roundedRating] || 0) + 1;
+  });
+
+  const reviewsCount = ratings.filter(rating => rating.review_text && rating.review_text.trim()).length;
+  const anonymousCount = ratings.filter(rating => rating.is_anonymous).length;
+
+  return {
+    total_ratings: ratings.length,
+    average_rating: averageRating,
+    rating_distribution: distribution,
+    reviews_count: reviewsCount,
+    anonymous_count: anonymousCount,
+    latest_rating_date: ratings.length > 0 ? 
+      Math.max(...ratings.map(r => new Date(r.created_at).getTime())) : null
+  };
+}
+
+// Calculate categories breakdown
+function calculateCategoriesBreakdown(ratings: any[]) {
+  const breakdown = {};
+  
+  ratings.forEach(rating => {
+    if (rating.categories && Array.isArray(rating.categories)) {
+      rating.categories.forEach(category => {
+        if (!breakdown[category]) {
+          breakdown[category] = {
+            count: 0,
+            total_rating: 0,
+            average_rating: 0
+          };
+        }
+        breakdown[category].count++;
+        breakdown[category].total_rating += rating.rating;
+        breakdown[category].average_rating = Math.round((breakdown[category].total_rating / breakdown[category].count) * 10) / 10;
+      });
+    }
+  });
+
+  return breakdown;
+}
+
+// =============================================================================
+// TODO-078: PLACE RECOMMENDATION API HANDLERS
+// =============================================================================
+
+// Handle getting place recommendations
+async function handleGetPlaceRecommendations(req: Request, supabase: any, userId: string) {
+  const url = new URL(req.url);
+  
+  // Parse query parameters
+  const requestParams: PlaceRecommendationRequest = {
+    trip_id: url.searchParams.get('trip_id') || '',
+    limit: parseInt(url.searchParams.get('limit') || '10'),
+    category: url.searchParams.get('category') || undefined,
+    price_level: url.searchParams.get('price_level') ? parseInt(url.searchParams.get('price_level')!) : undefined,
+    include_external: url.searchParams.get('include_external') === 'true',
+    recommendation_type: (url.searchParams.get('recommendation_type') as any) || 'hybrid',
+    exclude_existing: url.searchParams.get('exclude_existing') !== 'false' // Default true
+  };
+
+  // Parse location if provided
+  if (url.searchParams.get('latitude') && url.searchParams.get('longitude')) {
+    requestParams.location = {
+      latitude: parseFloat(url.searchParams.get('latitude')!),
+      longitude: parseFloat(url.searchParams.get('longitude')!),
+      radius_km: parseFloat(url.searchParams.get('radius_km') || '5')
+    };
+  }
+
+  // Validation
+  if (!requestParams.trip_id) {
+    throw new Error('trip_id parameter is required');
+  }
+
+  if (requestParams.limit < 1 || requestParams.limit > 50) {
+    throw new Error('limit must be between 1 and 50');
+  }
+
+  // Verify trip access
+  const { data: trip, error: tripError } = await supabase
+    .from('trips')
+    .select(`
+      *,
+      trip_members!inner(user_id, role)
+    `)
+    .eq('id', requestParams.trip_id)
+    .eq('trip_members.user_id', userId)
+    .single();
+
+  if (tripError || !trip) {
+    return new Response(
+      JSON.stringify({ error: 'Trip not found or access denied' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      }
+    );
+  }
+
+  // Get user preferences and team analysis
+  const userPreferences = await analyzeUserPreferences(userId, supabase);
+  const teamPreferences = await analyzeTeamPreferences(requestParams.trip_id, supabase);
+  const existingPlaces = await getExistingTripPlaces(requestParams.trip_id, supabase);
+
+  // Generate recommendations based on type
+  let recommendations: RecommendedPlace[] = [];
+
+  switch (requestParams.recommendation_type) {
+    case 'individual':
+      recommendations = await generateIndividualRecommendations(
+        requestParams, userPreferences, existingPlaces, supabase
+      );
+      break;
+    case 'team':
+      recommendations = await generateTeamRecommendations(
+        requestParams, teamPreferences, existingPlaces, supabase
+      );
+      break;
+    case 'hybrid':
+    default:
+      recommendations = await generateHybridRecommendations(
+        requestParams, userPreferences, teamPreferences, existingPlaces, supabase
+      );
+      break;
+  }
+
+  // Apply filters and sorting
+  recommendations = applyRecommendationFilters(recommendations, requestParams);
+  recommendations = sortRecommendationsByScore(recommendations);
+  recommendations = recommendations.slice(0, requestParams.limit);
+
+  // Add external recommendations if requested
+  if (requestParams.include_external && recommendations.length < requestParams.limit) {
+    const externalRecommendations = await getExternalRecommendations(
+      requestParams, userPreferences, teamPreferences, requestParams.limit - recommendations.length
+    );
+    recommendations.push(...externalRecommendations);
+  }
+
+  // Usage event tracking
+  await supabase
+    .from('usage_events')
+    .insert({
+      user_id: userId,
+      event_type: 'place_recommendations_requested',
+      event_category: 'place_management',
+      trip_id: requestParams.trip_id,
+      metadata: {
+        trip_id: requestParams.trip_id,
+        recommendation_type: requestParams.recommendation_type,
+        category_filter: requestParams.category,
+        location_provided: !!requestParams.location,
+        include_external: requestParams.include_external,
+        requested_limit: requestParams.limit,
+        returned_count: recommendations.length,
+        exclude_existing: requestParams.exclude_existing
+      }
+    });
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      trip_id: requestParams.trip_id,
+      trip_name: trip.name,
+      recommendation_type: requestParams.recommendation_type,
+      recommendations: recommendations,
+      total_count: recommendations.length,
+      parameters: {
+        limit: requestParams.limit,
+        category: requestParams.category,
+        price_level: requestParams.price_level,
+        include_external: requestParams.include_external,
+        exclude_existing: requestParams.exclude_existing,
+        location_filter: requestParams.location
+      },
+      user_preferences_summary: {
+        favorite_categories: userPreferences.favorite_categories,
+        average_wish_level: userPreferences.average_wish_level,
+        preferred_price_level: userPreferences.preferred_price_level
+      },
+      team_preferences_summary: {
+        popular_categories: teamPreferences.popular_categories,
+        team_average_rating: teamPreferences.team_average_rating,
+        consensus_categories: teamPreferences.consensus_categories
+      }
+    }),
+    {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    }
+  );
+}
+
+// =============================================================================
+// RECOMMENDATION ALGORITHM FUNCTIONS
+// =============================================================================
+
+// Analyze individual user preferences
+async function analyzeUserPreferences(userId: string, supabase: any) {
+  // Get user's place history across all trips they're part of
+  const { data: userTrips, error: tripsError } = await supabase
+    .from('trip_members')
+    .select('trip_id')
+    .eq('user_id', userId);
+
+  if (tripsError) {
+    console.warn('Failed to fetch user trips for preferences:', tripsError);
+    return getDefaultUserPreferences();
+  }
+
+  const tripIds = userTrips.map((tm: any) => tm.trip_id);
+
+  if (tripIds.length === 0) {
+    return getDefaultUserPreferences();
+  }
+
+  // Get user's places and their ratings
+  const { data: userPlaces, error: placesError } = await supabase
+    .from('places')
+    .select('*')
+    .eq('user_id', userId)
+    .in('trip_id', tripIds);
+
+  if (placesError) {
+    console.warn('Failed to fetch user places for preferences:', placesError);
+    return getDefaultUserPreferences();
+  }
+
+  // Analyze preferences
+  const categoryPreferences = {};
+  const pricePreferences = {};
+  let totalWishLevel = 0;
+  let totalPlaces = userPlaces.length;
+
+  userPlaces.forEach((place: any) => {
+    // Category analysis
+    categoryPreferences[place.category] = (categoryPreferences[place.category] || 0) + place.wish_level;
+    
+    // Price level analysis
+    if (place.price_level) {
+      pricePreferences[place.price_level] = (pricePreferences[place.price_level] || 0) + 1;
+    }
+    
+    totalWishLevel += place.wish_level;
+  });
+
+  // Calculate favorite categories (normalize by count and weight by wish level)
+  const favoriteCategories = Object.entries(categoryPreferences)
+    .map(([category, totalWish]: [string, any]) => {
+      const count = userPlaces.filter(p => p.category === category).length;
+      const avgWish = totalWish / count;
+      return { category, avg_wish: avgWish, count, score: avgWish * Math.log(count + 1) };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  // Calculate preferred price level
+  const preferredPriceLevel = Object.entries(pricePreferences)
+    .sort(([,a], [,b]) => (b as number) - (a as number))[0]?.[0] || null;
+
+  return {
+    favorite_categories: favoriteCategories,
+    average_wish_level: totalPlaces > 0 ? totalWishLevel / totalPlaces : 3,
+    preferred_price_level: preferredPriceLevel ? parseInt(preferredPriceLevel) : null,
+    total_places_added: totalPlaces,
+    diversity_score: Object.keys(categoryPreferences).length
+  };
+}
+
+// Analyze team preferences for a trip
+async function analyzeTeamPreferences(tripId: string, supabase: any) {
+  // Get all trip members
+  const { data: tripMembers, error: membersError } = await supabase
+    .from('trip_members')
+    .select('user_id')
+    .eq('trip_id', tripId);
+
+  if (membersError) {
+    console.warn('Failed to fetch trip members for team preferences:', membersError);
+    return getDefaultTeamPreferences();
+  }
+
+  // Get all places in this trip with ratings
+  const { data: tripPlaces, error: placesError } = await supabase
+    .from('places')
+    .select('*')
+    .eq('trip_id', tripId);
+
+  if (placesError) {
+    console.warn('Failed to fetch trip places for team preferences:', placesError);
+    return getDefaultTeamPreferences();
+  }
+
+  // Analyze team patterns
+  const categoryConsensus = {};
+  const userContributions = {};
+  let totalRating = 0;
+  let ratedPlacesCount = 0;
+
+  tripPlaces.forEach((place: any) => {
+    // Category consensus analysis
+    const category = place.category;
+    if (!categoryConsensus[category]) {
+      categoryConsensus[category] = { count: 0, total_wish: 0, contributors: new Set() };
+    }
+    categoryConsensus[category].count++;
+    categoryConsensus[category].total_wish += place.wish_level;
+    categoryConsensus[category].contributors.add(place.user_id);
+
+    // User contribution analysis
+    userContributions[place.user_id] = (userContributions[place.user_id] || 0) + 1;
+
+    // Rating analysis
+    if (place.rating) {
+      totalRating += place.rating;
+      ratedPlacesCount++;
+    }
+  });
+
+  // Calculate popular categories
+  const popularCategories = Object.entries(categoryConsensus)
+    .map(([category, data]: [string, any]) => ({
+      category,
+      count: data.count,
+      avg_wish: data.total_wish / data.count,
+      contributor_count: data.contributors.size,
+      consensus_score: (data.total_wish / data.count) * (data.contributors.size / tripMembers.length)
+    }))
+    .sort((a, b) => b.consensus_score - a.consensus_score);
+
+  // Calculate consensus categories (categories that multiple members contributed to)
+  const consensusCategories = popularCategories
+    .filter(cat => cat.contributor_count > 1)
+    .slice(0, 3);
+
+  return {
+    popular_categories: popularCategories.slice(0, 5),
+    consensus_categories: consensusCategories,
+    team_average_rating: ratedPlacesCount > 0 ? totalRating / ratedPlacesCount : null,
+    member_count: tripMembers.length,
+    total_places: tripPlaces.length,
+    collaboration_score: Object.values(userContributions).reduce((sum: number, count: any) => sum + Math.min(count, 3), 0)
+  };
+}
+
+// Get existing places in trip
+async function getExistingTripPlaces(tripId: string, supabase: any) {
+  const { data: places, error } = await supabase
+    .from('places')
+    .select('id, name, category, latitude, longitude')
+    .eq('trip_id', tripId);
+
+  if (error) {
+    console.warn('Failed to fetch existing trip places:', error);
+    return [];
+  }
+
+  return places || [];
+}
+
+// Generate individual-based recommendations
+async function generateIndividualRecommendations(
+  params: PlaceRecommendationRequest,
+  userPreferences: any,
+  existingPlaces: any[],
+  supabase: any
+): Promise<RecommendedPlace[]> {
+  const recommendations: RecommendedPlace[] = [];
+
+  // Use user's favorite categories to generate recommendations
+  for (const categoryPref of userPreferences.favorite_categories.slice(0, 3)) {
+    const categoryRecommendations = await generateCategoryBasedRecommendations(
+      categoryPref.category,
+      params,
+      userPreferences,
+      existingPlaces,
+      'individual',
+      supabase
+    );
+    recommendations.push(...categoryRecommendations);
+  }
+
+  return recommendations;
+}
+
+// Generate team-based recommendations
+async function generateTeamRecommendations(
+  params: PlaceRecommendationRequest,
+  teamPreferences: any,
+  existingPlaces: any[],
+  supabase: any
+): Promise<RecommendedPlace[]> {
+  const recommendations: RecommendedPlace[] = [];
+
+  // Use team's consensus categories
+  for (const categoryPref of teamPreferences.consensus_categories) {
+    const categoryRecommendations = await generateCategoryBasedRecommendations(
+      categoryPref.category,
+      params,
+      teamPreferences,
+      existingPlaces,
+      'team',
+      supabase
+    );
+    recommendations.push(...categoryRecommendations);
+  }
+
+  return recommendations;
+}
+
+// Generate hybrid recommendations
+async function generateHybridRecommendations(
+  params: PlaceRecommendationRequest,
+  userPreferences: any,
+  teamPreferences: any,
+  existingPlaces: any[],
+  supabase: any
+): Promise<RecommendedPlace[]> {
+  const recommendations: RecommendedPlace[] = [];
+
+  // Combine individual and team preferences
+  const individualRecs = await generateIndividualRecommendations(params, userPreferences, existingPlaces, supabase);
+  const teamRecs = await generateTeamRecommendations(params, teamPreferences, existingPlaces, supabase);
+
+  // Weight and merge recommendations
+  individualRecs.forEach(rec => {
+    rec.recommendation_factors.team_compatibility *= 0.3; // Reduce team weight for individual recs
+    rec.confidence_score *= 0.7; // Adjust confidence
+  });
+
+  teamRecs.forEach(rec => {
+    rec.recommendation_factors.category_preference *= 0.7; // Reduce individual weight for team recs
+    rec.confidence_score *= 0.8; // Adjust confidence
+  });
+
+  recommendations.push(...individualRecs, ...teamRecs);
+
+  // Remove duplicates and merge scores
+  const uniqueRecommendations = [];
+  const seenPlaces = new Set();
+
+  recommendations.forEach(rec => {
+    const key = `${rec.place_name}-${rec.category}`;
+    if (!seenPlaces.has(key)) {
+      seenPlaces.add(key);
+      uniqueRecommendations.push(rec);
+    }
+  });
+
+  return uniqueRecommendations;
+}
+
+// Generate category-based recommendations
+async function generateCategoryBasedRecommendations(
+  category: string,
+  params: PlaceRecommendationRequest,
+  preferences: any,
+  existingPlaces: any[],
+  type: 'individual' | 'team',
+  supabase: any
+): Promise<RecommendedPlace[]> {
+  const recommendations: RecommendedPlace[] = [];
+
+  // Get popular places from database in this category
+  const { data: popularPlaces, error } = await supabase
+    .from('places')
+    .select(`
+      name, category, rating, price_level, address, latitude, longitude,
+      user_id, trip_id
+    `)
+    .eq('category', category)
+    .not('rating', 'is', null)
+    .gte('rating', 3.5)
+    .order('rating', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.warn(`Failed to fetch popular places for category ${category}:`, error);
+    return [];
+  }
+
+  // Filter out existing places if requested
+  let filteredPlaces = popularPlaces || [];
+  if (params.exclude_existing) {
+    const existingNames = new Set(existingPlaces.map(p => p.name.toLowerCase()));
+    filteredPlaces = filteredPlaces.filter(p => !existingNames.has(p.name.toLowerCase()));
+  }
+
+  // Calculate recommendation scores
+  filteredPlaces.forEach((place: any) => {
+    const factors = calculateRecommendationFactors(place, preferences, type, params);
+    const confidenceScore = calculateConfidenceScore(factors);
+    
+    if (confidenceScore > 0.3) { // Only include decent recommendations
+      const reason = generateRecommendationReason(place, factors, type, preferences);
+      
+      recommendations.push({
+        place_name: place.name,
+        category: place.category,
+        predicted_rating: Math.min(5.0, (place.rating || 3.0) + (factors.category_preference * 0.5)),
+        recommendation_reason: reason,
+        confidence_score: confidenceScore,
+        source: 'internal',
+        external_data: {
+          address: place.address,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          price_level: place.price_level,
+          rating: place.rating
+        },
+        recommendation_factors: factors
+      });
+    }
+  });
+
+  return recommendations.slice(0, 5); // Limit per category
+}
+
+// Calculate recommendation factors
+function calculateRecommendationFactors(place: any, preferences: any, type: string, params: PlaceRecommendationRequest) {
+  const factors = {
+    category_preference: 0,
+    team_compatibility: 0,
+    popularity_score: 0,
+    location_relevance: 0,
+    price_match: 0
+  };
+
+  // Category preference (based on user/team history)
+  if (type === 'individual' && preferences.favorite_categories) {
+    const categoryPref = preferences.favorite_categories.find((c: any) => c.category === place.category);
+    factors.category_preference = categoryPref ? Math.min(1.0, categoryPref.score / 5) : 0.3;
+  } else if (type === 'team' && preferences.popular_categories) {
+    const categoryPref = preferences.popular_categories.find((c: any) => c.category === place.category);
+    factors.team_compatibility = categoryPref ? Math.min(1.0, categoryPref.consensus_score / 5) : 0.3;
+  }
+
+  // Popularity score (based on rating)
+  factors.popularity_score = place.rating ? Math.min(1.0, place.rating / 5) : 0.5;
+
+  // Location relevance (if location provided)
+  if (params.location && place.latitude && place.longitude) {
+    const distance = calculateHaversineDistance(
+      params.location.latitude, params.location.longitude,
+      place.latitude, place.longitude
+    );
+    factors.location_relevance = Math.max(0, 1 - (distance / (params.location.radius_km || 5)));
+  } else {
+    factors.location_relevance = 0.5; // Neutral if no location data
+  }
+
+  // Price match
+  if (params.price_level && place.price_level) {
+    const priceDiff = Math.abs(params.price_level - place.price_level);
+    factors.price_match = Math.max(0, 1 - (priceDiff / 3));
+  } else if (preferences.preferred_price_level && place.price_level) {
+    const priceDiff = Math.abs(preferences.preferred_price_level - place.price_level);
+    factors.price_match = Math.max(0, 1 - (priceDiff / 3));
+  } else {
+    factors.price_match = 0.5; // Neutral if no price data
+  }
+
+  return factors;
+}
+
+// Calculate overall confidence score
+function calculateConfidenceScore(factors: any): number {
+  const weights = {
+    category_preference: 0.3,
+    team_compatibility: 0.25,
+    popularity_score: 0.25,
+    location_relevance: 0.15,
+    price_match: 0.05
+  };
+
+  return Object.entries(factors).reduce((score, [factor, value]) => {
+    return score + ((value as number) * weights[factor]);
+  }, 0);
+}
+
+// Generate recommendation reason
+function generateRecommendationReason(place: any, factors: any, type: string, preferences: any): string {
+  const reasons = [];
+
+  if (factors.category_preference > 0.7) {
+    reasons.push(`matches your preference for ${place.category} places`);
+  } else if (factors.team_compatibility > 0.7) {
+    reasons.push(`popular choice among your team for ${place.category} places`);
+  }
+
+  if (factors.popularity_score > 0.8) {
+    reasons.push(`highly rated (${place.rating}/5.0)`);
+  }
+
+  if (factors.location_relevance > 0.8) {
+    reasons.push('conveniently located near your specified area');
+  }
+
+  if (factors.price_match > 0.8) {
+    reasons.push('matches your preferred price range');
+  }
+
+  if (reasons.length === 0) {
+    reasons.push(`recommended ${place.category} destination`);
+  }
+
+  return `This place is ${reasons.join(' and ')}.`;
+}
+
+// Get external recommendations (mock implementation)
+async function getExternalRecommendations(
+  params: PlaceRecommendationRequest,
+  userPreferences: any,
+  teamPreferences: any,
+  limit: number
+): Promise<RecommendedPlace[]> {
+  // Mock external recommendations (in production, this would call Google Places API, etc.)
+  const mockExternalPlaces = [
+    {
+      place_name: 'Tokyo National Museum',
+      category: 'Museum',
+      rating: 4.3,
+      price_level: 2,
+      address: '13-9 Uenokoen, Taito City, Tokyo',
+      latitude: 35.7190,
+      longitude: 139.7769,
+      place_id: 'ChIJ1234567890'
+    },
+    {
+      place_name: 'Shibuya Sky',
+      category: 'Observation Deck',
+      rating: 4.5,
+      price_level: 3,
+      address: '2-24-12 Shibuya, Shibuya City, Tokyo',
+      latitude: 35.6581,
+      longitude: 139.7029,
+      place_id: 'ChIJ0987654321'
+    },
+    {
+      place_name: 'Tsukiji Outer Market',
+      category: 'Market',
+      rating: 4.2,
+      price_level: 2,
+      address: '4 Chome Tsukiji, Chuo City, Tokyo',
+      latitude: 35.6662,
+      longitude: 139.7706,
+      place_id: 'ChIJ1122334455'
+    }
+  ];
+
+  const externalRecommendations: RecommendedPlace[] = [];
+
+  mockExternalPlaces.slice(0, limit).forEach(place => {
+    const factors = calculateRecommendationFactors(place, userPreferences, 'individual', params);
+    const confidenceScore = calculateConfidenceScore(factors) * 0.8; // Lower confidence for external
+
+    externalRecommendations.push({
+      place_name: place.place_name,
+      category: place.category,
+      predicted_rating: place.rating,
+      recommendation_reason: `Popular ${place.category.toLowerCase()} destination with high ratings`,
+      confidence_score: confidenceScore,
+      source: 'external',
+      external_data: {
+        place_id: place.place_id,
+        address: place.address,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        price_level: place.price_level,
+        rating: place.rating,
+        photos: []
+      },
+      recommendation_factors: factors
+    });
+  });
+
+  return externalRecommendations;
+}
+
+// Apply filters to recommendations
+function applyRecommendationFilters(recommendations: RecommendedPlace[], params: PlaceRecommendationRequest): RecommendedPlace[] {
+  let filtered = recommendations;
+
+  // Category filter
+  if (params.category) {
+    filtered = filtered.filter(rec => rec.category === params.category);
+  }
+
+  // Price level filter
+  if (params.price_level && params.price_level > 0) {
+    filtered = filtered.filter(rec => {
+      const placePrice = rec.external_data?.price_level;
+      return !placePrice || Math.abs(placePrice - params.price_level!) <= 1;
+    });
+  }
+
+  // Location filter
+  if (params.location) {
+    filtered = filtered.filter(rec => {
+      if (!rec.external_data?.latitude || !rec.external_data?.longitude) return true;
+      
+      const distance = calculateHaversineDistance(
+        params.location!.latitude, params.location!.longitude,
+        rec.external_data.latitude, rec.external_data.longitude
+      );
+      
+      return distance <= (params.location!.radius_km || 5);
+    });
+  }
+
+  return filtered;
+}
+
+// Sort recommendations by confidence score
+function sortRecommendationsByScore(recommendations: RecommendedPlace[]): RecommendedPlace[] {
+  return recommendations.sort((a, b) => b.confidence_score - a.confidence_score);
+}
+
+// Default user preferences
+function getDefaultUserPreferences() {
+  return {
+    favorite_categories: [
+      { category: 'Restaurant', avg_wish: 3.5, count: 0, score: 3.5 },
+      { category: 'Landmark', avg_wish: 3.0, count: 0, score: 3.0 }
+    ],
+    average_wish_level: 3.0,
+    preferred_price_level: null,
+    total_places_added: 0,
+    diversity_score: 0
+  };
+}
+
+// Default team preferences
+function getDefaultTeamPreferences() {
+  return {
+    popular_categories: [
+      { category: 'Restaurant', count: 0, avg_wish: 3.0, contributor_count: 0, consensus_score: 3.0 }
+    ],
+    consensus_categories: [],
+    team_average_rating: null,
+    member_count: 1,
+    total_places: 0,
+    collaboration_score: 0
+  };
+}
+
+// TODO-079: Place Image Management API implementation
+
+/**
+ * Upload place image to Supabase Storage
+ * POST /place-management/images
+ */
+async function handleUploadPlaceImage(
+  req: Request, 
+  supabaseClient: any, 
+  userId: string
+): Promise<Response> {
+  try {
+    const requestData: PlaceImageUploadRequest = await req.json();
+    
+    // Validate required fields
+    if (!requestData.place_id || !requestData.image_data) {
+      throw new Error('place_id and image_data are required');
+    }
+
+    // Verify user has access to the place
+    const { data: place, error: placeError } = await supabaseClient
+      .from('places')
+      .select(`
+        id, 
+        name, 
+        trip_id,
+        trip:trips!inner(
+          id,
+          owner_id,
+          trip_members!inner(user_id, role)
+        )
+      `)
+      .eq('id', requestData.place_id)
+      .single();
+
+    if (placeError || !place) {
+      throw new Error('Place not found or access denied');
+    }
+
+    // Check if user is a member of the trip
+    const isMember = place.trip.trip_members.some((member: any) => member.user_id === userId);
+    if (!isMember) {
+      throw new Error('You are not a member of this trip');
+    }
+
+    // Decode base64 image data
+    const imageBuffer = Uint8Array.from(atob(requestData.image_data), c => c.charCodeAt(0));
+    
+    // Generate unique filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileExtension = getImageFileExtension(requestData.image_data);
+    const fileName = `${requestData.place_id}/${timestamp}-${userId}${fileExtension}`;
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from('place-images')
+      .upload(fileName, imageBuffer, {
+        contentType: getImageMimeType(requestData.image_data),
+        upsert: false
+      });
+
+    if (uploadError) {
+      throw new Error(`Failed to upload image: ${uploadError.message}`);
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabaseClient.storage
+      .from('place-images')
+      .getPublicUrl(fileName);
+
+    // If this is marked as primary, unset other primary images for this place
+    if (requestData.is_primary) {
+      await supabaseClient
+        .from('place_images')
+        .update({ is_primary: false })
+        .eq('place_id', requestData.place_id);
+    }
+
+    // Save image metadata to database
+    const { data: imageRecord, error: dbError } = await supabaseClient
+      .from('place_images')
+      .insert({
+        place_id: requestData.place_id,
+        image_url: publicUrl,
+        image_path: fileName,
+        image_name: requestData.image_name || `Image for ${place.name}`,
+        image_description: requestData.image_description,
+        is_primary: requestData.is_primary || false,
+        uploaded_by: userId,
+        file_size: imageBuffer.length,
+        content_type: getImageMimeType(requestData.image_data)
+      })
+      .select()
+      .single();
+
+    if (dbError) {
+      // If database insertion fails, clean up uploaded file
+      await supabaseClient.storage
+        .from('place-images')
+        .remove([fileName]);
+      throw new Error(`Failed to save image metadata: ${dbError.message}`);
+    }
+
+    // If this was set as primary, update the place's main image_url
+    if (requestData.is_primary) {
+      await supabaseClient
+        .from('places')
+        .update({ 
+          image_url: publicUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestData.place_id);
+    }
+
+    // Track usage event
+    await trackUsageEvent(supabaseClient, userId, place.trip_id, 'place_image_uploaded', {
+      place_id: requestData.place_id,
+      image_id: imageRecord.id,
+      is_primary: requestData.is_primary,
+      file_size: imageBuffer.length
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        image: {
+          id: imageRecord.id,
+          url: publicUrl,
+          name: imageRecord.image_name,
+          description: imageRecord.image_description,
+          is_primary: imageRecord.is_primary,
+          uploaded_at: imageRecord.created_at,
+          file_size: imageRecord.file_size
+        }
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 201,
+      }
+    );
+
+  } catch (error) {
+    console.error('Error uploading place image:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message || 'Failed to upload image',
+        code: 'IMAGE_UPLOAD_ERROR'
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      }
+    );
+  }
+}
+
+/**
+ * Get place images
+ * GET /place-management/images?place_id={id} or ?trip_id={id} or ?user_id={id}
+ */
+async function handleGetPlaceImages(
+  req: Request, 
+  supabaseClient: any, 
+  userId: string
+): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const placeId = url.searchParams.get('place_id');
+    const tripId = url.searchParams.get('trip_id');
+    const targetUserId = url.searchParams.get('user_id');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const includeMetadata = url.searchParams.get('include_metadata') === 'true';
+
+    let query = supabaseClient
+      .from('place_images')
+      .select(`
+        id,
+        place_id,
+        image_url,
+        image_name,
+        image_description,
+        is_primary,
+        created_at,
+        ${includeMetadata ? 'file_size, content_type, uploaded_by,' : ''}
+        place:places!inner(
+          id,
+          name,
+          trip_id,
+          trip:trips!inner(
+            id,
+            name,
+            owner_id,
+            trip_members!inner(user_id, role)
+          )
+        )
+      `);
+
+    // Apply filters based on request parameters
+    if (placeId) {
+      query = query.eq('place_id', placeId);
+    } else if (tripId) {
+      query = query.eq('place.trip_id', tripId);
+    } else if (targetUserId) {
+      query = query.eq('uploaded_by', targetUserId);
+    } else {
+      throw new Error('place_id, trip_id, or user_id parameter is required');
+    }
+
+    // Execute query with pagination
+    const { data: images, error } = await query
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      throw new Error(`Failed to fetch images: ${error.message}`);
+    }
+
+    // Filter images based on user access to trips
+    const accessibleImages = images.filter((image: any) => {
+      const isMember = image.place.trip.trip_members.some((member: any) => member.user_id === userId);
+      return isMember;
+    });
+
+    // Format response
+    const formattedImages = accessibleImages.map((image: any) => ({
+      id: image.id,
+      place_id: image.place_id,
+      place_name: image.place.name,
+      trip_id: image.place.trip_id,
+      trip_name: image.place.trip.name,
+      image_url: image.image_url,
+      image_name: image.image_name,
+      image_description: image.image_description,
+      is_primary: image.is_primary,
+      uploaded_at: image.created_at,
+      ...(includeMetadata && {
+        file_size: image.file_size,
+        content_type: image.content_type,
+        uploaded_by: image.uploaded_by
+      })
+    }));
+
+    // Track usage event
+    await trackUsageEvent(supabaseClient, userId, tripId || 'multiple', 'place_images_viewed', {
+      query_type: placeId ? 'place' : tripId ? 'trip' : 'user',
+      filter_value: placeId || tripId || targetUserId,
+      results_count: formattedImages.length
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        images: formattedImages,
+        pagination: {
+          offset,
+          limit,
+          total: formattedImages.length,
+          has_more: formattedImages.length === limit
+        }
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
+
+  } catch (error) {
+    console.error('Error fetching place images:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message || 'Failed to fetch images',
+        code: 'IMAGE_FETCH_ERROR'
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      }
+    );
+  }
+}
+
+/**
+ * Update place image metadata
+ * PUT /place-management/images
+ */
+async function handleUpdatePlaceImage(
+  req: Request, 
+  supabaseClient: any, 
+  userId: string
+): Promise<Response> {
+  try {
+    const requestData: PlaceImageUpdateRequest = await req.json();
+    
+    if (!requestData.image_id || !requestData.place_id) {
+      throw new Error('image_id and place_id are required');
+    }
+
+    // Verify user has access to the image and place
+    const { data: imageData, error: imageError } = await supabaseClient
+      .from('place_images')
+      .select(`
+        id,
+        place_id,
+        image_url,
+        uploaded_by,
+        place:places!inner(
+          id,
+          name,
+          trip_id,
+          trip:trips!inner(
+            id,
+            owner_id,
+            trip_members!inner(user_id, role)
+          )
+        )
+      `)
+      .eq('id', requestData.image_id)
+      .eq('place_id', requestData.place_id)
+      .single();
+
+    if (imageError || !imageData) {
+      throw new Error('Image not found or access denied');
+    }
+
+    // Check if user is a member of the trip
+    const isMember = imageData.place.trip.trip_members.some((member: any) => member.user_id === userId);
+    const isOwner = imageData.uploaded_by === userId;
+    const isAdmin = imageData.place.trip.trip_members.find((member: any) => 
+      member.user_id === userId && member.role === 'admin'
+    );
+
+    if (!isMember || (!isOwner && !isAdmin)) {
+      throw new Error('You do not have permission to update this image');
+    }
+
+    // If setting as primary, unset other primary images for this place
+    if (requestData.is_primary) {
+      await supabaseClient
+        .from('place_images')
+        .update({ is_primary: false })
+        .eq('place_id', requestData.place_id);
+    }
+
+    // Update image metadata
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (requestData.image_name !== undefined) updateData.image_name = requestData.image_name;
+    if (requestData.image_description !== undefined) updateData.image_description = requestData.image_description;
+    if (requestData.is_primary !== undefined) updateData.is_primary = requestData.is_primary;
+
+    const { data: updatedImage, error: updateError } = await supabaseClient
+      .from('place_images')
+      .update(updateData)
+      .eq('id', requestData.image_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new Error(`Failed to update image: ${updateError.message}`);
+    }
+
+    // If this was set as primary, update the place's main image_url
+    if (requestData.is_primary) {
+      await supabaseClient
+        .from('places')
+        .update({ 
+          image_url: imageData.image_url,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestData.place_id);
+    }
+
+    // Track usage event
+    await trackUsageEvent(supabaseClient, userId, imageData.place.trip_id, 'place_image_updated', {
+      image_id: requestData.image_id,
+      place_id: requestData.place_id,
+      is_primary: requestData.is_primary
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        image: {
+          id: updatedImage.id,
+          place_id: updatedImage.place_id,
+          image_url: updatedImage.image_url,
+          image_name: updatedImage.image_name,
+          image_description: updatedImage.image_description,
+          is_primary: updatedImage.is_primary,
+          updated_at: updatedImage.updated_at
+        }
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
+
+  } catch (error) {
+    console.error('Error updating place image:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message || 'Failed to update image',
+        code: 'IMAGE_UPDATE_ERROR'
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      }
+    );
+  }
+}
+
+/**
+ * Delete place image
+ * DELETE /place-management/images?image_id={id}&place_id={id}
+ */
+async function handleDeletePlaceImage(
+  req: Request, 
+  supabaseClient: any, 
+  userId: string
+): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const imageId = url.searchParams.get('image_id');
+    const placeId = url.searchParams.get('place_id');
+    
+    if (!imageId || !placeId) {
+      throw new Error('image_id and place_id parameters are required');
+    }
+
+    // Verify user has access to the image
+    const { data: imageData, error: imageError } = await supabaseClient
+      .from('place_images')
+      .select(`
+        id,
+        place_id,
+        image_path,
+        is_primary,
+        uploaded_by,
+        place:places!inner(
+          id,
+          trip_id,
+          trip:trips!inner(
+            id,
+            owner_id,
+            trip_members!inner(user_id, role)
+          )
+        )
+      `)
+      .eq('id', imageId)
+      .eq('place_id', placeId)
+      .single();
+
+    if (imageError || !imageData) {
+      throw new Error('Image not found or access denied');
+    }
+
+    // Check if user has permission to delete
+    const isMember = imageData.place.trip.trip_members.some((member: any) => member.user_id === userId);
+    const isOwner = imageData.uploaded_by === userId;
+    const isAdmin = imageData.place.trip.trip_members.find((member: any) => 
+      member.user_id === userId && member.role === 'admin'
+    );
+
+    if (!isMember || (!isOwner && !isAdmin)) {
+      throw new Error('You do not have permission to delete this image');
+    }
+
+    // Delete from Supabase Storage
+    const { error: storageError } = await supabaseClient.storage
+      .from('place-images')
+      .remove([imageData.image_path]);
+
+    if (storageError) {
+      console.warn(`Failed to delete image file from storage: ${storageError.message}`);
+      // Continue with database deletion even if storage deletion fails
+    }
+
+    // Delete from database
+    const { error: deleteError } = await supabaseClient
+      .from('place_images')
+      .delete()
+      .eq('id', imageId);
+
+    if (deleteError) {
+      throw new Error(`Failed to delete image record: ${deleteError.message}`);
+    }
+
+    // If this was the primary image, unset it from the place
+    if (imageData.is_primary) {
+      // Try to find another image to set as primary
+      const { data: otherImages } = await supabaseClient
+        .from('place_images')
+        .select('image_url')
+        .eq('place_id', placeId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const newImageUrl = otherImages && otherImages.length > 0 ? otherImages[0].image_url : null;
+      
+      await supabaseClient
+        .from('places')
+        .update({ 
+          image_url: newImageUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', placeId);
+
+      // If there's another image, set it as primary
+      if (otherImages && otherImages.length > 0) {
+        await supabaseClient
+          .from('place_images')
+          .update({ is_primary: true })
+          .eq('place_id', placeId)
+          .eq('image_url', newImageUrl);
+      }
+    }
+
+    // Track usage event
+    await trackUsageEvent(supabaseClient, userId, imageData.place.trip_id, 'place_image_deleted', {
+      image_id: imageId,
+      place_id: placeId,
+      was_primary: imageData.is_primary
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Image deleted successfully',
+        deleted_image_id: imageId
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
+
+  } catch (error) {
+    console.error('Error deleting place image:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message || 'Failed to delete image',
+        code: 'IMAGE_DELETE_ERROR'
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      }
+    );
+  }
+}
+
+// Helper functions for image processing
+
+function getImageFileExtension(base64Data: string): string {
+  const header = base64Data.substring(0, 50);
+  if (header.includes('jpeg') || header.includes('jpg')) return '.jpg';
+  if (header.includes('png')) return '.png';
+  if (header.includes('gif')) return '.gif';
+  if (header.includes('webp')) return '.webp';
+  return '.jpg'; // default
+}
+
+function getImageMimeType(base64Data: string): string {
+  const header = base64Data.substring(0, 50);
+  if (header.includes('jpeg') || header.includes('jpg')) return 'image/jpeg';
+  if (header.includes('png')) return 'image/png';
+  if (header.includes('gif')) return 'image/gif';
+  if (header.includes('webp')) return 'image/webp';
+  return 'image/jpeg'; // default
+}
+
+async function trackUsageEvent(
+  supabaseClient: any, 
+  userId: string, 
+  tripId: string, 
+  eventType: string, 
+  metadata: any
+): Promise<void> {
+  try {
+    await supabaseClient
+      .from('usage_events')
+      .insert({
+        user_id: userId,
+        event_type: eventType,
+        trip_id: tripId,
+        metadata,
+        created_at: new Date().toISOString()
+      });
+  } catch (error) {
+    console.warn('Failed to track usage event:', error);
+    // Don't throw error for tracking failures
+  }
+}
+
+// TODO-080: Place Statistics API implementation
+
+/**
+ * Get place statistics
+ * GET /place-management/stats?stats_type={type}&trip_id={id}&...
+ */
+async function handleGetPlaceStats(
+  req: Request, 
+  supabaseClient: any, 
+  userId: string
+): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const statsType = url.searchParams.get('stats_type') as PlaceStatsRequest['stats_type'] || 'trip';
+    const tripId = url.searchParams.get('trip_id');
+    const targetUserId = url.searchParams.get('user_id');
+    const category = url.searchParams.get('category');
+    const startDate = url.searchParams.get('start_date');
+    const endDate = url.searchParams.get('end_date');
+    const limit = parseInt(url.searchParams.get('limit') || '50');
+    const includeDetails = url.searchParams.get('include_details') === 'true';
+    const timeRange = url.searchParams.get('time_range') as PlaceStatsRequest['time_range'] || 'monthly';
+
+    // Validate required parameters based on stats type
+    if (statsType === 'trip' && !tripId) {
+      throw new Error('trip_id is required for trip statistics');
+    }
+    if (statsType === 'user' && !targetUserId) {
+      throw new Error('user_id is required for user statistics');
+    }
+    if (statsType === 'category' && !category) {
+      throw new Error('category is required for category statistics');
+    }
+
+    // First get accessible trip IDs for the user
+    const { data: accessibleTrips, error: tripsError } = await supabaseClient
+      .from('trip_members')
+      .select('trip_id')
+      .eq('user_id', userId);
+
+    if (tripsError) {
+      throw new Error(`Failed to fetch accessible trips: ${tripsError.message}`);
+    }
+
+    const tripIds = accessibleTrips.map(tm => tm.trip_id);
+    
+    if (tripIds.length === 0) {
+      throw new Error('No accessible trips found');
+    }
+
+    // Build base query for accessible places
+    let placesQuery = supabaseClient
+      .from('places')
+      .select(`
+        *,
+        trip:trips!inner(id, name),
+        user:users!inner(id, name)
+      `)
+      .in('trip_id', tripIds);
+
+    // Apply filters based on stats type
+    switch (statsType) {
+      case 'trip':
+        placesQuery = placesQuery.eq('trip_id', tripId);
+        break;
+      case 'user':
+        placesQuery = placesQuery.eq('user_id', targetUserId);
+        break;
+      case 'category':
+        placesQuery = placesQuery.eq('category', category);
+        break;
+      case 'global':
+      case 'popularity':
+        // No additional filters for global stats
+        break;
+    }
+
+    // Apply date range filters
+    if (startDate) {
+      placesQuery = placesQuery.gte('created_at', startDate);
+    }
+    if (endDate) {
+      placesQuery = placesQuery.lte('created_at', endDate);
+    }
+
+    // Execute main query
+    const { data: places, error: placesError } = await placesQuery;
+
+    if (placesError) {
+      throw new Error(`Failed to fetch places: ${placesError.message}`);
+    }
+
+    // Calculate summary statistics
+    const summary = await calculatePlaceStatsSummary(places, supabaseClient);
+
+    // Initialize response structure
+    const response: PlaceStatsResponse = {
+      success: true,
+      stats: {
+        summary
+      },
+      metadata: {
+        generated_at: new Date().toISOString(),
+        stats_type: statsType,
+        data_range: {
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
+          total_records: places.length
+        }
+      }
+    };
+
+    // Add category breakdown if requested or for relevant stats types
+    if (statsType === 'global' || statsType === 'trip' || includeDetails) {
+      response.stats.category_breakdown = calculateCategoryBreakdown(places);
+    }
+
+    // Add popularity ranking for popularity stats
+    if (statsType === 'popularity') {
+      response.stats.popularity_ranking = await calculatePopularityRanking(
+        places, 
+        supabaseClient, 
+        limit
+      );
+    }
+
+    // Add time series data if requested
+    if (includeDetails && (startDate || endDate)) {
+      response.stats.time_series = calculateTimeSeriesStats(places, timeRange);
+    }
+
+    // Add detailed statistics if requested
+    if (includeDetails) {
+      response.stats.details = await calculateDetailedStats(places, supabaseClient);
+    }
+
+    // Track usage event
+    await trackUsageEvent(supabaseClient, userId, tripId || 'multiple', 'place_stats_viewed', {
+      stats_type: statsType,
+      trip_id: tripId,
+      target_user_id: targetUserId,
+      category,
+      include_details: includeDetails,
+      results_count: places.length
+    });
+
+    return new Response(
+      JSON.stringify(response),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
+
+  } catch (error) {
+    console.error('Error getting place statistics:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message || 'Failed to get statistics',
+        code: 'STATS_FETCH_ERROR'
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      }
+    );
+  }
+}
+
+/**
+ * Calculate summary statistics
+ */
+async function calculatePlaceStatsSummary(
+  places: any[], 
+  supabaseClient: any
+): Promise<PlaceStatsSummary> {
+  const totalPlaces = places.length;
+  
+  if (totalPlaces === 0) {
+    return {
+      total_places: 0,
+      total_trips: 0,
+      total_users: 0,
+      average_wish_level: 0,
+      average_rating: 0,
+      most_popular_category: '',
+      total_estimated_cost: 0,
+      total_stay_duration_hours: 0
+    };
+  }
+
+  // Calculate basic stats
+  const uniqueTrips = new Set(places.map(p => p.trip_id)).size;
+  const uniqueUsers = new Set(places.map(p => p.user_id)).size;
+  
+  const totalWishLevel = places.reduce((sum, p) => sum + (p.wish_level || 0), 0);
+  const averageWishLevel = totalWishLevel / totalPlaces;
+  
+  const ratedPlaces = places.filter(p => p.rating && p.rating > 0);
+  const totalRating = ratedPlaces.reduce((sum, p) => sum + p.rating, 0);
+  const averageRating = ratedPlaces.length > 0 ? totalRating / ratedPlaces.length : 0;
+  
+  const totalEstimatedCost = places.reduce((sum, p) => sum + (p.estimated_cost || 0), 0);
+  const totalStayDurationHours = places.reduce((sum, p) => sum + ((p.stay_duration_minutes || 0) / 60), 0);
+  
+  // Find most popular category
+  const categoryCount = places.reduce((acc, p) => {
+    acc[p.category] = (acc[p.category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const mostPopularCategory = Object.entries(categoryCount)
+    .sort(([,a], [,b]) => b - a)[0]?.[0] || '';
+
+  return {
+    total_places: totalPlaces,
+    total_trips: uniqueTrips,
+    total_users: uniqueUsers,
+    average_wish_level: Math.round(averageWishLevel * 100) / 100,
+    average_rating: Math.round(averageRating * 100) / 100,
+    most_popular_category: mostPopularCategory,
+    total_estimated_cost: totalEstimatedCost,
+    total_stay_duration_hours: Math.round(totalStayDurationHours * 100) / 100
+  };
+}
+
+/**
+ * Calculate category breakdown
+ */
+function calculateCategoryBreakdown(places: any[]): CategoryStatsBreakdown[] {
+  const categoryStats = places.reduce((acc, place) => {
+    const category = place.category;
+    if (!acc[category]) {
+      acc[category] = {
+        places: [],
+        totalWish: 0,
+        totalRating: 0,
+        ratedCount: 0,
+        totalCost: 0,
+        totalDuration: 0
+      };
+    }
+    
+    acc[category].places.push(place);
+    acc[category].totalWish += place.wish_level || 0;
+    if (place.rating && place.rating > 0) {
+      acc[category].totalRating += place.rating;
+      acc[category].ratedCount++;
+    }
+    acc[category].totalCost += place.estimated_cost || 0;
+    acc[category].totalDuration += place.stay_duration_minutes || 0;
+    
+    return acc;
+  }, {} as Record<string, any>);
+
+  const totalPlaces = places.length;
+  
+  return Object.entries(categoryStats).map(([category, stats]) => ({
+    category,
+    place_count: stats.places.length,
+    percentage: Math.round((stats.places.length / totalPlaces) * 100 * 100) / 100,
+    average_wish_level: Math.round((stats.totalWish / stats.places.length) * 100) / 100,
+    average_rating: stats.ratedCount > 0 ? Math.round((stats.totalRating / stats.ratedCount) * 100) / 100 : 0,
+    average_cost: stats.places.length > 0 ? Math.round((stats.totalCost / stats.places.length) * 100) / 100 : 0,
+    total_stay_duration: Math.round((stats.totalDuration / 60) * 100) / 100
+  })).sort((a, b) => b.place_count - a.place_count);
+}
+
+/**
+ * Calculate popularity ranking
+ */
+async function calculatePopularityRanking(
+  places: any[], 
+  supabaseClient: any, 
+  limit: number
+): Promise<PopularityRanking[]> {
+  // Group places by name and location to identify popular destinations
+  const placeGroups = places.reduce((acc, place) => {
+    const key = `${place.name.toLowerCase()}_${place.category}`;
+    if (!acc[key]) {
+      acc[key] = {
+        name: place.name,
+        category: place.category,
+        places: [],
+        totalWish: 0,
+        totalRating: 0,
+        ratedCount: 0
+      };
+    }
+    
+    acc[key].places.push(place);
+    acc[key].totalWish += place.wish_level || 0;
+    if (place.rating && place.rating > 0) {
+      acc[key].totalRating += place.rating;
+      acc[key].ratedCount++;
+    }
+    
+    return acc;
+  }, {} as Record<string, any>);
+
+  // Calculate popularity scores and rank
+  const rankings = Object.entries(placeGroups).map(([key, group]) => {
+    const addedCount = group.places.length;
+    const avgWishLevel = group.totalWish / addedCount;
+    const avgRating = group.ratedCount > 0 ? group.totalRating / group.ratedCount : 0;
+    
+    // Popularity score: weighted combination of frequency, wish level, and rating
+    const popularityScore = (
+      addedCount * 0.5 +
+      avgWishLevel * 0.3 +
+      avgRating * 0.2
+    );
+    
+    return {
+      place_id: group.places[0].id, // Use first place as representative
+      place_name: group.name,
+      category: group.category,
+      popularity_score: Math.round(popularityScore * 100) / 100,
+      total_added_count: addedCount,
+      average_wish_level: Math.round(avgWishLevel * 100) / 100,
+      average_rating: Math.round(avgRating * 100) / 100,
+      recent_trend: 'stable' as const // Simplified for now
+    };
+  }).sort((a, b) => b.popularity_score - a.popularity_score);
+
+  // Add ranking numbers
+  return rankings.slice(0, limit).map((item, index) => ({
+    rank: index + 1,
+    ...item
+  }));
+}
+
+/**
+ * Calculate time series statistics
+ */
+function calculateTimeSeriesStats(places: any[], timeRange: string): TimeSeriesStats[] {
+  // Group places by date based on time range
+  const dateGroups = places.reduce((acc, place) => {
+    const date = new Date(place.created_at);
+    let dateKey: string;
+    
+    switch (timeRange) {
+      case 'daily':
+        dateKey = date.toISOString().split('T')[0];
+        break;
+      case 'weekly':
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - date.getDay());
+        dateKey = weekStart.toISOString().split('T')[0];
+        break;
+      case 'monthly':
+        dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        break;
+      case 'yearly':
+        dateKey = String(date.getFullYear());
+        break;
+      default:
+        dateKey = date.toISOString().split('T')[0];
+    }
+    
+    if (!acc[dateKey]) {
+      acc[dateKey] = {
+        places: [],
+        users: new Set(),
+        totalWish: 0,
+        categories: new Set()
+      };
+    }
+    
+    acc[dateKey].places.push(place);
+    acc[dateKey].users.add(place.user_id);
+    acc[dateKey].totalWish += place.wish_level || 0;
+    acc[dateKey].categories.add(place.category);
+    
+    return acc;
+  }, {} as Record<string, any>);
+
+  return Object.entries(dateGroups).map(([date, data]) => ({
+    date,
+    total_places_added: data.places.length,
+    unique_users: data.users.size,
+    popular_categories: Array.from(data.categories).slice(0, 3),
+    average_wish_level: Math.round((data.totalWish / data.places.length) * 100) / 100
+  })).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Calculate detailed statistics
+ */
+async function calculateDetailedStats(
+  places: any[], 
+  supabaseClient: any
+): Promise<PlaceStatsDetails> {
+  const details: PlaceStatsDetails = {};
+
+  // Geographic distribution
+  const placesWithCoords = places.filter(p => p.latitude && p.longitude);
+  if (placesWithCoords.length > 0) {
+    const latitudes = placesWithCoords.map(p => p.latitude);
+    const longitudes = placesWithCoords.map(p => p.longitude);
+    
+    const centerLat = latitudes.reduce((sum, lat) => sum + lat, 0) / latitudes.length;
+    const centerLng = longitudes.reduce((sum, lng) => sum + lng, 0) / longitudes.length;
+    
+    // Calculate geographic spread (max distance from center)
+    const maxDistance = Math.max(...placesWithCoords.map(p => 
+      calculateHaversineDistance(centerLat, centerLng, p.latitude, p.longitude)
+    ));
+    
+    details.geographic_distribution = {
+      total_coordinates: placesWithCoords.length,
+      coverage_area_km2: Math.round(Math.PI * Math.pow(maxDistance, 2) * 100) / 100,
+      center_point: {
+        latitude: Math.round(centerLat * 1000000) / 1000000,
+        longitude: Math.round(centerLng * 1000000) / 1000000
+      },
+      geographic_spread: Math.round(maxDistance * 100) / 100
+    };
+  }
+
+  // User engagement stats
+  const userStats = places.reduce((acc, place) => {
+    acc[place.user_id] = (acc[place.user_id] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const userCounts = Object.values(userStats);
+  const powerUsers = userCounts.filter(count => count > 10).length;
+  const avgPlacesPerUser = userCounts.reduce((sum, count) => sum + count, 0) / userCounts.length;
+  
+  details.user_engagement = {
+    active_users: userCounts.length,
+    average_places_per_user: Math.round(avgPlacesPerUser * 100) / 100,
+    power_users: powerUsers,
+    engagement_score: Math.round((avgPlacesPerUser + powerUsers * 2) * 100) / 100
+  };
+
+  // Cost analysis
+  const placesWithCost = places.filter(p => p.estimated_cost && p.estimated_cost > 0);
+  if (placesWithCost.length > 0) {
+    const totalCost = placesWithCost.reduce((sum, p) => sum + p.estimated_cost, 0);
+    const avgCostPerPlace = totalCost / placesWithCost.length;
+    
+    // Price level distribution
+    const priceLevelDistribution = places.reduce((acc, place) => {
+      const level = place.price_level || 1;
+      acc[level] = (acc[level] || 0) + 1;
+      return acc;
+    }, {} as Record<number, number>);
+    
+    const totalPlaces = places.length;
+    const costDistribution = Object.entries(priceLevelDistribution).map(([level, count]) => ({
+      level: parseInt(level),
+      count,
+      percentage: Math.round((count / totalPlaces) * 100 * 100) / 100
+    }));
+    
+    const budgetFriendlyCount = (priceLevelDistribution[1] || 0) + (priceLevelDistribution[2] || 0);
+    const budgetFriendlyPercentage = (budgetFriendlyCount / totalPlaces) * 100;
+    
+    details.cost_analysis = {
+      total_estimated_cost: totalCost,
+      average_cost_per_place: Math.round(avgCostPerPlace * 100) / 100,
+      cost_distribution_by_level: costDistribution,
+      budget_friendly_percentage: Math.round(budgetFriendlyPercentage * 100) / 100
+    };
+  }
+
+  // Temporal patterns
+  const hourCounts = places.reduce((acc, place) => {
+    const hour = new Date(place.created_at).getHours();
+    acc[hour] = (acc[hour] || 0) + 1;
+    return acc;
+  }, {} as Record<number, number>);
+  
+  const peakHours = Object.entries(hourCounts)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 3)
+    .map(([hour]) => parseInt(hour));
+  
+  const dayOfWeekCounts = places.reduce((acc, place) => {
+    const dayOfWeek = new Date(place.created_at).getDay();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = dayNames[dayOfWeek];
+    acc[dayName] = (acc[dayName] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const mostActiveDayOfWeek = Object.entries(dayOfWeekCounts)
+    .sort(([,a], [,b]) => b - a)[0]?.[0] || 'Unknown';
+  
+  details.temporal_patterns = {
+    peak_adding_hours: peakHours,
+    seasonal_trends: [
+      { season: 'Spring', activity_level: 25 },
+      { season: 'Summer', activity_level: 35 },
+      { season: 'Fall', activity_level: 25 },
+      { season: 'Winter', activity_level: 15 }
+    ], // Simplified for now
+    most_active_day_of_week: mostActiveDayOfWeek
+  };
+
+  return details;
+}
+
+// Helper function for distance calculation (reuse existing implementation)
+function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// External API Handler Functions
+
+// Handle Google Places Search
+async function handleGooglePlacesSearch(req: Request, supabase: any, userId: string): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const query = url.searchParams.get('query');
+    const latitude = url.searchParams.get('latitude');
+    const longitude = url.searchParams.get('longitude');
+    const radius = url.searchParams.get('radius');
+    const type = url.searchParams.get('type');
+    const language = url.searchParams.get('language') || 'en';
+    const region = url.searchParams.get('region');
+
+    if (!query) {
+      return new Response(
+        JSON.stringify({ error: 'Query parameter is required' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      );
+    }
+
+    // Check API quota
+    const hasQuota = await checkAPIQuota('google_places', supabase);
+    if (!hasQuota) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Google Places API daily quota exceeded',
+          quota_exceeded: true 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429 
+        }
+      );
+    }
+
+    // Prepare search request
+    const searchRequest: GooglePlacesSearchRequest = {
+      query,
+      type,
+      language,
+      region
+    };
+
+    if (latitude && longitude) {
+      searchRequest.location = {
+        lat: parseFloat(latitude),
+        lng: parseFloat(longitude)
+      };
+      
+      if (radius) {
+        searchRequest.radius = parseInt(radius);
+      }
+    }
+
+    // Execute search
+    const result = await searchGooglePlaces(searchRequest);
+
+    if (result.success) {
+      // Increment quota usage
+      await incrementAPIUsage('google_places', supabase);
+
+      // Normalize results to Voypath format
+      const normalizedPlaces = result.data.map((place: any) => ({
+        external_data: place,
+        normalized: normalizeGooglePlaceToVoypath(place),
+        source: 'google_places'
+      }));
+
+      // Track usage event
+      await supabase
+        .from('usage_events')
+        .insert({
+          user_id: userId,
+          event_type: 'external_api_used',
+          metadata: {
+            api_type: 'google_places',
+            search_query: query,
+            results_count: normalizedPlaces.length,
+            has_location: !!searchRequest.location
+          }
+        });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          results: normalizedPlaces,
+          count: normalizedPlaces.length,
+          source: 'google_places',
+          search_metadata: {
+            query,
+            location: searchRequest.location,
+            type,
+            language
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: result.error,
+          source: 'google_places',
+          quota_used: result.quota_used
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: result.quota_used ? 429 : 500
+        }
+      );
+    }
+
+  } catch (error) {
+    console.error('Error in Google Places search:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error during Google Places search' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
+  }
+}
+
+// Handle Google Place Details
+async function handleGooglePlaceDetails(req: Request, supabase: any, userId: string): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const placeId = url.searchParams.get('place_id');
+
+    if (!placeId) {
+      return new Response(
+        JSON.stringify({ error: 'place_id parameter is required' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      );
+    }
+
+    // Check API quota
+    const hasQuota = await checkAPIQuota('google_places', supabase);
+    if (!hasQuota) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Google Places API daily quota exceeded',
+          quota_exceeded: true 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429 
+        }
+      );
+    }
+
+    // Execute details request
+    const result = await getGooglePlaceDetails(placeId);
+
+    if (result.success) {
+      // Increment quota usage
+      await incrementAPIUsage('google_places', supabase);
+
+      // Normalize result to Voypath format
+      const normalizedPlace = normalizeGooglePlaceToVoypath(result.data);
+
+      // Track usage event
+      await supabase
+        .from('usage_events')
+        .insert({
+          user_id: userId,
+          event_type: 'external_api_used',
+          metadata: {
+            api_type: 'google_places_details',
+            place_id: placeId,
+            place_name: result.data.name
+          }
+        });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          place_details: {
+            external_data: result.data,
+            normalized: normalizedPlace,
+            source: 'google_places'
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: result.error,
+          source: 'google_places',
+          quota_used: result.quota_used
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: result.quota_used ? 429 : 500
+        }
+      );
+    }
+
+  } catch (error) {
+    console.error('Error in Google Place details:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error during Google Place details fetch' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
+  }
+}
+
+// Handle Pexels Image Search
+async function handlePexelsImageSearch(req: Request, supabase: any, userId: string): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const query = url.searchParams.get('query');
+    const count = parseInt(url.searchParams.get('count') || '5');
+
+    if (!query) {
+      return new Response(
+        JSON.stringify({ error: 'Query parameter is required' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      );
+    }
+
+    if (count > 20) {
+      return new Response(
+        JSON.stringify({ error: 'Maximum count is 20 images per request' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      );
+    }
+
+    // Check API quota
+    const hasQuota = await checkAPIQuota('pexels', supabase);
+    if (!hasQuota) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Pexels API monthly quota exceeded',
+          quota_exceeded: true 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429 
+        }
+      );
+    }
+
+    // Execute image search
+    const result = await searchPexelsImages(query, count);
+
+    if (result.success) {
+      // Increment quota usage
+      await incrementAPIUsage('pexels', supabase);
+
+      // Format images for response
+      const formattedImages = result.data.map((photo: PexelsImageResponse) => ({
+        id: photo.id,
+        url: photo.src.medium,
+        large_url: photo.src.large,
+        small_url: photo.src.small,
+        alt: photo.alt,
+        photographer: photo.photographer,
+        photographer_url: photo.photographer_url,
+        width: photo.width,
+        height: photo.height,
+        avg_color: photo.avg_color,
+        source: 'pexels'
+      }));
+
+      // Track usage event
+      await supabase
+        .from('usage_events')
+        .insert({
+          user_id: userId,
+          event_type: 'external_api_used',
+          metadata: {
+            api_type: 'pexels',
+            search_query: query,
+            image_count: formattedImages.length,
+            requested_count: count
+          }
+        });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          images: formattedImages,
+          count: formattedImages.length,
+          source: 'pexels',
+          search_metadata: {
+            query,
+            requested_count: count
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: result.error,
+          source: 'pexels'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        }
+      );
+    }
+
+  } catch (error) {
+    console.error('Error in Pexels image search:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error during Pexels image search' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
   }
 }

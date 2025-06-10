@@ -7,11 +7,12 @@ const corsHeaders = {
 };
 
 interface TripCreateRequest {
-  name: string;
+  departure_location: string; // Required - most important field
+  name?: string; // Optional - auto-generated if not provided
   description?: string;
-  destination: string;
-  start_date: string;
-  end_date: string;
+  destination?: string; // Optional - can be "same as departure location" or auto-set
+  start_date?: string; // Optional - for unscheduled trips
+  end_date?: string; // Optional - for unscheduled trips
   add_place_deadline?: string;
   max_members?: number;
   optimization_preferences?: Record<string, any>;
@@ -19,6 +20,7 @@ interface TripCreateRequest {
 
 interface TripUpdateRequest {
   trip_id: string;
+  departure_location?: string;
   name?: string;
   description?: string;
   destination?: string;
@@ -117,79 +119,98 @@ serve(async (req) => {
 async function handleCreateTrip(req: Request, supabase: any, userId: string) {
   const requestData: TripCreateRequest = await req.json();
   
-  // バリデーション
-  if (!requestData.name || !requestData.destination || !requestData.start_date || !requestData.end_date) {
-    throw new Error('Name, destination, start_date, and end_date are required');
+  // バリデーション - departure_location is the only required field
+  if (!requestData.departure_location?.trim()) {
+    throw new Error('Departure location is required');
   }
 
-  // 日付検証
-  const startDate = new Date(requestData.start_date);
-  const endDate = new Date(requestData.end_date);
-  
-  if (endDate <= startDate) {
-    throw new Error('End date must be after start date');
+  // 日付検証（提供された場合のみ）
+  if (requestData.start_date && requestData.end_date) {
+    const startDate = new Date(requestData.start_date);
+    const endDate = new Date(requestData.end_date);
+    
+    if (endDate <= startDate) {
+      throw new Error('End date must be after start date');
+    }
   }
 
-  // トランザクション開始 - 旅行作成とメンバー追加
-  const { data: trip, error: tripError } = await supabase
-    .from('trips')
-    .insert({
-      name: requestData.name,
-      description: requestData.description,
-      destination: requestData.destination,
-      start_date: requestData.start_date,
-      end_date: requestData.end_date,
-      owner_id: userId,
-      add_place_deadline: requestData.add_place_deadline,
-      max_members: requestData.max_members || 10,
-      optimization_preferences: requestData.optimization_preferences || {
-        fairness_weight: 0.6,
-        efficiency_weight: 0.4,
-        auto_optimize: false,
-        include_meals: true,
-        preferred_transport: null
-      }
-    })
-    .select()
-    .single();
+  // Use the database function to create trip with automatic departure/destination place generation
+  const { data: tripId, error: tripError } = await supabase
+    .rpc('create_trip_with_owner', {
+      p_departure_location: requestData.departure_location,
+      p_name: requestData.name || null,
+      p_description: requestData.description || null,
+      p_destination: requestData.destination || null,
+      p_start_date: requestData.start_date || null,
+      p_end_date: requestData.end_date || null,
+      p_owner_id: userId
+    });
 
   if (tripError) {
     throw new Error(`Failed to create trip: ${tripError.message}`);
   }
 
-  // 作成者を管理者として自動追加
-  const { error: memberError } = await supabase
-    .from('trip_members')
-    .insert({
-      trip_id: trip.id,
-      user_id: userId,
-      role: 'admin',
-      can_add_places: true,
-      can_edit_places: true,
-      can_optimize: true,
-      can_invite_members: true,
-      joined_at: new Date().toISOString(),
-      invitation_accepted_at: new Date().toISOString()
-    });
+  // Get the created trip details
+  const { data: trip, error: fetchError } = await supabase
+    .from('trips')
+    .select(`
+      *,
+      places(id, name, category, source)
+    `)
+    .eq('id', tripId)
+    .single();
 
-  if (memberError) {
-    // 旅行作成は成功したが、メンバー追加に失敗した場合のロールバック
-    await supabase.from('trips').delete().eq('id', trip.id);
-    throw new Error(`Failed to add trip owner as member: ${memberError.message}`);
+  if (fetchError) {
+    throw new Error(`Failed to fetch created trip: ${fetchError.message}`);
+  }
+
+  // Update trip with additional settings if provided
+  if (requestData.add_place_deadline || requestData.max_members || requestData.optimization_preferences) {
+    const updateData: any = {};
+    
+    if (requestData.add_place_deadline) updateData.add_place_deadline = requestData.add_place_deadline;
+    if (requestData.max_members) updateData.max_members = requestData.max_members;
+    if (requestData.optimization_preferences) {
+      updateData.optimization_preferences = requestData.optimization_preferences;
+    } else {
+      updateData.optimization_preferences = {
+        fairness_weight: 0.6,
+        efficiency_weight: 0.4,
+        auto_optimize: false,
+        include_meals: true,
+        preferred_transport: null
+      };
+    }
+
+    const { error: updateError } = await supabase
+      .from('trips')
+      .update(updateData)
+      .eq('id', tripId);
+
+    if (updateError) {
+      console.warn('Failed to update trip settings:', updateError.message);
+    }
   }
 
   // 使用状況イベント記録
+  const duration_days = requestData.start_date && requestData.end_date
+    ? Math.ceil((new Date(requestData.end_date).getTime() - new Date(requestData.start_date).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
   await supabase
     .from('usage_events')
     .insert({
       user_id: userId,
       event_type: 'trip_created',
       event_category: 'trip_management',
-      trip_id: trip.id,
+      trip_id: tripId,
       metadata: {
-        trip_name: trip.name,
+        departure_location: trip.departure_location,
         destination: trip.destination,
-        duration_days: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+        trip_name: trip.name,
+        duration_days,
+        has_dates: !!(requestData.start_date && requestData.end_date),
+        auto_generated_places: trip.places.filter((p: any) => p.source === 'system').length
       }
     });
 
@@ -197,7 +218,7 @@ async function handleCreateTrip(req: Request, supabase: any, userId: string) {
     JSON.stringify({ 
       success: true, 
       trip: trip,
-      message: 'Trip created successfully'
+      message: 'Trip created successfully with departure and destination places'
     }),
     {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -231,7 +252,7 @@ async function handleGetUserTrips(supabase: any, userId: string) {
     user_role: trip.trip_members[0]?.role || 'member',
     is_owner: trip.owner_id === userId,
     days_until_start: Math.ceil((new Date(trip.start_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
-    status: getTrip Status(trip)
+    status: getTripStatus(trip)
   }));
 
   return new Response(
@@ -351,6 +372,7 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
     updated_at: new Date().toISOString()
   };
 
+  if (requestData.departure_location) updateData.departure_location = requestData.departure_location;
   if (requestData.name) updateData.name = requestData.name;
   if (requestData.description !== undefined) updateData.description = requestData.description;
   if (requestData.destination) updateData.destination = requestData.destination;

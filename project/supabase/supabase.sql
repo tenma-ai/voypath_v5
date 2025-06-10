@@ -94,11 +94,12 @@ CREATE TABLE users (
 -- Trips table
 CREATE TABLE trips (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
+  departure_location TEXT NOT NULL,
+  name TEXT,
   description TEXT,
-  destination TEXT NOT NULL,
-  start_date DATE NOT NULL,
-  end_date DATE NOT NULL,
+  destination TEXT,
+  start_date DATE,
+  end_date DATE,
   owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   
   -- Settings
@@ -130,11 +131,12 @@ CREATE TABLE trips (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   
   -- Constraints
-  CONSTRAINT valid_date_range CHECK (end_date >= start_date),
-  CONSTRAINT valid_name_length CHECK (char_length(name) >= 1 AND char_length(name) <= 200),
-  CONSTRAINT valid_destination_length CHECK (char_length(destination) >= 1 AND char_length(destination) <= 200),
+  CONSTRAINT valid_date_range CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date),
+  CONSTRAINT valid_name_length CHECK (name IS NULL OR (char_length(name) >= 1 AND char_length(name) <= 200)),
+  CONSTRAINT valid_departure_location_length CHECK (char_length(departure_location) >= 1 AND char_length(departure_location) <= 200),
+  CONSTRAINT valid_destination_length CHECK (destination IS NULL OR (char_length(destination) >= 1 AND char_length(destination) <= 200)),
   CONSTRAINT valid_max_members CHECK (max_members >= 1 AND max_members <= 50),
-  CONSTRAINT valid_deadline CHECK (add_place_deadline IS NULL OR add_place_deadline <= start_date)
+  CONSTRAINT valid_deadline CHECK (add_place_deadline IS NULL OR start_date IS NULL OR add_place_deadline <= start_date)
 );
 
 -- Places table
@@ -368,6 +370,39 @@ CREATE TABLE invitation_codes (
   CONSTRAINT valid_expiry CHECK (expires_at IS NULL OR expires_at > created_at)
 );
 
+-- Place images table (TODO-079)
+CREATE TABLE place_images (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  place_id UUID NOT NULL REFERENCES places(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  
+  -- Image storage info
+  image_url TEXT NOT NULL,
+  image_path TEXT NOT NULL, -- path in Supabase Storage
+  
+  -- Image metadata
+  image_name TEXT,
+  image_description TEXT,
+  is_primary BOOLEAN DEFAULT false,
+  
+  -- File info
+  file_size INTEGER,
+  content_type TEXT,
+  
+  -- Ownership
+  uploaded_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Constraints
+  CONSTRAINT valid_image_name_length CHECK (image_name IS NULL OR char_length(image_name) <= 200),
+  CONSTRAINT valid_image_description_length CHECK (image_description IS NULL OR char_length(image_description) <= 1000),
+  CONSTRAINT valid_file_size CHECK (file_size IS NULL OR file_size > 0),
+  CONSTRAINT valid_image_url CHECK (image_url ~ '^https?://'),
+  CONSTRAINT valid_content_type CHECK (content_type IS NULL OR content_type ~ '^image/')
+);
+
 -- Usage events table (for analytics)
 CREATE TABLE usage_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -441,12 +476,13 @@ CREATE INDEX idx_users_name_trgm ON users USING gin(name gin_trgm_ops);
 
 -- Trips table indexes
 CREATE INDEX idx_trips_owner_id ON trips(owner_id);
-CREATE INDEX idx_trips_start_date ON trips(start_date);
-CREATE INDEX idx_trips_end_date ON trips(end_date);
-CREATE INDEX idx_trips_destination ON trips(destination);
+CREATE INDEX idx_trips_start_date ON trips(start_date) WHERE start_date IS NOT NULL;
+CREATE INDEX idx_trips_end_date ON trips(end_date) WHERE end_date IS NOT NULL;
+CREATE INDEX idx_trips_departure_location ON trips(departure_location);
+CREATE INDEX idx_trips_destination ON trips(destination) WHERE destination IS NOT NULL;
 CREATE INDEX idx_trips_created_at ON trips(created_at);
 CREATE INDEX idx_trips_is_public ON trips(is_public) WHERE is_public = true;
-CREATE INDEX idx_trips_name_trgm ON trips USING gin(name gin_trgm_ops);
+CREATE INDEX idx_trips_name_trgm ON trips USING gin(name gin_trgm_ops) WHERE name IS NOT NULL;
 CREATE INDEX idx_trips_description_trgm ON trips USING gin(description gin_trgm_ops) WHERE description IS NOT NULL;
 
 -- Places table indexes
@@ -502,6 +538,13 @@ CREATE INDEX idx_invitation_codes_created_by ON invitation_codes(created_by);
 CREATE INDEX idx_invitation_codes_is_active ON invitation_codes(is_active) WHERE is_active = true;
 CREATE INDEX idx_invitation_codes_expires_at ON invitation_codes(expires_at) WHERE expires_at IS NOT NULL;
 
+-- Place images table indexes (TODO-079)
+CREATE INDEX idx_place_images_place_id ON place_images(place_id);
+CREATE INDEX idx_place_images_uploaded_by ON place_images(uploaded_by);
+CREATE INDEX idx_place_images_created_at ON place_images(created_at);
+CREATE INDEX idx_place_images_is_primary ON place_images(is_primary) WHERE is_primary = true;
+CREATE UNIQUE INDEX idx_place_images_primary_per_place ON place_images(place_id) WHERE is_primary = true;
+
 -- Usage events table indexes
 CREATE INDEX idx_usage_events_created_at ON usage_events(created_at);
 CREATE INDEX idx_usage_events_user_id ON usage_events(user_id);
@@ -528,6 +571,7 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE optimization_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invitation_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE place_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE usage_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE optimization_cache ENABLE ROW LEVEL SECURITY;
 
@@ -755,6 +799,63 @@ CREATE POLICY "Trip admins can manage invitation codes" ON invitation_codes
     )
   );
 
+-- Place images RLS policies (TODO-079)
+CREATE POLICY "Trip members can view place images" ON place_images
+  FOR SELECT
+  USING (
+    place_id IN (
+      SELECT p.id 
+      FROM places p 
+      JOIN trip_members tm ON p.trip_id = tm.trip_id 
+      WHERE tm.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Trip members can upload place images" ON place_images
+  FOR INSERT
+  WITH CHECK (
+    uploaded_by = auth.uid() AND 
+    place_id IN (
+      SELECT p.id 
+      FROM places p 
+      JOIN trip_members tm ON p.trip_id = tm.trip_id 
+      WHERE tm.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Image owners and trip admins can update place images" ON place_images
+  FOR UPDATE
+  USING (
+    uploaded_by = auth.uid() OR 
+    place_id IN (
+      SELECT p.id 
+      FROM places p 
+      JOIN trip_members tm ON p.trip_id = tm.trip_id 
+      WHERE tm.user_id = auth.uid() AND tm.role = 'admin'
+    )
+  )
+  WITH CHECK (
+    uploaded_by = auth.uid() OR 
+    place_id IN (
+      SELECT p.id 
+      FROM places p 
+      JOIN trip_members tm ON p.trip_id = tm.trip_id 
+      WHERE tm.user_id = auth.uid() AND tm.role = 'admin'
+    )
+  );
+
+CREATE POLICY "Image owners and trip admins can delete place images" ON place_images
+  FOR DELETE
+  USING (
+    uploaded_by = auth.uid() OR 
+    place_id IN (
+      SELECT p.id 
+      FROM places p 
+      JOIN trip_members tm ON p.trip_id = tm.trip_id 
+      WHERE tm.user_id = auth.uid() AND tm.role = 'admin'
+    )
+  );
+
 -- Usage events RLS policies
 CREATE POLICY "Users can view own usage events" ON usage_events
   FOR SELECT
@@ -845,24 +946,124 @@ LANGUAGE plpgsql;
 
 -- Create trip with owner function
 CREATE OR REPLACE FUNCTION create_trip_with_owner(
-  p_name TEXT,
-  p_description TEXT,
-  p_destination TEXT,
-  p_start_date DATE,
-  p_end_date DATE,
+  p_departure_location TEXT,
+  p_name TEXT DEFAULT NULL,
+  p_description TEXT DEFAULT NULL,
+  p_destination TEXT DEFAULT NULL,
+  p_start_date DATE DEFAULT NULL,
+  p_end_date DATE DEFAULT NULL,
   p_owner_id UUID
 ) RETURNS UUID AS 
 'DECLARE
   v_trip_id UUID;
+  v_trip_name TEXT;
+  v_final_destination TEXT;
 BEGIN
-  INSERT INTO trips (name, description, destination, start_date, end_date, owner_id)
-  VALUES (p_name, p_description, p_destination, p_start_date, p_end_date, p_owner_id)
+  -- Auto-generate name if not provided
+  IF p_name IS NULL THEN
+    v_trip_name := p_departure_location || ''からの旅行'';
+  ELSE
+    v_trip_name := p_name;
+  END IF;
+  
+  -- Handle destination logic
+  -- If destination is empty, null, or "same as departure location", use departure location
+  IF p_destination IS NULL OR p_destination = '''' OR LOWER(p_destination) = ''same as departure location'' THEN
+    v_final_destination := p_departure_location;
+  ELSE
+    v_final_destination := p_destination;
+  END IF;
+  
+  INSERT INTO trips (departure_location, name, description, destination, start_date, end_date, owner_id)
+  VALUES (p_departure_location, v_trip_name, p_description, v_final_destination, p_start_date, p_end_date, p_owner_id)
   RETURNING id INTO v_trip_id;
   
   INSERT INTO trip_members (trip_id, user_id, role, can_add_places, can_edit_places, can_optimize, can_invite_members)
   VALUES (v_trip_id, p_owner_id, ''admin'', true, true, true, true);
   
-  UPDATE trips SET total_members = 1 WHERE id = v_trip_id;
+  -- Add departure location as the first place (mandatory)
+  INSERT INTO places (
+    name, 
+    category, 
+    trip_id, 
+    user_id, 
+    wish_level, 
+    stay_duration_minutes,
+    scheduled,
+    scheduled_date,
+    notes,
+    source
+  ) VALUES (
+    p_departure_location || '' (Departure)'',
+    ''departure_point'',
+    v_trip_id,
+    p_owner_id,
+    5,
+    60,
+    CASE WHEN p_start_date IS NOT NULL THEN true ELSE false END,
+    p_start_date,
+    ''Auto-generated departure location'',
+    ''system''
+  );
+  
+  -- Add destination/return point as the last place
+  IF v_final_destination != p_departure_location THEN
+    -- Different destination: add as final destination
+    INSERT INTO places (
+      name, 
+      category, 
+      trip_id, 
+      user_id, 
+      wish_level, 
+      stay_duration_minutes,
+      scheduled,
+      scheduled_date,
+      notes,
+      source
+    ) VALUES (
+      v_final_destination || '' (Final Destination)'',
+      ''destination_point'',
+      v_trip_id,
+      p_owner_id,
+      5,
+      60,
+      CASE WHEN p_end_date IS NOT NULL THEN true ELSE false END,
+      p_end_date,
+      ''Auto-generated final destination'',
+      ''system''
+    );
+  ELSE
+    -- Same as departure: add return point
+    INSERT INTO places (
+      name, 
+      category, 
+      trip_id, 
+      user_id, 
+      wish_level, 
+      stay_duration_minutes,
+      scheduled,
+      scheduled_date,
+      notes,
+      source
+    ) VALUES (
+      v_final_destination || '' (Return)'',
+      ''return_point'',
+      v_trip_id,
+      p_owner_id,
+      5,
+      60,
+      CASE WHEN p_end_date IS NOT NULL THEN true ELSE false END,
+      p_end_date,
+      ''Auto-generated return to departure location'',
+      ''system''
+    );
+  END IF;
+  
+  -- Update statistics
+  UPDATE trips SET 
+    total_members = 1,
+    total_places = (SELECT COUNT(*) FROM places WHERE trip_id = v_trip_id)
+  WHERE id = v_trip_id;
   
   RETURN v_trip_id;
 END;'
@@ -1062,6 +1263,10 @@ CREATE TRIGGER update_places_updated_at
   BEFORE UPDATE ON places 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_place_images_updated_at 
+  BEFORE UPDATE ON place_images 
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Location point update trigger
 CREATE TRIGGER update_places_location_point
   BEFORE INSERT OR UPDATE ON places
@@ -1096,6 +1301,7 @@ SELECT
   t.id,
   t.name,
   t.description,
+  t.departure_location,
   t.destination,
   t.start_date,
   t.end_date,
@@ -1118,6 +1324,7 @@ SELECT
   
   -- Progress info
   CASE 
+    WHEN t.start_date IS NULL OR t.end_date IS NULL THEN 'planning'
     WHEN t.start_date > CURRENT_DATE THEN 'planning'
     WHEN t.end_date < CURRENT_DATE THEN 'completed'
     ELSE 'active'
@@ -1176,6 +1383,41 @@ GROUP BY u.id, u.name, u.email, u.is_premium, u.last_active_at;
 -- =============================================================================
 
 -- Schema migrations table
+-- =============================================================================
+-- External API Quota Management
+-- =============================================================================
+
+CREATE TABLE api_quotas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  api_type TEXT NOT NULL, -- 'google_places', 'pexels'
+  used_count INTEGER DEFAULT 0,
+  quota_limit INTEGER NOT NULL,
+  last_reset TIMESTAMPTZ DEFAULT NOW(),
+  last_used TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  UNIQUE(api_type)
+);
+
+-- Add RLS for api_quotas (service role only)
+ALTER TABLE api_quotas ENABLE ROW LEVEL SECURITY;
+
+-- Allow service role to manage quotas
+CREATE POLICY "Service role can manage API quotas" ON api_quotas
+  FOR ALL 
+  TO service_role
+  USING (true);
+
+-- Trigger for updated_at
+CREATE TRIGGER update_api_quotas_updated_at
+  BEFORE UPDATE ON api_quotas
+  FOR EACH ROW
+  EXECUTE FUNCTION trigger_set_timestamp();
+
+-- Index for efficient quota checks
+CREATE INDEX idx_api_quotas_type_reset ON api_quotas(api_type, last_reset);
+
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version TEXT PRIMARY KEY,
   applied_at TIMESTAMPTZ DEFAULT NOW()
