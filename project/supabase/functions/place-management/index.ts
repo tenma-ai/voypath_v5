@@ -885,6 +885,19 @@ serve(async (req) => {
         } else if (pathSegments.length >= 2 && pathSegments[1] === 'hours') {
           // POST /place-management/hours (営業時間設定)
           return await handleSetPlaceHours(req, supabaseClient, user.id);
+        } else if (pathSegments.length >= 2 && pathSegments[1] === 'sync') {
+          if (pathSegments.length >= 3) {
+            if (pathSegments[2] === 'force') {
+              // POST /place-management/sync/force (強制同期実行)
+              return await handleForceSynchronization(req, supabaseClient, user.id);
+            } else if (pathSegments[2] === 'resolve') {
+              // POST /place-management/sync/resolve (競合解決)
+              return await handleResolveSyncConflicts(req, supabaseClient, user.id);
+            } else if (pathSegments[2] === 'validate') {
+              // POST /place-management/sync/validate (同期検証)
+              return await handleValidateSyncData(req, supabaseClient, user.id);
+            }
+          }
         } else {
           return await handleCreatePlace(req, supabaseClient, user.id);
         }
@@ -951,6 +964,22 @@ serve(async (req) => {
               } else if (pathSegments[2] === 'clusters') {
                 // GET /place-management/geo/clusters (地理的クラスタリング)
                 return await handleGeographicClustering(req, supabaseClient, user.id);
+              }
+            }
+          } else if (pathSegments[1] === 'sync') {
+            if (pathSegments.length >= 3) {
+              if (pathSegments[2] === 'status') {
+                // GET /place-management/sync/status (同期状況確認)
+                return await handleGetSyncStatus(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'integrity') {
+                // GET /place-management/sync/integrity (データ整合性チェック)
+                return await handleCheckDataIntegrity(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'conflicts') {
+                // GET /place-management/sync/conflicts (同期競合検出)
+                return await handleDetectSyncConflicts(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'stats') {
+                // GET /place-management/sync/stats (同期統計)
+                return await handleGetSyncStats(req, supabaseClient, user.id);
               }
             }
             }
@@ -2200,6 +2229,72 @@ async function getPlacesInViewport(
   }
   
   return result;
+}
+
+// Data Synchronization Interfaces
+interface SyncStatus {
+  trip_id: string;
+  last_sync: string;
+  sync_version: number;
+  places_count: number;
+  pending_changes: number;
+  conflicts_count: number;
+  status: 'synced' | 'pending' | 'conflict' | 'error';
+}
+
+interface SyncConflict {
+  place_id: string;
+  conflict_type: 'version_mismatch' | 'concurrent_edit' | 'data_corruption';
+  local_version: any;
+  remote_version: any;
+  last_modified_by: string;
+  last_modified_at: string;
+  resolution_required: boolean;
+}
+
+interface DataIntegrityCheck {
+  check_type: string;
+  passed: boolean;
+  details: string;
+  error_count: number;
+  suggestions: string[];
+}
+
+interface SyncRequest {
+  trip_id: string;
+  force_full_sync?: boolean;
+  include_images?: boolean;
+  include_ratings?: boolean;
+  include_opening_hours?: boolean;
+}
+
+interface SyncResponse {
+  success: boolean;
+  sync_id: string;
+  changes_applied: number;
+  conflicts_detected: number;
+  errors: string[];
+  performance: {
+    execution_time_ms: number;
+    data_transferred_kb: number;
+  };
+}
+
+interface ConflictResolution {
+  conflict_id: string;
+  resolution_strategy: 'use_local' | 'use_remote' | 'merge' | 'manual';
+  merged_data?: any;
+  comment?: string;
+}
+
+interface SyncStatistics {
+  total_syncs: number;
+  successful_syncs: number;
+  failed_syncs: number;
+  avg_sync_time_ms: number;
+  data_integrity_score: number;
+  last_24h_syncs: number;
+  conflict_resolution_rate: number;
 }
 
 // Geographic performance monitoring
@@ -7535,4 +7630,760 @@ function calculateViewportArea(viewport: {
   const area = R * R * latDiffRad * lngDiffRad * Math.cos(avgLatRad);
   
   return Math.abs(area);
+}
+
+// Data Synchronization Handler Functions
+
+async function handleGetSyncStatus(req: Request, supabaseClient: SupabaseClient, userId: string): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const tripId = url.searchParams.get('trip_id');
+
+    if (!tripId) {
+      return new Response(JSON.stringify({
+        error: 'trip_id parameter is required'
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Get trip sync status
+    const { data: syncData, error: syncError } = await supabaseClient
+      .from('trip_sync_status')
+      .select('*')
+      .eq('trip_id', tripId)
+      .single();
+
+    if (syncError && syncError.code !== 'PGRST116') {
+      throw syncError;
+    }
+
+    // Count places in trip
+    const { count: placesCount, error: placesError } = await supabaseClient
+      .from('places')
+      .select('*', { count: 'exact', head: true })
+      .eq('trip_id', tripId);
+
+    if (placesError) throw placesError;
+
+    // Check for pending changes
+    const { count: pendingCount, error: pendingError } = await supabaseClient
+      .from('place_changes')
+      .select('*', { count: 'exact', head: true })
+      .eq('trip_id', tripId)
+      .eq('status', 'pending');
+
+    if (pendingError) throw pendingError;
+
+    // Check for conflicts
+    const { count: conflictsCount, error: conflictsError } = await supabaseClient
+      .from('sync_conflicts')
+      .select('*', { count: 'exact', head: true })
+      .eq('trip_id', tripId)
+      .eq('resolved', false);
+
+    if (conflictsError) throw conflictsError;
+
+    const status: SyncStatus = {
+      trip_id: tripId,
+      last_sync: syncData?.last_sync || new Date().toISOString(),
+      sync_version: syncData?.sync_version || 1,
+      places_count: placesCount || 0,
+      pending_changes: pendingCount || 0,
+      conflicts_count: conflictsCount || 0,
+      status: conflictsCount > 0 ? 'conflict' : 
+              pendingCount > 0 ? 'pending' : 'synced'
+    };
+
+    return new Response(JSON.stringify({
+      success: true,
+      data: status
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error getting sync status:', error);
+    return new Response(JSON.stringify({
+      error: 'Failed to get sync status',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+}
+
+async function handleCheckDataIntegrity(req: Request, supabaseClient: SupabaseClient, userId: string): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const tripId = url.searchParams.get('trip_id');
+
+    if (!tripId) {
+      return new Response(JSON.stringify({
+        error: 'trip_id parameter is required'
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const checks: DataIntegrityCheck[] = [];
+
+    // Check 1: Orphaned places
+    const { data: orphanedPlaces, error: orphanError } = await supabaseClient
+      .from('places')
+      .select('id')
+      .eq('trip_id', tripId)
+      .is('trip_id', null);
+
+    checks.push({
+      check_type: 'orphaned_places',
+      passed: !orphanedPlaces || orphanedPlaces.length === 0,
+      details: `Found ${orphanedPlaces?.length || 0} orphaned places`,
+      error_count: orphanedPlaces?.length || 0,
+      suggestions: orphanedPlaces?.length > 0 ? ['Reassign places to correct trip', 'Remove orphaned places'] : []
+    });
+
+    // Check 2: Duplicate places
+    const { data: duplicates, error: dupError } = await supabaseClient
+      .from('places')
+      .select('name, latitude, longitude, count(*)')
+      .eq('trip_id', tripId)
+      .group('name, latitude, longitude')
+      .having('count(*) > 1');
+
+    checks.push({
+      check_type: 'duplicate_places',
+      passed: !duplicates || duplicates.length === 0,
+      details: `Found ${duplicates?.length || 0} sets of duplicate places`,
+      error_count: duplicates?.length || 0,
+      suggestions: duplicates?.length > 0 ? ['Merge duplicate places', 'Review place creation process'] : []
+    });
+
+    // Check 3: Invalid coordinates
+    const { data: invalidCoords, error: coordError } = await supabaseClient
+      .from('places')
+      .select('id, latitude, longitude')
+      .eq('trip_id', tripId)
+      .or('latitude.is.null,longitude.is.null,latitude.lt.-90,latitude.gt.90,longitude.lt.-180,longitude.gt.180');
+
+    checks.push({
+      check_type: 'invalid_coordinates',
+      passed: !invalidCoords || invalidCoords.length === 0,
+      details: `Found ${invalidCoords?.length || 0} places with invalid coordinates`,
+      error_count: invalidCoords?.length || 0,
+      suggestions: invalidCoords?.length > 0 ? ['Validate coordinate inputs', 'Use geocoding service'] : []
+    });
+
+    // Check 4: Missing required data
+    const { data: missingData, error: missingError } = await supabaseClient
+      .from('places')
+      .select('id, name, category')
+      .eq('trip_id', tripId)
+      .or('name.is.null,category.is.null');
+
+    checks.push({
+      check_type: 'missing_required_data',
+      passed: !missingData || missingData.length === 0,
+      details: `Found ${missingData?.length || 0} places with missing required data`,
+      error_count: missingData?.length || 0,
+      suggestions: missingData?.length > 0 ? ['Complete missing place information', 'Implement data validation'] : []
+    });
+
+    // Overall integrity score
+    const totalPassed = checks.filter(c => c.passed).length;
+    const integrityScore = (totalPassed / checks.length) * 100;
+
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        integrity_score: integrityScore,
+        checks: checks,
+        overall_status: integrityScore === 100 ? 'excellent' : 
+                       integrityScore >= 80 ? 'good' : 
+                       integrityScore >= 60 ? 'fair' : 'poor',
+        recommendations: integrityScore < 100 ? 
+          ['Run data cleanup procedures', 'Implement stricter validation', 'Regular integrity monitoring'] : 
+          ['Maintain current data quality standards']
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error checking data integrity:', error);
+    return new Response(JSON.stringify({
+      error: 'Failed to check data integrity',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+}
+
+async function handleDetectSyncConflicts(req: Request, supabaseClient: SupabaseClient, userId: string): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const tripId = url.searchParams.get('trip_id');
+
+    if (!tripId) {
+      return new Response(JSON.stringify({
+        error: 'trip_id parameter is required'
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Get unresolved conflicts
+    const { data: conflicts, error: conflictsError } = await supabaseClient
+      .from('sync_conflicts')
+      .select('*')
+      .eq('trip_id', tripId)
+      .eq('resolved', false)
+      .order('created_at', { ascending: false });
+
+    if (conflictsError) throw conflictsError;
+
+    // Detect new conflicts by checking for version mismatches
+    const { data: places, error: placesError } = await supabaseClient
+      .from('places')
+      .select('id, name, sync_version, last_modified_at, last_modified_by')
+      .eq('trip_id', tripId);
+
+    if (placesError) throw placesError;
+
+    const newConflicts: SyncConflict[] = [];
+
+    // Check for concurrent modifications
+    for (const place of places || []) {
+      const { data: modifications, error: modError } = await supabaseClient
+        .from('place_modifications')
+        .select('*')
+        .eq('place_id', place.id)
+        .gte('modified_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
+        .order('modified_at', { ascending: false });
+
+      if (modError) continue;
+
+      if (modifications && modifications.length > 1) {
+        // Multiple modifications in short time - potential conflict
+        const latestMod = modifications[0];
+        const conflictingMod = modifications[1];
+
+        newConflicts.push({
+          place_id: place.id,
+          conflict_type: 'concurrent_edit',
+          local_version: latestMod,
+          remote_version: conflictingMod,
+          last_modified_by: latestMod.modified_by,
+          last_modified_at: latestMod.modified_at,
+          resolution_required: true
+        });
+      }
+    }
+
+    // Store new conflicts
+    if (newConflicts.length > 0) {
+      const { error: insertError } = await supabaseClient
+        .from('sync_conflicts')
+        .insert(newConflicts.map(conflict => ({
+          trip_id: tripId,
+          place_id: conflict.place_id,
+          conflict_type: conflict.conflict_type,
+          conflict_data: conflict,
+          resolved: false,
+          created_at: new Date().toISOString()
+        })));
+
+      if (insertError) {
+        console.error('Error storing conflicts:', insertError);
+      }
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        existing_conflicts: conflicts || [],
+        new_conflicts: newConflicts,
+        total_conflicts: (conflicts?.length || 0) + newConflicts.length,
+        requires_resolution: newConflicts.some(c => c.resolution_required) || 
+                           (conflicts && conflicts.some(c => !c.resolved))
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error detecting sync conflicts:', error);
+    return new Response(JSON.stringify({
+      error: 'Failed to detect sync conflicts',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+}
+
+async function handleGetSyncStats(req: Request, supabaseClient: SupabaseClient, userId: string): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const tripId = url.searchParams.get('trip_id');
+    const timeRange = url.searchParams.get('time_range') || '24h';
+
+    if (!tripId) {
+      return new Response(JSON.stringify({
+        error: 'trip_id parameter is required'
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const since = new Date();
+    switch (timeRange) {
+      case '1h': since.setHours(since.getHours() - 1); break;
+      case '24h': since.setHours(since.getHours() - 24); break;
+      case '7d': since.setDate(since.getDate() - 7); break;
+      case '30d': since.setDate(since.getDate() - 30); break;
+      default: since.setHours(since.getHours() - 24);
+    }
+
+    // Get sync operations
+    const { data: syncOps, error: syncError } = await supabaseClient
+      .from('sync_operations')
+      .select('*')
+      .eq('trip_id', tripId)
+      .gte('created_at', since.toISOString());
+
+    if (syncError) throw syncError;
+
+    const totalSyncs = syncOps?.length || 0;
+    const successfulSyncs = syncOps?.filter(op => op.status === 'success').length || 0;
+    const failedSyncs = totalSyncs - successfulSyncs;
+
+    const avgSyncTime = totalSyncs > 0 ? 
+      (syncOps?.reduce((sum, op) => sum + (op.duration_ms || 0), 0) || 0) / totalSyncs : 0;
+
+    // Get data integrity score
+    const { data: integrityCheck } = await supabaseClient
+      .from('data_integrity_checks')
+      .select('integrity_score')
+      .eq('trip_id', tripId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    // Get conflicts resolution rate
+    const { data: allConflicts } = await supabaseClient
+      .from('sync_conflicts')
+      .select('resolved')
+      .eq('trip_id', tripId);
+
+    const totalConflicts = allConflicts?.length || 0;
+    const resolvedConflicts = allConflicts?.filter(c => c.resolved).length || 0;
+    const resolutionRate = totalConflicts > 0 ? (resolvedConflicts / totalConflicts) * 100 : 100;
+
+    const stats: SyncStatistics = {
+      total_syncs: totalSyncs,
+      successful_syncs: successfulSyncs,
+      failed_syncs: failedSyncs,
+      avg_sync_time_ms: Math.round(avgSyncTime),
+      data_integrity_score: integrityCheck?.integrity_score || 100,
+      last_24h_syncs: syncOps?.filter(op => 
+        new Date(op.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+      ).length || 0,
+      conflict_resolution_rate: Math.round(resolutionRate)
+    };
+
+    return new Response(JSON.stringify({
+      success: true,
+      data: stats,
+      meta: {
+        time_range: timeRange,
+        since: since.toISOString(),
+        generated_at: new Date().toISOString()
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error getting sync stats:', error);
+    return new Response(JSON.stringify({
+      error: 'Failed to get sync statistics',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+}
+
+async function handleForceSynchronization(req: Request, supabaseClient: SupabaseClient, userId: string): Promise<Response> {
+  try {
+    const syncRequest: SyncRequest = await req.json();
+
+    if (!syncRequest.trip_id) {
+      return new Response(JSON.stringify({
+        error: 'trip_id is required'
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const startTime = Date.now();
+    const syncId = `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Log sync start
+    await supabaseClient
+      .from('sync_operations')
+      .insert({
+        id: syncId,
+        trip_id: syncRequest.trip_id,
+        operation_type: 'force_sync',
+        status: 'in_progress',
+        initiated_by: userId,
+        created_at: new Date().toISOString()
+      });
+
+    let changesApplied = 0;
+    let conflictsDetected = 0;
+    const errors: string[] = [];
+
+    try {
+      // Get all places for the trip
+      const { data: places, error: placesError } = await supabaseClient
+        .from('places')
+        .select('*')
+        .eq('trip_id', syncRequest.trip_id);
+
+      if (placesError) throw placesError;
+
+      // Sync place data
+      for (const place of places || []) {
+        try {
+          // Update sync version and timestamp
+          const { error: updateError } = await supabaseClient
+            .from('places')
+            .update({
+              sync_version: (place.sync_version || 0) + 1,
+              last_synced_at: new Date().toISOString(),
+              synced_by: userId
+            })
+            .eq('id', place.id);
+
+          if (updateError) throw updateError;
+
+          changesApplied++;
+
+          // Sync additional data if requested
+          if (syncRequest.include_images) {
+            const { error: imageError } = await supabaseClient
+              .from('place_images')
+              .update({ last_synced_at: new Date().toISOString() })
+              .eq('place_id', place.id);
+
+            if (imageError) errors.push(`Image sync failed for place ${place.id}: ${imageError.message}`);
+          }
+
+          if (syncRequest.include_ratings) {
+            const { error: ratingError } = await supabaseClient
+              .from('place_ratings')
+              .update({ last_synced_at: new Date().toISOString() })
+              .eq('place_id', place.id);
+
+            if (ratingError) errors.push(`Rating sync failed for place ${place.id}: ${ratingError.message}`);
+          }
+
+          if (syncRequest.include_opening_hours) {
+            const { error: hoursError } = await supabaseClient
+              .from('place_opening_hours')
+              .update({ last_synced_at: new Date().toISOString() })
+              .eq('place_id', place.id);
+
+            if (hoursError) errors.push(`Hours sync failed for place ${place.id}: ${hoursError.message}`);
+          }
+
+        } catch (placeError) {
+          errors.push(`Place sync failed for ${place.id}: ${placeError instanceof Error ? placeError.message : 'Unknown error'}`);
+          conflictsDetected++;
+        }
+      }
+
+      // Update trip sync status
+      const { error: tripSyncError } = await supabaseClient
+        .from('trip_sync_status')
+        .upsert({
+          trip_id: syncRequest.trip_id,
+          last_sync: new Date().toISOString(),
+          sync_version: Date.now(),
+          synced_by: userId
+        });
+
+      if (tripSyncError) errors.push(`Trip sync status update failed: ${tripSyncError.message}`);
+
+      const executionTime = Date.now() - startTime;
+      const dataTransferred = changesApplied * 1.5; // Approximate KB
+
+      const response: SyncResponse = {
+        success: errors.length === 0,
+        sync_id: syncId,
+        changes_applied: changesApplied,
+        conflicts_detected: conflictsDetected,
+        errors: errors,
+        performance: {
+          execution_time_ms: executionTime,
+          data_transferred_kb: dataTransferred
+        }
+      };
+
+      // Update sync operation status
+      await supabaseClient
+        .from('sync_operations')
+        .update({
+          status: errors.length === 0 ? 'success' : 'failed',
+          changes_applied: changesApplied,
+          conflicts_detected: conflictsDetected,
+          duration_ms: executionTime,
+          error_details: errors.length > 0 ? errors : null,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', syncId);
+
+      return new Response(JSON.stringify({
+        success: true,
+        data: response
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+    } catch (syncError) {
+      // Mark sync as failed
+      await supabaseClient
+        .from('sync_operations')
+        .update({
+          status: 'failed',
+          error_details: [syncError instanceof Error ? syncError.message : 'Unknown sync error'],
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', syncId);
+
+      throw syncError;
+    }
+
+  } catch (error) {
+    console.error('Error in force synchronization:', error);
+    return new Response(JSON.stringify({
+      error: 'Force synchronization failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+}
+
+async function handleResolveSyncConflicts(req: Request, supabaseClient: SupabaseClient, userId: string): Promise<Response> {
+  try {
+    const resolutions: ConflictResolution[] = await req.json();
+
+    if (!Array.isArray(resolutions) || resolutions.length === 0) {
+      return new Response(JSON.stringify({
+        error: 'Array of conflict resolutions is required'
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const results = [];
+
+    for (const resolution of resolutions) {
+      try {
+        // Get conflict details
+        const { data: conflict, error: conflictError } = await supabaseClient
+          .from('sync_conflicts')
+          .select('*')
+          .eq('id', resolution.conflict_id)
+          .single();
+
+        if (conflictError) throw conflictError;
+
+        if (!conflict) {
+          results.push({
+            conflict_id: resolution.conflict_id,
+            success: false,
+            error: 'Conflict not found'
+          });
+          continue;
+        }
+
+        // Apply resolution based on strategy
+        let resolvedData = null;
+
+        switch (resolution.resolution_strategy) {
+          case 'use_local':
+            resolvedData = conflict.conflict_data.local_version;
+            break;
+          case 'use_remote':
+            resolvedData = conflict.conflict_data.remote_version;
+            break;
+          case 'merge':
+            resolvedData = resolution.merged_data || {
+              ...conflict.conflict_data.remote_version,
+              ...conflict.conflict_data.local_version
+            };
+            break;
+          case 'manual':
+            resolvedData = resolution.merged_data;
+            break;
+          default:
+            throw new Error(`Invalid resolution strategy: ${resolution.resolution_strategy}`);
+        }
+
+        // Update the place with resolved data
+        if (resolvedData) {
+          const { error: updateError } = await supabaseClient
+            .from('places')
+            .update({
+              ...resolvedData,
+              sync_version: (conflict.conflict_data.local_version.sync_version || 0) + 1,
+              last_modified_at: new Date().toISOString(),
+              last_modified_by: userId
+            })
+            .eq('id', conflict.place_id);
+
+          if (updateError) throw updateError;
+        }
+
+        // Mark conflict as resolved
+        const { error: resolveError } = await supabaseClient
+          .from('sync_conflicts')
+          .update({
+            resolved: true,
+            resolution_strategy: resolution.resolution_strategy,
+            resolved_by: userId,
+            resolved_at: new Date().toISOString(),
+            resolution_comment: resolution.comment
+          })
+          .eq('id', resolution.conflict_id);
+
+        if (resolveError) throw resolveError;
+
+        results.push({
+          conflict_id: resolution.conflict_id,
+          success: true,
+          applied_strategy: resolution.resolution_strategy
+        });
+
+      } catch (resolutionError) {
+        results.push({
+          conflict_id: resolution.conflict_id,
+          success: false,
+          error: resolutionError instanceof Error ? resolutionError.message : 'Unknown error'
+        });
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.length - successCount;
+
+    return new Response(JSON.stringify({
+      success: failureCount === 0,
+      data: {
+        total_resolutions: results.length,
+        successful_resolutions: successCount,
+        failed_resolutions: failureCount,
+        results: results
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error resolving sync conflicts:', error);
+    return new Response(JSON.stringify({
+      error: 'Failed to resolve sync conflicts',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+}
+
+async function handleValidateSyncData(req: Request, supabaseClient: SupabaseClient, userId: string): Promise<Response> {
+  try {
+    const { trip_id } = await req.json();
+
+    if (!trip_id) {
+      return new Response(JSON.stringify({
+        error: 'trip_id is required'
+      }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    const validationResults = [];
+
+    // Validate sync versions consistency
+    const { data: places, error: placesError } = await supabaseClient
+      .from('places')
+      .select('id, name, sync_version, last_synced_at')
+      .eq('trip_id', trip_id);
+
+    if (placesError) throw placesError;
+
+    // Check for version inconsistencies
+    const versionIssues = (places || []).filter(place => 
+      !place.sync_version || place.sync_version < 1
+    );
+
+    validationResults.push({
+      validation_type: 'sync_versions',
+      passed: versionIssues.length === 0,
+      issues_found: versionIssues.length,
+      details: versionIssues.length > 0 ? 
+        `${versionIssues.length} places have invalid sync versions` : 
+        'All places have valid sync versions'
+    });
+
+    // Validate sync timestamps
+    const staleThreshold = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
+    const stalePlaces = (places || []).filter(place => 
+      !place.last_synced_at || new Date(place.last_synced_at) < staleThreshold
+    );
+
+    validationResults.push({
+      validation_type: 'sync_freshness',
+      passed: stalePlaces.length === 0,
+      issues_found: stalePlaces.length,
+      details: stalePlaces.length > 0 ? 
+        `${stalePlaces.length} places haven't been synced in over 7 days` : 
+        'All places have recent sync timestamps'
+    });
+
+    // Validate data consistency
+    const { data: orphanedData } = await supabaseClient
+      .from('place_images')
+      .select('place_id')
+      .not('place_id', 'in', `(${(places || []).map(p => p.id).join(',')})`);
+
+    validationResults.push({
+      validation_type: 'data_consistency',
+      passed: !orphanedData || orphanedData.length === 0,
+      issues_found: orphanedData?.length || 0,
+      details: orphanedData?.length > 0 ? 
+        `${orphanedData.length} orphaned image records found` : 
+        'No orphaned data detected'
+    });
+
+    // Calculate overall validation score
+    const passedValidations = validationResults.filter(v => v.passed).length;
+    const validationScore = (passedValidations / validationResults.length) * 100;
+
+    // Store validation results
+    await supabaseClient
+      .from('sync_validations')
+      .insert({
+        trip_id: trip_id,
+        validation_score: validationScore,
+        validation_results: validationResults,
+        validated_by: userId,
+        validated_at: new Date().toISOString()
+      });
+
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        validation_score: validationScore,
+        status: validationScore === 100 ? 'excellent' : 
+                validationScore >= 80 ? 'good' : 
+                validationScore >= 60 ? 'fair' : 'poor',
+        validations: validationResults,
+        recommendations: validationScore < 100 ? [
+          'Run data cleanup procedures',
+          'Perform full synchronization',
+          'Review sync frequency settings'
+        ] : ['Sync data is healthy']
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error validating sync data:', error);
+    return new Response(JSON.stringify({
+      error: 'Failed to validate sync data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
 }
