@@ -982,6 +982,21 @@ serve(async (req) => {
                 return await handleGetSyncStats(req, supabaseClient, user.id);
               }
             }
+          } else if (pathSegments[1] === 'analyze') {
+            if (pathSegments.length >= 3) {
+              if (pathSegments[2] === 'deletion') {
+                // GET /place-management/analyze/deletion (削除影響分析)
+                return await handleDeletionImpactAnalysis(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'dependencies') {
+                // GET /place-management/analyze/dependencies (依存関係分析)
+                return await handleDependencyAnalysis(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'cascade') {
+                // GET /place-management/analyze/cascade (カスケード削除分析)
+                return await handleCascadeDeletionAnalysis(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'safety') {
+                // GET /place-management/analyze/safety (削除安全性分析)
+                return await handleDeletionSafetyAnalysis(req, supabaseClient, user.id);
+              }
             }
           } else {
             // GET /place-management/{place_id}
@@ -2295,6 +2310,114 @@ interface SyncStatistics {
   data_integrity_score: number;
   last_24h_syncs: number;
   conflict_resolution_rate: number;
+}
+
+// Place Deletion Impact Analysis Interfaces
+interface DeletionImpact {
+  place_id: string;
+  place_name: string;
+  impact_severity: 'low' | 'medium' | 'high' | 'critical';
+  affected_systems: string[];
+  affected_users: string[];
+  dependent_places: PlaceDependency[];
+  schedule_conflicts: ScheduleConflict[];
+  optimization_effects: OptimizationEffect[];
+  estimated_recovery_time: number; // in minutes
+  recommendations: string[];
+}
+
+interface PlaceDependency {
+  dependent_place_id: string;
+  dependent_place_name: string;
+  dependency_type: 'route' | 'group' | 'prerequisite' | 'alternative';
+  dependency_strength: number; // 0-1 scale
+  suggested_alternatives: string[];
+}
+
+interface ScheduleConflict {
+  user_id: string;
+  username: string;
+  scheduled_time: string;
+  conflict_type: 'direct_visit' | 'route_dependency' | 'group_activity';
+  resolution_options: string[];
+}
+
+interface OptimizationEffect {
+  optimization_type: 'route' | 'time' | 'cost' | 'preference';
+  current_score: number;
+  projected_score: number;
+  impact_percentage: number;
+  mitigation_strategies: string[];
+}
+
+interface DeletionSafety {
+  is_safe_to_delete: boolean;
+  safety_score: number; // 0-100
+  warning_level: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  blocking_factors: BlockingFactor[];
+  prerequisites: string[];
+  recommended_actions: string[];
+}
+
+interface BlockingFactor {
+  factor_type: 'active_schedule' | 'user_dependency' | 'system_critical' | 'data_integrity';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  resolution_required: boolean;
+  estimated_resolution_time: number;
+}
+
+interface CascadeDeletionAnalysis {
+  cascade_depth: number;
+  total_affected_records: number;
+  affected_tables: string[];
+  deletion_order: string[];
+  potential_data_loss: DataLossEstimate[];
+  rollback_complexity: 'simple' | 'moderate' | 'complex' | 'critical';
+  estimated_execution_time: number;
+}
+
+interface DataLossEstimate {
+  table_name: string;
+  records_affected: number;
+  data_importance: 'low' | 'medium' | 'high' | 'critical';
+  recovery_possibility: 'impossible' | 'difficult' | 'moderate' | 'easy';
+  backup_recommended: boolean;
+}
+
+interface DependencyAnalysis {
+  direct_dependencies: Dependency[];
+  indirect_dependencies: Dependency[];
+  circular_dependencies: Dependency[];
+  dependency_graph: DependencyNode[];
+  critical_path_analysis: CriticalPath[];
+}
+
+interface Dependency {
+  from_table: string;
+  from_id: string;
+  to_table: string;
+  to_id: string;
+  relationship_type: 'foreign_key' | 'reference' | 'logical' | 'functional';
+  is_critical: boolean;
+  can_be_nullified: boolean;
+}
+
+interface DependencyNode {
+  id: string;
+  type: string;
+  name: string;
+  children: string[];
+  parents: string[];
+  depth_level: number;
+}
+
+interface CriticalPath {
+  path_id: string;
+  nodes: string[];
+  path_length: number;
+  impact_score: number;
+  alternative_paths: string[][];
 }
 
 // Geographic performance monitoring
@@ -8386,4 +8509,506 @@ async function handleValidateSyncData(req: Request, supabaseClient: SupabaseClie
       details: error instanceof Error ? error.message : 'Unknown error'
     }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
+}
+
+// TODO-085: Place Deletion Impact Analysis API Implementation
+async function handleDeletionImpactAnalysis(
+  req: Request, 
+  supabaseClient: any, 
+  userId: string
+): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const placeId = url.searchParams.get('place_id');
+    
+    if (!placeId) {
+      throw new Error('place_id parameter is required');
+    }
+
+    // Verify user has access to this place
+    const { data: place, error: placeError } = await supabaseClient
+      .from('places')
+      .select(`
+        *,
+        trip:trips!inner(
+          id, name, start_date, end_date,
+          trip_members!inner(user_id, role)
+        )
+      `)
+      .eq('id', placeId)
+      .eq('trip.trip_members.user_id', userId)
+      .single();
+
+    if (placeError || !place) {
+      return new Response(
+        JSON.stringify({ error: 'Place not found or access denied' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        }
+      );
+    }
+
+    // Perform comprehensive deletion impact analysis
+    const impactAnalysis = await performDeletionImpactAnalysis(place, supabaseClient);
+    
+    // Record usage event
+    await recordUsageEvent(supabaseClient, userId, 'deletion_impact_analysis', {
+      place_id: placeId,
+      place_name: place.name,
+      trip_id: place.trip_id,
+      impact_severity: impactAnalysis.impact_severity,
+      affected_systems_count: impactAnalysis.affected_systems.length,
+      affected_users_count: impactAnalysis.affected_users.length
+    });
+
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        place_info: {
+          id: place.id,
+          name: place.name,
+          category: place.category,
+          trip_id: place.trip_id,
+          user_id: place.user_id
+        },
+        impact_analysis: impactAnalysis,
+        analysis_timestamp: new Date().toISOString(),
+        analyzed_by: userId
+      }
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error analyzing deletion impact:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: 'Failed to analyze deletion impact',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+}
+
+async function performDeletionImpactAnalysis(
+  place: any, 
+  supabaseClient: any
+): Promise<DeletionImpact> {
+  const startTime = Date.now();
+
+  // 1. Analyze affected systems
+  const affectedSystems = await analyzeAffectedSystems(place, supabaseClient);
+  
+  // 2. Analyze affected users
+  const affectedUsers = await analyzeAffectedUsers(place, supabaseClient);
+  
+  // 3. Analyze dependent places
+  const dependentPlaces = await analyzeDependentPlaces(place, supabaseClient);
+  
+  // 4. Analyze schedule conflicts
+  const scheduleConflicts = await analyzeScheduleConflicts(place, supabaseClient);
+  
+  // 5. Analyze optimization effects
+  const optimizationEffects = await analyzeOptimizationEffects(place, supabaseClient);
+  
+  // 6. Calculate impact severity
+  const impactSeverity = calculateImpactSeverity(
+    affectedSystems, 
+    affectedUsers, 
+    dependentPlaces, 
+    scheduleConflicts, 
+    optimizationEffects
+  );
+
+  const executionTime = Date.now() - startTime;
+
+  return {
+    place_id: place.id,
+    place_name: place.name,
+    impact_severity: impactSeverity,
+    affected_systems: affectedSystems,
+    affected_users: affectedUsers,
+    dependent_places: dependentPlaces,
+    schedule_conflicts: scheduleConflicts,
+    optimization_effects: optimizationEffects,
+    estimated_recovery_time: calculateRecoveryTime(dependentPlaces, scheduleConflicts),
+    recommendations: generateRecommendations(impactSeverity, dependentPlaces, scheduleConflicts, optimizationEffects)
+  };
+}
+
+async function analyzeAffectedSystems(place: any, supabaseClient: any): Promise<string[]> {
+  const affectedSystems: string[] = [];
+
+  // Check if place is scheduled
+  if (place.scheduled) {
+    affectedSystems.push('trip_schedule');
+  }
+
+  // Check if place has images
+  const { data: images } = await supabaseClient
+    .from('place_images')
+    .select('id')
+    .eq('place_id', place.id);
+  
+  if (images && images.length > 0) {
+    affectedSystems.push('image_storage');
+  }
+
+  // Check if place has ratings
+  const { data: ratings } = await supabaseClient
+    .from('place_ratings')
+    .select('id')
+    .eq('place_id', place.id);
+  
+  if (ratings && ratings.length > 0) {
+    affectedSystems.push('rating_system');
+  }
+
+  // Check if place has opening hours
+  const { data: hours } = await supabaseClient
+    .from('place_opening_hours')
+    .select('id')
+    .eq('place_id', place.id);
+  
+  if (hours && hours.length > 0) {
+    affectedSystems.push('opening_hours');
+  }
+
+  // Check optimization results
+  const { data: optimizations } = await supabaseClient
+    .from('optimization_results')
+    .select('id')
+    .eq('trip_id', place.trip_id);
+  
+  if (optimizations && optimizations.length > 0) {
+    affectedSystems.push('route_optimization');
+  }
+
+  // Check messages/notifications
+  const { data: messages } = await supabaseClient
+    .from('messages')
+    .select('id')
+    .eq('trip_id', place.trip_id)
+    .like('content', `%${place.name}%`);
+  
+  if (messages && messages.length > 0) {
+    affectedSystems.push('messaging_system');
+  }
+
+  return affectedSystems;
+}
+
+async function analyzeAffectedUsers(place: any, supabaseClient: any): Promise<string[]> {
+  // Get all trip members
+  const { data: tripMembers } = await supabaseClient
+    .from('trip_members')
+    .select('user_id')
+    .eq('trip_id', place.trip_id);
+
+  return tripMembers ? tripMembers.map((member: any) => member.user_id) : [];
+}
+
+async function analyzeDependentPlaces(place: any, supabaseClient: any): Promise<PlaceDependency[]> {
+  const dependencies: PlaceDependency[] = [];
+
+  // Find places that are geographically close (might affect route optimization)
+  const { data: nearbyPlaces } = await supabaseClient
+    .from('places')
+    .select('id, name, latitude, longitude, scheduled, scheduled_date')
+    .eq('trip_id', place.trip_id)
+    .neq('id', place.id);
+
+  if (nearbyPlaces && place.latitude && place.longitude) {
+    for (const nearbyPlace of nearbyPlaces) {
+      if (nearbyPlace.latitude && nearbyPlace.longitude) {
+        const distance = calculateHaversineDistance(
+          { latitude: place.latitude, longitude: place.longitude },
+          { latitude: nearbyPlace.latitude, longitude: nearbyPlace.longitude }
+        );
+
+        // If within 5km, consider it dependent
+        if (distance <= 5) {
+          dependencies.push({
+            dependent_place_id: nearbyPlace.id,
+            dependent_place_name: nearbyPlace.name,
+            dependency_type: 'route',
+            dependency_strength: distance <= 1 ? 0.9 : distance <= 3 ? 0.6 : 0.3,
+            suggested_alternatives: [`Consider visiting ${nearbyPlace.name} as alternative`, 'Adjust route to minimize travel time']
+          });
+        }
+      }
+    }
+  }
+
+  // Find places scheduled on the same day
+  if (place.scheduled && place.scheduled_date) {
+    const { data: sameDayPlaces } = await supabaseClient
+      .from('places')
+      .select('id, name, scheduled_date, arrival_time, departure_time')
+      .eq('trip_id', place.trip_id)
+      .eq('scheduled_date', place.scheduled_date)
+      .neq('id', place.id);
+
+    if (sameDayPlaces) {
+      for (const sameDayPlace of sameDayPlaces) {
+        dependencies.push({
+          dependent_place_id: sameDayPlace.id,
+          dependent_place_name: sameDayPlace.name,
+          dependency_type: 'group',
+          dependency_strength: 0.7,
+          suggested_alternatives: [`Reschedule ${sameDayPlace.name} to different day`, 'Combine with nearby activities']
+        });
+      }
+    }
+  }
+
+  return dependencies;
+}
+
+async function analyzeScheduleConflicts(place: any, supabaseClient: any): Promise<ScheduleConflict[]> {
+  const conflicts: ScheduleConflict[] = [];
+
+  if (!place.scheduled || !place.scheduled_date) {
+    return conflicts;
+  }
+
+  // Find conflicts with adjacent scheduled places
+  const { data: scheduledPlaces } = await supabaseClient
+    .from('places')
+    .select('id, name, scheduled_date, arrival_time, departure_time')
+    .eq('trip_id', place.trip_id)
+    .eq('scheduled_date', place.scheduled_date)
+    .not('arrival_time', 'is', null)
+    .not('departure_time', 'is', null)
+    .neq('id', place.id)
+    .order('arrival_time');
+
+  if (scheduledPlaces && place.arrival_time && place.departure_time) {
+    const placeStart = new Date(`${place.scheduled_date}T${place.arrival_time}`);
+    const placeEnd = new Date(`${place.scheduled_date}T${place.departure_time}`);
+
+    for (const scheduledPlace of scheduledPlaces) {
+      const scheduledStart = new Date(`${scheduledPlace.scheduled_date}T${scheduledPlace.arrival_time}`);
+      const scheduledEnd = new Date(`${scheduledPlace.scheduled_date}T${scheduledPlace.departure_time}`);
+
+      // Check for temporal proximity (within 2 hours)
+      const timeDiff = Math.min(
+        Math.abs(scheduledStart.getTime() - placeEnd.getTime()),
+        Math.abs(placeStart.getTime() - scheduledEnd.getTime())
+      ) / (1000 * 60 * 60); // Convert to hours
+
+      if (timeDiff <= 2) {
+        conflicts.push({
+          user_id: place.user_id,
+          username: 'Trip Member', // Simplified for now
+          scheduled_time: place.arrival_time,
+          conflict_type: 'direct_visit',
+          resolution_options: [
+            timeDiff <= 1 ? 'Adjust times of adjacent places' : 'Schedule gap is manageable',
+            'Consider adding buffer time',
+            'Reschedule adjacent activities'
+          ]
+        });
+      }
+    }
+  }
+
+  return conflicts;
+}
+
+async function analyzeOptimizationEffects(place: any, supabaseClient: any): Promise<OptimizationEffect[]> {
+  const effects: OptimizationEffect[] = [];
+
+  // Check if there are existing optimization results
+  const { data: optimizationResults } = await supabaseClient
+    .from('optimization_results')
+    .select('optimized_route, optimization_score')
+    .eq('trip_id', place.trip_id)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (optimizationResults && optimizationResults.length > 0) {
+    const currentScore = optimizationResults[0].optimization_score;
+
+    // Simulate route optimization effect
+    effects.push({
+      optimization_type: 'route',
+      current_score: currentScore.overall || 0.75,
+      projected_score: Math.max(0, (currentScore.overall || 0.75) - 0.05), // Slight decrease
+      impact_percentage: -5,
+      mitigation_strategies: [
+        'Re-run route optimization after deletion',
+        'Consider adding alternative places nearby',
+        'Adjust remaining places\' time allocation'
+      ]
+    });
+
+    effects.push({
+      optimization_type: 'time',
+      current_score: currentScore.efficiency || 0.70,
+      projected_score: Math.max(0, (currentScore.efficiency || 0.70) + 0.03), // Slight improvement
+      impact_percentage: 3,
+      mitigation_strategies: [
+        'Time allocation will improve with fewer places',
+        'More buffer time available for remaining places'
+      ]
+    });
+
+    // If place has high wish level, it affects preference optimization
+    if (place.wish_level >= 4) {
+      effects.push({
+        optimization_type: 'preference',
+        current_score: currentScore.fairness || 0.80,
+        projected_score: Math.max(0, (currentScore.fairness || 0.80) - 0.10),
+        impact_percentage: -10,
+        mitigation_strategies: [
+          'High-preference place removal affects fairness',
+          'Consider adding alternative high-wish places',
+          'Adjust remaining places\' wish levels if appropriate'
+        ]
+      });
+    }
+  }
+
+  return effects;
+}
+
+function calculateImpactSeverity(
+  affectedSystems: string[],
+  affectedUsers: string[],
+  dependentPlaces: PlaceDependency[],
+  scheduleConflicts: ScheduleConflict[],
+  optimizationEffects: OptimizationEffect[]
+): 'low' | 'medium' | 'high' | 'critical' {
+  let score = 0;
+
+  // System impact scoring
+  score += affectedSystems.length * 10;
+
+  // User impact scoring
+  score += Math.min(affectedUsers.length * 5, 50); // Cap at 50
+
+  // Dependencies scoring
+  const highDependencies = dependentPlaces.filter(d => d.dependency_strength >= 0.8).length;
+  const mediumDependencies = dependentPlaces.filter(d => d.dependency_strength >= 0.5 && d.dependency_strength < 0.8).length;
+  score += highDependencies * 15 + mediumDependencies * 10;
+
+  // Schedule conflicts scoring (simplified since we don't have severity in the interface)
+  score += scheduleConflicts.length * 15;
+
+  // Optimization effects scoring
+  const significantEffects = optimizationEffects.filter(e => Math.abs(e.impact_percentage) >= 10).length;
+  score += significantEffects * 15;
+
+  // Determine severity
+  if (score >= 80) return 'critical';
+  if (score >= 50) return 'high';
+  if (score >= 20) return 'medium';
+  return 'low';
+}
+
+function calculateConfidenceScore(place: any): number {
+  let confidence = 0.6; // Base confidence
+
+  // Increase confidence based on available data
+  if (place.latitude && place.longitude) confidence += 0.1;
+  if (place.scheduled) confidence += 0.1;
+  if (place.rating) confidence += 0.05;
+  if (place.price_level) confidence += 0.05;
+  if (place.estimated_cost) confidence += 0.05;
+  if (place.opening_hours) confidence += 0.05;
+
+  return Math.min(confidence, 1.0);
+}
+
+function calculateRecoveryTime(
+  dependentPlaces: PlaceDependency[],
+  scheduleConflicts: ScheduleConflict[]
+): number {
+  // Base recovery time: 30 minutes
+  let recoveryTime = 30;
+  
+  // Add time based on dependencies
+  const highDependencies = dependentPlaces.filter(d => d.dependency_strength >= 0.8).length;
+  const mediumDependencies = dependentPlaces.filter(d => d.dependency_strength >= 0.5 && d.dependency_strength < 0.8).length;
+  
+  recoveryTime += highDependencies * 60; // 1 hour per high dependency
+  recoveryTime += mediumDependencies * 30; // 30 minutes per medium dependency
+  
+  // Add time based on schedule conflicts
+  recoveryTime += scheduleConflicts.length * 20; // 20 minutes per conflict
+  
+  return recoveryTime;
+}
+
+function generateRecommendations(
+  impactSeverity: 'low' | 'medium' | 'high' | 'critical',
+  dependentPlaces: PlaceDependency[],
+  scheduleConflicts: ScheduleConflict[],
+  optimizationEffects: OptimizationEffect[]
+): string[] {
+  const recommendations: string[] = [];
+  
+  // General recommendations based on severity
+  switch (impactSeverity) {
+    case 'critical':
+      recommendations.push('Consider keeping this place due to critical impact');
+      recommendations.push('If deletion is necessary, plan comprehensive mitigation strategy');
+      break;
+    case 'high':
+      recommendations.push('High impact detected - proceed with caution');
+      recommendations.push('Review all affected systems before deletion');
+      break;
+    case 'medium':
+      recommendations.push('Moderate impact expected - manageable with planning');
+      break;
+    case 'low':
+      recommendations.push('Low impact - safe to delete with minimal consequences');
+      break;
+  }
+  
+  // Dependency-specific recommendations
+  if (dependentPlaces.length > 0) {
+    recommendations.push(`Review ${dependentPlaces.length} dependent place(s) before deletion`);
+    const highDeps = dependentPlaces.filter(d => d.dependency_strength >= 0.8);
+    if (highDeps.length > 0) {
+      recommendations.push('Consider alternative places for high-dependency relationships');
+    }
+  }
+  
+  // Schedule-specific recommendations
+  if (scheduleConflicts.length > 0) {
+    recommendations.push('Adjust schedule to minimize conflicts after deletion');
+    recommendations.push('Allow extra buffer time for schedule reorganization');
+  }
+  
+  // Optimization-specific recommendations
+  const significantEffects = optimizationEffects.filter(e => Math.abs(e.impact_percentage) >= 10);
+  if (significantEffects.length > 0) {
+    recommendations.push('Re-run route optimization after deletion');
+    recommendations.push('Consider impact on overall trip efficiency');
+  }
+  
+  return recommendations;
+}
+
+function calculateHaversineDistance(
+  point1: { latitude: number; longitude: number },
+  point2: { latitude: number; longitude: number }
+): number {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (point2.latitude - point1.latitude) * Math.PI / 180;
+  const dLon = (point2.longitude - point1.longitude) * Math.PI / 180;
+  
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(point1.latitude * Math.PI / 180) * Math.cos(point2.latitude * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
 }
