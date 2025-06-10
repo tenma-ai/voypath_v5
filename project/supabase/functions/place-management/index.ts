@@ -71,6 +71,128 @@ interface PlaceSearchRequest {
   sort_order?: 'asc' | 'desc';
 }
 
+// TODO-087: Advanced Search & Filter Interfaces
+interface AdvancedPlaceSearchRequest extends PlaceSearchRequest {
+  // Temporal filtering
+  date_range?: {
+    start_date?: string; // YYYY-MM-DD
+    end_date?: string;   // YYYY-MM-DD
+  };
+  time_range?: {
+    start_time?: string; // HH:MM
+    end_time?: string;   // HH:MM
+  };
+  day_of_week?: number[]; // 0-6 (Sunday to Saturday)
+  
+  // Advanced text search
+  text_search?: {
+    fields?: ('name' | 'address' | 'notes' | 'description')[];
+    mode?: 'exact' | 'fuzzy' | 'semantic';
+    boost_recent?: boolean;
+    boost_popular?: boolean;
+  };
+  
+  // Multi-criteria filtering
+  complex_filters?: {
+    and_conditions?: PlaceFilterCondition[];
+    or_conditions?: PlaceFilterCondition[];
+    not_conditions?: PlaceFilterCondition[];
+  };
+  
+  // Clustering and grouping
+  cluster_options?: {
+    enable_clustering?: boolean;
+    cluster_radius_km?: number;
+    min_cluster_size?: number;
+    return_clusters?: boolean;
+  };
+  
+  // Advanced sorting
+  multi_sort?: {
+    primary: SortCriteria;
+    secondary?: SortCriteria;
+    tertiary?: SortCriteria;
+  };
+  
+  // Analytics and scoring
+  include_analytics?: boolean;
+  custom_scoring?: {
+    weight_popularity?: number;
+    weight_distance?: number;
+    weight_rating?: number;
+    weight_recency?: number;
+    weight_user_preference?: number;
+  };
+  
+  // Output customization
+  include_related_data?: {
+    include_images?: boolean;
+    include_ratings?: boolean;
+    include_opening_hours?: boolean;
+    include_user_activity?: boolean;
+    include_similar_places?: boolean;
+  };
+  
+  // Performance options
+  use_cache?: boolean;
+  cache_duration_minutes?: number;
+  enable_faceted_search?: boolean;
+}
+
+interface PlaceFilterCondition {
+  field: string;
+  operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains' | 'starts_with' | 'in' | 'not_in' | 'between';
+  value: any;
+  case_sensitive?: boolean;
+}
+
+interface SortCriteria {
+  field: string;
+  order: 'asc' | 'desc';
+  null_handling?: 'first' | 'last';
+}
+
+interface FacetedSearchResult {
+  facets: {
+    categories: { name: string; count: number }[];
+    price_levels: { level: number; count: number }[];
+    ratings: { range: string; count: number }[];
+    locations: { area: string; count: number }[];
+    tags: { tag: string; count: number }[];
+  };
+  filters_applied: PlaceFilterCondition[];
+  total_without_filters: number;
+}
+
+interface PlaceCluster {
+  cluster_id: string;
+  center: {
+    latitude: number;
+    longitude: number;
+  };
+  radius_km: number;
+  place_count: number;
+  places: any[];
+  cluster_score: number;
+  representative_place: any;
+}
+
+interface AdvancedSearchResponse {
+  success: boolean;
+  places: any[];
+  total_count: number;
+  faceted_results?: FacetedSearchResult;
+  clusters?: PlaceCluster[];
+  analytics?: {
+    search_performance_ms: number;
+    result_quality_score: number;
+    personalization_applied: boolean;
+    cache_hit: boolean;
+  };
+  search_suggestions?: string[];
+  related_searches?: string[];
+}
+
 interface PlaceListRequest {
   list_type: 'trip' | 'user' | 'all_user_trips';
   trip_id?: string;
@@ -984,6 +1106,11 @@ serve(async (req) => {
               return await handleValidateSyncData(req, supabaseClient, user.id);
             }
           }
+        } else if (pathSegments.length >= 2 && pathSegments[1] === 'search') {
+          if (pathSegments.length >= 3 && pathSegments[2] === 'advanced') {
+            // POST /place-management/search/advanced (高度検索 - 複雑なパラメータ)
+            return await handleAdvancedSearchPlaces(req, supabaseClient, user.id);
+          }
         } else if (pathSegments.length >= 2 && pathSegments[1] === 'batch') {
           if (pathSegments.length >= 3) {
             if (pathSegments[2] === 'create') {
@@ -1004,8 +1131,13 @@ serve(async (req) => {
       case 'GET':
         if (pathSegments.length >= 2) {
           if (pathSegments[1] === 'search') {
-            // GET /place-management/search (場所検索)
-            return await handleSearchPlaces(req, supabaseClient, user.id);
+            if (pathSegments.length >= 3 && pathSegments[2] === 'advanced') {
+              // GET /place-management/search/advanced (高度検索)
+              return await handleAdvancedSearchPlaces(req, supabaseClient, user.id);
+            } else {
+              // GET /place-management/search (基本検索)
+              return await handleSearchPlaces(req, supabaseClient, user.id);
+            }
           } else if (pathSegments[1] === 'list') {
             // GET /place-management/list (拡張場所一覧)
             return await handlePlacesList(req, supabaseClient, user.id);
@@ -9923,4 +10055,661 @@ function calculateHaversineDistance(
   
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
+}
+
+// TODO-087: Advanced Search Handler
+async function handleAdvancedSearchPlaces(req: Request, supabase: any, userId: string): Promise<Response> {
+  try {
+    const startTime = Date.now();
+    let searchParams: AdvancedPlaceSearchRequest;
+
+    // パラメータの取得 (GET または POST)
+    if (req.method === 'GET') {
+      searchParams = await parseAdvancedSearchFromURL(req);
+    } else {
+      const body = await req.json();
+      searchParams = body as AdvancedPlaceSearchRequest;
+    }
+
+    // 権限確認
+    await validateUserAccess(supabase, userId, searchParams.trip_id);
+
+    // 検索実行
+    const searchResult = await executeAdvancedSearch(supabase, userId, searchParams);
+
+    // パフォーマンス測定
+    const searchTime = Date.now() - startTime;
+
+    // レスポンス構築
+    const response: AdvancedSearchResponse = {
+      success: true,
+      places: searchResult.places,
+      total_count: searchResult.total_count,
+      ...(searchParams.enable_faceted_search ? { faceted_results: searchResult.faceted_results } : {}),
+      ...(searchParams.cluster_options?.return_clusters ? { clusters: searchResult.clusters } : {}),
+      ...(searchParams.include_analytics ? {
+        analytics: {
+          search_performance_ms: searchTime,
+          result_quality_score: calculateResultQuality(searchResult.places, searchParams),
+          personalization_applied: hasPersonalization(searchParams),
+          cache_hit: false // TODO: Implement caching
+        }
+      } : {}),
+      ...(searchParams.text_search?.mode === 'semantic' ? {
+        search_suggestions: generateSearchSuggestions(searchParams.query || ''),
+        related_searches: generateRelatedSearches(searchParams.query || '')
+      } : {})
+    };
+
+    // 使用状況記録
+    await trackUsageEvent(supabase, userId, 'advanced_search', {
+      search_type: 'advanced',
+      parameters_count: Object.keys(searchParams).length,
+      results_count: searchResult.places.length,
+      performance_ms: searchTime
+    });
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
+
+  } catch (error) {
+    console.error('Error in handleAdvancedSearchPlaces:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        search_suggestions: []
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      }
+    );
+  }
+}
+
+// URL パラメータから高度検索パラメータを解析
+async function parseAdvancedSearchFromURL(req: Request): Promise<AdvancedPlaceSearchRequest> {
+  const url = new URL(req.url);
+  const params: any = {};
+
+  // 基本パラメータ
+  if (url.searchParams.get('trip_id')) params.trip_id = url.searchParams.get('trip_id');
+  if (url.searchParams.get('query')) params.query = url.searchParams.get('query');
+  if (url.searchParams.get('category')) params.category = url.searchParams.get('category');
+  if (url.searchParams.get('min_rating')) params.min_rating = parseFloat(url.searchParams.get('min_rating')!);
+  if (url.searchParams.get('max_rating')) params.max_rating = parseFloat(url.searchParams.get('max_rating')!);
+  if (url.searchParams.get('min_price_level')) params.min_price_level = parseInt(url.searchParams.get('min_price_level')!);
+  if (url.searchParams.get('max_price_level')) params.max_price_level = parseInt(url.searchParams.get('max_price_level')!);
+  if (url.searchParams.get('latitude')) params.latitude = parseFloat(url.searchParams.get('latitude')!);
+  if (url.searchParams.get('longitude')) params.longitude = parseFloat(url.searchParams.get('longitude')!);
+  if (url.searchParams.get('radius_km')) params.radius_km = parseFloat(url.searchParams.get('radius_km')!);
+  if (url.searchParams.get('limit')) params.limit = parseInt(url.searchParams.get('limit')!);
+  if (url.searchParams.get('offset')) params.offset = parseInt(url.searchParams.get('offset')!);
+
+  // 高度パラメータ
+  if (url.searchParams.get('start_date') || url.searchParams.get('end_date')) {
+    params.date_range = {
+      start_date: url.searchParams.get('start_date'),
+      end_date: url.searchParams.get('end_date')
+    };
+  }
+
+  if (url.searchParams.get('start_time') || url.searchParams.get('end_time')) {
+    params.time_range = {
+      start_time: url.searchParams.get('start_time'),
+      end_time: url.searchParams.get('end_time')
+    };
+  }
+
+  if (url.searchParams.get('day_of_week')) {
+    params.day_of_week = url.searchParams.get('day_of_week')!.split(',').map(d => parseInt(d));
+  }
+
+  if (url.searchParams.get('text_search_mode')) {
+    params.text_search = {
+      mode: url.searchParams.get('text_search_mode') as 'exact' | 'fuzzy' | 'semantic',
+      fields: url.searchParams.get('text_search_fields')?.split(',') as any[],
+      boost_recent: url.searchParams.get('boost_recent') === 'true',
+      boost_popular: url.searchParams.get('boost_popular') === 'true'
+    };
+  }
+
+  if (url.searchParams.get('enable_clustering') === 'true') {
+    params.cluster_options = {
+      enable_clustering: true,
+      cluster_radius_km: parseFloat(url.searchParams.get('cluster_radius_km') || '1.0'),
+      min_cluster_size: parseInt(url.searchParams.get('min_cluster_size') || '2'),
+      return_clusters: url.searchParams.get('return_clusters') === 'true'
+    };
+  }
+
+  params.include_analytics = url.searchParams.get('include_analytics') === 'true';
+  params.enable_faceted_search = url.searchParams.get('enable_faceted_search') === 'true';
+
+  return params;
+}
+
+// ユーザーアクセス権限の検証
+async function validateUserAccess(supabase: any, userId: string, tripId?: string): Promise<void> {
+  if (tripId) {
+    const { data: membership, error } = await supabase
+      .from('trip_members')
+      .select('role')
+      .eq('trip_id', tripId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !membership) {
+      throw new Error('You are not a member of this trip');
+    }
+  }
+}
+
+// 高度検索の実行
+async function executeAdvancedSearch(
+  supabase: any, 
+  userId: string, 
+  searchParams: AdvancedPlaceSearchRequest
+): Promise<{
+  places: any[];
+  total_count: number;
+  faceted_results?: FacetedSearchResult;
+  clusters?: PlaceCluster[];
+}> {
+  // ベースクエリ構築
+  let query = supabase
+    .from('places')
+    .select(`
+      *,
+      user:users(id, name, avatar_url, is_premium),
+      place_images(id, image_url, is_primary),
+      place_ratings(rating, comment, created_at)
+    `);
+
+  // 基本フィルタリング
+  query = await applyBasicFilters(query, supabase, userId, searchParams);
+  
+  // 高度フィルタリング
+  query = await applyAdvancedFilters(query, searchParams);
+
+  // ソート適用
+  query = applyAdvancedSorting(query, searchParams);
+
+  // ページネーション
+  if (searchParams.limit) query = query.limit(searchParams.limit);
+  if (searchParams.offset) query = query.range(searchParams.offset, (searchParams.offset || 0) + (searchParams.limit || 50) - 1);
+
+  const { data: places, error } = await query;
+
+  if (error) {
+    throw new Error(`Search failed: ${error.message}`);
+  }
+
+  // カスタムスコアリング適用
+  let scoredPlaces = places || [];
+  if (searchParams.custom_scoring) {
+    scoredPlaces = await applyCustomScoring(scoredPlaces, searchParams);
+  }
+
+  // セマンティック検索の適用
+  if (searchParams.text_search?.mode === 'semantic') {
+    scoredPlaces = await applySemanticSearch(scoredPlaces, searchParams);
+  }
+
+  // 総数取得
+  const { count: totalCount } = await supabase
+    .from('places')
+    .select('*', { count: 'exact', head: true });
+
+  const result: any = {
+    places: scoredPlaces,
+    total_count: totalCount || 0
+  };
+
+  // ファセット検索結果
+  if (searchParams.enable_faceted_search) {
+    result.faceted_results = await generateFacetedResults(supabase, searchParams);
+  }
+
+  // クラスタリング
+  if (searchParams.cluster_options?.enable_clustering) {
+    result.clusters = await generateClusters(scoredPlaces, searchParams.cluster_options);
+  }
+
+  return result;
+}
+
+// 基本フィルタリングの適用
+async function applyBasicFilters(query: any, supabase: any, userId: string, searchParams: AdvancedPlaceSearchRequest) {
+  // トリップフィルタリング
+  if (searchParams.trip_id) {
+    query = query.eq('trip_id', searchParams.trip_id);
+  } else {
+    // ユーザーのアクセス可能な旅行のみ
+    const { data: userTrips } = await supabase
+      .from('trip_members')
+      .select('trip_id')
+      .eq('user_id', userId);
+    
+    const tripIds = userTrips?.map((t: any) => t.trip_id) || [];
+    if (tripIds.length > 0) {
+      query = query.in('trip_id', tripIds);
+    }
+  }
+
+  // テキスト検索
+  if (searchParams.query) {
+    if (searchParams.text_search?.mode === 'exact') {
+      query = query.or(`name.eq.${searchParams.query},address.eq.${searchParams.query}`);
+    } else {
+      query = query.or(`name.ilike.%${searchParams.query}%,address.ilike.%${searchParams.query}%,notes.ilike.%${searchParams.query}%`);
+    }
+  }
+
+  // カテゴリ、評価、価格帯フィルター
+  if (searchParams.category) query = query.eq('category', searchParams.category);
+  if (searchParams.min_rating !== undefined) query = query.gte('rating', searchParams.min_rating);
+  if (searchParams.max_rating !== undefined) query = query.lte('rating', searchParams.max_rating);
+  if (searchParams.min_price_level !== undefined) query = query.gte('price_level', searchParams.min_price_level);
+  if (searchParams.max_price_level !== undefined) query = query.lte('price_level', searchParams.max_price_level);
+
+  return query;
+}
+
+// 高度フィルタリングの適用
+async function applyAdvancedFilters(query: any, searchParams: AdvancedPlaceSearchRequest) {
+  // 日付範囲フィルター
+  if (searchParams.date_range) {
+    if (searchParams.date_range.start_date) {
+      query = query.gte('visit_date', searchParams.date_range.start_date);
+    }
+    if (searchParams.date_range.end_date) {
+      query = query.lte('visit_date', searchParams.date_range.end_date);
+    }
+  }
+
+  // 複合フィルター条件の適用
+  if (searchParams.complex_filters) {
+    query = await applyComplexFilters(query, searchParams.complex_filters);
+  }
+
+  return query;
+}
+
+// 複合フィルター条件の適用
+async function applyComplexFilters(query: any, complexFilters: any) {
+  // AND条件
+  if (complexFilters.and_conditions) {
+    for (const condition of complexFilters.and_conditions) {
+      query = applyFilterCondition(query, condition);
+    }
+  }
+
+  // OR条件
+  if (complexFilters.or_conditions && complexFilters.or_conditions.length > 0) {
+    const orConditions = complexFilters.or_conditions.map((condition: PlaceFilterCondition) => {
+      return buildFilterCondition(condition);
+    });
+    query = query.or(orConditions.join(','));
+  }
+
+  return query;
+}
+
+// 単一フィルター条件の適用
+function applyFilterCondition(query: any, condition: PlaceFilterCondition): any {
+  const { field, operator, value } = condition;
+
+  switch (operator) {
+    case 'equals':
+      return query.eq(field, value);
+    case 'not_equals':
+      return query.neq(field, value);
+    case 'greater_than':
+      return query.gt(field, value);
+    case 'less_than':
+      return query.lt(field, value);
+    case 'contains':
+      return query.ilike(field, `%${value}%`);
+    case 'starts_with':
+      return query.ilike(field, `${value}%`);
+    case 'in':
+      return query.in(field, Array.isArray(value) ? value : [value]);
+    case 'not_in':
+      return query.not(field, 'in', Array.isArray(value) ? value : [value]);
+    case 'between':
+      if (Array.isArray(value) && value.length === 2) {
+        return query.gte(field, value[0]).lte(field, value[1]);
+      }
+      return query;
+    default:
+      return query;
+  }
+}
+
+// フィルター条件の構築（OR用）
+function buildFilterCondition(condition: PlaceFilterCondition): string {
+  const { field, operator, value } = condition;
+
+  switch (operator) {
+    case 'equals':
+      return `${field}.eq.${value}`;
+    case 'contains':
+      return `${field}.ilike.%${value}%`;
+    case 'starts_with':
+      return `${field}.ilike.${value}%`;
+    case 'greater_than':
+      return `${field}.gt.${value}`;
+    case 'less_than':
+      return `${field}.lt.${value}`;
+    default:
+      return `${field}.eq.${value}`;
+  }
+}
+
+// 高度ソートの適用
+function applyAdvancedSorting(query: any, searchParams: AdvancedPlaceSearchRequest): any {
+  if (searchParams.multi_sort) {
+    const { primary, secondary, tertiary } = searchParams.multi_sort;
+    
+    // プライマリソート
+    query = query.order(primary.field, { 
+      ascending: primary.order === 'asc',
+      nullsFirst: primary.null_handling === 'first'
+    });
+
+    // セカンダリソート
+    if (secondary) {
+      query = query.order(secondary.field, { 
+        ascending: secondary.order === 'asc',
+        nullsFirst: secondary.null_handling === 'first'
+      });
+    }
+
+    // ターシャリソート
+    if (tertiary) {
+      query = query.order(tertiary.field, { 
+        ascending: tertiary.order === 'asc',
+        nullsFirst: tertiary.null_handling === 'first'
+      });
+    }
+  } else {
+    // 基本ソート
+    const sortBy = searchParams.sort_by || 'created_at';
+    const sortOrder = searchParams.sort_order || 'desc';
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+  }
+
+  return query;
+}
+
+// カスタムスコアリングの適用
+async function applyCustomScoring(places: any[], searchParams: AdvancedPlaceSearchRequest): Promise<any[]> {
+  if (!searchParams.custom_scoring) return places;
+
+  const weights = searchParams.custom_scoring;
+
+  return places.map(place => {
+    let score = 0;
+    let totalWeight = 0;
+
+    // 人気度スコア
+    if (weights.weight_popularity && place.visit_count) {
+      score += (place.visit_count / 100) * weights.weight_popularity;
+      totalWeight += weights.weight_popularity;
+    }
+
+    // 距離スコア（近いほど高スコア）
+    if (weights.weight_distance && place.distance !== undefined) {
+      const distanceScore = Math.max(0, 1 - (place.distance / 50)); // 50km基準
+      score += distanceScore * weights.weight_distance;
+      totalWeight += weights.weight_distance;
+    }
+
+    // 評価スコア
+    if (weights.weight_rating && place.rating) {
+      score += (place.rating / 5) * weights.weight_rating;
+      totalWeight += weights.weight_rating;
+    }
+
+    // 新しさスコア
+    if (weights.weight_recency && place.created_at) {
+      const daysSinceCreated = (Date.now() - new Date(place.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const recencyScore = Math.max(0, 1 - (daysSinceCreated / 365)); // 1年基準
+      score += recencyScore * weights.weight_recency;
+      totalWeight += weights.weight_recency;
+    }
+
+    place.custom_score = totalWeight > 0 ? score / totalWeight : 0;
+    return place;
+  }).sort((a, b) => (b.custom_score || 0) - (a.custom_score || 0));
+}
+
+// セマンティック検索の適用
+async function applySemanticSearch(places: any[], searchParams: AdvancedPlaceSearchRequest): Promise<any[]> {
+  if (!searchParams.query || !searchParams.text_search?.mode === 'semantic') {
+    return places;
+  }
+
+  const query = searchParams.query.toLowerCase();
+  const searchTerms = query.split(' ').filter(term => term.length > 2);
+
+  return places.map(place => {
+    let relevanceScore = 0;
+    const texts = [
+      place.name || '',
+      place.address || '',
+      place.notes || '',
+      place.category || '',
+      ...(place.tags || [])
+    ].join(' ').toLowerCase();
+
+    // 完全一致
+    if (texts.includes(query)) {
+      relevanceScore += 100;
+    }
+
+    // 部分一致
+    searchTerms.forEach(term => {
+      if (texts.includes(term)) {
+        relevanceScore += 10;
+      }
+    });
+
+    // カテゴリ関連性
+    if (place.category?.toLowerCase().includes(query)) {
+      relevanceScore += 50;
+    }
+
+    place.semantic_score = relevanceScore;
+    return place;
+  }).sort((a, b) => (b.semantic_score || 0) - (a.semantic_score || 0));
+}
+
+// ファセット検索結果の生成
+async function generateFacetedResults(supabase: any, searchParams: AdvancedPlaceSearchRequest): Promise<FacetedSearchResult> {
+  // カテゴリファセット
+  const { data: categories } = await supabase
+    .from('places')
+    .select('category')
+    .not('category', 'is', null);
+
+  const categoryFacets = categories?.reduce((acc: any, place: any) => {
+    acc[place.category] = (acc[place.category] || 0) + 1;
+    return acc;
+  }, {});
+
+  // 価格レベルファセット
+  const { data: priceLevels } = await supabase
+    .from('places')
+    .select('price_level')
+    .not('price_level', 'is', null);
+
+  const priceFacets = priceLevels?.reduce((acc: any, place: any) => {
+    acc[place.price_level] = (acc[place.price_level] || 0) + 1;
+    return acc;
+  }, {});
+
+  // 評価ファセット
+  const { data: ratings } = await supabase
+    .from('places')
+    .select('rating')
+    .not('rating', 'is', null);
+
+  const ratingFacets = ratings?.reduce((acc: any, place: any) => {
+    const range = Math.floor(place.rating);
+    acc[`${range}-${range + 1}`] = (acc[`${range}-${range + 1}`] || 0) + 1;
+    return acc;
+  }, {});
+
+  return {
+    facets: {
+      categories: Object.entries(categoryFacets || {}).map(([name, count]) => ({ name, count: count as number })),
+      price_levels: Object.entries(priceFacets || {}).map(([level, count]) => ({ level: parseInt(level), count: count as number })),
+      ratings: Object.entries(ratingFacets || {}).map(([range, count]) => ({ range, count: count as number })),
+      locations: [], // TODO: Implement location facets
+      tags: [] // TODO: Implement tag facets
+    },
+    filters_applied: [],
+    total_without_filters: 0
+  };
+}
+
+// クラスターの生成
+async function generateClusters(places: any[], clusterOptions: any): Promise<PlaceCluster[]> {
+  if (!clusterOptions?.enable_clustering || places.length < 2) {
+    return [];
+  }
+
+  const clusters: PlaceCluster[] = [];
+  const processed = new Set<number>();
+  const radiusKm = clusterOptions.cluster_radius_km || 1.0;
+  const minSize = clusterOptions.min_cluster_size || 2;
+
+  places.forEach((place, index) => {
+    if (processed.has(index) || !place.latitude || !place.longitude) {
+      return;
+    }
+
+    const cluster: PlaceCluster = {
+      cluster_id: `cluster_${clusters.length + 1}`,
+      center: {
+        latitude: place.latitude,
+        longitude: place.longitude
+      },
+      radius_km: radiusKm,
+      place_count: 1,
+      places: [place],
+      cluster_score: 0,
+      representative_place: place
+    };
+
+    // 近くの場所を探す
+    places.forEach((otherPlace, otherIndex) => {
+      if (index === otherIndex || processed.has(otherIndex) || !otherPlace.latitude || !otherPlace.longitude) {
+        return;
+      }
+
+      const distance = calculateHaversineDistance(
+        { latitude: place.latitude, longitude: place.longitude },
+        { latitude: otherPlace.latitude, longitude: otherPlace.longitude }
+      );
+
+      if (distance <= radiusKm) {
+        cluster.places.push(otherPlace);
+        cluster.place_count++;
+        processed.add(otherIndex);
+      }
+    });
+
+    if (cluster.place_count >= minSize) {
+      // クラスター中心を再計算
+      const avgLat = cluster.places.reduce((sum, p) => sum + p.latitude, 0) / cluster.places.length;
+      const avgLng = cluster.places.reduce((sum, p) => sum + p.longitude, 0) / cluster.places.length;
+      cluster.center = { latitude: avgLat, longitude: avgLng };
+
+      // 代表場所を選択（最も評価の高い場所）
+      cluster.representative_place = cluster.places.reduce((best, current) => 
+        (current.rating || 0) > (best.rating || 0) ? current : best
+      );
+
+      // クラスタースコア計算
+      cluster.cluster_score = cluster.places.reduce((sum, p) => sum + (p.rating || 0), 0) / cluster.places.length;
+
+      clusters.push(cluster);
+      processed.add(index);
+    }
+  });
+
+  return clusters;
+}
+
+// 結果品質の計算
+function calculateResultQuality(places: any[], searchParams: AdvancedPlaceSearchRequest): number {
+  if (places.length === 0) return 0;
+
+  let qualityScore = 0;
+  let factors = 0;
+
+  // 結果数による品質
+  if (places.length > 0) {
+    qualityScore += Math.min(places.length / 10, 1) * 20; // 10件以上で満点
+    factors++;
+  }
+
+  // 評価による品質
+  const avgRating = places.reduce((sum, p) => sum + (p.rating || 0), 0) / places.length;
+  if (avgRating > 0) {
+    qualityScore += (avgRating / 5) * 30;
+    factors++;
+  }
+
+  // 検索の詳細度による品質
+  const paramCount = Object.keys(searchParams).length;
+  qualityScore += Math.min(paramCount / 5, 1) * 25; // 5個以上のパラメータで満点
+  factors++;
+
+  // 地理的分散による品質（クラスタリング有効時）
+  if (searchParams.cluster_options?.enable_clustering) {
+    qualityScore += 25;
+    factors++;
+  }
+
+  return factors > 0 ? qualityScore / factors : 0;
+}
+
+// パーソナライゼーション適用確認
+function hasPersonalization(searchParams: AdvancedPlaceSearchRequest): boolean {
+  return !!(
+    searchParams.custom_scoring ||
+    searchParams.text_search?.boost_recent ||
+    searchParams.text_search?.boost_popular
+  );
+}
+
+// 検索提案の生成
+function generateSearchSuggestions(query: string): string[] {
+  const suggestions = [
+    `${query} restaurant`,
+    `${query} attraction`,
+    `${query} shopping`,
+    `near ${query}`,
+    `best ${query}`
+  ];
+  return suggestions.filter(s => s.trim().length > query.length);
+}
+
+// 関連検索の生成
+function generateRelatedSearches(query: string): string[] {
+  const related = [
+    'popular places',
+    'highly rated',
+    'nearby attractions',
+    'restaurants',
+    'shopping centers'
+  ];
+  return related.filter(s => !s.includes(query.toLowerCase()));
 }
