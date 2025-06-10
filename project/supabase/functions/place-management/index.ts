@@ -71,6 +71,30 @@ interface PlaceSearchRequest {
   sort_order?: 'asc' | 'desc';
 }
 
+interface PlaceListRequest {
+  list_type: 'trip' | 'user' | 'all_user_trips';
+  trip_id?: string;
+  target_user_id?: string;
+  category?: string;
+  min_rating?: number;
+  max_rating?: number;
+  min_wish_level?: number;
+  max_wish_level?: number;
+  scheduled?: boolean;
+  has_coordinates?: boolean;
+  date_range?: {
+    start_date?: string;
+    end_date?: string;
+  };
+  tags?: string[];
+  sort_by?: 'created_at' | 'wish_level' | 'rating' | 'name' | 'trip_name' | 'visit_date';
+  sort_order?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+  include_statistics?: boolean;
+  include_trip_info?: boolean;
+}
+
 serve(async (req) => {
   // CORS対応
   if (req.method === 'OPTIONS') {
@@ -119,6 +143,9 @@ serve(async (req) => {
           if (pathSegments[1] === 'search') {
             // GET /place-management/search (場所検索)
             return await handleSearchPlaces(req, supabaseClient, user.id);
+          } else if (pathSegments[1] === 'list') {
+            // GET /place-management/list (拡張場所一覧)
+            return await handlePlacesList(req, supabaseClient, user.id);
           } else {
             // GET /place-management/{place_id}
             const placeId = pathSegments[1];
@@ -1527,6 +1554,433 @@ async function broadcastRealtimeNotification(
   } catch (error) {
     console.warn('Failed to broadcast realtime notification:', error);
   }
+}
+
+// Enhanced places list handler for TODO-076
+async function handlePlacesList(req: Request, supabase: any, userId: string) {
+  const url = new URL(req.url);
+  
+  // Parse query parameters
+  const listParams: PlaceListRequest = {
+    list_type: (url.searchParams.get('list_type') as any) || 'trip',
+    trip_id: url.searchParams.get('trip_id') || undefined,
+    target_user_id: url.searchParams.get('target_user_id') || undefined,
+    category: url.searchParams.get('category') || undefined,
+    min_rating: url.searchParams.get('min_rating') ? parseFloat(url.searchParams.get('min_rating')!) : undefined,
+    max_rating: url.searchParams.get('max_rating') ? parseFloat(url.searchParams.get('max_rating')!) : undefined,
+    min_wish_level: url.searchParams.get('min_wish_level') ? parseInt(url.searchParams.get('min_wish_level')!) : undefined,
+    max_wish_level: url.searchParams.get('max_wish_level') ? parseInt(url.searchParams.get('max_wish_level')!) : undefined,
+    scheduled: url.searchParams.get('scheduled') ? url.searchParams.get('scheduled') === 'true' : undefined,
+    has_coordinates: url.searchParams.get('has_coordinates') ? url.searchParams.get('has_coordinates') === 'true' : undefined,
+    date_range: {
+      start_date: url.searchParams.get('start_date') || undefined,
+      end_date: url.searchParams.get('end_date') || undefined
+    },
+    tags: url.searchParams.get('tags') ? url.searchParams.get('tags')!.split(',') : undefined,
+    sort_by: (url.searchParams.get('sort_by') as any) || 'created_at',
+    sort_order: (url.searchParams.get('sort_order') as any) || 'desc',
+    limit: url.searchParams.get('limit') ? parseInt(url.searchParams.get('limit')!) : 50,
+    offset: url.searchParams.get('offset') ? parseInt(url.searchParams.get('offset')!) : 0,
+    include_statistics: url.searchParams.get('include_statistics') === 'true',
+    include_trip_info: url.searchParams.get('include_trip_info') === 'true'
+  };
+
+  // Validate list type and required parameters
+  if (!['trip', 'user', 'all_user_trips'].includes(listParams.list_type)) {
+    throw new Error('Invalid list_type. Must be: trip, user, or all_user_trips');
+  }
+
+  let places: any[] = [];
+  let totalCount = 0;
+  let statistics: any = {};
+
+  switch (listParams.list_type) {
+    case 'trip':
+      if (!listParams.trip_id) {
+        throw new Error('trip_id is required for list_type=trip');
+      }
+      const tripResult = await getTripPlacesList(listParams, supabase, userId);
+      places = tripResult.places;
+      totalCount = tripResult.totalCount;
+      statistics = tripResult.statistics;
+      break;
+
+    case 'user':
+      const userResult = await getUserPlacesList(listParams, supabase, userId);
+      places = userResult.places;
+      totalCount = userResult.totalCount;
+      statistics = userResult.statistics;
+      break;
+
+    case 'all_user_trips':
+      const allTripsResult = await getAllUserTripsPlacesList(listParams, supabase, userId);
+      places = allTripsResult.places;
+      totalCount = allTripsResult.totalCount;
+      statistics = allTripsResult.statistics;
+      break;
+  }
+
+  // Usage event tracking
+  await supabase
+    .from('usage_events')
+    .insert({
+      user_id: userId,
+      event_type: 'places_list_fetched',
+      event_category: 'place_management',
+      trip_id: listParams.trip_id || null,
+      metadata: {
+        list_type: listParams.list_type,
+        total_places_returned: places.length,
+        filters_applied: {
+          category: listParams.category,
+          rating_range: listParams.min_rating || listParams.max_rating ? [listParams.min_rating, listParams.max_rating] : null,
+          wish_level_range: listParams.min_wish_level || listParams.max_wish_level ? [listParams.min_wish_level, listParams.max_wish_level] : null,
+          has_filters: !!(listParams.category || listParams.min_rating || listParams.max_rating || 
+                         listParams.min_wish_level || listParams.max_wish_level || listParams.scheduled !== undefined)
+        },
+        sort_by: listParams.sort_by,
+        include_statistics: listParams.include_statistics
+      }
+    });
+
+  const response = {
+    success: true,
+    list_type: listParams.list_type,
+    places: places,
+    total_count: totalCount,
+    returned_count: places.length,
+    pagination: {
+      limit: listParams.limit,
+      offset: listParams.offset,
+      has_more: places.length === listParams.limit
+    },
+    applied_filters: {
+      category: listParams.category,
+      rating_range: listParams.min_rating || listParams.max_rating ? {
+        min: listParams.min_rating,
+        max: listParams.max_rating
+      } : null,
+      wish_level_range: listParams.min_wish_level || listParams.max_wish_level ? {
+        min: listParams.min_wish_level,
+        max: listParams.max_wish_level
+      } : null,
+      scheduled: listParams.scheduled,
+      has_coordinates: listParams.has_coordinates,
+      date_range: listParams.date_range?.start_date || listParams.date_range?.end_date ? listParams.date_range : null,
+      tags: listParams.tags
+    },
+    sorting: {
+      sort_by: listParams.sort_by,
+      sort_order: listParams.sort_order
+    }
+  };
+
+  if (listParams.include_statistics) {
+    response.statistics = statistics;
+  }
+
+  return new Response(
+    JSON.stringify(response),
+    {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    }
+  );
+}
+
+// Get places for a specific trip
+async function getTripPlacesList(params: PlaceListRequest, supabase: any, userId: string) {
+  // Verify trip membership
+  const { data: membership, error: memberError } = await supabase
+    .from('trip_members')
+    .select('role')
+    .eq('trip_id', params.trip_id)
+    .eq('user_id', userId)
+    .single();
+
+  if (memberError || !membership) {
+    throw new Error('You are not a member of this trip');
+  }
+
+  // Build query with trip info if requested
+  const selectFields = params.include_trip_info
+    ? `*, user:users(id, name, avatar_url, is_premium), trip:trips(id, name, destination, start_date, end_date)`
+    : `*, user:users(id, name, avatar_url, is_premium)`;
+
+  let query = supabase
+    .from('places')
+    .select(selectFields)
+    .eq('trip_id', params.trip_id);
+
+  // Apply filters
+  query = applyPlaceFilters(query, params);
+
+  // Apply sorting
+  query = applyPlaceSorting(query, params);
+
+  // Apply pagination
+  query = query.range(params.offset!, params.offset! + params.limit! - 1);
+
+  const { data: places, error, count } = await query;
+
+  if (error) {
+    throw new Error(`Failed to fetch trip places: ${error.message}`);
+  }
+
+  // Calculate statistics if requested
+  let statistics = {};
+  if (params.include_statistics) {
+    statistics = calculatePlaceStatistics(places || []);
+  }
+
+  return {
+    places: places || [],
+    totalCount: count || 0,
+    statistics
+  };
+}
+
+// Get places for a specific user across trips they have access to
+async function getUserPlacesList(params: PlaceListRequest, supabase: any, userId: string) {
+  const targetUserId = params.target_user_id || userId;
+
+  // Get trips where requesting user has access
+  const { data: userTrips, error: tripsError } = await supabase
+    .from('trip_members')
+    .select('trip_id')
+    .eq('user_id', userId);
+
+  if (tripsError) {
+    throw new Error(`Failed to fetch user trips: ${tripsError.message}`);
+  }
+
+  const tripIds = userTrips.map((t: any) => t.trip_id);
+
+  if (tripIds.length === 0) {
+    return {
+      places: [],
+      totalCount: 0,
+      statistics: {}
+    };
+  }
+
+  // Build query for user's places
+  const selectFields = params.include_trip_info
+    ? `*, user:users(id, name, avatar_url, is_premium), trip:trips(id, name, destination, start_date, end_date)`
+    : `*, user:users(id, name, avatar_url, is_premium)`;
+
+  let query = supabase
+    .from('places')
+    .select(selectFields)
+    .eq('user_id', targetUserId)
+    .in('trip_id', tripIds);
+
+  // Apply filters
+  query = applyPlaceFilters(query, params);
+
+  // Apply sorting
+  query = applyPlaceSorting(query, params);
+
+  // Apply pagination
+  query = query.range(params.offset!, params.offset! + params.limit! - 1);
+
+  const { data: places, error, count } = await query;
+
+  if (error) {
+    throw new Error(`Failed to fetch user places: ${error.message}`);
+  }
+
+  // Calculate statistics if requested
+  let statistics = {};
+  if (params.include_statistics) {
+    statistics = calculatePlaceStatistics(places || []);
+    statistics.trips_count = new Set((places || []).map(p => p.trip_id)).size;
+  }
+
+  return {
+    places: places || [],
+    totalCount: count || 0,
+    statistics
+  };
+}
+
+// Get all places across all trips the user has access to
+async function getAllUserTripsPlacesList(params: PlaceListRequest, supabase: any, userId: string) {
+  // Get all trips where user is a member
+  const { data: userTrips, error: tripsError } = await supabase
+    .from('trip_members')
+    .select('trip_id, trip:trips(id, name, destination)')
+    .eq('user_id', userId);
+
+  if (tripsError) {
+    throw new Error(`Failed to fetch user trips: ${tripsError.message}`);
+  }
+
+  const tripIds = userTrips.map((t: any) => t.trip_id);
+
+  if (tripIds.length === 0) {
+    return {
+      places: [],
+      totalCount: 0,
+      statistics: {}
+    };
+  }
+
+  // Build query for all places across user's trips
+  const selectFields = params.include_trip_info
+    ? `*, user:users(id, name, avatar_url, is_premium), trip:trips(id, name, destination, start_date, end_date)`
+    : `*, user:users(id, name, avatar_url, is_premium)`;
+
+  let query = supabase
+    .from('places')
+    .select(selectFields)
+    .in('trip_id', tripIds);
+
+  // Apply filters
+  query = applyPlaceFilters(query, params);
+
+  // Apply sorting
+  query = applyPlaceSorting(query, params);
+
+  // Apply pagination
+  query = query.range(params.offset!, params.offset! + params.limit! - 1);
+
+  const { data: places, error, count } = await query;
+
+  if (error) {
+    throw new Error(`Failed to fetch all user trips places: ${error.message}`);
+  }
+
+  // Calculate statistics if requested
+  let statistics = {};
+  if (params.include_statistics) {
+    statistics = calculatePlaceStatistics(places || []);
+    statistics.trips_count = tripIds.length;
+    statistics.places_by_trip = userTrips.reduce((acc: any, trip: any) => {
+      const tripPlaces = (places || []).filter(p => p.trip_id === trip.trip_id);
+      acc[trip.trip.name] = tripPlaces.length;
+      return acc;
+    }, {});
+  }
+
+  return {
+    places: places || [],
+    totalCount: count || 0,
+    statistics
+  };
+}
+
+// Apply common filters to place queries
+function applyPlaceFilters(query: any, params: PlaceListRequest) {
+  if (params.category) {
+    query = query.eq('category', params.category);
+  }
+
+  if (params.min_rating !== undefined) {
+    query = query.gte('rating', params.min_rating);
+  }
+
+  if (params.max_rating !== undefined) {
+    query = query.lte('rating', params.max_rating);
+  }
+
+  if (params.min_wish_level !== undefined) {
+    query = query.gte('wish_level', params.min_wish_level);
+  }
+
+  if (params.max_wish_level !== undefined) {
+    query = query.lte('wish_level', params.max_wish_level);
+  }
+
+  if (params.scheduled !== undefined) {
+    query = query.eq('scheduled', params.scheduled);
+  }
+
+  if (params.has_coordinates !== undefined) {
+    if (params.has_coordinates) {
+      query = query.not('latitude', 'is', null).not('longitude', 'is', null);
+    } else {
+      query = query.or('latitude.is.null,longitude.is.null');
+    }
+  }
+
+  if (params.date_range?.start_date) {
+    query = query.gte('visit_date', params.date_range.start_date);
+  }
+
+  if (params.date_range?.end_date) {
+    query = query.lte('visit_date', params.date_range.end_date);
+  }
+
+  if (params.tags && params.tags.length > 0) {
+    query = query.overlaps('tags', params.tags);
+  }
+
+  return query;
+}
+
+// Apply sorting to place queries
+function applyPlaceSorting(query: any, params: PlaceListRequest) {
+  const sortBy = params.sort_by || 'created_at';
+  const sortOrder = params.sort_order === 'asc';
+
+  switch (sortBy) {
+    case 'trip_name':
+      // Note: This requires join with trips table which should be handled in select
+      query = query.order('trip.name', { ascending: sortOrder });
+      break;
+    case 'visit_date':
+      query = query.order('visit_date', { ascending: sortOrder, nullsFirst: false });
+      break;
+    default:
+      query = query.order(sortBy, { ascending: sortOrder });
+      break;
+  }
+
+  return query;
+}
+
+// Calculate comprehensive statistics for places
+function calculatePlaceStatistics(places: any[]) {
+  if (places.length === 0) {
+    return {
+      total_places: 0,
+      places_by_category: {},
+      places_by_user: {},
+      avg_wish_level: 0,
+      avg_rating: 0,
+      total_estimated_time: 0,
+      places_with_coordinates: 0,
+      scheduled_places: 0
+    };
+  }
+
+  const statistics = {
+    total_places: places.length,
+    places_by_category: places.reduce((acc: any, place: any) => {
+      acc[place.category] = (acc[place.category] || 0) + 1;
+      return acc;
+    }, {}),
+    places_by_user: places.reduce((acc: any, place: any) => {
+      const userName = place.user?.name || 'Unknown';
+      acc[userName] = (acc[userName] || 0) + 1;
+      return acc;
+    }, {}),
+    avg_wish_level: places.reduce((sum: number, place: any) => sum + place.wish_level, 0) / places.length,
+    avg_rating: places.filter(p => p.rating).length > 0 
+      ? places.filter(p => p.rating).reduce((sum: number, place: any) => sum + place.rating, 0) / places.filter(p => p.rating).length 
+      : 0,
+    total_estimated_time: places.reduce((sum: number, place: any) => sum + (place.stay_duration_minutes || 0), 0),
+    places_with_coordinates: places.filter((place: any) => place.latitude && place.longitude).length,
+    scheduled_places: places.filter((place: any) => place.scheduled).length,
+    places_by_wish_level: places.reduce((acc: any, place: any) => {
+      acc[place.wish_level] = (acc[place.wish_level] || 0) + 1;
+      return acc;
+    }, {}),
+    places_with_visit_date: places.filter((place: any) => place.visit_date).length
+  };
+
+  return statistics;
 }
 
 // Related data processing before place deletion
