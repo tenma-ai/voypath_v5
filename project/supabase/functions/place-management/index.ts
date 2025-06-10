@@ -302,6 +302,92 @@ interface TemporalPatternStats {
   most_active_day_of_week: string;
 }
 
+// TODO-086: Batch Operations Interfaces
+interface BatchCreateRequest {
+  places: PlaceCreateRequest[];
+  validation_options?: {
+    skip_duplicate_check?: boolean;
+    allow_partial_failure?: boolean;
+    validate_coordinates?: boolean;
+    validate_opening_hours?: boolean;
+  };
+  processing_options?: {
+    batch_size?: number; // Max places to process at once
+    parallel_processing?: boolean;
+    rollback_on_failure?: boolean;
+  };
+}
+
+interface BatchUpdateRequest {
+  updates: BatchPlaceUpdate[];
+  validation_options?: {
+    allow_partial_failure?: boolean;
+    validate_permissions?: boolean;
+    validate_coordinates?: boolean;
+  };
+  processing_options?: {
+    batch_size?: number;
+    parallel_processing?: boolean;
+    rollback_on_failure?: boolean;
+  };
+}
+
+interface BatchPlaceUpdate {
+  place_id: string;
+  updates: Partial<PlaceUpdateRequest>;
+}
+
+interface BatchDeleteRequest {
+  place_ids: string[];
+  deletion_options?: {
+    perform_impact_analysis?: boolean;
+    allow_partial_failure?: boolean;
+    cascade_delete_related?: boolean;
+  };
+  processing_options?: {
+    batch_size?: number;
+    parallel_processing?: boolean;
+    send_notifications?: boolean;
+  };
+}
+
+interface BatchOperationResult {
+  success: boolean;
+  total_requested: number;
+  successful_count: number;
+  failed_count: number;
+  skipped_count: number;
+  results: BatchItemResult[];
+  execution_summary: {
+    total_execution_time_ms: number;
+    average_item_time_ms: number;
+    batches_processed: number;
+    parallel_processing_used: boolean;
+  };
+  validation_summary?: {
+    coordinate_validations: number;
+    permission_validations: number;
+    duplicate_checks: number;
+  };
+  error_summary?: {
+    validation_errors: number;
+    permission_errors: number;
+    system_errors: number;
+    network_errors: number;
+  };
+}
+
+interface BatchItemResult {
+  index: number; // Position in original request
+  status: 'success' | 'failed' | 'skipped';
+  item_id?: string; // place_id for updates/deletes, new ID for creates
+  error_message?: string;
+  error_code?: string;
+  execution_time_ms?: number;
+  warnings?: string[];
+  data?: any; // Created/updated place data for successful operations
+}
+
 // Opening Hours Management Interfaces
 interface OpeningHours {
   [key: string]: DayHours; // Key is day number (0-6) as string
@@ -896,6 +982,19 @@ serve(async (req) => {
             } else if (pathSegments[2] === 'validate') {
               // POST /place-management/sync/validate (同期検証)
               return await handleValidateSyncData(req, supabaseClient, user.id);
+            }
+          }
+        } else if (pathSegments.length >= 2 && pathSegments[1] === 'batch') {
+          if (pathSegments.length >= 3) {
+            if (pathSegments[2] === 'create') {
+              // POST /place-management/batch/create (一括場所作成)
+              return await handleBatchCreatePlaces(req, supabaseClient, user.id);
+            } else if (pathSegments[2] === 'update') {
+              // POST /place-management/batch/update (一括場所更新)
+              return await handleBatchUpdatePlaces(req, supabaseClient, user.id);
+            } else if (pathSegments[2] === 'delete') {
+              // POST /place-management/batch/delete (一括場所削除)
+              return await handleBatchDeletePlaces(req, supabaseClient, user.id);
             }
           }
         } else {
@@ -8995,6 +9094,819 @@ function generateRecommendations(
   }
   
   return recommendations;
+}
+
+// TODO-086: Batch Operations Implementation
+async function handleBatchCreatePlaces(
+  req: Request,
+  supabaseClient: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const requestData: BatchCreateRequest = await req.json();
+    
+    // Validate batch request
+    if (!requestData.places || !Array.isArray(requestData.places) || requestData.places.length === 0) {
+      throw new Error('places array is required and must not be empty');
+    }
+
+    // Limit batch size to prevent timeout
+    const MAX_BATCH_SIZE = 50;
+    if (requestData.places.length > MAX_BATCH_SIZE) {
+      throw new Error(`Batch size cannot exceed ${MAX_BATCH_SIZE} places`);
+    }
+
+    const startTime = Date.now();
+    const results = await processBatchCreate(requestData, userId, supabaseClient);
+    
+    // Record usage event
+    await recordUsageEvent(supabaseClient, userId, 'batch_create_places', {
+      total_places: requestData.places.length,
+      successful_count: results.successful_count,
+      failed_count: results.failed_count,
+      execution_time_ms: results.execution_summary.total_execution_time_ms,
+      parallel_processing: results.execution_summary.parallel_processing_used
+    });
+
+    return new Response(JSON.stringify({
+      success: results.success,
+      data: results
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error in batch create places:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: 'Failed to process batch create request',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
+      { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+}
+
+async function handleBatchUpdatePlaces(
+  req: Request,
+  supabaseClient: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const requestData: BatchUpdateRequest = await req.json();
+    
+    // Validate batch request
+    if (!requestData.updates || !Array.isArray(requestData.updates) || requestData.updates.length === 0) {
+      throw new Error('updates array is required and must not be empty');
+    }
+
+    // Limit batch size
+    const MAX_BATCH_SIZE = 50;
+    if (requestData.updates.length > MAX_BATCH_SIZE) {
+      throw new Error(`Batch size cannot exceed ${MAX_BATCH_SIZE} updates`);
+    }
+
+    const startTime = Date.now();
+    const results = await processBatchUpdate(requestData, userId, supabaseClient);
+    
+    // Record usage event
+    await recordUsageEvent(supabaseClient, userId, 'batch_update_places', {
+      total_updates: requestData.updates.length,
+      successful_count: results.successful_count,
+      failed_count: results.failed_count,
+      execution_time_ms: results.execution_summary.total_execution_time_ms,
+      parallel_processing: results.execution_summary.parallel_processing_used
+    });
+
+    return new Response(JSON.stringify({
+      success: results.success,
+      data: results
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error in batch update places:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: 'Failed to process batch update request',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
+      { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+}
+
+async function handleBatchDeletePlaces(
+  req: Request,
+  supabaseClient: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const requestData: BatchDeleteRequest = await req.json();
+    
+    // Validate batch request
+    if (!requestData.place_ids || !Array.isArray(requestData.place_ids) || requestData.place_ids.length === 0) {
+      throw new Error('place_ids array is required and must not be empty');
+    }
+
+    // Limit batch size
+    const MAX_BATCH_SIZE = 50;
+    if (requestData.place_ids.length > MAX_BATCH_SIZE) {
+      throw new Error(`Batch size cannot exceed ${MAX_BATCH_SIZE} deletions`);
+    }
+
+    const startTime = Date.now();
+    const results = await processBatchDelete(requestData, userId, supabaseClient);
+    
+    // Record usage event
+    await recordUsageEvent(supabaseClient, userId, 'batch_delete_places', {
+      total_deletions: requestData.place_ids.length,
+      successful_count: results.successful_count,
+      failed_count: results.failed_count,
+      execution_time_ms: results.execution_summary.total_execution_time_ms,
+      parallel_processing: results.execution_summary.parallel_processing_used,
+      impact_analysis_performed: requestData.deletion_options?.perform_impact_analysis || false
+    });
+
+    return new Response(JSON.stringify({
+      success: results.success,
+      data: results
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error in batch delete places:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: 'Failed to process batch delete request',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
+      { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+}
+
+async function processBatchCreate(
+  request: BatchCreateRequest,
+  userId: string,
+  supabaseClient: any
+): Promise<BatchOperationResult> {
+  const startTime = Date.now();
+  const results: BatchItemResult[] = [];
+  const batchSize = request.processing_options?.batch_size || 10;
+  const useParallel = request.processing_options?.parallel_processing !== false;
+  const allowPartialFailure = request.validation_options?.allow_partial_failure !== false;
+
+  let successCount = 0;
+  let failedCount = 0;
+  let batchesProcessed = 0;
+
+  // Process places in batches
+  for (let i = 0; i < request.places.length; i += batchSize) {
+    const batch = request.places.slice(i, i + batchSize);
+    batchesProcessed++;
+
+    if (useParallel) {
+      // Parallel processing within batch
+      const batchPromises = batch.map(async (place, batchIndex) => {
+        const overallIndex = i + batchIndex;
+        return await processCreateSinglePlace(place, overallIndex, userId, supabaseClient, request.validation_options);
+      });
+
+      const batchResults = await Promise.allSettled(batchPromises);
+      
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+          if (result.value.status === 'success') {
+            successCount++;
+          } else {
+            failedCount++;
+          }
+        } else {
+          failedCount++;
+          results.push({
+            index: results.length,
+            status: 'failed',
+            error_message: 'Promise rejected: ' + result.reason,
+            error_code: 'PROMISE_REJECTION'
+          });
+        }
+      }
+    } else {
+      // Sequential processing within batch
+      for (let j = 0; j < batch.length; j++) {
+        const place = batch[j];
+        const overallIndex = i + j;
+        
+        try {
+          const result = await processCreateSinglePlace(place, overallIndex, userId, supabaseClient, request.validation_options);
+          results.push(result);
+          
+          if (result.status === 'success') {
+            successCount++;
+          } else {
+            failedCount++;
+          }
+        } catch (error) {
+          failedCount++;
+          results.push({
+            index: overallIndex,
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : 'Unknown error',
+            error_code: 'PROCESSING_ERROR'
+          });
+
+          // Stop on first failure if rollback is enabled
+          if (request.processing_options?.rollback_on_failure) {
+            break;
+          }
+        }
+      }
+    }
+
+    // Break if we encounter failures and rollback is enabled
+    if (request.processing_options?.rollback_on_failure && failedCount > 0) {
+      break;
+    }
+  }
+
+  const totalTime = Date.now() - startTime;
+  const avgItemTime = results.length > 0 ? totalTime / results.length : 0;
+
+  return {
+    success: failedCount === 0 || allowPartialFailure,
+    total_requested: request.places.length,
+    successful_count: successCount,
+    failed_count: failedCount,
+    skipped_count: request.places.length - successCount - failedCount,
+    results: results,
+    execution_summary: {
+      total_execution_time_ms: totalTime,
+      average_item_time_ms: Math.round(avgItemTime * 100) / 100,
+      batches_processed: batchesProcessed,
+      parallel_processing_used: useParallel
+    }
+  };
+}
+
+async function processCreateSinglePlace(
+  place: PlaceCreateRequest,
+  index: number,
+  userId: string,
+  supabaseClient: any,
+  validationOptions?: BatchCreateRequest['validation_options']
+): Promise<BatchItemResult> {
+  const itemStartTime = Date.now();
+  const warnings: string[] = [];
+
+  try {
+    // Basic validation
+    if (!place.trip_id || !place.name || !place.category || 
+        place.wish_level === undefined || place.stay_duration_minutes === undefined) {
+      return {
+        index,
+        status: 'failed',
+        error_message: 'Missing required fields: trip_id, name, category, wish_level, stay_duration_minutes',
+        error_code: 'VALIDATION_ERROR',
+        execution_time_ms: Date.now() - itemStartTime
+      };
+    }
+
+    // Check trip membership (validate user can add to this trip)
+    const { data: membership, error: memberError } = await supabaseClient
+      .from('trip_members')
+      .select('can_add_places')
+      .eq('trip_id', place.trip_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (memberError || !membership || !membership.can_add_places) {
+      return {
+        index,
+        status: 'failed',
+        error_message: 'No permission to add places to this trip',
+        error_code: 'PERMISSION_ERROR',
+        execution_time_ms: Date.now() - itemStartTime
+      };
+    }
+
+    // Coordinate validation
+    if (validationOptions?.validate_coordinates !== false && 
+        (place.latitude !== undefined || place.longitude !== undefined)) {
+      if (place.latitude === undefined || place.longitude === undefined) {
+        warnings.push('Both latitude and longitude should be provided together');
+      } else if (place.latitude < -90 || place.latitude > 90 || 
+                 place.longitude < -180 || place.longitude > 180) {
+        return {
+          index,
+          status: 'failed',
+          error_message: 'Invalid coordinates',
+          error_code: 'COORDINATE_VALIDATION_ERROR',
+          execution_time_ms: Date.now() - itemStartTime
+        };
+      }
+    }
+
+    // Duplicate check
+    if (!validationOptions?.skip_duplicate_check) {
+      const { data: existingPlace } = await supabaseClient
+        .from('places')
+        .select('id')
+        .eq('trip_id', place.trip_id)
+        .eq('name', place.name)
+        .eq('user_id', userId)
+        .single();
+
+      if (existingPlace) {
+        return {
+          index,
+          status: 'skipped',
+          error_message: 'Place with same name already exists',
+          error_code: 'DUPLICATE_FOUND',
+          execution_time_ms: Date.now() - itemStartTime,
+          warnings: ['Skipped due to duplicate name']
+        };
+      }
+    }
+
+    // Create the place
+    const { data: createdPlace, error: createError } = await supabaseClient
+      .from('places')
+      .insert({
+        ...place,
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      return {
+        index,
+        status: 'failed',
+        error_message: createError.message,
+        error_code: 'DATABASE_ERROR',
+        execution_time_ms: Date.now() - itemStartTime
+      };
+    }
+
+    return {
+      index,
+      status: 'success',
+      item_id: createdPlace.id,
+      execution_time_ms: Date.now() - itemStartTime,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      data: createdPlace
+    };
+
+  } catch (error) {
+    return {
+      index,
+      status: 'failed',
+      error_message: error instanceof Error ? error.message : 'Unknown error',
+      error_code: 'UNEXPECTED_ERROR',
+      execution_time_ms: Date.now() - itemStartTime
+    };
+  }
+}
+
+async function processBatchUpdate(
+  request: BatchUpdateRequest,
+  userId: string,
+  supabaseClient: any
+): Promise<BatchOperationResult> {
+  const startTime = Date.now();
+  const results: BatchItemResult[] = [];
+  const batchSize = request.processing_options?.batch_size || 10;
+  const useParallel = request.processing_options?.parallel_processing !== false;
+  const allowPartialFailure = request.validation_options?.allow_partial_failure !== false;
+
+  let successCount = 0;
+  let failedCount = 0;
+  let batchesProcessed = 0;
+
+  // Process updates in batches
+  for (let i = 0; i < request.updates.length; i += batchSize) {
+    const batch = request.updates.slice(i, i + batchSize);
+    batchesProcessed++;
+
+    if (useParallel) {
+      // Parallel processing within batch
+      const batchPromises = batch.map(async (update, batchIndex) => {
+        const overallIndex = i + batchIndex;
+        return await processUpdateSinglePlace(update, overallIndex, userId, supabaseClient, request.validation_options);
+      });
+
+      const batchResults = await Promise.allSettled(batchPromises);
+      
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+          if (result.value.status === 'success') {
+            successCount++;
+          } else {
+            failedCount++;
+          }
+        } else {
+          failedCount++;
+          results.push({
+            index: results.length,
+            status: 'failed',
+            error_message: 'Promise rejected: ' + result.reason,
+            error_code: 'PROMISE_REJECTION'
+          });
+        }
+      }
+    } else {
+      // Sequential processing within batch
+      for (let j = 0; j < batch.length; j++) {
+        const update = batch[j];
+        const overallIndex = i + j;
+        
+        try {
+          const result = await processUpdateSinglePlace(update, overallIndex, userId, supabaseClient, request.validation_options);
+          results.push(result);
+          
+          if (result.status === 'success') {
+            successCount++;
+          } else {
+            failedCount++;
+          }
+        } catch (error) {
+          failedCount++;
+          results.push({
+            index: overallIndex,
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : 'Unknown error',
+            error_code: 'PROCESSING_ERROR'
+          });
+
+          // Stop on first failure if rollback is enabled
+          if (request.processing_options?.rollback_on_failure) {
+            break;
+          }
+        }
+      }
+    }
+
+    // Break if we encounter failures and rollback is enabled
+    if (request.processing_options?.rollback_on_failure && failedCount > 0) {
+      break;
+    }
+  }
+
+  const totalTime = Date.now() - startTime;
+  const avgItemTime = results.length > 0 ? totalTime / results.length : 0;
+
+  return {
+    success: failedCount === 0 || allowPartialFailure,
+    total_requested: request.updates.length,
+    successful_count: successCount,
+    failed_count: failedCount,
+    skipped_count: request.updates.length - successCount - failedCount,
+    results: results,
+    execution_summary: {
+      total_execution_time_ms: totalTime,
+      average_item_time_ms: Math.round(avgItemTime * 100) / 100,
+      batches_processed: batchesProcessed,
+      parallel_processing_used: useParallel
+    }
+  };
+}
+
+async function processUpdateSinglePlace(
+  update: BatchPlaceUpdate,
+  index: number,
+  userId: string,
+  supabaseClient: any,
+  validationOptions?: BatchUpdateRequest['validation_options']
+): Promise<BatchItemResult> {
+  const itemStartTime = Date.now();
+  const warnings: string[] = [];
+
+  try {
+    // Validate place_id
+    if (!update.place_id) {
+      return {
+        index,
+        status: 'failed',
+        error_message: 'place_id is required',
+        error_code: 'VALIDATION_ERROR',
+        execution_time_ms: Date.now() - itemStartTime
+      };
+    }
+
+    // Check permissions if validation is enabled
+    if (validationOptions?.validate_permissions !== false) {
+      const { data: place, error: placeError } = await supabaseClient
+        .from('places')
+        .select(`
+          *,
+          trip:trips!inner(
+            trip_members!inner(role, user_id)
+          )
+        `)
+        .eq('id', update.place_id)
+        .eq('trip.trip_members.user_id', userId)
+        .single();
+
+      if (placeError || !place) {
+        return {
+          index,
+          status: 'failed',
+          error_message: 'Place not found or access denied',
+          error_code: 'PERMISSION_ERROR',
+          execution_time_ms: Date.now() - itemStartTime
+        };
+      }
+
+      // Check if user can edit (owner or admin)
+      const userMember = place.trip.trip_members.find((member: any) => member.user_id === userId);
+      const canEdit = place.user_id === userId || (userMember && userMember.role === 'admin');
+
+      if (!canEdit) {
+        return {
+          index,
+          status: 'failed',
+          error_message: 'Insufficient permissions to edit this place',
+          error_code: 'PERMISSION_ERROR',
+          execution_time_ms: Date.now() - itemStartTime
+        };
+      }
+    }
+
+    // Coordinate validation
+    if (validationOptions?.validate_coordinates !== false && 
+        update.updates && (update.updates.latitude !== undefined || update.updates.longitude !== undefined)) {
+      const lat = update.updates.latitude;
+      const lng = update.updates.longitude;
+      
+      if ((lat !== undefined && (lat < -90 || lat > 90)) ||
+          (lng !== undefined && (lng < -180 || lng > 180))) {
+        return {
+          index,
+          status: 'failed',
+          error_message: 'Invalid coordinates',
+          error_code: 'COORDINATE_VALIDATION_ERROR',
+          execution_time_ms: Date.now() - itemStartTime
+        };
+      }
+    }
+
+    // Perform the update
+    const { data: updatedPlace, error: updateError } = await supabaseClient
+      .from('places')
+      .update({
+        ...update.updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', update.place_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return {
+        index,
+        status: 'failed',
+        error_message: updateError.message,
+        error_code: 'DATABASE_ERROR',
+        execution_time_ms: Date.now() - itemStartTime
+      };
+    }
+
+    return {
+      index,
+      status: 'success',
+      item_id: update.place_id,
+      execution_time_ms: Date.now() - itemStartTime,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      data: updatedPlace
+    };
+
+  } catch (error) {
+    return {
+      index,
+      status: 'failed',
+      error_message: error instanceof Error ? error.message : 'Unknown error',
+      error_code: 'UNEXPECTED_ERROR',
+      execution_time_ms: Date.now() - itemStartTime
+    };
+  }
+}
+
+async function processBatchDelete(
+  request: BatchDeleteRequest,
+  userId: string,
+  supabaseClient: any
+): Promise<BatchOperationResult> {
+  const startTime = Date.now();
+  const results: BatchItemResult[] = [];
+  const batchSize = request.processing_options?.batch_size || 10;
+  const useParallel = request.processing_options?.parallel_processing !== false;
+  const allowPartialFailure = request.deletion_options?.allow_partial_failure !== false;
+
+  let successCount = 0;
+  let failedCount = 0;
+  let batchesProcessed = 0;
+
+  // Process deletions in batches
+  for (let i = 0; i < request.place_ids.length; i += batchSize) {
+    const batch = request.place_ids.slice(i, i + batchSize);
+    batchesProcessed++;
+
+    if (useParallel) {
+      // Parallel processing within batch
+      const batchPromises = batch.map(async (placeId, batchIndex) => {
+        const overallIndex = i + batchIndex;
+        return await processDeleteSinglePlace(placeId, overallIndex, userId, supabaseClient, request.deletion_options);
+      });
+
+      const batchResults = await Promise.allSettled(batchPromises);
+      
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+          if (result.value.status === 'success') {
+            successCount++;
+          } else {
+            failedCount++;
+          }
+        } else {
+          failedCount++;
+          results.push({
+            index: results.length,
+            status: 'failed',
+            error_message: 'Promise rejected: ' + result.reason,
+            error_code: 'PROMISE_REJECTION'
+          });
+        }
+      }
+    } else {
+      // Sequential processing within batch
+      for (let j = 0; j < batch.length; j++) {
+        const placeId = batch[j];
+        const overallIndex = i + j;
+        
+        try {
+          const result = await processDeleteSinglePlace(placeId, overallIndex, userId, supabaseClient, request.deletion_options);
+          results.push(result);
+          
+          if (result.status === 'success') {
+            successCount++;
+          } else {
+            failedCount++;
+          }
+        } catch (error) {
+          failedCount++;
+          results.push({
+            index: overallIndex,
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : 'Unknown error',
+            error_code: 'PROCESSING_ERROR'
+          });
+
+          // Note: No rollback support for deletions since they can't be easily undone
+        }
+      }
+    }
+  }
+
+  const totalTime = Date.now() - startTime;
+  const avgItemTime = results.length > 0 ? totalTime / results.length : 0;
+
+  return {
+    success: failedCount === 0 || allowPartialFailure,
+    total_requested: request.place_ids.length,
+    successful_count: successCount,
+    failed_count: failedCount,
+    skipped_count: request.place_ids.length - successCount - failedCount,
+    results: results,
+    execution_summary: {
+      total_execution_time_ms: totalTime,
+      average_item_time_ms: Math.round(avgItemTime * 100) / 100,
+      batches_processed: batchesProcessed,
+      parallel_processing_used: useParallel
+    }
+  };
+}
+
+async function processDeleteSinglePlace(
+  placeId: string,
+  index: number,
+  userId: string,
+  supabaseClient: any,
+  deletionOptions?: BatchDeleteRequest['deletion_options']
+): Promise<BatchItemResult> {
+  const itemStartTime = Date.now();
+  const warnings: string[] = [];
+
+  try {
+    // Get place and verify permissions
+    const { data: place, error: placeError } = await supabaseClient
+      .from('places')
+      .select(`
+        *,
+        trip:trips!inner(
+          trip_members!inner(role, user_id)
+        )
+      `)
+      .eq('id', placeId)
+      .eq('trip.trip_members.user_id', userId)
+      .single();
+
+    if (placeError || !place) {
+      return {
+        index,
+        status: 'failed',
+        error_message: 'Place not found or access denied',
+        error_code: 'PERMISSION_ERROR',
+        execution_time_ms: Date.now() - itemStartTime
+      };
+    }
+
+    // Check deletion permissions
+    const userMember = place.trip.trip_members.find((member: any) => member.user_id === userId);
+    const canDelete = place.user_id === userId || (userMember && userMember.role === 'admin');
+
+    if (!canDelete) {
+      return {
+        index,
+        status: 'failed',
+        error_message: 'Insufficient permissions to delete this place',
+        error_code: 'PERMISSION_ERROR',
+        execution_time_ms: Date.now() - itemStartTime
+      };
+    }
+
+    // Perform impact analysis if requested
+    if (deletionOptions?.perform_impact_analysis) {
+      try {
+        const impactAnalysis = await performDeletionImpactAnalysis(place, supabaseClient);
+        if (impactAnalysis.impact_severity === 'critical') {
+          warnings.push('Critical impact detected - consider keeping this place');
+        } else if (impactAnalysis.impact_severity === 'high') {
+          warnings.push('High impact detected - proceed with caution');
+        }
+      } catch (impactError) {
+        warnings.push('Impact analysis failed but proceeding with deletion');
+      }
+    }
+
+    // Handle related data if cascade delete is enabled
+    if (deletionOptions?.cascade_delete_related) {
+      // Delete related images, ratings, opening hours, etc.
+      await supabaseClient.from('place_images').delete().eq('place_id', placeId);
+      await supabaseClient.from('place_ratings').delete().eq('place_id', placeId);
+      await supabaseClient.from('place_opening_hours').delete().eq('place_id', placeId);
+    }
+
+    // Delete the place
+    const { error: deleteError } = await supabaseClient
+      .from('places')
+      .delete()
+      .eq('id', placeId);
+
+    if (deleteError) {
+      return {
+        index,
+        status: 'failed',
+        error_message: deleteError.message,
+        error_code: 'DATABASE_ERROR',
+        execution_time_ms: Date.now() - itemStartTime
+      };
+    }
+
+    return {
+      index,
+      status: 'success',
+      item_id: placeId,
+      execution_time_ms: Date.now() - itemStartTime,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      data: { deleted_place: { id: placeId, name: place.name } }
+    };
+
+  } catch (error) {
+    return {
+      index,
+      status: 'failed',
+      error_message: error instanceof Error ? error.message : 'Unknown error',
+      error_code: 'UNEXPECTED_ERROR',
+      execution_time_ms: Date.now() - itemStartTime
+    };
+  }
 }
 
 function calculateHaversineDistance(
