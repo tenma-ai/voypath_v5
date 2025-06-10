@@ -642,6 +642,9 @@ async function handleDeletePlace(supabase: any, userId: string, placeId: string)
     );
   }
 
+  // 関連データの事前確認と処理
+  const relatedDataInfo = await processRelatedDataBeforeDeletion(placeId, place, supabase);
+
   // 場所削除
   const { error: deleteError } = await supabase
     .from('places')
@@ -664,9 +667,15 @@ async function handleDeletePlace(supabase: any, userId: string, placeId: string)
         place_id: placeId,
         place_name: place.name,
         category: place.category,
-        deleted_by_owner: place.user_id === userId
+        deleted_by_owner: place.user_id === userId,
+        related_data_processed: relatedDataInfo.processedItems,
+        had_scheduled_data: relatedDataInfo.hadScheduledData,
+        affected_optimization_results: relatedDataInfo.affectedOptimizations
       }
     });
+
+  // 削除通知の送信
+  await sendPlaceDeletionNotification(place, userId, relatedDataInfo, supabase);
 
   return new Response(
     JSON.stringify({ 
@@ -1517,5 +1526,213 @@ async function broadcastRealtimeNotification(
     console.log(`Realtime notification broadcasted to trip-${tripId}`);
   } catch (error) {
     console.warn('Failed to broadcast realtime notification:', error);
+  }
+}
+
+// Related data processing before place deletion
+async function processRelatedDataBeforeDeletion(
+  placeId: string, 
+  place: any, 
+  supabase: any
+): Promise<any> {
+  const processedItems: string[] = [];
+  let hadScheduledData = false;
+  let affectedOptimizations = 0;
+
+  try {
+    // 1. Check for scheduled data (arrival/departure times)
+    if (place.scheduled && (place.arrival_time || place.departure_time)) {
+      hadScheduledData = true;
+      processedItems.push('scheduled_times');
+      console.log(`Place ${place.name} had scheduled data that will be removed`);
+    }
+
+    // 2. Check for optimization results that reference this place
+    const { data: optimizationResults, error: optError } = await supabase
+      .from('optimization_results')
+      .select('id, optimized_route')
+      .eq('trip_id', place.trip_id);
+
+    if (!optError && optimizationResults) {
+      for (const result of optimizationResults) {
+        if (result.optimized_route) {
+          // Check if this place is referenced in the optimization route
+          const routeString = JSON.stringify(result.optimized_route);
+          if (routeString.includes(placeId)) {
+            affectedOptimizations++;
+          }
+        }
+      }
+      
+      if (affectedOptimizations > 0) {
+        processedItems.push('optimization_results');
+        console.log(`Found ${affectedOptimizations} optimization results that reference this place`);
+      }
+    }
+
+    // 3. Check for any messages that mention this place
+    const { data: relatedMessages, error: msgError } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('trip_id', place.trip_id)
+      .ilike('content', `%${place.name}%`);
+
+    if (!msgError && relatedMessages && relatedMessages.length > 0) {
+      processedItems.push('related_messages');
+      console.log(`Found ${relatedMessages.length} messages that mention this place`);
+    }
+
+    // 4. Check for usage events related to this place
+    const { data: usageEvents, error: usageError } = await supabase
+      .from('usage_events')
+      .select('id')
+      .eq('event_category', 'place_management')
+      .contains('metadata', { place_id: placeId });
+
+    if (!usageError && usageEvents && usageEvents.length > 0) {
+      processedItems.push('usage_events');
+      console.log(`Found ${usageEvents.length} usage events for this place`);
+    }
+
+    console.log(`Related data processing completed for place ${placeId}`);
+    return {
+      processedItems,
+      hadScheduledData,
+      affectedOptimizations,
+      relatedMessagesCount: relatedMessages?.length || 0,
+      usageEventsCount: usageEvents?.length || 0
+    };
+
+  } catch (error) {
+    console.warn('Error processing related data:', error);
+    return {
+      processedItems: ['error_occurred'],
+      hadScheduledData: false,
+      affectedOptimizations: 0,
+      error: error.message
+    };
+  }
+}
+
+// Send place deletion notification to trip members
+async function sendPlaceDeletionNotification(
+  deletedPlace: any,
+  deletedByUserId: string,
+  relatedDataInfo: any,
+  supabase: any
+): Promise<void> {
+  try {
+    // Get trip members (excluding deleter)
+    const { data: tripMembers, error: membersError } = await supabase
+      .from('trip_members')
+      .select(`
+        user_id,
+        user:users(id, name, email)
+      `)
+      .eq('trip_id', deletedPlace.trip_id)
+      .neq('user_id', deletedByUserId);
+
+    if (membersError) {
+      console.warn('Failed to fetch trip members for deletion notification:', membersError);
+      return;
+    }
+
+    if (!tripMembers || tripMembers.length === 0) {
+      console.log('No other members to notify for place deletion');
+      return;
+    }
+
+    // Get deleter information
+    const { data: deleter, error: deleterError } = await supabase
+      .from('users')
+      .select('name')
+      .eq('id', deletedByUserId)
+      .single();
+
+    if (deleterError) {
+      console.warn('Failed to fetch deleter info:', deleterError);
+      return;
+    }
+
+    // Create notification message with impact information
+    let impactDetails = '';
+    if (relatedDataInfo.hadScheduledData) {
+      impactDetails += ' This may affect the trip schedule.';
+    }
+    if (relatedDataInfo.affectedOptimizations > 0) {
+      impactDetails += ` ${relatedDataInfo.affectedOptimizations} optimization result(s) may be affected.`;
+    }
+
+    const notificationMessage = `${deleter.name} deleted "${deletedPlace.name}" from the trip.${impactDetails}`;
+
+    // Send notifications to database
+    const notifications = tripMembers.map((member: any) => ({
+      user_id: member.user_id,
+      trip_id: deletedPlace.trip_id,
+      type: 'place_deleted',
+      title: 'Place removed from trip',
+      message: notificationMessage,
+      data: {
+        deleted_place_id: deletedPlace.id,
+        deleted_place_name: deletedPlace.name,
+        deleted_place_category: deletedPlace.category,
+        deleted_by: deleter.name,
+        deleted_by_id: deletedByUserId,
+        trip_id: deletedPlace.trip_id,
+        impact_info: relatedDataInfo
+      },
+      created_at: new Date().toISOString(),
+      read: false
+    }));
+
+    // Save notifications to database
+    const { error: notificationError } = await supabase
+      .from('notifications')
+      .insert(notifications);
+
+    if (notificationError) {
+      console.warn('Failed to save deletion notifications:', notificationError);
+    } else {
+      console.log(`Place deletion notifications sent to ${notifications.length} members`);
+    }
+
+    // Broadcast real-time notification
+    await broadcastRealtimeDeletionNotification(deletedPlace.trip_id, {
+      type: 'place_deleted',
+      place: {
+        id: deletedPlace.id,
+        name: deletedPlace.name,
+        category: deletedPlace.category
+      },
+      deleted_by: deleter.name,
+      impact_info: relatedDataInfo,
+      message: notificationMessage
+    }, supabase);
+
+  } catch (error) {
+    console.error('Error sending place deletion notification:', error);
+    // Don't let notification errors affect deletion success
+  }
+}
+
+// Broadcast real-time deletion notifications
+async function broadcastRealtimeDeletionNotification(
+  tripId: string,
+  notificationData: any,
+  supabase: any
+): Promise<void> {
+  try {
+    // Broadcast notification to Supabase Realtime channel
+    await supabase
+      .channel(`trip-${tripId}`)
+      .send({
+        type: 'broadcast',
+        event: 'place_deletion_notification',
+        payload: notificationData
+      });
+
+    console.log(`Realtime deletion notification broadcasted to trip-${tripId}`);
+  } catch (error) {
+    console.warn('Failed to broadcast realtime deletion notification:', error);
   }
 }
