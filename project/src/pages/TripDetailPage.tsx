@@ -18,6 +18,7 @@ export function TripDetailPage() {
   // Mock trip data if no current trip
   const trip = currentTrip || {
     id: '1',
+    departureLocation: 'Tokyo Station',
     name: 'Tokyo Adventure',
     description: 'Exploring the vibrant culture and cuisine of Tokyo',
     destination: 'Tokyo, Japan',
@@ -205,20 +206,31 @@ export function TripDetailPage() {
                 whileHover={{ scale: 1.02 }}
               >
                 <MapPin className="w-4 h-4 text-primary-500" />
-                <span className="font-medium">{trip.destination}</span>
+                <span className="font-medium">From: {trip.departureLocation}</span>
               </motion.div>
+              {trip.destination && (
+                <motion.div 
+                  className="flex items-center space-x-1 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <MapPin className="w-4 h-4 text-secondary-500" />
+                  <span className="font-medium">To: {trip.destination}</span>
+                </motion.div>
+              )}
+              {trip.startDate && trip.endDate && (
+                <motion.div 
+                  className="flex items-center space-x-1 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <Calendar className="w-4 h-4 text-accent-500" />
+                  <span className="font-medium">{formatDateRange(trip.startDate, trip.endDate)}</span>
+                </motion.div>
+              )}
               <motion.div 
                 className="flex items-center space-x-1 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50"
                 whileHover={{ scale: 1.02 }}
               >
-                <Calendar className="w-4 h-4 text-secondary-500" />
-                <span className="font-medium">{formatDateRange(trip.startDate, trip.endDate)}</span>
-              </motion.div>
-              <motion.div 
-                className="flex items-center space-x-1 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50"
-                whileHover={{ scale: 1.02 }}
-              >
-                <Users className="w-4 h-4 text-accent-500" />
+                <Users className="w-4 h-4 text-green-500" />
                 <span className="font-medium">{trip.memberCount}</span>
               </motion.div>
             </div>

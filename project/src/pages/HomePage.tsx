@@ -310,10 +310,10 @@ export function HomePage() {
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex-1 min-w-0 pr-12">
                               <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                                {trip.name}
+                                {trip.name || `${trip.departureLocation} Trip`}
                               </h3>
                               <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2 leading-relaxed">
-                                {trip.description}
+                                {trip.description || `Trip starting from ${trip.departureLocation}`}
                               </p>
                             </div>
                             <div className="flex space-x-1">
@@ -350,18 +350,28 @@ export function HomePage() {
                               <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center mr-3">
                                 <MapPin className="w-4 h-4 text-primary-600 dark:text-primary-400" />
                               </div>
-                              <span className="font-medium">{trip.destination}</span>
+                              <span className="font-medium">From: {trip.departureLocation}</span>
                             </div>
-                            <div className="flex items-center text-slate-600 dark:text-slate-400 text-sm">
-                              <div className="w-8 h-8 bg-secondary-100 dark:bg-secondary-900/30 rounded-xl flex items-center justify-center mr-3">
-                                <Calendar className="w-4 h-4 text-secondary-600 dark:text-secondary-400" />
+                            {trip.destination && (
+                              <div className="flex items-center text-slate-600 dark:text-slate-400 text-sm">
+                                <div className="w-8 h-8 bg-secondary-100 dark:bg-secondary-900/30 rounded-xl flex items-center justify-center mr-3">
+                                  <MapPin className="w-4 h-4 text-secondary-600 dark:text-secondary-400" />
+                                </div>
+                                <span className="font-medium">To: {trip.destination}</span>
                               </div>
-                              <span>{formatDateRange(trip.startDate, trip.endDate)}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
+                            )}
+                            {trip.startDate && trip.endDate && (
                               <div className="flex items-center text-slate-600 dark:text-slate-400 text-sm">
                                 <div className="w-8 h-8 bg-accent-100 dark:bg-accent-900/30 rounded-xl flex items-center justify-center mr-3">
-                                  <Users className="w-4 h-4 text-accent-600 dark:text-accent-400" />
+                                  <Calendar className="w-4 h-4 text-accent-600 dark:text-accent-400" />
+                                </div>
+                                <span>{formatDateRange(trip.startDate, trip.endDate)}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center text-slate-600 dark:text-slate-400 text-sm">
+                                <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center mr-3">
+                                  <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
                                 </div>
                                 <span>{trip.memberCount} member{trip.memberCount !== 1 ? 's' : ''}</span>
                               </div>

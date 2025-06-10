@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Dialog } from '@headlessui/react';
-import { X, MapPin, Calendar, Users, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, MapPin, Calendar, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -11,12 +11,15 @@ interface CreateTripModalProps {
 
 export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
   const [formData, setFormData] = useState({
+    departureLocation: '',
     name: '',
     description: '',
     destination: '',
     startDate: '',
     endDate: '',
   });
+
+  const [useSameDeparture, setUseSameDeparture] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -25,34 +28,54 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
     end: null
   });
 
-  const { addTrip, setCurrentTrip, user } = useStore();
+  const { addTrip, setCurrentTrip, user, createTripWithAPI } = useStore();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newTrip = {
-      id: `trip-${Date.now()}`,
-      ...formData,
-      startDate: selectedRange.start?.toISOString().split('T')[0] || '',
-      endDate: selectedRange.end?.toISOString().split('T')[0] || selectedRange.start?.toISOString().split('T')[0] || '',
-      memberCount: 1,
-      createdAt: new Date().toISOString(),
-      ownerId: user?.id || 'guest',
-    };
-
-    addTrip(newTrip);
-    setCurrentTrip(newTrip);
-    onClose();
+    if (!formData.departureLocation.trim()) {
+      alert('Departure location is required');
+      return;
+    }
     
-    // Reset form
-    setFormData({
-      name: '',
-      description: '',
-      destination: '',
-      startDate: '',
-      endDate: '',
-    });
-    setSelectedRange({ start: null, end: null });
+    setIsSubmitting(true);
+    
+    try {
+      const finalDestination = useSameDeparture ? 'same as departure location' : formData.destination;
+      
+      const tripData = {
+        departure_location: formData.departureLocation,
+        name: formData.name || undefined,
+        description: formData.description || undefined,
+        destination: finalDestination || undefined,
+        start_date: selectedRange.start?.toISOString().split('T')[0] || undefined,
+        end_date: selectedRange.end?.toISOString().split('T')[0] || undefined,
+      };
+
+      // Try to create trip with API first, fallback to local storage
+      await createTripWithAPI(tripData);
+      
+      onClose();
+      
+      // Reset form
+      setFormData({
+        departureLocation: '',
+        name: '',
+        description: '',
+        destination: '',
+        startDate: '',
+        endDate: '',
+      });
+      setSelectedRange({ start: null, end: null });
+      setUseSameDeparture(false);
+    } catch (error) {
+      console.error('Failed to create trip:', error);
+      alert('Failed to create trip. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -81,8 +104,10 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
     } else {
       if (date < selectedRange.start) {
         setSelectedRange({ start: date, end: selectedRange.start });
+        setShowDatePicker(false);
       } else {
         setSelectedRange({ start: selectedRange.start, end: date });
+        setShowDatePicker(false);
       }
     }
   };
@@ -184,7 +209,7 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="w-full max-w-md bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 overflow-hidden"
+              className="w-full max-w-md max-h-[75vh] bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 overflow-y-auto"
             >
               {/* Header */}
               <div className="relative p-6 pb-4 border-b border-slate-200/50 dark:border-slate-700/50">
@@ -213,15 +238,33 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
                 {/* Trip Name */}
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Trip Name *
+                    Trip Name <span className="text-slate-400 font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Auto-generated from departure location if empty"
+                      className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
+                    />
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                  </div>
+                </div>
+
+                {/* Departure Location */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    <MapPin className="w-4 h-4 inline mr-2 text-primary-500" />
+                    Departure Location *
                   </label>
                   <div className="relative">
                     <input
                       type="text"
                       required
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g., Tokyo Adventure"
+                      value={formData.departureLocation}
+                      onChange={(e) => setFormData({ ...formData, departureLocation: e.target.value })}
+                      placeholder="e.g., Tokyo Station, New York JFK"
                       className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
                     />
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
@@ -231,26 +274,78 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
                 {/* Destination */}
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    <MapPin className="w-4 h-4 inline mr-2 text-primary-500" />
-                    Destination
+                    <MapPin className="w-4 h-4 inline mr-2 text-secondary-500" />
+                    Destination <span className="text-slate-400 font-normal">(optional)</span>
                   </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={formData.destination}
-                      onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                      placeholder="e.g., Tokyo, Japan"
-                      className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
-                    />
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                  </div>
+                  
+                  {/* Same as departure location option */}
+                  <motion.button
+                    type="button"
+                    onClick={() => {
+                      setUseSameDeparture(!useSameDeparture);
+                      if (!useSameDeparture) {
+                        setFormData({ ...formData, destination: '' });
+                      }
+                    }}
+                    className={`w-full p-3 rounded-xl text-left transition-all duration-300 border-2 ${
+                      useSameDeparture
+                        ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-300 dark:border-primary-600/50 text-primary-700 dark:text-primary-300'
+                        : 'bg-slate-50/50 dark:bg-slate-700/50 border-slate-200/50 dark:border-slate-600/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-700/80'
+                    }`}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                        useSameDeparture
+                          ? 'border-primary-500 bg-primary-500'
+                          : 'border-slate-300 dark:border-slate-600'
+                      }`}>
+                        {useSameDeparture && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="w-2 h-2 bg-white rounded-full"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">Same as departure location</div>
+                        <div className="text-xs opacity-75">
+                          {useSameDeparture && formData.departureLocation 
+                            ? `Return to ${formData.departureLocation}`
+                            : 'Round trip returning to departure point'
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </motion.button>
+
+                  {/* Custom destination input */}
+                  {!useSameDeparture && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="relative"
+                    >
+                      <input
+                        type="text"
+                        value={formData.destination}
+                        onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                        placeholder="Enter destination or leave empty"
+                        className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
+                      />
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                    </motion.div>
+                  )}
                 </div>
 
                 {/* Travel Dates */}
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                     <Calendar className="w-4 h-4 inline mr-2 text-secondary-500" />
-                    Travel Dates
+                    Travel Dates <span className="text-slate-400 font-normal">(optional)</span>
                   </label>
                   
                   <div className="relative">
@@ -345,7 +440,7 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
                 {/* Description */}
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Description
+                    Description <span className="text-slate-400 font-normal">(optional)</span>
                   </label>
                   <div className="relative">
                     <textarea
@@ -372,12 +467,22 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
                   </motion.button>
                   <motion.button
                     type="submit"
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 text-white rounded-2xl hover:from-primary-600 hover:via-secondary-600 hover:to-primary-700 transition-all duration-300 font-semibold shadow-glow hover:shadow-glow-lg relative overflow-hidden group"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    disabled={isSubmitting || !formData.departureLocation.trim()}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 text-white rounded-2xl hover:from-primary-600 hover:via-secondary-600 hover:to-primary-700 transition-all duration-300 font-semibold shadow-glow hover:shadow-glow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+                    whileHover={!isSubmitting ? { scale: 1.02 } : {}}
+                    whileTap={!isSubmitting ? { scale: 0.98 } : {}}
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <span className="relative z-10">Create Trip</span>
+                    <span className="relative z-10 flex items-center justify-center">
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Trip'
+                      )}
+                    </span>
                   </motion.button>
                 </div>
               </form>

@@ -362,6 +362,66 @@ glass: "bg-white/10 dark:bg-slate-900/10 backdrop-blur-xl border border-white/20
 
 ### 3.3 フォームコンポーネント
 
+#### 3.3.0 CreateTripModal フォーム仕様
+```typescript
+interface CreateTripFormData {
+  departure_location: string; // 必須：出発地（最重要フィールド）
+  name?: string;              // 任意：旅行名（未入力時は"[出発地]からの旅行"で自動生成）
+  destination?: string;       // 任意：目的地（placesから推定可能、"same as departure location"オプション追加）
+  start_date?: Date;         // 任意：出発日（日程未確定の場合）
+  end_date?: Date;           // 任意：帰国日（日程未確定の場合）
+  description?: string;      // 任意：説明
+}
+
+// destination入力フィールドの新機能
+interface DestinationFieldOptions {
+  showSameAsDepatureOption: boolean; // "出発地と同じ"オプションを表示
+  placeholder: string; // "目的地を入力するか「出発地と同じ」を選択"
+  sameAsDepatureText: string; // "Same as departure location"表示テキスト
+}
+
+// フォームバリデーション
+const validateCreateTrip = (data: CreateTripFormData) => {
+  if (!data.departure_location?.trim()) {
+    throw new Error('出発地は必須です');
+  }
+  
+  if (data.start_date && data.end_date && data.start_date > data.end_date) {
+    throw new Error('帰国日は出発日より後に設定してください');
+  }
+  
+  // destinationが"same as departure location"の場合の処理
+  if (data.destination === 'same as departure location' || data.destination === '') {
+    data.destination = data.departure_location;
+  }
+};
+
+// destination入力UI仕様
+const DestinationInputUI = {
+  // 入力フィールド
+  inputField: {
+    placeholder: "Enter destination or select 'Same as departure location'",
+    className: "w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl",
+    clearable: true,
+  },
+  
+  // "Same as departure location" オプション
+  sameAsDepatureOption: {
+    type: "button",
+    text: "Same as departure location",
+    className: "w-full mt-2 p-2 text-left text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl",
+    icon: "MapPin", // Lucide icon
+  },
+  
+  // 選択状態の表示
+  selectedState: {
+    showDepartureLocationCopy: true,
+    className: "text-primary-600 dark:text-primary-400 font-medium",
+    indicator: "✓ Same as departure location"
+  }
+};
+```
+
 #### 3.3.1 DurationSlider.tsx
 ```typescript
 interface DurationSliderProps {
@@ -710,8 +770,20 @@ xl: 1280px  /* デスクトップ */
 
 // フォーム
 <form>
-  <label htmlFor="tripName">Trip Name</label>
-  <input id="tripName" type="text" required />
+  <label htmlFor="departureLocation">出発地 *</label>
+  <input id="departureLocation" type="text" required />
+  
+  <label htmlFor="tripName">旅行名</label>
+  <input id="tripName" type="text" placeholder="未入力時は自動生成されます" />
+  
+  <label htmlFor="destination">目的地</label>
+  <input id="destination" type="text" placeholder="任意" />
+  
+  <label htmlFor="startDate">出発日</label>
+  <input id="startDate" type="date" placeholder="任意" />
+  
+  <label htmlFor="endDate">帰国日</label>
+  <input id="endDate" type="date" placeholder="任意" />
 </form>
 ```
 

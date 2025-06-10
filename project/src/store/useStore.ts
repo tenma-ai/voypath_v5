@@ -13,11 +13,12 @@ export interface User {
 
 export interface Trip {
   id: string;
-  name: string;
-  description: string;
-  destination: string;
-  startDate: string;
-  endDate: string;
+  departureLocation: string; // Required field - where the trip starts from
+  name?: string; // Optional - auto-generated from departureLocation if not provided
+  description?: string; // Optional
+  destination?: string; // Optional - can be inferred from places
+  startDate?: string; // Optional - for undated trips
+  endDate?: string; // Optional - for undated trips
   memberCount: number;
   createdAt: string;
   ownerId: string;
@@ -87,12 +88,25 @@ interface StoreState {
   isOptimizing: boolean;
   setIsOptimizing: (optimizing: boolean) => void;
 
+  // API Integration
+  createTripWithAPI: (tripData: TripCreateData) => Promise<Trip>;
+  optimizeTrip: (tripId: string) => Promise<void>;
+
   // Premium functions
   canCreateTrip: () => boolean;
   canAddMember: (tripId: string) => boolean;
   canAddPlace: (userId: string, tripId?: string) => boolean;
   getUserPlaceCount: (userId: string, tripId?: string) => number;
   upgradeToPremium: () => void;
+}
+
+export interface TripCreateData {
+  departure_location: string;
+  name?: string;
+  description?: string;
+  destination?: string;
+  start_date?: string;
+  end_date?: string;
 }
 
 export const useStore = create<StoreState>()(
@@ -206,6 +220,107 @@ export const useStore = create<StoreState>()(
             premiumExpiresAt: premiumExpiresAt.toISOString(),
           }
         });
+      },
+
+      // API Integration
+      createTripWithAPI: async (tripData: TripCreateData): Promise<Trip> => {
+        const { user } = get();
+        if (!user) throw new Error('User not authenticated');
+
+        try {
+          const response = await fetch('/api/supabase/functions/trip-management', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${user.id}`, // In real implementation, use proper JWT token
+            },
+            body: JSON.stringify(tripData),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create trip');
+          }
+
+          const result = await response.json();
+          const newTrip: Trip = {
+            id: result.trip.id,
+            departureLocation: result.trip.departure_location,
+            name: result.trip.name,
+            description: result.trip.description,
+            destination: result.trip.destination,
+            startDate: result.trip.start_date,
+            endDate: result.trip.end_date,
+            memberCount: result.trip.total_members || 1,
+            createdAt: result.trip.created_at,
+            ownerId: result.trip.owner_id,
+          };
+
+          // Add to local store
+          set((state) => ({ 
+            trips: [...state.trips, newTrip],
+            currentTrip: newTrip 
+          }));
+
+          return newTrip;
+        } catch (error) {
+          console.error('Failed to create trip with API:', error);
+          // Fallback to local storage for demo
+          const fallbackTrip: Trip = {
+            id: `trip-${Date.now()}`,
+            departureLocation: tripData.departure_location,
+            name: tripData.name || `${tripData.departure_location} Trip`,
+            description: tripData.description,
+            destination: tripData.destination,
+            startDate: tripData.start_date,
+            endDate: tripData.end_date,
+            memberCount: 1,
+            createdAt: new Date().toISOString(),
+            ownerId: user.id,
+          };
+
+          set((state) => ({ 
+            trips: [...state.trips, fallbackTrip],
+            currentTrip: fallbackTrip 
+          }));
+
+          return fallbackTrip;
+        }
+      },
+
+      optimizeTrip: async (tripId: string): Promise<void> => {
+        const { user } = get();
+        if (!user) throw new Error('User not authenticated');
+
+        set({ isOptimizing: true });
+
+        try {
+          const response = await fetch('/api/supabase/functions/optimize-route', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${user.id}`, // In real implementation, use proper JWT token
+            },
+            body: JSON.stringify({ trip_id: tripId }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to optimize trip');
+          }
+
+          const result = await response.json();
+          console.log('Optimization completed:', result);
+
+          // Update places with optimized schedule if needed
+          // This would typically update the places array with scheduling information
+          
+        } catch (error) {
+          console.error('Failed to optimize trip:', error);
+          throw error;
+        } finally {
+          set({ isOptimizing: false });
+        }
       },
     }),
     {

@@ -302,6 +302,107 @@ interface TemporalPatternStats {
   most_active_day_of_week: string;
 }
 
+// Opening Hours Management Interfaces
+interface OpeningHours {
+  [key: string]: DayHours; // Key is day number (0-6) as string
+}
+
+interface DayHours {
+  is_closed: boolean;
+  open_time: string | null; // "HH:MM" format
+  close_time: string | null; // "HH:MM" format
+  breaks?: TimeBreak[]; // Optional lunch breaks, etc.
+}
+
+interface TimeBreak {
+  start_time: string; // "HH:MM"
+  end_time: string; // "HH:MM"
+  break_type: 'lunch' | 'maintenance' | 'other';
+}
+
+interface SpecialHours {
+  date: string; // YYYY-MM-DD
+  is_closed: boolean;
+  open_time: string | null;
+  close_time: string | null;
+  reason: string; // Holiday, special event, etc.
+  breaks?: TimeBreak[];
+}
+
+interface PlaceHoursRequest {
+  place_id: string;
+  opening_hours: OpeningHours;
+  special_hours?: SpecialHours[];
+  timezone?: string; // e.g., "Asia/Tokyo"
+  auto_detect_holidays?: boolean;
+}
+
+interface PlaceHoursResponse {
+  place_id: string;
+  opening_hours: OpeningHours;
+  special_hours: SpecialHours[];
+  timezone: string;
+  is_open_now: boolean;
+  next_status_change: {
+    time: string;
+    status: 'open' | 'closed';
+  } | null;
+  validation_errors?: string[];
+}
+
+interface HoursValidationRequest {
+  opening_hours: OpeningHours;
+  special_hours?: SpecialHours[];
+  check_overlaps?: boolean;
+  check_time_format?: boolean;
+  check_logical_order?: boolean;
+}
+
+interface HoursValidationResponse {
+  is_valid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+  suggestions: string[];
+}
+
+interface ValidationError {
+  field: string;
+  message: string;
+  severity: 'error' | 'warning';
+  day?: number;
+  time?: string;
+}
+
+interface ValidationWarning {
+  field: string;
+  message: string;
+  suggestion?: string;
+}
+
+interface HoursConflictRequest {
+  trip_id: string;
+  target_date: string; // YYYY-MM-DD
+  time_range?: {
+    start_time: string; // "HH:MM"
+    end_time: string; // "HH:MM"
+  };
+}
+
+interface HoursConflictResponse {
+  has_conflicts: boolean;
+  conflicts: PlaceConflict[];
+  recommendations: string[];
+  alternative_times?: string[];
+}
+
+interface PlaceConflict {
+  place_id: string;
+  place_name: string;
+  conflict_type: 'closed' | 'limited_hours' | 'busy_period';
+  details: string;
+  suggested_time?: string;
+}
+
 // External API Integration Interfaces and Functions
 interface GooglePlacesSearchRequest {
   query: string;
@@ -781,6 +882,9 @@ serve(async (req) => {
         } else if (pathSegments.length >= 2 && pathSegments[1] === 'images') {
           // POST /place-management/images (画像アップロード)
           return await handleUploadPlaceImage(req, supabaseClient, user.id);
+        } else if (pathSegments.length >= 2 && pathSegments[1] === 'hours') {
+          // POST /place-management/hours (営業時間設定)
+          return await handleSetPlaceHours(req, supabaseClient, user.id);
         } else {
           return await handleCreatePlace(req, supabaseClient, user.id);
         }
@@ -823,6 +927,33 @@ serve(async (req) => {
                 return await handlePexelsImageSearch(req, supabaseClient, user.id);
               }
             }
+          } else if (pathSegments[1] === 'hours') {
+            if (pathSegments.length >= 3) {
+              if (pathSegments[2] === 'validate') {
+                // GET /place-management/hours/validate (営業時間検証)
+                return await handleValidateOpeningHours(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'conflicts') {
+                // GET /place-management/hours/conflicts (営業時間競合チェック)
+                return await handleCheckHoursConflicts(req, supabaseClient, user.id);
+              }
+            } else {
+              // GET /place-management/hours?place_id={place_id} (営業時間取得)
+              return await handleGetPlaceHours(req, supabaseClient, user.id);
+            }
+          } else if (pathSegments[1] === 'geo') {
+            if (pathSegments.length >= 3) {
+              if (pathSegments[2] === 'search') {
+                // GET /place-management/geo/search (最適化地理的検索)
+                return await handleOptimizedGeographicSearch(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'viewport') {
+                // GET /place-management/geo/viewport (ビューポート検索)
+                return await handleViewportSearch(req, supabaseClient, user.id);
+              } else if (pathSegments[2] === 'clusters') {
+                // GET /place-management/geo/clusters (地理的クラスタリング)
+                return await handleGeographicClustering(req, supabaseClient, user.id);
+              }
+            }
+            }
           } else {
             // GET /place-management/{place_id}
             const placeId = pathSegments[1];
@@ -844,6 +975,9 @@ serve(async (req) => {
         } else if (pathSegments.length >= 2 && pathSegments[1] === 'images') {
           // PUT /place-management/images (画像情報更新)
           return await handleUpdatePlaceImage(req, supabaseClient, user.id);
+        } else if (pathSegments.length >= 2 && pathSegments[1] === 'hours') {
+          // PUT /place-management/hours (営業時間更新)
+          return await handleUpdatePlaceHours(req, supabaseClient, user.id);
         } else {
           return await handleUpdatePlace(req, supabaseClient, user.id);
         }
@@ -1836,16 +1970,259 @@ async function enhanceGeographicData(placeData: any, requestData: PlaceCreateReq
 }
 
 // ハヴァーサイン距離計算関数
+// Geographic Search Optimization Functions
+
+// Optimized Haversine distance calculation with early exit optimizations
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // 地球の半径 (km)
+  // Early exit for identical coordinates
+  if (lat1 === lat2 && lon1 === lon2) return 0;
+  
+  const R = 6371; // Earth's radius in kilometers
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
+  
+  // Pre-calculate commonly used values
+  const lat1Rad = lat1 * Math.PI / 180;
+  const lat2Rad = lat2 * Math.PI / 180;
+  
   const a = 
     Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * 
     Math.sin(dLon/2) * Math.sin(dLon/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
+}
+
+// Fast distance calculation using equirectangular approximation (faster but less accurate)
+function calculateFastDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  if (lat1 === lat2 && lon1 === lon2) return 0;
+  
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const avgLat = (lat1 + lat2) / 2 * Math.PI / 180;
+  
+  const x = dLon * Math.cos(avgLat);
+  const y = dLat;
+  return R * Math.sqrt(x * x + y * y);
+}
+
+// Bounding box calculation for geographic queries optimization
+function getBoundingBox(centerLat: number, centerLon: number, radiusKm: number): {
+  minLat: number;
+  maxLat: number;
+  minLon: number;
+  maxLon: number;
+} {
+  const R = 6371; // Earth's radius in kilometers
+  const latChange = radiusKm / R * 180 / Math.PI;
+  const lonChange = radiusKm / R * 180 / Math.PI / Math.cos(centerLat * Math.PI / 180);
+  
+  return {
+    minLat: centerLat - latChange,
+    maxLat: centerLat + latChange,
+    minLon: centerLon - lonChange,
+    maxLon: centerLon + lonChange
+  };
+}
+
+// Geographic clustering for place grouping
+interface ClusterPoint {
+  id: string;
+  latitude: number;
+  longitude: number;
+  data: any;
+}
+
+interface Cluster {
+  center: { latitude: number; longitude: number };
+  points: ClusterPoint[];
+  radius: number;
+}
+
+function createGeographicClusters(points: ClusterPoint[], maxClusterRadius: number = 1): Cluster[] {
+  const clusters: Cluster[] = [];
+  const visited = new Set<string>();
+  
+  for (const point of points) {
+    if (visited.has(point.id)) continue;
+    
+    const cluster: Cluster = {
+      center: { latitude: point.latitude, longitude: point.longitude },
+      points: [point],
+      radius: 0
+    };
+    
+    visited.add(point.id);
+    
+    // Find nearby points to add to this cluster
+    for (const otherPoint of points) {
+      if (visited.has(otherPoint.id)) continue;
+      
+      const distance = calculateFastDistance(
+        point.latitude, point.longitude,
+        otherPoint.latitude, otherPoint.longitude
+      );
+      
+      if (distance <= maxClusterRadius) {
+        cluster.points.push(otherPoint);
+        visited.add(otherPoint.id);
+        
+        // Update cluster center (centroid)
+        const totalLat = cluster.points.reduce((sum, p) => sum + p.latitude, 0);
+        const totalLon = cluster.points.reduce((sum, p) => sum + p.longitude, 0);
+        cluster.center.latitude = totalLat / cluster.points.length;
+        cluster.center.longitude = totalLon / cluster.points.length;
+        
+        // Update cluster radius
+        cluster.radius = Math.max(cluster.radius, distance);
+      }
+    }
+    
+    clusters.push(cluster);
+  }
+  
+  return clusters;
+}
+
+// Optimized geographic search with spatial filtering
+async function performOptimizedGeographicSearch(
+  supabase: any,
+  searchParams: {
+    latitude: number;
+    longitude: number;
+    radius_km?: number;
+    limit?: number;
+    use_fast_distance?: boolean;
+  }
+): Promise<any[]> {
+  const radiusKm = searchParams.radius_km || 10;
+  const limit = searchParams.limit || 100;
+  const useFastDistance = searchParams.use_fast_distance || false;
+  
+  // Step 1: Use bounding box for initial filtering (much faster than distance calculation)
+  const bbox = getBoundingBox(searchParams.latitude, searchParams.longitude, radiusKm);
+  
+  let query = supabase
+    .from('places')
+    .select('*')
+    .gte('latitude', bbox.minLat)
+    .lte('latitude', bbox.maxLat)
+    .gte('longitude', bbox.minLon)
+    .lte('longitude', bbox.maxLon)
+    .not('latitude', 'is', null)
+    .not('longitude', 'is', null);
+  
+  const { data: places, error } = await query;
+  
+  if (error) throw error;
+  
+  // Step 2: Apply precise distance filtering
+  const distanceCalc = useFastDistance ? calculateFastDistance : calculateHaversineDistance;
+  
+  const placesWithDistance = places
+    .map(place => ({
+      ...place,
+      distance_km: distanceCalc(
+        searchParams.latitude, searchParams.longitude,
+        place.latitude, place.longitude
+      )
+    }))
+    .filter(place => place.distance_km <= radiusKm)
+    .sort((a, b) => a.distance_km - b.distance_km)
+    .slice(0, limit);
+  
+  return placesWithDistance;
+}
+
+// Viewport-based query optimization for map display
+async function getPlacesInViewport(
+  supabase: any,
+  viewport: {
+    northEast: { latitude: number; longitude: number };
+    southWest: { latitude: number; longitude: number };
+  },
+  options: {
+    maxPlaces?: number;
+    clustering?: boolean;
+    clusterRadius?: number;
+  } = {}
+): Promise<{
+  places: any[];
+  clusters?: Cluster[];
+  viewport_stats: {
+    total_places: number;
+    clustered_places: number;
+    visible_clusters: number;
+  };
+}> {
+  const maxPlaces = options.maxPlaces || 200;
+  const enableClustering = options.clustering || false;
+  const clusterRadius = options.clusterRadius || 1;
+  
+  // Query places within viewport bounds
+  const { data: places, error } = await supabase
+    .from('places')
+    .select('*')
+    .gte('latitude', viewport.southWest.latitude)
+    .lte('latitude', viewport.northEast.latitude)
+    .gte('longitude', viewport.southWest.longitude)
+    .lte('longitude', viewport.northEast.longitude)
+    .not('latitude', 'is', null)
+    .not('longitude', 'is', null)
+    .limit(maxPlaces);
+  
+  if (error) throw error;
+  
+  let result: any = {
+    places,
+    viewport_stats: {
+      total_places: places.length,
+      clustered_places: 0,
+      visible_clusters: 0
+    }
+  };
+  
+  // Apply clustering if requested
+  if (enableClustering && places.length > 0) {
+    const clusterPoints: ClusterPoint[] = places.map(place => ({
+      id: place.id,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      data: place
+    }));
+    
+    const clusters = createGeographicClusters(clusterPoints, clusterRadius);
+    
+    result.clusters = clusters;
+    result.viewport_stats.clustered_places = clusters.reduce((sum, cluster) => sum + cluster.points.length, 0);
+    result.viewport_stats.visible_clusters = clusters.length;
+  }
+  
+  return result;
+}
+
+// Geographic performance monitoring
+interface GeographicSearchMetrics {
+  search_type: 'radius' | 'viewport' | 'cluster';
+  execution_time_ms: number;
+  places_found: number;
+  search_radius_km?: number;
+  viewport_area_km2?: number;
+  optimization_used: string;
+  bbox_filter_reduction?: number;
+}
+
+function logGeographicSearchMetrics(metrics: GeographicSearchMetrics): void {
+  console.log(`Geographic Search Metrics:`, {
+    type: metrics.search_type,
+    duration: `${metrics.execution_time_ms}ms`,
+    results: metrics.places_found,
+    optimization: metrics.optimization_used,
+    ...(metrics.search_radius_km && { radius: `${metrics.search_radius_km}km` }),
+    ...(metrics.viewport_area_km2 && { area: `${metrics.viewport_area_km2}km²` }),
+    ...(metrics.bbox_filter_reduction && { reduction: `${metrics.bbox_filter_reduction}%` })
+  });
 }
 
 // Enhanced operating hours information
@@ -5826,4 +6203,1336 @@ async function handlePexelsImageSearch(req: Request, supabase: any, userId: stri
       }
     );
   }
+}
+
+// Opening Hours Management Functions
+
+async function handleSetPlaceHours(
+  req: Request,
+  supabase: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const body = await req.json() as PlaceHoursRequest;
+    
+    // Validate request
+    if (!body.place_id || !body.opening_hours) {
+      return new Response(
+        JSON.stringify({ error: 'place_id and opening_hours are required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
+    // Verify place exists and user has access
+    const { data: place, error: placeError } = await supabase
+      .from('places')
+      .select('id, trip_id, name')
+      .eq('id', body.place_id)
+      .single();
+
+    if (placeError || !place) {
+      return new Response(
+        JSON.stringify({ error: 'Place not found' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404
+        }
+      );
+    }
+
+    // Check if user has access to this trip
+    const { data: tripMember } = await supabase
+      .from('trip_members')
+      .select('role')
+      .eq('trip_id', place.trip_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (!tripMember) {
+      return new Response(
+        JSON.stringify({ error: 'Access denied' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403
+        }
+      );
+    }
+
+    // Validate opening hours format
+    const validation = validateOpeningHours(body.opening_hours, body.special_hours);
+    if (!validation.is_valid) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid opening hours format',
+          validation_errors: validation.errors
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
+    const timezone = body.timezone || 'Asia/Tokyo';
+
+    // Insert or update opening hours
+    const hoursData = {
+      place_id: body.place_id,
+      opening_hours: body.opening_hours,
+      special_hours: body.special_hours || [],
+      timezone,
+      auto_detect_holidays: body.auto_detect_holidays || false,
+      updated_at: new Date().toISOString(),
+      updated_by: userId
+    };
+
+    const { data: existingHours } = await supabase
+      .from('place_opening_hours')
+      .select('id')
+      .eq('place_id', body.place_id)
+      .single();
+
+    let result;
+    if (existingHours) {
+      // Update existing hours
+      const { data, error } = await supabase
+        .from('place_opening_hours')
+        .update(hoursData)
+        .eq('place_id', body.place_id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      result = data;
+    } else {
+      // Create new hours
+      const { data, error } = await supabase
+        .from('place_opening_hours')
+        .insert({
+          ...hoursData,
+          created_at: new Date().toISOString(),
+          created_by: userId
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      result = data;
+    }
+
+    // Calculate current status
+    const currentStatus = calculateCurrentOpenStatus(
+      body.opening_hours,
+      body.special_hours,
+      timezone
+    );
+
+    const response: PlaceHoursResponse = {
+      place_id: body.place_id,
+      opening_hours: body.opening_hours,
+      special_hours: body.special_hours || [],
+      timezone,
+      is_open_now: currentStatus.is_open,
+      next_status_change: currentStatus.next_change,
+      validation_errors: validation.warnings.map(w => w.message)
+    };
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 201
+    });
+
+  } catch (error) {
+    console.error('Error setting place hours:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
+  }
+}
+
+async function handleUpdatePlaceHours(
+  req: Request,
+  supabase: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const body = await req.json() as PlaceHoursRequest;
+    
+    if (!body.place_id) {
+      return new Response(
+        JSON.stringify({ error: 'place_id is required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
+    // Check if hours exist
+    const { data: existingHours, error: hoursError } = await supabase
+      .from('place_opening_hours')
+      .select('id, place_id')
+      .eq('place_id', body.place_id)
+      .single();
+
+    if (hoursError || !existingHours) {
+      return new Response(
+        JSON.stringify({ error: 'Opening hours not found for this place' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404
+        }
+      );
+    }
+
+    // Verify user access (same logic as setPlaceHours)
+    const { data: place } = await supabase
+      .from('places')
+      .select('trip_id')
+      .eq('id', body.place_id)
+      .single();
+
+    const { data: tripMember } = await supabase
+      .from('trip_members')
+      .select('role')
+      .eq('trip_id', place.trip_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (!tripMember) {
+      return new Response(
+        JSON.stringify({ error: 'Access denied' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403
+        }
+      );
+    }
+
+    // Build update object with only provided fields
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+      updated_by: userId
+    };
+
+    if (body.opening_hours) {
+      const validation = validateOpeningHours(body.opening_hours, body.special_hours);
+      if (!validation.is_valid) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid opening hours format',
+            validation_errors: validation.errors
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          }
+        );
+      }
+      updateData.opening_hours = body.opening_hours;
+    }
+
+    if (body.special_hours !== undefined) {
+      updateData.special_hours = body.special_hours;
+    }
+
+    if (body.timezone) {
+      updateData.timezone = body.timezone;
+    }
+
+    if (body.auto_detect_holidays !== undefined) {
+      updateData.auto_detect_holidays = body.auto_detect_holidays;
+    }
+
+    // Update hours
+    const { data, error } = await supabase
+      .from('place_opening_hours')
+      .update(updateData)
+      .eq('place_id', body.place_id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Get complete hours data for response
+    const currentStatus = calculateCurrentOpenStatus(
+      data.opening_hours,
+      data.special_hours || [],
+      data.timezone
+    );
+
+    const response: PlaceHoursResponse = {
+      place_id: body.place_id,
+      opening_hours: data.opening_hours,
+      special_hours: data.special_hours || [],
+      timezone: data.timezone,
+      is_open_now: currentStatus.is_open,
+      next_status_change: currentStatus.next_change
+    };
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error updating place hours:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
+  }
+}
+
+async function handleGetPlaceHours(
+  req: Request,
+  supabase: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const placeId = url.searchParams.get('place_id');
+
+    if (!placeId) {
+      return new Response(
+        JSON.stringify({ error: 'place_id parameter is required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
+    // Verify user access
+    const { data: place } = await supabase
+      .from('places')
+      .select('trip_id, name')
+      .eq('id', placeId)
+      .single();
+
+    if (!place) {
+      return new Response(
+        JSON.stringify({ error: 'Place not found' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404
+        }
+      );
+    }
+
+    const { data: tripMember } = await supabase
+      .from('trip_members')
+      .select('role')
+      .eq('trip_id', place.trip_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (!tripMember) {
+      return new Response(
+        JSON.stringify({ error: 'Access denied' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403
+        }
+      );
+    }
+
+    // Get opening hours
+    const { data: hours, error: hoursError } = await supabase
+      .from('place_opening_hours')
+      .select('*')
+      .eq('place_id', placeId)
+      .single();
+
+    if (hoursError) {
+      // No hours set yet
+      return new Response(
+        JSON.stringify({ 
+          place_id: placeId,
+          opening_hours: {},
+          special_hours: [],
+          timezone: 'Asia/Tokyo',
+          is_open_now: false,
+          next_status_change: null,
+          message: 'No opening hours set for this place'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Calculate current status
+    const currentStatus = calculateCurrentOpenStatus(
+      hours.opening_hours,
+      hours.special_hours || [],
+      hours.timezone
+    );
+
+    const response: PlaceHoursResponse = {
+      place_id: placeId,
+      opening_hours: hours.opening_hours,
+      special_hours: hours.special_hours || [],
+      timezone: hours.timezone,
+      is_open_now: currentStatus.is_open,
+      next_status_change: currentStatus.next_change
+    };
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error getting place hours:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
+  }
+}
+
+async function handleValidateOpeningHours(
+  req: Request,
+  supabase: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const body = await req.json() as HoursValidationRequest;
+    
+    if (!body.opening_hours) {
+      return new Response(
+        JSON.stringify({ error: 'opening_hours is required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
+    const validation = validateOpeningHours(
+      body.opening_hours,
+      body.special_hours,
+      {
+        checkOverlaps: body.check_overlaps !== false,
+        checkTimeFormat: body.check_time_format !== false,
+        checkLogicalOrder: body.check_logical_order !== false
+      }
+    );
+
+    const response: HoursValidationResponse = {
+      is_valid: validation.is_valid,
+      errors: validation.errors,
+      warnings: validation.warnings,
+      suggestions: validation.suggestions || []
+    };
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error validating opening hours:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
+  }
+}
+
+async function handleCheckHoursConflicts(
+  req: Request,
+  supabase: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const tripId = url.searchParams.get('trip_id');
+    const targetDate = url.searchParams.get('target_date');
+    const startTime = url.searchParams.get('start_time');
+    const endTime = url.searchParams.get('end_time');
+
+    if (!tripId || !targetDate) {
+      return new Response(
+        JSON.stringify({ error: 'trip_id and target_date are required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
+    // Verify user access to trip
+    const { data: tripMember } = await supabase
+      .from('trip_members')
+      .select('role')
+      .eq('trip_id', tripId)
+      .eq('user_id', userId)
+      .single();
+
+    if (!tripMember) {
+      return new Response(
+        JSON.stringify({ error: 'Access denied' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403
+        }
+      );
+    }
+
+    // Get all places in the trip with their opening hours
+    const { data: places, error: placesError } = await supabase
+      .from('places')
+      .select(`
+        id,
+        name,
+        place_opening_hours(
+          opening_hours,
+          special_hours,
+          timezone
+        )
+      `)
+      .eq('trip_id', tripId);
+
+    if (placesError) throw placesError;
+
+    const conflicts: PlaceConflict[] = [];
+    const recommendations: string[] = [];
+    const alternativeTimes: string[] = [];
+
+    const targetDateObj = new Date(targetDate);
+    const dayOfWeek = targetDateObj.getDay();
+
+    for (const place of places) {
+      if (!place.place_opening_hours || place.place_opening_hours.length === 0) {
+        continue;
+      }
+
+      const hours = place.place_opening_hours[0];
+      const dayHours = hours.opening_hours[dayOfWeek.toString()];
+
+      // Check for special hours on this date
+      const specialHour = hours.special_hours?.find(
+        (sh: any) => sh.date === targetDate
+      );
+
+      let isOpen = false;
+      let openTime = null;
+      let closeTime = null;
+
+      if (specialHour) {
+        isOpen = !specialHour.is_closed;
+        openTime = specialHour.open_time;
+        closeTime = specialHour.close_time;
+      } else if (dayHours) {
+        isOpen = !dayHours.is_closed;
+        openTime = dayHours.open_time;
+        closeTime = dayHours.close_time;
+      }
+
+      if (!isOpen) {
+        conflicts.push({
+          place_id: place.id,
+          place_name: place.name,
+          conflict_type: 'closed',
+          details: `${place.name} is closed on ${targetDate}`,
+          suggested_time: null
+        });
+      } else if (startTime && endTime && openTime && closeTime) {
+        // Check if requested time range conflicts with opening hours
+        if (startTime < openTime || endTime > closeTime) {
+          conflicts.push({
+            place_id: place.id,
+            place_name: place.name,
+            conflict_type: 'limited_hours',
+            details: `${place.name} is only open from ${openTime} to ${closeTime}`,
+            suggested_time: `${openTime}-${closeTime}`
+          });
+        }
+      }
+    }
+
+    if (conflicts.length > 0) {
+      recommendations.push('Consider adjusting your visit times to match place opening hours');
+      recommendations.push('Check for alternative dates when more places are open');
+      
+      // Generate alternative time suggestions
+      const openPlaces = places.filter(place => {
+        if (!place.place_opening_hours || place.place_opening_hours.length === 0) return false;
+        const hours = place.place_opening_hours[0];
+        const dayHours = hours.opening_hours[dayOfWeek.toString()];
+        return dayHours && !dayHours.is_closed;
+      });
+
+      if (openPlaces.length > 0) {
+        // Find common opening hours
+        const commonStart = Math.max(...openPlaces.map(p => {
+          const hours = p.place_opening_hours[0];
+          const dayHours = hours.opening_hours[dayOfWeek.toString()];
+          return timeToMinutes(dayHours.open_time || '00:00');
+        }));
+
+        const commonEnd = Math.min(...openPlaces.map(p => {
+          const hours = p.place_opening_hours[0];
+          const dayHours = hours.opening_hours[dayOfWeek.toString()];
+          return timeToMinutes(dayHours.close_time || '23:59');
+        }));
+
+        if (commonStart < commonEnd) {
+          alternativeTimes.push(`${minutesToTime(commonStart)}-${minutesToTime(commonEnd)}`);
+        }
+      }
+    }
+
+    const response: HoursConflictResponse = {
+      has_conflicts: conflicts.length > 0,
+      conflicts,
+      recommendations,
+      alternative_times: alternativeTimes
+    };
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error checking hours conflicts:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
+  }
+}
+
+// Opening Hours Utility Functions
+
+function validateOpeningHours(
+  openingHours: OpeningHours,
+  specialHours?: SpecialHours[],
+  options = { checkOverlaps: true, checkTimeFormat: true, checkLogicalOrder: true }
+): HoursValidationResponse {
+  const errors: ValidationError[] = [];
+  const warnings: ValidationWarning[] = [];
+  const suggestions: string[] = [];
+
+  // Validate regular opening hours
+  for (const [day, hours] of Object.entries(openingHours)) {
+    const dayNum = parseInt(day);
+    if (dayNum < 0 || dayNum > 6) {
+      errors.push({
+        field: 'opening_hours',
+        message: `Invalid day number: ${day}. Must be 0-6 (Sunday-Saturday)`,
+        severity: 'error',
+        day: dayNum
+      });
+      continue;
+    }
+
+    if (!hours.is_closed) {
+      if (options.checkTimeFormat) {
+        if (!hours.open_time || !isValidTimeFormat(hours.open_time)) {
+          errors.push({
+            field: 'open_time',
+            message: `Invalid open time format for day ${day}`,
+            severity: 'error',
+            day: dayNum,
+            time: hours.open_time || ''
+          });
+        }
+
+        if (!hours.close_time || !isValidTimeFormat(hours.close_time)) {
+          errors.push({
+            field: 'close_time',
+            message: `Invalid close time format for day ${day}`,
+            severity: 'error',
+            day: dayNum,
+            time: hours.close_time || ''
+          });
+        }
+      }
+
+      if (options.checkLogicalOrder && hours.open_time && hours.close_time) {
+        if (timeToMinutes(hours.open_time) >= timeToMinutes(hours.close_time)) {
+          errors.push({
+            field: 'time_order',
+            message: `Close time must be after open time for day ${day}`,
+            severity: 'error',
+            day: dayNum
+          });
+        }
+      }
+
+      // Check breaks
+      if (hours.breaks && hours.breaks.length > 0) {
+        for (const breakItem of hours.breaks) {
+          if (options.checkTimeFormat) {
+            if (!isValidTimeFormat(breakItem.start_time)) {
+              errors.push({
+                field: 'break_start_time',
+                message: `Invalid break start time format for day ${day}`,
+                severity: 'error',
+                day: dayNum,
+                time: breakItem.start_time
+              });
+            }
+
+            if (!isValidTimeFormat(breakItem.end_time)) {
+              errors.push({
+                field: 'break_end_time',
+                message: `Invalid break end time format for day ${day}`,
+                severity: 'error',
+                day: dayNum,
+                time: breakItem.end_time
+              });
+            }
+          }
+
+          if (options.checkLogicalOrder) {
+            if (timeToMinutes(breakItem.start_time) >= timeToMinutes(breakItem.end_time)) {
+              errors.push({
+                field: 'break_time_order',
+                message: `Break end time must be after start time for day ${day}`,
+                severity: 'error',
+                day: dayNum
+              });
+            }
+
+            // Check if break is within opening hours
+            if (hours.open_time && hours.close_time) {
+              const openMinutes = timeToMinutes(hours.open_time);
+              const closeMinutes = timeToMinutes(hours.close_time);
+              const breakStart = timeToMinutes(breakItem.start_time);
+              const breakEnd = timeToMinutes(breakItem.end_time);
+
+              if (breakStart < openMinutes || breakEnd > closeMinutes) {
+                warnings.push({
+                  field: 'break_timing',
+                  message: `Break time extends outside opening hours for day ${day}`,
+                  suggestion: 'Ensure break times are within opening hours'
+                });
+              }
+            }
+          }
+        }
+
+        // Check for overlapping breaks
+        if (options.checkOverlaps && hours.breaks.length > 1) {
+          for (let i = 0; i < hours.breaks.length - 1; i++) {
+            for (let j = i + 1; j < hours.breaks.length; j++) {
+              const break1Start = timeToMinutes(hours.breaks[i].start_time);
+              const break1End = timeToMinutes(hours.breaks[i].end_time);
+              const break2Start = timeToMinutes(hours.breaks[j].start_time);
+              const break2End = timeToMinutes(hours.breaks[j].end_time);
+
+              if (break1Start < break2End && break2Start < break1End) {
+                errors.push({
+                  field: 'break_overlap',
+                  message: `Overlapping breaks found for day ${day}`,
+                  severity: 'error',
+                  day: dayNum
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Validate special hours
+  if (specialHours && specialHours.length > 0) {
+    for (const special of specialHours) {
+      if (!isValidDateFormat(special.date)) {
+        errors.push({
+          field: 'special_date',
+          message: `Invalid date format: ${special.date}. Use YYYY-MM-DD`,
+          severity: 'error'
+        });
+      }
+
+      if (!special.is_closed && options.checkTimeFormat) {
+        if (special.open_time && !isValidTimeFormat(special.open_time)) {
+          errors.push({
+            field: 'special_open_time',
+            message: `Invalid special open time format for ${special.date}`,
+            severity: 'error',
+            time: special.open_time
+          });
+        }
+
+        if (special.close_time && !isValidTimeFormat(special.close_time)) {
+          errors.push({
+            field: 'special_close_time',
+            message: `Invalid special close time format for ${special.date}`,
+            severity: 'error',
+            time: special.close_time
+          });
+        }
+      }
+    }
+
+    // Check for duplicate special dates
+    const dates = specialHours.map(sh => sh.date);
+    const duplicates = dates.filter((date, index) => dates.indexOf(date) !== index);
+    if (duplicates.length > 0) {
+      errors.push({
+        field: 'special_hours_duplicates',
+        message: `Duplicate special hours found for dates: ${duplicates.join(', ')}`,
+        severity: 'error'
+      });
+    }
+  }
+
+  // Generate suggestions
+  if (errors.length === 0) {
+    const allClosed = Object.values(openingHours).every(hours => hours.is_closed);
+    if (allClosed) {
+      warnings.push({
+        field: 'all_closed',
+        message: 'All days are marked as closed',
+        suggestion: 'Consider setting opening hours for at least some days'
+      });
+    }
+
+    // Check for very long hours
+    for (const [day, hours] of Object.entries(openingHours)) {
+      if (!hours.is_closed && hours.open_time && hours.close_time) {
+        const openMinutes = timeToMinutes(hours.open_time);
+        const closeMinutes = timeToMinutes(hours.close_time);
+        const duration = closeMinutes - openMinutes;
+
+        if (duration > 14 * 60) { // More than 14 hours
+          warnings.push({
+            field: 'long_hours',
+            message: `Very long opening hours for day ${day} (${Math.floor(duration / 60)} hours)`,
+            suggestion: 'Consider adding breaks for very long opening hours'
+          });
+        }
+      }
+    }
+
+    suggestions.push('Opening hours format is valid');
+    if (!specialHours || specialHours.length === 0) {
+      suggestions.push('Consider adding special hours for holidays or events');
+    }
+  }
+
+  return {
+    is_valid: errors.length === 0,
+    errors,
+    warnings,
+    suggestions
+  };
+}
+
+function calculateCurrentOpenStatus(
+  openingHours: OpeningHours,
+  specialHours: SpecialHours[],
+  timezone: string
+): { is_open: boolean; next_change: { time: string; status: 'open' | 'closed' } | null } {
+  const now = new Date();
+  const todayDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const currentDay = now.getDay();
+  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  const currentMinutes = timeToMinutes(currentTime);
+
+  // Check for special hours first
+  const todaySpecial = specialHours.find(sh => sh.date === todayDate);
+  if (todaySpecial) {
+    if (todaySpecial.is_closed) {
+      return { is_open: false, next_change: null };
+    }
+    
+    const openMinutes = timeToMinutes(todaySpecial.open_time || '00:00');
+    const closeMinutes = timeToMinutes(todaySpecial.close_time || '23:59');
+    
+    const is_open = currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+    
+    let next_change = null;
+    if (is_open && todaySpecial.close_time) {
+      next_change = {
+        time: todaySpecial.close_time,
+        status: 'closed' as const
+      };
+    } else if (!is_open && todaySpecial.open_time && currentMinutes < openMinutes) {
+      next_change = {
+        time: todaySpecial.open_time,
+        status: 'open' as const
+      };
+    }
+    
+    return { is_open, next_change };
+  }
+
+  // Check regular hours
+  const todayHours = openingHours[currentDay.toString()];
+  if (!todayHours || todayHours.is_closed) {
+    return { is_open: false, next_change: null };
+  }
+
+  const openMinutes = timeToMinutes(todayHours.open_time || '00:00');
+  const closeMinutes = timeToMinutes(todayHours.close_time || '23:59');
+  
+  let is_open = currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+  
+  // Check if currently in a break
+  if (is_open && todayHours.breaks) {
+    for (const breakItem of todayHours.breaks) {
+      const breakStart = timeToMinutes(breakItem.start_time);
+      const breakEnd = timeToMinutes(breakItem.end_time);
+      
+      if (currentMinutes >= breakStart && currentMinutes < breakEnd) {
+        is_open = false;
+        break;
+      }
+    }
+  }
+
+  let next_change = null;
+  if (is_open && todayHours.close_time) {
+    next_change = {
+      time: todayHours.close_time,
+      status: 'closed' as const
+    };
+  } else if (!is_open && todayHours.open_time && currentMinutes < openMinutes) {
+    next_change = {
+      time: todayHours.open_time,
+      status: 'open' as const
+    };
+  }
+
+  return { is_open, next_change };
+}
+
+function isValidTimeFormat(time: string): boolean {
+  const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+  return timeRegex.test(time);
+}
+
+function isValidDateFormat(date: string): boolean {
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(date)) return false;
+  
+  const dateObj = new Date(date);
+  return dateObj.toISOString().split('T')[0] === date;
+}
+
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+}
+
+// Geographic Search Optimization Handlers
+
+async function handleOptimizedGeographicSearch(
+  req: Request,
+  supabase: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const latitude = parseFloat(url.searchParams.get('latitude') || '0');
+    const longitude = parseFloat(url.searchParams.get('longitude') || '0');
+    const radiusKm = parseFloat(url.searchParams.get('radius_km') || '10');
+    const limit = parseInt(url.searchParams.get('limit') || '100');
+    const useFastDistance = url.searchParams.get('use_fast_distance') === 'true';
+    const tripId = url.searchParams.get('trip_id');
+
+    // Validate coordinates
+    if (latitude === 0 && longitude === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Valid latitude and longitude are required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
+    const startTime = Date.now();
+
+    // Perform optimized search
+    const places = await performOptimizedGeographicSearch(supabase, {
+      latitude,
+      longitude,
+      radius_km: radiusKm,
+      limit,
+      use_fast_distance: useFastDistance
+    });
+
+    // Filter by trip if specified
+    let filteredPlaces = places;
+    if (tripId) {
+      // Verify user has access to the trip
+      const { data: tripMember } = await supabase
+        .from('trip_members')
+        .select('role')
+        .eq('trip_id', tripId)
+        .eq('user_id', userId)
+        .single();
+
+      if (!tripMember) {
+        return new Response(
+          JSON.stringify({ error: 'Access denied to trip' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403
+          }
+        );
+      }
+
+      filteredPlaces = places.filter(place => place.trip_id === tripId);
+    }
+
+    const executionTime = Date.now() - startTime;
+
+    // Log performance metrics
+    logGeographicSearchMetrics({
+      search_type: 'radius',
+      execution_time_ms: executionTime,
+      places_found: filteredPlaces.length,
+      search_radius_km: radiusKm,
+      optimization_used: useFastDistance ? 'fast_distance' : 'haversine',
+      bbox_filter_reduction: Math.round((1 - filteredPlaces.length / Math.max(places.length, 1)) * 100)
+    });
+
+    // Record usage event
+    await recordUsageEvent(supabase, userId, 'geo_search', {
+      search_radius_km: radiusKm,
+      places_found: filteredPlaces.length,
+      execution_time_ms: executionTime,
+      optimization_used: useFastDistance ? 'fast_distance' : 'haversine'
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        places: filteredPlaces,
+        search_params: {
+          center: { latitude, longitude },
+          radius_km: radiusKm,
+          optimization: useFastDistance ? 'fast_distance' : 'haversine'
+        },
+        performance: {
+          execution_time_ms: executionTime,
+          places_found: filteredPlaces.length,
+          total_scanned: places.length
+        }
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('Error in optimized geographic search:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error during geographic search' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
+  }
+}
+
+async function handleViewportSearch(
+  req: Request,
+  supabase: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const neLat = parseFloat(url.searchParams.get('ne_lat') || '0');
+    const neLng = parseFloat(url.searchParams.get('ne_lng') || '0');
+    const swLat = parseFloat(url.searchParams.get('sw_lat') || '0');
+    const swLng = parseFloat(url.searchParams.get('sw_lng') || '0');
+    const maxPlaces = parseInt(url.searchParams.get('max_places') || '200');
+    const enableClustering = url.searchParams.get('clustering') === 'true';
+    const clusterRadius = parseFloat(url.searchParams.get('cluster_radius') || '1');
+    const tripId = url.searchParams.get('trip_id');
+
+    // Validate viewport bounds
+    if (neLat === 0 || neLng === 0 || swLat === 0 || swLng === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Valid viewport bounds are required (ne_lat, ne_lng, sw_lat, sw_lng)' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
+    const startTime = Date.now();
+
+    const viewport = {
+      northEast: { latitude: neLat, longitude: neLng },
+      southWest: { latitude: swLat, longitude: swLng }
+    };
+
+    // Get places in viewport with optional clustering
+    let result = await getPlacesInViewport(supabase, viewport, {
+      maxPlaces,
+      clustering: enableClustering,
+      clusterRadius
+    });
+
+    // Filter by trip if specified
+    if (tripId) {
+      const { data: tripMember } = await supabase
+        .from('trip_members')
+        .select('role')
+        .eq('trip_id', tripId)
+        .eq('user_id', userId)
+        .single();
+
+      if (!tripMember) {
+        return new Response(
+          JSON.stringify({ error: 'Access denied to trip' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403
+          }
+        );
+      }
+
+      result.places = result.places.filter(place => place.trip_id === tripId);
+      
+      // Re-apply clustering to filtered places if enabled
+      if (enableClustering) {
+        const clusterPoints: ClusterPoint[] = result.places.map(place => ({
+          id: place.id,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          data: place
+        }));
+        
+        result.clusters = createGeographicClusters(clusterPoints, clusterRadius);
+        result.viewport_stats.clustered_places = result.clusters.reduce((sum, cluster) => sum + cluster.points.length, 0);
+        result.viewport_stats.visible_clusters = result.clusters.length;
+      }
+    }
+
+    const executionTime = Date.now() - startTime;
+
+    // Calculate viewport area
+    const viewportAreaKm2 = calculateViewportArea(viewport);
+
+    // Log performance metrics
+    logGeographicSearchMetrics({
+      search_type: 'viewport',
+      execution_time_ms: executionTime,
+      places_found: result.places.length,
+      viewport_area_km2: viewportAreaKm2,
+      optimization_used: enableClustering ? 'clustering' : 'none'
+    });
+
+    // Record usage event
+    await recordUsageEvent(supabase, userId, 'viewport_search', {
+      viewport_area_km2: viewportAreaKm2,
+      places_found: result.places.length,
+      clustering_enabled: enableClustering,
+      execution_time_ms: executionTime
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        ...result,
+        viewport: viewport,
+        performance: {
+          execution_time_ms: executionTime,
+          viewport_area_km2: viewportAreaKm2
+        }
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('Error in viewport search:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error during viewport search' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
+  }
+}
+
+async function handleGeographicClustering(
+  req: Request,
+  supabase: any,
+  userId: string
+): Promise<Response> {
+  try {
+    const url = new URL(req.url);
+    const tripId = url.searchParams.get('trip_id');
+    const clusterRadius = parseFloat(url.searchParams.get('cluster_radius') || '1');
+    const minClusterSize = parseInt(url.searchParams.get('min_cluster_size') || '2');
+
+    if (!tripId) {
+      return new Response(
+        JSON.stringify({ error: 'trip_id is required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+
+    // Verify user has access to the trip
+    const { data: tripMember } = await supabase
+      .from('trip_members')
+      .select('role')
+      .eq('trip_id', tripId)
+      .eq('user_id', userId)
+      .single();
+
+    if (!tripMember) {
+      return new Response(
+        JSON.stringify({ error: 'Access denied to trip' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403
+        }
+      );
+    }
+
+    const startTime = Date.now();
+
+    // Get all places in the trip with coordinates
+    const { data: places, error } = await supabase
+      .from('places')
+      .select('*')
+      .eq('trip_id', tripId)
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null);
+
+    if (error) throw error;
+
+    // Convert places to cluster points
+    const clusterPoints: ClusterPoint[] = places.map(place => ({
+      id: place.id,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      data: place
+    }));
+
+    // Create clusters
+    const clusters = createGeographicClusters(clusterPoints, clusterRadius);
+
+    // Filter clusters by minimum size
+    const filteredClusters = clusters.filter(cluster => cluster.points.length >= minClusterSize);
+
+    // Calculate cluster statistics
+    const clusterStats = {
+      total_places: places.length,
+      clustered_places: filteredClusters.reduce((sum, cluster) => sum + cluster.points.length, 0),
+      num_clusters: filteredClusters.length,
+      avg_cluster_size: filteredClusters.length > 0 
+        ? Math.round(filteredClusters.reduce((sum, cluster) => sum + cluster.points.length, 0) / filteredClusters.length * 100) / 100
+        : 0,
+      largest_cluster: filteredClusters.length > 0 
+        ? Math.max(...filteredClusters.map(cluster => cluster.points.length))
+        : 0
+    };
+
+    const executionTime = Date.now() - startTime;
+
+    // Log performance metrics
+    logGeographicSearchMetrics({
+      search_type: 'cluster',
+      execution_time_ms: executionTime,
+      places_found: places.length,
+      optimization_used: 'geographic_clustering'
+    });
+
+    // Record usage event
+    await recordUsageEvent(supabase, userId, 'geographic_clustering', {
+      trip_id: tripId,
+      cluster_radius: clusterRadius,
+      clusters_found: filteredClusters.length,
+      clustered_places: clusterStats.clustered_places,
+      execution_time_ms: executionTime
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        clusters: filteredClusters,
+        cluster_stats: clusterStats,
+        parameters: {
+          cluster_radius: clusterRadius,
+          min_cluster_size: minClusterSize
+        },
+        performance: {
+          execution_time_ms: executionTime
+        }
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('Error in geographic clustering:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error during geographic clustering' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
+  }
+}
+
+// Helper function to calculate viewport area
+function calculateViewportArea(viewport: {
+  northEast: { latitude: number; longitude: number };
+  southWest: { latitude: number; longitude: number };
+}): number {
+  const { northEast, southWest } = viewport;
+  
+  // Calculate area using the spherical excess formula (approximation)
+  const latDiff = northEast.latitude - southWest.latitude;
+  const lngDiff = northEast.longitude - southWest.longitude;
+  
+  // Convert to radians
+  const latDiffRad = latDiff * Math.PI / 180;
+  const lngDiffRad = lngDiff * Math.PI / 180;
+  const avgLatRad = (northEast.latitude + southWest.latitude) / 2 * Math.PI / 180;
+  
+  // Earth's radius in km
+  const R = 6371;
+  
+  // Approximate area calculation
+  const area = R * R * latDiffRad * lngDiffRad * Math.cos(avgLatRad);
+  
+  return Math.abs(area);
 }
