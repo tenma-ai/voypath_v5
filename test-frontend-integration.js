@@ -7,8 +7,8 @@ console.log('Testing Google Places Frontend Integration...');
 
 // Simulate the GooglePlacesService call
 async function testGooglePlacesService() {
-    const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
+    const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'your_supabase_url_here';
+    const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'your_supabase_anon_key_here';
     const PROXY_URL = `${SUPABASE_URL}/functions/v1/google-places-proxy`;
     
     console.log('🔍 Testing text search...');

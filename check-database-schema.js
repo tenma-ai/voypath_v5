@@ -1,8 +1,8 @@
 // Check actual Supabase database schema
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://rdufxwoeneglyponagdz.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lb2VnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'your_supabase_url_here';
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || 'your_supabase_anon_key_here';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
