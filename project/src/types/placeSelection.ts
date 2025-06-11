@@ -22,11 +22,17 @@ export interface SelectedPlaceData {
     open_now?: boolean;
     weekday_text?: string[];
   };
+  vicinity?: string;
   
   // Context information (6 input locations support)
   source_location: 'create_trip_departure' | 'create_trip_destination' | 'map_view' | 'list_view' | 'calendar_view' | 'my_places';
   selected_date?: string;
   selected_time_slot?: string;
+  
+  // Additional metadata
+  search_timestamp?: string;
+  user_id?: string;
+  trip_id?: string;
 }
 
 export interface PlaceInputContext {
@@ -47,4 +53,59 @@ export interface PlaceDetailForm {
   transport_mode?: 'walking' | 'public_transport' | 'car' | 'bicycle' | 'taxi';
   category: string;
   image_url?: string;
-} 
+}
+
+// Utility functions for place selection
+export const createSelectedPlaceData = (
+  googlePlace: any,
+  sourceLocation: SelectedPlaceData['source_location'],
+  context?: {
+    date?: string;
+    timeSlot?: string;
+    userId?: string;
+    tripId?: string;
+  }
+): SelectedPlaceData => {
+  return {
+    google_place_id: googlePlace.place_id,
+    name: googlePlace.name,
+    formatted_address: googlePlace.formatted_address,
+    geometry: googlePlace.geometry,
+    rating: googlePlace.rating,
+    user_ratings_total: googlePlace.user_ratings_total,
+    price_level: googlePlace.price_level,
+    types: googlePlace.types || [],
+    photos: googlePlace.photos,
+    opening_hours: googlePlace.opening_hours,
+    vicinity: googlePlace.vicinity,
+    source_location: sourceLocation,
+    selected_date: context?.date,
+    selected_time_slot: context?.timeSlot,
+    search_timestamp: new Date().toISOString(),
+    user_id: context?.userId,
+    trip_id: context?.tripId
+  };
+};
+
+export const validateSelectedPlace = (place: Partial<SelectedPlaceData>): boolean => {
+  return !!(
+    place.google_place_id &&
+    place.name &&
+    place.formatted_address &&
+    place.geometry?.location?.lat &&
+    place.geometry?.location?.lng &&
+    place.source_location
+  );
+};
+
+// Constants for source locations
+export const PLACE_SOURCE_LOCATIONS = {
+  CREATE_TRIP_DEPARTURE: 'create_trip_departure' as const,
+  CREATE_TRIP_DESTINATION: 'create_trip_destination' as const,
+  MAP_VIEW: 'map_view' as const,
+  LIST_VIEW: 'list_view' as const,
+  CALENDAR_VIEW: 'calendar_view' as const,
+  MY_PLACES: 'my_places' as const
+} as const;
+
+export type PlaceSourceLocation = typeof PLACE_SOURCE_LOCATIONS[keyof typeof PLACE_SOURCE_LOCATIONS]; 

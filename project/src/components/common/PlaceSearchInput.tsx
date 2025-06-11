@@ -62,11 +62,12 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
 
         const places = await searchPlacesWithFallback(searchRequest);
         setSuggestions(places);
-        setShowSuggestions(true);
+        setShowSuggestions(places.length > 0);
       } catch (err) {
         console.error('Place search error:', err);
         setError('Search failed. Please try again.');
         setSuggestions([]);
+        setShowSuggestions(false);
       } finally {
         setIsLoading(false);
       }
@@ -92,6 +93,7 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
     onChange(place.name);
     setShowSuggestions(false);
     setSuggestions([]);
+    setError(null);
     onPlaceSelect(place);
   };
 
@@ -127,13 +129,13 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
           onBlur={handleInputBlur}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full pl-12 pr-12 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full pl-12 pr-12 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         />
         
         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
         
         {isLoading && (
-          <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-primary-500 animate-spin" />
+          <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-blue-500 animate-spin" />
         )}
       </div>
 

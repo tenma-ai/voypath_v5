@@ -122,4 +122,41 @@ describe('PlaceSearchService', () => {
       }
     });
   });
+
+  test('should handle location-based search', async () => {
+    const searchRequest: PlaceSearchRequest = {
+      inputValue: 'restaurant',
+      location: { lat: 35.6762, lng: 139.6503 },
+      searchRadius: 5,
+      language: 'en',
+      maxResults: 3
+    };
+
+    const result = await PlaceSearchService.searchPlaces(searchRequest);
+    expect(result).toBeDefined();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  test('should handle place type filtering', async () => {
+    const searchRequest: PlaceSearchRequest = {
+      inputValue: 'food',
+      placeTypes: ['restaurant'],
+      language: 'en',
+      maxResults: 5
+    };
+
+    const result = await PlaceSearchService.searchPlaces(searchRequest);
+    expect(result).toBeDefined();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  test('should return empty array for very short queries', async () => {
+    const searchRequest: PlaceSearchRequest = {
+      inputValue: 'a',
+      language: 'en'
+    };
+
+    const result = await PlaceSearchService.searchPlaces(searchRequest);
+    expect(result).toEqual([]);
+  });
 }); 

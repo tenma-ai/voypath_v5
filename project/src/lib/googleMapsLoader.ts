@@ -55,19 +55,34 @@ class GoogleMapsAPILoader {
         return;
       }
 
+      // Validate API key
+      if (!options.apiKey || options.apiKey.trim() === '') {
+        reject(new Error('Google Maps API key is required'));
+        return;
+      }
+
+      // Create unique callback name to avoid conflicts
+      const callbackName = `initGoogleMaps_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
       // Google Maps API script dynamic loading with async parameter
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${options.apiKey}&libraries=${options.libraries.join(',')}&language=${options.language}&region=${options.region}&loading=async&callback=initGoogleMaps`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${options.apiKey}&libraries=${options.libraries.join(',')}&language=${options.language}&region=${options.region}&loading=async&callback=${callbackName}`;
       script.async = true;
       script.defer = true;
 
-      (window as any).initGoogleMaps = () => {
+      (window as any)[callbackName] = () => {
         this.google = (window as any).google;
         this.trackAPIUsage('maps_initialization', 1, 0.01);
+        
+        // Clean up callback
+        delete (window as any)[callbackName];
+        
         resolve(this.google);
       };
 
       script.onerror = () => {
+        // Clean up callback on error
+        delete (window as any)[callbackName];
         reject(new Error('Failed to load Google Maps API'));
       };
 
