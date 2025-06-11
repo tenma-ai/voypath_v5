@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Clock, Users, Calendar as CalendarIcon, Star, MapPin, Sparkles, Plus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Clock, Users, Calendar as CalendarIcon, Sparkles, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const mockEvents = {
@@ -135,118 +135,10 @@ const getEventBackgroundStyle = (assignedTo: string[]) => {
   };
 };
 
-interface AddPlaceModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  date: string;
-}
-
-function AddPlaceModal({ isOpen, onClose, date }: AddPlaceModalProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults] = useState([
-    { id: 'search1', name: 'Ueno Park', category: 'park', rating: 4.3, image: 'https://images.unsplash.com/photo-1526481280693-3bfa7568e0f3?w=300&h=200&fit=crop' },
-    { id: 'search2', name: 'Tokyo National Museum', category: 'museum', rating: 4.5, image: 'https://images.unsplash.com/photo-1554072675-66db59dba46f?w=300&h=200&fit=crop' },
-    { id: 'search3', name: 'Ameya-Yokocho Market', category: 'market', rating: 4.0, image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=200&fit=crop' }
-  ]);
-
-  const handleAddPlace = (place: any) => {
-    console.log('Adding place:', place, 'on date:', date);
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="w-full max-w-md bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="p-6 border-b border-slate-200/50 dark:border-slate-700/50">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
-            Add Place
-          </h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </p>
-          
-          <div className="mt-4 relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for places..."
-              className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
-              autoFocus
-            />
-          </div>
-        </div>
-
-        {/* Search Results */}
-        <div className="max-h-64 overflow-y-auto">
-          {searchResults.map((place) => (
-            <motion.button
-              key={place.id}
-              onClick={() => handleAddPlace(place)}
-              className="w-full p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border-b border-slate-200/30 dark:border-slate-700/30 last:border-b-0"
-              whileHover={{ x: 4 }}
-            >
-              <div className="flex items-center space-x-3">
-                <img
-                  src={place.image}
-                  alt={place.name}
-                  className="w-12 h-12 rounded-xl object-cover"
-                />
-                <div className="flex-1">
-                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">
-                    {place.name}
-                  </h4>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <span className="text-sm text-slate-500 dark:text-slate-400 capitalize">
-                      {place.category}
-                    </span>
-                    <div className="flex items-center space-x-1">
-                      <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                      <span className="text-xs text-slate-600 dark:text-slate-400">{place.rating}</span>
-                    </div>
-                  </div>
-                </div>
-                <Plus className="w-5 h-5 text-primary-500" />
-              </div>
-            </motion.button>
-          ))}
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-200/50 dark:border-slate-700/50">
-          <Link
-            to="/add-place"
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-primary-500 to-secondary-600 text-white rounded-2xl hover:from-primary-600 hover:to-secondary-700 transition-all font-semibold"
-            onClick={onClose}
-          >
-            <Plus className="w-5 h-5" />
-            <span>Add Custom Place</span>
-          </Link>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
 
 export function CalendarView() {
+  const navigate = useNavigate();
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState('');
   
   // Trip period: May 15-22, 2024
   const tripStart = new Date('2024-05-15');
@@ -286,9 +178,8 @@ export function CalendarView() {
     }
   };
 
-  const handleAddPlace = (date: Date) => {
-    setSelectedDate(formatDate(date));
-    setShowAddModal(true);
+  const handleAddPlace = () => {
+    navigate('/add-place');
   };
 
   // Generate trip period days
@@ -413,6 +304,19 @@ export function CalendarView() {
             </motion.div>
           </div>
 
+          {/* Add Place Button */}
+          <div className="mb-6 text-center">
+            <motion.button
+              onClick={handleAddPlace}
+              className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 text-white rounded-2xl hover:from-primary-600 hover:via-secondary-600 hover:to-primary-700 transition-all duration-300 font-semibold shadow-glow hover:shadow-glow-lg group"
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+              <span>Add Place to Calendar</span>
+            </motion.button>
+          </div>
+
           {/* Enhanced Member Legend */}
           <div className="flex flex-wrap items-center gap-4 text-sm">
             {['Alice', 'Bob', 'Charlie', 'Diana'].map((member, index) => (
@@ -468,8 +372,6 @@ export function CalendarView() {
             {tripDays.map((date, index) => {
               const dayEvents = getDayEvents(date).filter(event => !event.isSpanning);
               const todayDate = isToday(date);
-              const spanningEvent = getSpanningEventForDate(date);
-              const spanPosition = spanningEvent ? getSpanningEventPosition(date, spanningEvent) : null;
 
               return (
                 <motion.div
@@ -506,7 +408,7 @@ export function CalendarView() {
 
                   {/* Add Place Button - Primary/Secondary gradient */}
                   <motion.button
-                    onClick={() => handleAddPlace(date)}
+                    onClick={handleAddPlace}
                     className="absolute top-2 right-2 w-6 h-6 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 rounded-full flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-300 group/btn z-20"
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
@@ -690,16 +592,6 @@ export function CalendarView() {
         </div>
       </div>
 
-      {/* Add Place Modal */}
-      <AnimatePresence>
-        {showAddModal && (
-          <AddPlaceModal
-            isOpen={showAddModal}
-            onClose={() => setShowAddModal(false)}
-            date={selectedDate}
-          />
-        )}
-      </AnimatePresence>
 
       {/* Enhanced Event Detail Modal */}
       <AnimatePresence>

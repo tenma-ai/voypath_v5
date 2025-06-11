@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, MapPin, Star, Users, ChevronRight, Eye, EyeOff, Sparkles, Plus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Calendar, Clock, Star, Users, ChevronRight, Eye, EyeOff, Sparkles, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const mockSchedule = [
@@ -103,122 +103,17 @@ const getMemberColor = (memberName: string): string => {
   return memberColors[memberName] || 'linear-gradient(135deg, #6b7280, #4b5563)';
 };
 
-interface AddPlaceModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  timeSlot: string;
-  date: string;
-}
-
-function AddPlaceModal({ isOpen, onClose, timeSlot, date }: AddPlaceModalProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults] = useState([
-    { id: 'search1', name: 'Ueno Park', category: 'park', rating: 4.3, image: 'https://images.unsplash.com/photo-1526481280693-3bfa7568e0f3?w=300&h=200&fit=crop' },
-    { id: 'search2', name: 'Tokyo National Museum', category: 'museum', rating: 4.5, image: 'https://images.unsplash.com/photo-1554072675-66db59dba46f?w=300&h=200&fit=crop' },
-    { id: 'search3', name: 'Ameya-Yokocho Market', category: 'market', rating: 4.0, image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=200&fit=crop' }
-  ]);
-
-  const handleAddPlace = (place: any) => {
-    console.log('Adding place:', place, 'at time:', timeSlot, 'on date:', date);
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="w-full max-w-md bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="p-6 border-b border-slate-200/50 dark:border-slate-700/50">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
-            Add Place at {timeSlot}
-          </h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </p>
-          
-          <div className="mt-4 relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for places..."
-              className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
-              autoFocus
-            />
-          </div>
-        </div>
-
-        {/* Search Results */}
-        <div className="max-h-64 overflow-y-auto">
-          {searchResults.map((place) => (
-            <motion.button
-              key={place.id}
-              onClick={() => handleAddPlace(place)}
-              className="w-full p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border-b border-slate-200/30 dark:border-slate-700/30 last:border-b-0"
-              whileHover={{ x: 4 }}
-            >
-              <div className="flex items-center space-x-3">
-                <img
-                  src={place.image}
-                  alt={place.name}
-                  className="w-12 h-12 rounded-xl object-cover"
-                />
-                <div className="flex-1">
-                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">
-                    {place.name}
-                  </h4>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <span className="text-sm text-slate-500 dark:text-slate-400 capitalize">
-                      {place.category}
-                    </span>
-                    <div className="flex items-center space-x-1">
-                      <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                      <span className="text-xs text-slate-600 dark:text-slate-400">{place.rating}</span>
-                    </div>
-                  </div>
-                </div>
-                <Plus className="w-5 h-5 text-primary-500" />
-              </div>
-            </motion.button>
-          ))}
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-200/50 dark:border-slate-700/50">
-          <Link
-            to="/add-place"
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-primary-500 to-secondary-600 text-white rounded-2xl hover:from-primary-600 hover:to-secondary-700 transition-all font-semibold"
-            onClick={onClose}
-          >
-            <Plus className="w-5 h-5" />
-            <span>Add Custom Place</span>
-          </Link>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
 
 export function ListView() {
+  const navigate = useNavigate();
   const [selectedDay, setSelectedDay] = useState('2024-05-15');
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
 
   const selectedSchedule = mockSchedule.find(s => s.date === selectedDay);
+
+  const handleAddPlace = () => {
+    navigate('/add-place');
+  };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -261,10 +156,6 @@ export function ListView() {
     setCollapsedEvents(newCollapsed);
   };
 
-  const handleAddBetween = (timeSlot: string) => {
-    setSelectedTimeSlot(timeSlot);
-    setShowAddModal(true);
-  };
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -323,6 +214,19 @@ export function ListView() {
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Add Place Button */}
+          <div className="mb-6 text-center">
+            <motion.button
+              onClick={handleAddPlace}
+              className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 text-white rounded-2xl hover:from-primary-600 hover:via-secondary-600 hover:to-primary-700 transition-all duration-300 font-semibold shadow-glow hover:shadow-glow-lg group"
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+              <span>Add Place to Schedule</span>
+            </motion.button>
           </div>
 
           {/* Enhanced Day Selector */}
@@ -626,7 +530,7 @@ export function ListView() {
                     <div className="relative flex items-center space-x-6">
                       <div className="w-4 h-4"></div> {/* Spacer for timeline alignment */}
                       <motion.button
-                        onClick={() => handleAddBetween(`Between ${event.time?.split(' - ')[1] || event.time} and ${selectedSchedule.events[index + 1].time?.split(' - ')[0] || selectedSchedule.events[index + 1].time}`)}
+                        onClick={handleAddPlace}
                         className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-primary-100/80 to-secondary-100/80 dark:from-primary-900/30 dark:to-secondary-900/30 border-2 border-dashed border-primary-300 dark:border-primary-600 rounded-2xl hover:border-primary-400 dark:hover:border-primary-500 hover:bg-gradient-to-r hover:from-primary-200/80 hover:to-secondary-200/80 dark:hover:from-primary-900/50 dark:hover:to-secondary-900/50 transition-all duration-300 text-primary-700 dark:text-primary-300 hover:text-primary-800 dark:hover:text-primary-200 group shadow-soft hover:shadow-medium"
                         whileHover={{ scale: 1.02, y: -1 }}
                         whileTap={{ scale: 0.98 }}
@@ -658,17 +562,6 @@ export function ListView() {
         )}
       </div>
 
-      {/* Add Place Modal */}
-      <AnimatePresence>
-        {showAddModal && (
-          <AddPlaceModal
-            isOpen={showAddModal}
-            onClose={() => setShowAddModal(false)}
-            timeSlot={selectedTimeSlot}
-            date={selectedDay}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

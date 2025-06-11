@@ -10,19 +10,22 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@headlessui/react": "^1.7.17",
+    "@stripe/react-stripe-js": "^2.4.0",
+    "@stripe/stripe-js": "^2.4.0",
+    "@supabase/mcp-server-supabase": "^0.4.2",
+    "@supabase/supabase-js": "^2.50.0",
+    "clsx": "^2.0.0",
+    "framer-motion": "^10.16.16",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.8.1",
-    "framer-motion": "^10.16.16",
-    "@headlessui/react": "^1.7.17",
-    "clsx": "^2.0.0",
-    "zustand": "^4.4.7",
-    "@stripe/stripe-js": "^2.4.0",
-    "@stripe/react-stripe-js": "^2.4.0"
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@types/google.maps": "^3.58.1",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

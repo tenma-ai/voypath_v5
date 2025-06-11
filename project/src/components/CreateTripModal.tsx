@@ -3,6 +3,9 @@ import { Dialog } from '@headlessui/react';
 import { X, MapPin, Calendar, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { PlaceSearchInput } from './common/PlaceSearchInput';
+import { GooglePlace } from '../services/PlaceSearchService';
 
 interface CreateTripModalProps {
   isOpen: boolean;
@@ -10,6 +13,7 @@ interface CreateTripModalProps {
 }
 
 export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     departureLocation: '',
     name: '',
@@ -19,6 +23,8 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
     endDate: '',
   });
 
+  const [selectedDeparture, setSelectedDeparture] = useState<GooglePlace | null>(null);
+  const [selectedDestination, setSelectedDestination] = useState<GooglePlace | null>(null);
   const [useSameDeparture, setUseSameDeparture] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -35,7 +41,8 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.departureLocation.trim()) {
+    const departureLocation = selectedDeparture?.formatted_address || formData.departureLocation;
+    if (!departureLocation.trim()) {
       alert('Departure location is required');
       return;
     }
@@ -43,10 +50,12 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
     setIsSubmitting(true);
     
     try {
-      const finalDestination = useSameDeparture ? 'same as departure location' : formData.destination;
+      const finalDestination = useSameDeparture 
+        ? 'same as departure location' 
+        : (selectedDestination?.formatted_address || formData.destination);
       
       const tripData = {
-        departure_location: formData.departureLocation,
+        departure_location: departureLocation,
         name: formData.name || undefined,
         description: formData.description || undefined,
         destination: finalDestination || undefined,
@@ -68,8 +77,13 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
         startDate: '',
         endDate: '',
       });
+      setSelectedDeparture(null);
+      setSelectedDestination(null);
       setSelectedRange({ start: null, end: null });
       setUseSameDeparture(false);
+      
+      // Navigate to the trip page
+      navigate('/my-trip');
     } catch (error) {
       console.error('Failed to create trip:', error);
       alert('Failed to create trip. Please try again.');
@@ -258,17 +272,18 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
                     <MapPin className="w-4 h-4 inline mr-2 text-primary-500" />
                     Departure Location *
                   </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      value={formData.departureLocation}
-                      onChange={(e) => setFormData({ ...formData, departureLocation: e.target.value })}
-                      placeholder="e.g., Tokyo Station, New York JFK"
-                      className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
-                    />
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                  </div>
+                  <PlaceSearchInput
+                    value={formData.departureLocation}
+                    onChange={(value) => setFormData({ ...formData, departureLocation: value })}
+                    onPlaceSelect={(place) => {
+                      setSelectedDeparture(place);
+                      setFormData({ ...formData, departureLocation: place.name });
+                    }}
+                    placeholder="e.g., Tokyo Station, New York JFK"
+                    searchContext={{
+                      // Remove type filtering to get broader results
+                    }}
+                  />
                 </div>
 
                 {/* Destination */}
@@ -285,6 +300,7 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
                       setUseSameDeparture(!useSameDeparture);
                       if (!useSameDeparture) {
                         setFormData({ ...formData, destination: '' });
+                        setSelectedDestination(null);
                       }
                     }}
                     className={`w-full p-3 rounded-xl text-left transition-all duration-300 border-2 ${
@@ -329,14 +345,19 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
                       exit={{ opacity: 0, height: 0 }}
                       className="relative"
                     >
-                      <input
-                        type="text"
+                      <PlaceSearchInput
                         value={formData.destination}
-                        onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                        onChange={(value) => setFormData({ ...formData, destination: value })}
+                        onPlaceSelect={(place) => {
+                          setSelectedDestination(place);
+                          setFormData({ ...formData, destination: place.name });
+                        }}
                         placeholder="Enter destination or leave empty"
-                        className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
+                        searchContext={{
+                          location: selectedDeparture?.geometry.location,
+                          // Remove type filtering to get broader results
+                        }}
                       />
-                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                     </motion.div>
                   )}
                 </div>
