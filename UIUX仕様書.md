@@ -48,6 +48,65 @@
 --secondary-500: #0ea5e9;  /* Main Secondary */
 --secondary-600: #0284c7;
 --secondary-700: #0369a1;
+```
+
+#### 2.1.3 メンバー色システム（20色パレット）
+```css
+/* Member Color System - 洗練された20色 */
+--member-color-0: #FF6B6B;  /* Rose */
+--member-color-1: #FF8E53;  /* Orange */
+--member-color-2: #FFD93D;  /* Amber */
+--member-color-3: #6BCF7F;  /* Lime */
+--member-color-4: #4ECDC4;  /* Emerald */
+--member-color-5: #45B7D1;  /* Cyan */
+--member-color-6: #4D79F6;  /* Blue */
+--member-color-7: #6C5CE7;  /* Indigo */
+--member-color-8: #A29BFE;  /* Purple */
+--member-color-9: #FD79A8;  /* Pink */
+--member-color-10: #E84393; /* Crimson */
+--member-color-11: #FF7675; /* Coral */
+--member-color-12: #FDCB6E; /* Peach */
+--member-color-13: #00B894; /* Mint */
+--member-color-14: #00CEC9; /* Teal */
+--member-color-15: #74B9FF; /* Sky */
+--member-color-16: #8E44AD; /* Violet */
+--member-color-17: #E17055; /* Magenta */
+--member-color-18: #F39C12; /* Gold */
+--member-color-19: #95A5A6; /* Silver */
+
+/* 特別色 */
+--place-gold: #FFD700;      /* 5人以上の場所色 */
+--departure-color: #6B7280; /* 出発地専用色 */
+```
+
+#### 2.1.4 場所色計算ルール
+```css
+/* 場所色表示ロジック */
+.place-single {
+  /* 1人の貢献者: 単色表示 */
+  background-color: var(--member-color-X);
+}
+
+.place-gradient {
+  /* 2-4人の貢献者: グラデーション表示 */
+  background: linear-gradient(45deg, 
+    var(--member-color-X) 0%, 
+    var(--member-color-Y) 50%, 
+    var(--member-color-Z) 100%);
+}
+
+.place-gold {
+  /* 5人以上の貢献者: 金色表示 */
+  background: linear-gradient(45deg, #FFD700 0%, #FFA500 50%, #FFD700 100%);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+.place-departure {
+  /* 出発地: 特別色 */
+  background-color: var(--departure-color);
+  border: 2px solid #374151;
+}
+```
 --secondary-800: #075985;
 --secondary-900: #0c4a6e;
 ```
@@ -188,6 +247,378 @@ font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 .backdrop-blur-md: backdrop-filter: blur(12px);
 .backdrop-blur-lg: backdrop-filter: blur(16px);
 .backdrop-blur-xl: backdrop-filter: blur(24px);
+```
+
+## 🎨 **10. フロントエンド↔バックエンド統合強化仕様**
+
+### 10.1 完全データフロー統合
+
+#### 10.1.1 フロントエンド→バックエンド連携強化
+```typescript
+// 統合データフロー設計
+interface IntegratedDataFlow {
+  // Google Places検索 → 最適化 → 表示の完全な流れ
+  searchToOptimization: {
+    // 1. フロントエンド検索
+    searchPlaces: (query: string) => Promise<GooglePlace[]>;
+    // 2. バックエンド保存
+    savePlaceToDatabase: (place: GooglePlace, tripId: string) => Promise<SavedPlace>;
+    // 3. 最適化トリガー
+    triggerOptimization: (tripId: string) => Promise<OptimizationJob>;
+    // 4. リアルタイム結果受信
+    subscribeToResults: (tripId: string) => Observable<OptimizedRoute>;
+    // 5. UI自動更新
+    updateDisplayModes: (route: OptimizedRoute) => void;
+  };
+}
+```
+
+#### 10.1.2 リアルタイム同期システム強化
+```typescript
+interface EnhancedRealtimeSystem {
+  // 統合チャンネル管理
+  channels: {
+    places: `places:trip_id=eq.${tripId}`;
+    optimization: `optimization_results:trip_id=eq.${tripId}`;
+    memberColors: `member_colors:trip_id=eq.${tripId}`;
+  };
+  
+  // 自動UI更新ロジック
+  autoUpdateHandlers: {
+    onPlaceAdded: (place: Place) => void;
+    onOptimizationComplete: (result: OptimizationResult) => void;
+    onMemberColorUpdate: (colors: MemberColors) => void;
+  };
+}
+```
+
+### 10.2 メンバー色システム
+
+#### 10.1.1 色割り当てルール
+```typescript
+interface MemberColorSystem {
+  // 色の自動割り当て
+  colorAssignment: {
+    strategy: "first-come-first-served";
+    uniquePerTrip: true;
+    maxMembers: 20;
+    recycleOnLeave: true;
+  };
+  
+  // 色の永続性
+  colorPersistence: {
+    memberFixedColor: true;
+    tripSpecific: true;
+    crossTripRecycling: false;
+  };
+}
+```
+
+#### 10.1.2 場所色表示アルゴリズム
+```typescript
+interface PlaceColorLogic {
+  singleContributor: {
+    display: "solid-color";
+    source: "member-assigned-color";
+  };
+  
+  multipleContributors: {
+    "2-4-members": {
+      display: "gradient";
+      algorithm: "equal-weight-blend";
+      direction: "45deg";
+    };
+    "5-plus-members": {
+      display: "gold";
+      color: "#FFD700";
+      effect: "glow";
+    };
+  };
+  
+  specialCases: {
+    departure: {
+      color: "#6B7280";
+      override: true;
+      memberColorIgnored: true;
+    };
+    noContributor: {
+      color: "#D1D5DB";
+      label: "未割り当て";
+    };
+  };
+}
+```
+
+### 10.2 Google Places検索統合UI
+
+#### 10.2.1 検索インターフェース
+```typescript
+interface GooglePlacesSearchUI {
+  searchInput: {
+    placeholder: "場所を検索...";
+    autoComplete: true;
+    debounceMs: 300;
+    minChars: 2;
+    showSuggestions: true;
+    showCurrentLocation: true;
+  };
+  
+  searchResults: {
+    layout: "grid" | "list";
+    itemsPerPage: 10;
+    showPhotos: true;
+    showRating: true;
+    showDistance: true;
+    showOpenHours: true;
+    showPriceLevel: true;
+  };
+  
+  mapIntegration: {
+    showMarkers: true;
+    syncWithList: true;
+    clusterResults: true;
+    showViewport: true;
+  };
+}
+```
+
+#### 10.2.2 場所詳細モーダル
+```typescript
+interface PlaceDetailModal {
+  layout: {
+    width: "max-w-4xl";
+    height: "max-h-[90vh]";
+    sections: ["photos", "info", "reviews", "actions"];
+  };
+  
+  photoGallery: {
+    maxPhotos: 10;
+    thumbnail: "64x64";
+    fullSize: "400x300";
+    swipeEnabled: true;
+  };
+  
+  placeInfo: {
+    name: true;
+    address: true;
+    phone: true;
+    website: true;
+    openingHours: true;
+    rating: true;
+    priceLevel: true;
+    types: true;
+  };
+  
+  reviews: {
+    showCount: 3;
+    sortBy: "recent";
+    showRating: true;
+    showAuthor: true;
+  };
+  
+  actions: {
+    addToTrip: true;
+    customizeWish: true;
+    setStayDuration: true;
+    addNotes: true;
+  };
+}
+```
+
+### 10.3 出発地・到着地固定システム
+
+#### 10.3.1 Trip作成フォーム拡張
+```typescript
+interface CreateTripFormExtended {
+  departureLocation: {
+    required: true;
+    searchEnabled: true;
+    geocoding: true;
+    validation: "required";
+  };
+  
+  tripType: {
+    options: ["round-trip", "one-way"];
+    default: "round-trip";
+    conditional: {
+      "round-trip": {
+        destination: "same-as-departure";
+        destinationInput: false;
+      };
+      "one-way": {
+        destination: "required";
+        destinationInput: true;
+      };
+    };
+  };
+  
+  destination: {
+    required: "if-one-way";
+    searchEnabled: true;
+    geocoding: true;
+    validation: "conditional";
+  };
+}
+```
+
+#### 10.3.2 ルート表示拡張
+```typescript
+interface RouteDisplayExtended {
+  departurePoint: {
+    alwaysFirst: true;
+    specialIcon: "home";
+    color: "departure-gray";
+    label: "出発地";
+  };
+  
+  destinationPoint: {
+    conditionalDisplay: "if-not-round-trip";
+    alwaysLast: true;
+    specialIcon: "flag";
+    color: "destination-red";
+    label: "到着地";
+  };
+  
+  routeVisualization: {
+    mapView: {
+      departureMarker: "home-icon";
+      destinationMarker: "flag-icon";
+      routeLine: "member-color-gradient";
+    };
+    timelineView: {
+      departureCard: "special-styling";
+      destinationCard: "special-styling";
+      intermediateCards: "member-colors";
+    };
+    calendarView: {
+      departureEvent: "fixed-first";
+      destinationEvent: "fixed-last";
+      memberColors: "intermediate-events";
+    };
+  };
+}
+```
+
+### 10.4 3つの表示モード統合
+
+#### 10.4.1 表示モード切り替え
+```typescript
+interface DisplayModeSystem {
+  modes: {
+    map: {
+      icon: "map";
+      label: "地図表示";
+      features: ["markers", "routes", "clusters"];
+    };
+    timeline: {
+      icon: "clock";
+      label: "タイムライン";
+      features: ["chronological", "durations", "travel-times"];
+    };
+    calendar: {
+      icon: "calendar";
+      label: "カレンダー";
+      features: ["date-grid", "scheduling", "conflicts"];
+    };
+  };
+  
+  stateSync: {
+    selectedPlace: "cross-mode-sync";
+    filterSettings: "persistent";
+    zoomLevel: "mode-specific";
+  };
+  
+  transitions: {
+    animation: "fade-slide";
+    duration: "300ms";
+    preserveSelection: true;
+  };
+}
+```
+
+#### 10.4.2 クロスモード・インタラクション
+```typescript
+interface CrossModeInteraction {
+  placeSelection: {
+    syncAcrossModes: true;
+    highlightInAll: true;
+    focusAnimation: true;
+  };
+  
+  placeActions: {
+    editFromAnyMode: true;
+    deleteFromAnyMode: true;
+    reorderInTimeline: true;
+    rescheduleInCalendar: true;
+  };
+  
+  contextMenus: {
+    modeSpecific: true;
+    commonActions: ["edit", "delete", "details"];
+    modeActions: {
+      map: ["zoom-to", "directions"];
+      timeline: ["reorder", "adjust-duration"];
+      calendar: ["reschedule", "set-date"];
+    };
+  };
+}
+```
+
+### 10.5 アクセシビリティ・カラーブラインド対応
+
+#### 10.5.1 カラーブラインド対応
+```typescript
+interface ColorBlindSupport {
+  alternativeVisualCues: {
+    patterns: true;
+    shapes: true;
+    textures: true;
+    icons: true;
+  };
+  
+  colorFilters: {
+    protanopia: "red-green-colorblind";
+    deuteranopia: "green-red-colorblind";
+    tritanopia: "blue-yellow-colorblind";
+    monochrome: "complete-colorblind";
+  };
+  
+  contrastSettings: {
+    highContrast: true;
+    customContrast: true;
+    outlineMode: true;
+  };
+}
+```
+
+#### 10.5.2 キーボード・スクリーンリーダー対応
+```typescript
+interface AccessibilitySupport {
+  keyboardNavigation: {
+    tabOrder: "logical";
+    skipLinks: true;
+    focusIndicators: "high-contrast";
+    shortcuts: {
+      "m": "map-mode";
+      "t": "timeline-mode";
+      "c": "calendar-mode";
+      "s": "search-places";
+      "o": "open-menu";
+    };
+  };
+  
+  screenReader: {
+    ariaLabels: "comprehensive";
+    roleDefinitions: "semantic";
+    liveRegions: "status-updates";
+    descriptions: {
+      colors: "text-alternative";
+      positions: "spatial-description";
+      actions: "clear-instructions";
+    };
+  };
+}
+```
 .backdrop-blur-2xl: backdrop-filter: blur(40px);
 .backdrop-blur-3xl: backdrop-filter: blur(64px);
 ```

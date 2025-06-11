@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Places Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .loading { background-color: #e2e3e5; border-color: #d6d8db; }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .results {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .place-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin: 5px 0;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Google Places Integration Test</h1>
+        <p>This test verifies that the Google Places API integration is working correctly through the Supabase proxy.</p>
+        
+        <div id="search-section" class="test-section">
+            <h3>🔍 Place Search Test</h3>
+            <input type="text" id="searchQuery" placeholder="Search for places (e.g., coffee shop tokyo)" value="restaurant tokyo">
+            <button onclick="testPlaceSearch()">Search Places</button>
+            <div id="searchResults" class="results"></div>
+        </div>
+        
+        <div id="geocode-section" class="test-section">
+            <h3>📍 Geocoding Test</h3>
+            <input type="text" id="geocodeAddress" placeholder="Enter address" value="Tokyo Station, Japan">
+            <button onclick="testGeocoding()">Geocode Address</button>
+            <div id="geocodeResults" class="results"></div>
+        </div>
+        
+        <div id="nearby-section" class="test-section">
+            <h3>📍 Nearby Search Test</h3>
+            <button onclick="testNearbySearch()">Search Nearby (Tokyo)</button>
+            <div id="nearbyResults" class="results"></div>
+        </div>
+        
+        <div id="overall-status" class="test-section">
+            <h3>📊 Overall Integration Status</h3>
+            <div id="statusResults">Ready to test...</div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
+        const PROXY_URL = `${SUPABASE_URL}/functions/v1/google-places-proxy`;
+        
+        let testResults = {
+            search: false,
+            geocode: false,
+            nearby: false
+        };
+
+        function updateOverallStatus() {
+            const statusDiv = document.getElementById('statusResults');
+            const allPassed = Object.values(testResults).every(result => result === true);
+            const anyFailed = Object.values(testResults).some(result => result === false);
+            
+            if (allPassed) {
+                statusDiv.innerHTML = '<span style="color: green;">✅ All tests passed! Google Places integration is working correctly.</span>';
+                statusDiv.parentElement.className = 'test-section success';
+            } else if (anyFailed) {
+                statusDiv.innerHTML = '<span style="color: red;">❌ Some tests failed. Check individual test results above.</span>';
+                statusDiv.parentElement.className = 'test-section error';
+            } else {
+                statusDiv.innerHTML = '<span style="color: gray;">⏳ Tests in progress...</span>';
+                statusDiv.parentElement.className = 'test-section loading';
+            }
+        }
+
+        async function testPlaceSearch() {
+            const query = document.getElementById('searchQuery').value;
+            const resultsDiv = document.getElementById('searchResults');
+            const sectionDiv = document.getElementById('search-section');
+            
+            if (!query.trim()) {
+                alert('Please enter a search query');
+                return;
+            }
+            
+            sectionDiv.className = 'test-section loading';
+            resultsDiv.innerHTML = 'Searching...';
+            
+            try {
+                const params = new URLSearchParams({
+                    endpoint: 'textsearch',
+                    query: query,
+                    location: '35.6762,139.6503',
+                    radius: '2000'
+                });
+                
+                const response = await fetch(`${PROXY_URL}?${params}`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(`Proxy error: ${data.error}`);
+                }
+                
+                if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+                    throw new Error(`Google Places API error: ${data.status}`);
+                }
+                
+                testResults.search = true;
+                sectionDiv.className = 'test-section success';
+                
+                let html = `<strong>✅ Found ${data.results?.length || 0} places</strong><br>`;
+                
+                if (data.results && data.results.length > 0) {
+                    html += data.results.slice(0, 5).map(place => `
+                        <div class="place-item">
+                            <strong>${place.name}</strong><br>
+                            <small>${place.formatted_address}</small><br>
+                            ${place.rating ? `Rating: ${place.rating} ⭐` : 'No rating'}
+                            ${place.user_ratings_total ? ` (${place.user_ratings_total} reviews)` : ''}
+                        </div>
+                    `).join('');
+                    
+                    if (data.results.length > 5) {
+                        html += `<p><em>... and ${data.results.length - 5} more results</em></p>`;
+                    }
+                } else {
+                    html += '<p>No places found for this query.</p>';
+                }
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                testResults.search = false;
+                sectionDiv.className = 'test-section error';
+                resultsDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                console.error('Search error:', error);
+            }
+            
+            updateOverallStatus();
+        }
+
+        async function testGeocoding() {
+            const address = document.getElementById('geocodeAddress').value;
+            const resultsDiv = document.getElementById('geocodeResults');
+            const sectionDiv = document.getElementById('geocode-section');
+            
+            if (!address.trim()) {
+                alert('Please enter an address');
+                return;
+            }
+            
+            sectionDiv.className = 'test-section loading';
+            resultsDiv.innerHTML = 'Geocoding...';
+            
+            try {
+                const params = new URLSearchParams({
+                    endpoint: 'geocode',
+                    address: address
+                });
+                
+                const response = await fetch(`${PROXY_URL}?${params}`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(`Proxy error: ${data.error}`);
+                }
+                
+                if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+                    throw new Error(`Geocoding API error: ${data.status}`);
+                }
+                
+                testResults.geocode = true;
+                sectionDiv.className = 'test-section success';
+                
+                if (data.results && data.results.length > 0) {
+                    const result = data.results[0];
+                    const location = result.geometry.location;
+                    resultsDiv.innerHTML = `
+                        <strong>✅ Geocoding successful!</strong><br>
+                        <div class="place-item">
+                            <strong>Address:</strong> ${result.formatted_address}<br>
+                            <strong>Coordinates:</strong> ${location.lat}, ${location.lng}<br>
+                            <strong>Place ID:</strong> ${result.place_id || 'N/A'}
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = '<strong>✅ Request successful, but no results found.</strong>';
+                }
+                
+            } catch (error) {
+                testResults.geocode = false;
+                sectionDiv.className = 'test-section error';
+                resultsDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                console.error('Geocoding error:', error);
+            }
+            
+            updateOverallStatus();
+        }
+
+        async function testNearbySearch() {
+            const resultsDiv = document.getElementById('nearbyResults');
+            const sectionDiv = document.getElementById('nearby-section');
+            
+            sectionDiv.className = 'test-section loading';
+            resultsDiv.innerHTML = 'Searching nearby places...';
+            
+            try {
+                const params = new URLSearchParams({
+                    endpoint: 'nearbysearch',
+                    location: '35.6762,139.6503', // Tokyo coordinates
+                    radius: '1000',
+                    type: 'restaurant'
+                });
+                
+                const response = await fetch(`${PROXY_URL}?${params}`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(`Proxy error: ${data.error}`);
+                }
+                
+                if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+                    throw new Error(`Nearby search API error: ${data.status}`);
+                }
+                
+                testResults.nearby = true;
+                sectionDiv.className = 'test-section success';
+                
+                let html = `<strong>✅ Found ${data.results?.length || 0} nearby restaurants</strong><br>`;
+                
+                if (data.results && data.results.length > 0) {
+                    html += data.results.slice(0, 3).map(place => `
+                        <div class="place-item">
+                            <strong>${place.name}</strong><br>
+                            <small>${place.vicinity || place.formatted_address}</small><br>
+                            ${place.rating ? `Rating: ${place.rating} ⭐` : 'No rating'}
+                            ${place.price_level ? ` | Price: ${'$'.repeat(place.price_level)}` : ''}
+                        </div>
+                    `).join('');
+                    
+                    if (data.results.length > 3) {
+                        html += `<p><em>... and ${data.results.length - 3} more results</em></p>`;
+                    }
+                } else {
+                    html += '<p>No nearby restaurants found.</p>';
+                }
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                testResults.nearby = false;
+                sectionDiv.className = 'test-section error';
+                resultsDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                console.error('Nearby search error:', error);
+            }
+            
+            updateOverallStatus();
+        }
+
+        // Auto-run tests when page loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testPlaceSearch();
+                setTimeout(testGeocoding, 1000);
+                setTimeout(testNearbySearch, 2000);
+            }, 500);
+        });
+    </script>
+</body>
+</html>
