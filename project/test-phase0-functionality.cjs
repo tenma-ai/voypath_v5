@@ -20,7 +20,7 @@ if (fs.existsSync(envPath)) {
 }
 
 // Test Environment Configuration
-const API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyCsjSFjgQPCQQmYD30S9t27Zyvcg87jLYM';
+const API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY_HERE';
 
 console.log('🧪 Phase 0 Integration Test Suite Starting...');
 console.log('=' .repeat(50));
