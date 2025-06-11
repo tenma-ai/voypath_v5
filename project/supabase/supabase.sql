@@ -30,7 +30,12 @@ CREATE TYPE day_of_week AS ENUM (
 
 -- Transportation mode enumeration
 CREATE TYPE transport_mode AS ENUM (
-  'walking', 'public_transport', 'car', 'bicycle', 'taxi'
+  'walking', 'public_transport', 'car', 'bicycle', 'taxi', 'flight'
+);
+
+-- Island status enumeration
+CREATE TYPE island_status AS ENUM (
+  'mainland', 'major_island', 'remote_island'
 );
 
 -- Message type enumeration
@@ -162,6 +167,19 @@ CREATE TABLE places (
   longitude DECIMAL(11, 8),
   location_point GEOGRAPHY(POINT, 4326), -- PostGIS point data
   
+  -- Google Places API fields
+  google_place_id VARCHAR(255) UNIQUE,
+  google_rating DECIMAL(2,1),
+  google_review_count INTEGER,
+  google_photo_references TEXT[],
+  google_opening_hours JSONB,
+  google_price_level INTEGER,
+  google_place_types TEXT[],
+  google_vicinity TEXT,
+  google_website_url TEXT,
+  google_phone_number TEXT,
+  google_formatted_address TEXT,
+  
   -- Rating and wish level
   rating DECIMAL(2,1) CHECK (rating >= 0 AND rating <= 5),
   wish_level INTEGER NOT NULL CHECK (wish_level >= 1 AND wish_level <= 5),
@@ -220,7 +238,10 @@ CREATE TABLE places (
      longitude >= -180 AND longitude <= 180)
   ),
   CONSTRAINT valid_name_length CHECK (char_length(name) >= 1 AND char_length(name) <= 200),
-  CONSTRAINT valid_display_color CHECK (display_color IS NULL OR display_color ~ '^#[A-Fa-f0-9]{6}$')
+  CONSTRAINT valid_display_color CHECK (display_color IS NULL OR display_color ~ '^#[A-Fa-f0-9]{6}$'),
+  CONSTRAINT valid_google_place_id CHECK (google_place_id IS NULL OR google_place_id ~ '^[A-Za-z0-9_-]+$'),
+  CONSTRAINT valid_google_rating CHECK (google_rating IS NULL OR (google_rating >= 0 AND google_rating <= 5)),
+  CONSTRAINT valid_google_price_level CHECK (google_price_level IS NULL OR (google_price_level >= 0 AND google_price_level <= 4))
 );
 
 -- Trip members table
@@ -424,6 +445,62 @@ CREATE TABLE place_images (
   CONSTRAINT valid_content_type CHECK (content_type IS NULL OR content_type ~ '^image/')
 );
 
+-- Geographic regions table (for realistic route calculation)
+CREATE TABLE geographic_regions (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  country TEXT NOT NULL DEFAULT 'Japan',
+  center_lat DECIMAL(10, 7) NOT NULL,
+  center_lng DECIMAL(10, 7) NOT NULL,
+  has_airport BOOLEAN DEFAULT false,
+  has_railway BOOLEAN DEFAULT false,
+  has_highway BOOLEAN DEFAULT false,
+  island_status island_status DEFAULT 'mainland',
+  accessible_regions TEXT[] DEFAULT '{}',
+  
+  -- Metadata
+  metadata JSONB DEFAULT '{}'::jsonb,
+  
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Constraints
+  CONSTRAINT valid_coordinates CHECK (
+    center_lat >= -90 AND center_lat <= 90 AND
+    center_lng >= -180 AND center_lng <= 180
+  ),
+  CONSTRAINT valid_name_length CHECK (char_length(name) >= 1 AND char_length(name) <= 100)
+);
+
+-- Transport constraints table (for inter-region travel)
+CREATE TABLE transport_constraints (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  from_region_id TEXT NOT NULL REFERENCES geographic_regions(id) ON DELETE CASCADE,
+  to_region_id TEXT NOT NULL REFERENCES geographic_regions(id) ON DELETE CASCADE,
+  
+  -- Available transport modes
+  available_modes transport_mode[] NOT NULL DEFAULT '{}',
+  
+  -- Time constraints
+  min_travel_time INTEGER NOT NULL DEFAULT 5, -- minutes
+  max_travel_time INTEGER NOT NULL DEFAULT 1440, -- 24 hours
+  requires_transfer BOOLEAN DEFAULT false,
+  is_realistic BOOLEAN DEFAULT true,
+  
+  -- Metadata
+  notes TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Constraints
+  CONSTRAINT valid_time_range CHECK (min_travel_time >= 0 AND max_travel_time > min_travel_time),
+  CONSTRAINT unique_region_pair UNIQUE (from_region_id, to_region_id)
+);
+
 -- Usage events table (for analytics)
 CREATE TABLE usage_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -504,6 +581,41 @@ INSERT INTO member_colors (color_name, hex_color, rgb_color, hsl_color) VALUES
 ('Slate', '#708090', 'rgb(112,128,144)', 'hsl(210,13%,50%)'),
 ('Maroon', '#800000', 'rgb(128,0,0)', 'hsl(0,100%,25%)');
 
+-- Insert Japanese geographic regions
+INSERT INTO geographic_regions (id, name, country, center_lat, center_lng, has_airport, has_railway, has_highway, island_status, accessible_regions) VALUES
+('hokkaido', '北海道', 'Japan', 43.0642, 141.3469, true, true, true, 'major_island', '{}'),
+('tohoku', '東北地方', 'Japan', 38.7183, 140.1023, true, true, true, 'mainland', '{kanto,chubu}'),
+('kanto', '関東地方', 'Japan', 35.6762, 139.6503, true, true, true, 'mainland', '{tohoku,chubu}'),
+('chubu', '中部地方', 'Japan', 36.2048, 138.2529, true, true, true, 'mainland', '{kanto,tohoku,kansai}'),
+('kansai', '関西地方', 'Japan', 34.6937, 135.5023, true, true, true, 'mainland', '{chubu,chugoku}'),
+('chugoku', '中国地方', 'Japan', 34.3853, 132.4553, true, true, true, 'mainland', '{kansai,kyushu}'),
+('kyushu', '九州地方', 'Japan', 31.7717, 130.6594, true, true, true, 'major_island', '{chugoku}'),
+('shikoku', '四国地方', 'Japan', 33.7617, 133.2917, true, true, true, 'major_island', '{kansai,chugoku}'),
+('okinawa', '沖縄県', 'Japan', 26.2123, 127.6792, true, false, true, 'remote_island', '{}');
+
+-- Insert transport constraints for realistic routing
+INSERT INTO transport_constraints (from_region_id, to_region_id, available_modes, min_travel_time, max_travel_time, requires_transfer, is_realistic, notes) VALUES
+-- Mainland connections
+('tohoku', 'kanto', '{walking,bicycle,car,taxi,public_transport}', 120, 480, false, true, 'Direct land connection'),
+('kanto', 'chubu', '{walking,bicycle,car,taxi,public_transport}', 90, 360, false, true, 'Direct land connection'),
+('chubu', 'kansai', '{walking,bicycle,car,taxi,public_transport}', 120, 480, false, true, 'Direct land connection'),
+('kansai', 'chugoku', '{walking,bicycle,car,taxi,public_transport}', 90, 360, false, true, 'Direct land connection'),
+('chugoku', 'kyushu', '{car,taxi,public_transport}', 180, 600, false, true, 'Bridge/tunnel connection'),
+
+-- Bridge connections
+('kansai', 'shikoku', '{car,taxi,public_transport}', 120, 480, false, true, 'Bridge connection'),
+('chugoku', 'shikoku', '{car,taxi,public_transport}', 60, 240, false, true, 'Bridge connection'),
+
+-- Flight-only connections
+('hokkaido', 'tohoku', '{flight}', 90, 300, true, true, 'Flight only - no sea routes'),
+('hokkaido', 'kanto', '{flight}', 120, 360, true, true, 'Flight only - no sea routes'),
+('okinawa', 'kyushu', '{flight}', 120, 480, true, true, 'Flight only - no sea routes'),
+('okinawa', 'kansai', '{flight}', 150, 540, true, true, 'Flight only - no sea routes'),
+
+-- Long distance flights
+('hokkaido', 'kansai', '{flight}', 150, 480, true, true, 'Long distance flight'),
+('hokkaido', 'kyushu', '{flight}', 180, 600, true, true, 'Long distance flight');
+
 -- =============================================================================
 -- 4. INDEXES
 -- =============================================================================
@@ -543,6 +655,12 @@ CREATE INDEX idx_places_trip_user ON places(trip_id, user_id);
 CREATE INDEX idx_places_location_point ON places USING GIST(location_point) WHERE location_point IS NOT NULL;
 CREATE INDEX idx_places_name_trgm ON places USING gin(name gin_trgm_ops);
 CREATE INDEX idx_places_address_trgm ON places USING gin(address gin_trgm_ops) WHERE address IS NOT NULL;
+
+-- Google Places specific indexes
+CREATE INDEX idx_places_google_place_id ON places(google_place_id) WHERE google_place_id IS NOT NULL;
+CREATE INDEX idx_places_source ON places(source);
+CREATE INDEX idx_places_google_rating ON places(google_rating) WHERE google_rating IS NOT NULL;
+CREATE INDEX idx_places_google_price_level ON places(google_price_level) WHERE google_price_level IS NOT NULL;
 
 -- Member colors table indexes
 CREATE INDEX idx_member_colors_is_active ON member_colors(is_active) WHERE is_active = true;
@@ -608,6 +726,21 @@ CREATE INDEX idx_optimization_cache_expires_at ON optimization_cache(expires_at)
 CREATE INDEX idx_optimization_cache_last_accessed ON optimization_cache(last_accessed_at);
 CREATE UNIQUE INDEX idx_optimization_cache_lookup ON optimization_cache(trip_id, places_hash, settings_hash);
 
+-- Geographic regions table indexes
+CREATE INDEX idx_geographic_regions_country ON geographic_regions(country);
+CREATE INDEX idx_geographic_regions_island_status ON geographic_regions(island_status);
+CREATE INDEX idx_geographic_regions_has_airport ON geographic_regions(has_airport) WHERE has_airport = true;
+CREATE INDEX idx_geographic_regions_has_railway ON geographic_regions(has_railway) WHERE has_railway = true;
+CREATE INDEX idx_geographic_regions_has_highway ON geographic_regions(has_highway) WHERE has_highway = true;
+CREATE INDEX idx_geographic_regions_coordinates ON geographic_regions(center_lat, center_lng);
+
+-- Transport constraints table indexes
+CREATE INDEX idx_transport_constraints_from_region ON transport_constraints(from_region_id);
+CREATE INDEX idx_transport_constraints_to_region ON transport_constraints(to_region_id);
+CREATE INDEX idx_transport_constraints_is_realistic ON transport_constraints(is_realistic) WHERE is_realistic = true;
+CREATE INDEX idx_transport_constraints_requires_transfer ON transport_constraints(requires_transfer);
+CREATE INDEX idx_transport_constraints_travel_time ON transport_constraints(min_travel_time, max_travel_time);
+
 -- =============================================================================
 -- 5. ROW LEVEL SECURITY (RLS)
 -- =============================================================================
@@ -625,6 +758,8 @@ ALTER TABLE invitation_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE place_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE usage_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE optimization_cache ENABLE ROW LEVEL SECURITY;
+ALTER TABLE geographic_regions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transport_constraints ENABLE ROW LEVEL SECURITY;
 
 -- Users table RLS policies
 CREATE POLICY "Users can view own profile" ON users
@@ -942,6 +1077,16 @@ CREATE POLICY "Trip members can manage optimization cache" ON optimization_cache
       WHERE user_id = auth.uid()
     )
   );
+
+-- Geographic regions RLS policies
+CREATE POLICY "Anyone can view geographic regions" ON geographic_regions
+  FOR SELECT
+  USING (true); -- Public data for route calculation
+
+-- Transport constraints RLS policies
+CREATE POLICY "Anyone can view transport constraints" ON transport_constraints
+  FOR SELECT
+  USING (true); -- Public data for route calculation
 
 -- =============================================================================
 -- 6. FUNCTIONS
@@ -1457,6 +1602,69 @@ CREATE TABLE api_quotas (
   UNIQUE(api_type)
 );
 
+-- =============================================================================
+-- Google Places API Integration Tables
+-- =============================================================================
+
+-- Google Places cache table
+CREATE TABLE google_places_cache (
+  google_place_id VARCHAR(255) PRIMARY KEY,
+  place_data JSONB NOT NULL,
+  photos_data JSONB DEFAULT '[]'::jsonb,
+  cached_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '30 days',
+  
+  -- Constraints
+  CONSTRAINT valid_place_id_format CHECK (google_place_id ~ '^[A-Za-z0-9_-]+$'),
+  CONSTRAINT valid_expiry_cache CHECK (expires_at > cached_at)
+);
+
+-- Geocoding cache table
+CREATE TABLE geocoding_cache (
+  address_query TEXT PRIMARY KEY,
+  formatted_address TEXT NOT NULL,
+  latitude DECIMAL(10, 8) NOT NULL,
+  longitude DECIMAL(11, 8) NOT NULL,
+  place_id VARCHAR(255),
+  address_components JSONB,
+  cached_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '7 days',
+  
+  -- Constraints
+  CONSTRAINT valid_coordinates_geocoding CHECK (
+    latitude >= -90 AND latitude <= 90 AND
+    longitude >= -180 AND longitude <= 180
+  ),
+  CONSTRAINT valid_address_length CHECK (char_length(address_query) >= 1 AND char_length(address_query) <= 500),
+  CONSTRAINT valid_expiry_geocoding CHECK (expires_at > cached_at)
+);
+
+-- Google Places search history table
+CREATE TABLE google_places_search_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  
+  -- Search info
+  search_query TEXT NOT NULL,
+  search_location GEOGRAPHY(POINT, 4326),
+  search_radius INTEGER, -- meters
+  
+  -- Results
+  results_count INTEGER DEFAULT 0,
+  selected_place_id VARCHAR(255),
+  
+  -- Metadata
+  search_metadata JSONB DEFAULT '{}'::jsonb,
+  
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Constraints
+  CONSTRAINT valid_search_query_length CHECK (char_length(search_query) >= 1 AND char_length(search_query) <= 200),
+  CONSTRAINT valid_search_radius CHECK (search_radius IS NULL OR (search_radius > 0 AND search_radius <= 50000))
+);
+
 -- Add RLS for api_quotas (service role only)
 ALTER TABLE api_quotas ENABLE ROW LEVEL SECURITY;
 
@@ -1475,6 +1683,70 @@ CREATE TRIGGER update_api_quotas_updated_at
 -- Index for efficient quota checks
 CREATE INDEX idx_api_quotas_type_reset ON api_quotas(api_type, last_reset);
 
+-- Google Places cache table indexes
+CREATE INDEX idx_google_places_cache_expires_at ON google_places_cache(expires_at);
+CREATE INDEX idx_google_places_cache_cached_at ON google_places_cache(cached_at);
+
+-- Geocoding cache table indexes
+CREATE INDEX idx_geocoding_cache_expires_at ON geocoding_cache(expires_at);
+CREATE INDEX idx_geocoding_cache_cached_at ON geocoding_cache(cached_at);
+CREATE INDEX idx_geocoding_cache_place_id ON geocoding_cache(place_id) WHERE place_id IS NOT NULL;
+
+-- Google Places search history indexes
+CREATE INDEX idx_google_places_search_user_id ON google_places_search_history(user_id);
+CREATE INDEX idx_google_places_search_trip_id ON google_places_search_history(trip_id);
+CREATE INDEX idx_google_places_search_created_at ON google_places_search_history(created_at);
+CREATE INDEX idx_google_places_search_query ON google_places_search_history USING gin(search_query gin_trgm_ops);
+CREATE INDEX idx_google_places_search_location ON google_places_search_history USING GIST(search_location) WHERE search_location IS NOT NULL;
+
+-- =============================================================================
+-- BUSINESS METRICS TABLE
+-- =============================================================================
+
+-- Business metrics collection table for tracking feature usage and user engagement
+CREATE TABLE IF NOT EXISTS business_metrics (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  session_id TEXT,
+  event_type TEXT NOT NULL CHECK (event_type IN ('feature_usage', 'user_engagement', 'conversion', 'time_tracking', 'session')),
+  feature_name TEXT NOT NULL,
+  metric_name TEXT NOT NULL,
+  metric_value NUMERIC NOT NULL,
+  metadata JSONB DEFAULT '{}',
+  timestamp TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- Business metrics indexes for performance
+CREATE INDEX IF NOT EXISTS idx_business_metrics_user_id ON business_metrics(user_id);
+CREATE INDEX IF NOT EXISTS idx_business_metrics_event_type ON business_metrics(event_type);
+CREATE INDEX IF NOT EXISTS idx_business_metrics_feature_name ON business_metrics(feature_name);
+CREATE INDEX IF NOT EXISTS idx_business_metrics_timestamp ON business_metrics(timestamp);
+CREATE INDEX IF NOT EXISTS idx_business_metrics_session_id ON business_metrics(session_id);
+CREATE INDEX IF NOT EXISTS idx_business_metrics_metric_name ON business_metrics(metric_name);
+CREATE INDEX IF NOT EXISTS idx_business_metrics_composite ON business_metrics(event_type, feature_name, timestamp);
+
+-- Enable RLS for business metrics
+ALTER TABLE business_metrics ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies for business metrics
+CREATE POLICY "Users can view their own metrics" ON business_metrics
+  FOR SELECT USING (auth.uid() = user_id OR user_id IS NULL);
+
+CREATE POLICY "Users can insert their own metrics" ON business_metrics
+  FOR INSERT WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+
+CREATE POLICY "Service role can access all metrics" ON business_metrics
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
+
+-- Comments for business metrics table
+COMMENT ON TABLE business_metrics IS 'Tracks feature usage, user engagement, and business KPIs';
+COMMENT ON COLUMN business_metrics.event_type IS 'Type of metric event: feature_usage, user_engagement, conversion, time_tracking, session';
+COMMENT ON COLUMN business_metrics.feature_name IS 'Name of the feature being tracked';
+COMMENT ON COLUMN business_metrics.metric_name IS 'Specific metric being measured';
+COMMENT ON COLUMN business_metrics.metric_value IS 'Numeric value of the metric';
+COMMENT ON COLUMN business_metrics.metadata IS 'Additional context data in JSON format';
+
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version TEXT PRIMARY KEY,
   applied_at TIMESTAMPTZ DEFAULT NOW()
@@ -1492,6 +1764,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE trip_members;
 ALTER PUBLICATION supabase_realtime ADD TABLE messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE optimization_results;
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE business_metrics;
 
 -- =============================================================================
 -- SETUP COMPLETE
