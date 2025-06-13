@@ -1,6 +1,6 @@
 /**
  * Optimization Progress Service for Voypath
- * Phase 1: Real-time progress tracking with Supabase integration
+ * Phase 3: Enhanced real-time progress tracking with Edge Functions integration
  */
 
 import { supabase } from '../lib/supabase';
@@ -8,8 +8,11 @@ import {
   OptimizationProgress, 
   OptimizationStage, 
   OptimizationMetrics,
-  OptimizationError 
+  OptimizationError,
+  OptimizationErrorType,
+  EnhancedOptimizationError
 } from '../types/optimization';
+import { OptimizationProgress as ServiceProgress } from './TripOptimizationService';
 
 export class OptimizationProgressService {
   private static progressListeners = new Map<string, ((progress: OptimizationProgress) => void)[]>();
@@ -24,7 +27,7 @@ export class OptimizationProgressService {
     message: string,
     executionTimeMs?: number,
     errorMessage?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<OptimizationProgress> {
     try {
       const progressData = {
@@ -210,7 +213,7 @@ export class OptimizationProgressService {
     details?: {
       message?: string;
       executionTimeMs?: number;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
       error?: OptimizationError;
     }
   ): Promise<OptimizationProgress> {
@@ -237,20 +240,203 @@ export class OptimizationProgressService {
     );
   }
 
-  // Calculate overall progress from individual stages
+  // Phase 3: Enhanced progress calculation with error handling
   static calculateOverallProgress(stage: OptimizationStage, stageProgress: number): number {
     const stageWeights: Record<OptimizationStage, { min: number; max: number }> = {
-      collecting: { min: 0, max: 10 },
-      normalizing: { min: 10, max: 30 },
-      selecting: { min: 30, max: 60 },
-      routing: { min: 60, max: 90 },
-      complete: { min: 90, max: 100 }
+      collecting: { min: 0, max: 5 },
+      normalizing: { min: 5, max: 25 },
+      selecting: { min: 25, max: 65 },
+      routing: { min: 65, max: 95 },
+      complete: { min: 100, max: 100 }
     };
 
     const weight = stageWeights[stage];
+    if (!weight) return 0;
+    
     const progress = weight.min + ((weight.max - weight.min) * stageProgress / 100);
     
     return Math.min(100, Math.max(0, Math.round(progress)));
+  }
+
+  // Phase 3: Convert service progress to database progress format
+  static async updateProgressFromService(
+    tripId: string,
+    userId: string,
+    serviceProgress: ServiceProgress
+  ): Promise<void> {
+    const overallProgress = this.calculateOverallProgress(
+      serviceProgress.stage, 
+      serviceProgress.progress
+    );
+
+    await this.updateStageProgress(tripId, userId, serviceProgress.stage, overallProgress, {
+      message: serviceProgress.message,
+      executionTimeMs: serviceProgress.executionTimeMs,
+      metadata: {
+        serviceStage: serviceProgress.stage,
+        serviceProgress: serviceProgress.progress,
+        timestamp: new Date().toISOString()
+      },
+      error: serviceProgress.error ? {
+        code: 'OPTIMIZATION_ERROR',
+        message: serviceProgress.error,
+        stage: serviceProgress.stage
+      } : undefined
+    });
+  }
+
+  // Phase 3: Enhanced stage display with better UI integration
+  static getStageDisplayInfo(stage: OptimizationStage): {
+    title: string
+    description: string
+    icon: string
+    color: string
+    estimatedDuration: string
+  } {
+    switch (stage) {
+      case 'collecting':
+        return {
+          title: 'Collecting Data',
+          description: 'Gathering places and user preferences...',
+          icon: '📊',
+          color: 'blue',
+          estimatedDuration: '5-10s'
+        }
+      case 'normalizing':
+        return {
+          title: 'Normalizing Preferences',
+          description: 'Balancing user preferences for fairness...',
+          icon: '⚖️',
+          color: 'yellow',
+          estimatedDuration: '10-20s'
+        }
+      case 'selecting':
+        return {
+          title: 'Selecting Places',
+          description: 'Choosing optimal places for the trip...',
+          icon: '🎯',
+          color: 'orange',
+          estimatedDuration: '15-30s'
+        }
+      case 'routing':
+        return {
+          title: 'Optimizing Route',
+          description: 'Creating the best travel schedule...',
+          icon: '🗺️',
+          color: 'purple',
+          estimatedDuration: '20-40s'
+        }
+      case 'complete':
+        return {
+          title: 'Complete',
+          description: 'Optimization finished successfully!',
+          icon: '✅',
+          color: 'green',
+          estimatedDuration: 'Done'
+        }
+      default:
+        return {
+          title: 'Processing',
+          description: 'Working on your optimization...',
+          icon: '⏳',
+          color: 'gray',
+          estimatedDuration: 'Unknown'
+        }
+    }
+  }
+
+  // Phase 3: Enhanced subscription with better error handling
+  static subscribeToTripProgress(
+    tripId: string,
+    callback: (progress: ServiceProgress) => void
+  ): () => void {
+    const channel = supabase
+      .channel(`optimization_${tripId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'optimization_progress',
+          filter: `trip_id=eq.${tripId}`
+        },
+        (payload) => {
+          try {
+            if (payload.new) {
+              const dbProgress = payload.new as OptimizationProgress;
+              const serviceProgress: ServiceProgress = {
+                stage: dbProgress.stage,
+                progress: dbProgress.progress_percentage,
+                message: dbProgress.stage_message,
+                executionTimeMs: dbProgress.execution_time_ms,
+                error: dbProgress.error_message
+              };
+              callback(serviceProgress);
+            }
+          } catch (error) {
+            console.error('Error processing progress update:', error);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Progress subscription status for trip ${tripId}:`, status);
+      });
+
+    return () => {
+      console.log(`Unsubscribing from progress for trip ${tripId}`);
+      supabase.removeChannel(channel);
+    };
+  }
+
+  // Phase 3: Get current optimization status
+  static async getOptimizationStatus(tripId: string): Promise<{
+    isRunning: boolean
+    currentStage?: OptimizationStage
+    progress: number
+    message: string
+    error?: string
+    lastUpdated?: string
+  }> {
+    try {
+      const { data, error } = await supabase
+        .from('optimization_progress')
+        .select('*')
+        .eq('trip_id', tripId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (!data) {
+        return {
+          isRunning: false,
+          progress: 0,
+          message: 'No optimization in progress'
+        };
+      }
+
+      const isRunning = data.stage !== 'complete' && !data.error_message;
+
+      return {
+        isRunning,
+        currentStage: data.stage,
+        progress: data.progress_percentage,
+        message: data.stage_message,
+        error: data.error_message,
+        lastUpdated: data.updated_at
+      };
+    } catch (error) {
+      console.error('Error getting optimization status:', error);
+      return {
+        isRunning: false,
+        progress: 0,
+        message: 'Error checking optimization status',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
 
   // Get progress statistics for monitoring

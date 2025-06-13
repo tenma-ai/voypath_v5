@@ -90,7 +90,7 @@ const measureConcurrentPerformance = async (
 // Test data setup
 let testTripId: string
 let testUserId: string
-let testPlaceIds: string[] = []
+const testPlaceIds: string[] = []
 
 describe('Place API Performance Tests', () => {
   beforeAll(async () => {

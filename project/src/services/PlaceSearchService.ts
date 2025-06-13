@@ -154,7 +154,8 @@ export class PlaceSearchService {
         width: photo.width,
       })),
       opening_hours: place.opening_hours ? {
-        open_now: place.opening_hours.open_now,
+        // Note: open_now is deprecated, but keeping for backward compatibility until migration to new Places API
+        open_now: undefined, // Removed deprecated field
         weekday_text: place.opening_hours.weekday_text,
       } : undefined,
       vicinity: place.vicinity,

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Calendar, Users, Settings, Wand2, Clock, AlertCircle, List, Sparkles, Camera } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { MapView } from '../components/MapView';
 import { ListView } from '../components/ListView';
 import { CalendarView } from '../components/CalendarView';
 import { OptimizationModal } from '../components/OptimizationModal';
+import { OptimizationResult } from '../components/OptimizationResult';
 import { TripSettingsModal } from '../components/TripSettingsModal';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -13,7 +14,9 @@ export function TripDetailPage() {
   const [showOptimizationModal, setShowOptimizationModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [tripIcon, setTripIcon] = useState<string | null>(null);
-  const { currentTrip, isOptimizing, updateTrip } = useStore();
+  const [optimizationError, setOptimizationError] = useState<string | null>(null);
+  const [optimizationProgress, setOptimizationProgress] = useState(0);
+  const { currentTrip, places, isOptimizing, optimizationResult, setOptimizationResult, setIsOptimizing, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces } = useStore();
 
   // Mock trip data if no current trip
   const trip = currentTrip || {
@@ -29,6 +32,80 @@ export function TripDetailPage() {
     ownerId: 'user1',
     addPlaceDeadline: '2024-05-10T23:59:59Z',
     icon: tripIcon || undefined,
+  };
+
+  // Load places and optimization result on component mount
+  useEffect(() => {
+    if (trip.id && trip.id !== '1') { // Skip loading for mock trip
+      createSystemPlaces(trip.id); // Creates system places if they don't exist
+      loadPlacesFromAPI(trip.id);
+      loadOptimizationResult(trip.id);
+    }
+  }, [trip.id, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces]);
+
+  // Get places for current trip
+  const tripPlaces = places.filter(place => 
+    trip ? (place.trip_id === trip.id || place.tripId === trip.id) : false
+  );
+  const hasPlaces = tripPlaces.length > 0;
+
+  // Handle optimization
+  const handleOptimization = async () => {
+    if (!trip.id || !user) {
+      setOptimizationError('Trip ID and user authentication are required');
+      return;
+    }
+
+    if (!hasPlaces) {
+      setOptimizationError('Please add places to your trip before optimizing');
+      return;
+    }
+
+    // Close modal and start optimization
+    setShowOptimizationModal(false);
+    setIsOptimizing(true);
+    setOptimizationError(null);
+
+    try {
+      // Simulate optimization process with progress updates
+      const progressSteps = [0, 25, 50, 75, 90, 100];
+      for (let i = 0; i < progressSteps.length; i++) {
+        setOptimizationProgress(progressSteps[i]);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Create mock optimization result
+      const mockResult = {
+        daily_schedules: [
+          {
+            day_number: 1,
+            scheduled_places: tripPlaces.slice(0, Math.min(3, tripPlaces.length)).map((place, index) => ({
+              place,
+              order_in_day: index + 1,
+              arrival_time: new Date(Date.now() + (index * 2 * 60 * 60 * 1000)).toISOString(),
+              departure_time: new Date(Date.now() + ((index * 2 + 1) * 60 * 60 * 1000)).toISOString(),
+              visit_duration: place.stay_duration_minutes || 120,
+              travel_time_from_previous: index > 0 ? 30 : 0,
+              transport_mode: 'transit'
+            }))
+          }
+        ],
+        optimization_score: {
+          fairness: 0.85,
+          efficiency: 0.78
+        },
+        execution_time_ms: 3000,
+        selectedPlaces: tripPlaces.slice(0, Math.min(3, tripPlaces.length))
+      };
+
+      setOptimizationResult(mockResult);
+    } catch (error) {
+      console.error('Optimization failed:', error);
+      setOptimizationError(error instanceof Error ? error.message : 'Optimization failed');
+    } finally {
+      setIsOptimizing(false);
+      setOptimizationProgress(0);
+    }
   };
 
   const handleIconUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -338,7 +415,7 @@ export function TripDetailPage() {
         <motion.button
           whileHover={{ scale: 1.05, y: -2 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => setShowOptimizationModal(true)}
+          onClick={hasPlaces ? handleOptimization : () => setOptimizationError('Please add places to your trip before optimizing')}
           className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
             isOptimizing
               ? 'bg-gradient-to-br from-green-500 to-emerald-600'
@@ -371,11 +448,40 @@ export function TripDetailPage() {
           </div>
 
           {isOptimizing ? (
-            <motion.div 
-              className="w-6 h-6 border-2 border-white border-t-transparent rounded-full"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            />
+            <div className="relative w-8 h-8 flex items-center justify-center">
+              {/* Circular Progress Ring */}
+              <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 32 32">
+                {/* Background Circle */}
+                <circle
+                  cx="16"
+                  cy="16"
+                  r="12"
+                  fill="none"
+                  stroke="rgba(255, 255, 255, 0.2)"
+                  strokeWidth="2"
+                />
+                {/* Progress Circle */}
+                <motion.circle
+                  cx="16"
+                  cy="16"
+                  r="12"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 12}`}
+                  initial={{ strokeDashoffset: 2 * Math.PI * 12 }}
+                  animate={{ 
+                    strokeDashoffset: 2 * Math.PI * 12 * (1 - optimizationProgress / 100)
+                  }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+              </svg>
+              {/* Center Icon */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Wand2 className="w-4 h-4 text-white" />
+              </div>
+            </div>
           ) : (
             <Wand2 className="w-6 h-6 text-white relative z-10" />
           )}
@@ -385,7 +491,7 @@ export function TripDetailPage() {
             <div className="flex items-center space-x-2">
               <Sparkles className="w-4 h-4" />
               <span className="font-semibold">
-                {isOptimizing ? 'Optimizing Route...' : 'Optimize Route'}
+                {isOptimizing ? `Optimizing ${optimizationProgress}%` : 'Optimize Route'}
               </span>
             </div>
             <div className="absolute left-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-l-slate-900/90 dark:border-l-slate-700/90"></div>
@@ -397,11 +503,39 @@ export function TripDetailPage() {
       <OptimizationModal
         isOpen={showOptimizationModal}
         onClose={() => setShowOptimizationModal(false)}
+        tripId={currentTrip?.id || ''}
       />
       <TripSettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
       />
+      
+      {/* Optimization Result Display */}
+      <AnimatePresence>
+        {optimizationResult && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setOptimizationResult(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="max-w-4xl max-h-[90vh] w-full overflow-y-auto"
+            >
+              <OptimizationResult
+                result={optimizationResult}
+                onClose={() => setOptimizationResult(null)}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

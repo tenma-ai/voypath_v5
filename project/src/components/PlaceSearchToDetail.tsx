@@ -4,12 +4,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Star, Calendar, Plus, ArrowLeft } from 'lucide-react';
+import { Search, MapPin, Star, Calendar, Plus, ArrowLeft, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PlaceSearchInput } from './common/PlaceSearchInput';
 import { DurationSlider } from './DurationSlider';
-import { GooglePlace } from '../services/PlaceSearchService';
 import { useStore } from '../store/useStore';
+import { GooglePlace } from '../services/PlaceSearchService';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface PlaceSearchToDetailProps {
@@ -67,8 +67,60 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
       // Handle form submission
       console.log('Submitting place:', selectedPlace, formData);
       
-      // Here you would add the place to the trip
-      // await addPlaceToTrip(selectedPlace, formData);
+      // Generate proper UUID for place
+      const generateUUID = () => {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      };
+      
+      // Get current user and trip from store
+      const { user, currentTrip, addPlace } = useStore.getState();
+      
+      if (!user || !currentTrip) {
+        throw new Error('User and trip required');
+      }
+      
+      // Create place object with proper structure
+      const newPlace = {
+        id: generateUUID(),
+        name: selectedPlace.name,
+        category: 'attraction', // Default category
+        address: selectedPlace.formatted_address || '',
+        latitude: typeof selectedPlace.geometry?.location?.lat === 'function' 
+          ? selectedPlace.geometry.location.lat()
+          : selectedPlace.geometry?.location?.lat || 0,
+        longitude: typeof selectedPlace.geometry?.location?.lng === 'function'
+          ? selectedPlace.geometry.location.lng()
+          : selectedPlace.geometry?.location?.lng || 0,
+        rating: selectedPlace.rating || 0,
+        wishLevel: formData.visitPriority,
+        stayDuration: formData.duration,
+        priceLevel: selectedPlace.price_level || formData.budget,
+        scheduled: false,
+        visitDate: formData.visitDate || undefined,
+        notes: '',
+        tripId: currentTrip.id,
+        userId: user.id,
+        // Additional properties to match database schema
+        wish_level: formData.visitPriority,
+        stay_duration_minutes: formData.duration,
+        trip_id: currentTrip.id,
+        user_id: user.id,
+        google_place_id: selectedPlace.place_id,
+        google_rating: selectedPlace.rating,
+        google_price_level: selectedPlace.price_level,
+        estimated_cost: formData.budget * 10, // Rough estimate
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add to store
+      addPlace(newPlace);
+      
+      console.log('Place added successfully:', newPlace);
       
       if (onComplete) {
         onComplete();
@@ -145,7 +197,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
             <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-400" />
           </motion.button>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-            {selectedPlace ? 'Configure Place' : 'Search Places'}
+            Configure Place
           </h1>
         </div>
 
@@ -158,17 +210,14 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
       </div>
 
       <div className="p-4 lg:p-6 space-y-8 max-w-4xl mx-auto">
-        <AnimatePresence mode="wait">
-          {!selectedPlace ? (
-            // Search Phase
-            <motion.div
-              key="search"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
-            >
-              {/* Search Bar */}
+        {/* Unified Search and Configure Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column: Place Search */}
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                Search Places
+              </h2>
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-primary-500/10 to-secondary-500/10 rounded-3xl blur-xl opacity-0 focus-within:opacity-100 transition-opacity duration-500"></div>
                 <PlaceSearchInput
@@ -176,215 +225,167 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
                   onChange={setSearchQuery}
                   onPlaceSelect={handlePlaceSelect}
                   placeholder="Search for places, attractions, restaurants..."
-                  className="text-lg py-5 pl-14 pr-4 rounded-3xl"
+                  className="text-lg py-4 pl-12 pr-4 rounded-2xl w-full"
                   searchContext={{
                     radius: 50,
                   }}
                 />
               </div>
-            </motion.div>
-          ) : (
-            // Detail Configuration Phase
-            <motion.div
-              key="detail"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-8"
-            >
-              {/* Selected Place Summary */}
-              <div className="bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-primary-900/20 dark:via-slate-800/80 dark:to-secondary-900/20 backdrop-blur-xl rounded-3xl p-6 border border-primary-200/50 dark:border-primary-800/50 shadow-glass">
-                <div className="flex items-start space-x-4">
+            </div>
+
+            {/* Selected Place Preview */}
+            {selectedPlace && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-primary-900/20 dark:via-slate-800/80 dark:to-secondary-900/20 backdrop-blur-xl rounded-3xl p-4 border border-primary-200/50 dark:border-primary-800/50 shadow-glass"
+              >
+                <div className="flex items-start space-x-3">
                   {selectedPlace.photos && selectedPlace.photos.length > 0 ? (
                     <img
-                      src={`https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${selectedPlace.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
+                      src={`https://maps.googleapis.com/maps/api/place/photo?maxwidth=200&photoreference=${selectedPlace.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
                       alt={selectedPlace.name}
-                      className="w-20 h-20 rounded-2xl object-cover flex-shrink-0 shadow-medium"
+                      className="w-16 h-16 rounded-xl object-cover flex-shrink-0 shadow-medium"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center flex-shrink-0 shadow-medium">
-                      <MapPin className="w-8 h-8 text-slate-400" />
+                    <div className="w-16 h-16 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/40 dark:to-secondary-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <MapPin className="w-8 h-8 text-primary-600 dark:text-primary-400" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
                       {selectedPlace.name}
                     </h3>
-                    <p className="text-slate-600 dark:text-slate-400 text-sm mb-2">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                       {selectedPlace.formatted_address}
                     </p>
                     {selectedPlace.rating && (
-                      <div className="flex items-center space-x-1">
-                        {renderStars(selectedPlace.rating)}
-                        <span className="text-sm text-slate-600 dark:text-slate-400 ml-1">
-                          {selectedPlace.rating} {selectedPlace.user_ratings_total && `(${selectedPlace.user_ratings_total} reviews)`}
+                      <div className="flex items-center mt-2 space-x-1">
+                        <div className="flex space-x-0.5">
+                          {renderStars(selectedPlace.rating)}
+                        </div>
+                        <span className="text-xs text-slate-600 dark:text-slate-400 ml-1">
+                          ({selectedPlace.rating})
                         </span>
                       </div>
                     )}
                   </div>
                   <motion.button
-                    onClick={() => setSelectedPlace(null)}
-                    className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 p-2 rounded-xl hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300"
+                    onClick={() => {
+                      setSelectedPlace(null);
+                      setSearchQuery('');
+                    }}
+                    className="p-1 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition-all duration-300"
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                   >
-                    Change
+                    <span className="text-slate-400 text-sm">✕</span>
                   </motion.button>
                 </div>
-              </div>
+              </motion.div>
+            )}
+          </div>
 
-              {/* Configuration Form */}
-              <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-8 border border-slate-200/50 dark:border-slate-700/50 shadow-glass space-y-8">
-                {/* Visit Priority */}
-                <div className="space-y-4">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Visit Priority
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    {renderPriorityStars(formData.visitPriority)}
-                    <span className="ml-4 text-sm text-slate-600 dark:text-slate-400">
-                      {formData.visitPriority === 1 && 'Low priority'}
-                      {formData.visitPriority === 2 && 'Below average'}
-                      {formData.visitPriority === 3 && 'Average priority'}
-                      {formData.visitPriority === 4 && 'High priority'}
-                      {formData.visitPriority === 5 && 'Must visit!'}
-                    </span>
+          {/* Right Column: Configuration */}
+          <div className="space-y-6">
+            {selectedPlace ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                  Configure Place
+                </h2>
+                
+                {/* Configuration Form */}
+                <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-6 border border-slate-200/50 dark:border-slate-700/50 shadow-glass space-y-6">
+                  {/* Visit Priority */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-2">
+                      <Star className="w-4 h-4 text-yellow-500" />
+                      <span>Visit Priority</span>
+                    </label>
+                    <div className="flex space-x-1">
+                      {renderPriorityStars(formData.visitPriority)}
+                    </div>
                   </div>
-                </div>
 
-                {/* Duration Slider */}
-                <DurationSlider
-                  value={formData.duration}
-                  onChange={(duration) => setFormData({ ...formData, duration })}
-                />
-
-                {/* Visit Date */}
-                <div className="space-y-4">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    <Calendar className="w-4 h-4 inline mr-2 text-primary-500" />
-                    When to Visit
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      value={formData.visitDate}
-                      onChange={(e) => setFormData({ ...formData, visitDate: e.target.value })}
-                      min="2024-05-15"
-                      max="2024-05-22"
-                      className="w-full px-4 py-4 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300 cursor-pointer hover:border-primary-300/50 dark:hover:border-primary-600/50"
+                  {/* Duration */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center space-x-2">
+                      <Clock className="w-4 h-4 text-blue-500" />
+                      <span>Duration: {Math.floor(formData.duration / 60)}h {formData.duration % 60}m</span>
+                    </label>
+                    <DurationSlider
+                      value={formData.duration}
+                      onChange={(duration) => setFormData({ ...formData, duration })}
+                      className="w-full"
                     />
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Select a date within your trip period (May 15-22, 2024)
-                  </p>
-                </div>
 
-                {/* Budget Level */}
-                <div className="space-y-4">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Budget Level
-                  </label>
-                  <div className="flex space-x-3">
-                    {[1, 2, 3, 4].map((level) => (
-                      <motion.button
-                        key={level}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, budget: level })}
-                        className={`px-4 py-3 rounded-2xl border-2 transition-all duration-300 font-semibold ${
-                          formData.budget === level
-                            ? 'border-primary-300 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 shadow-glow'
-                            : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                        }`}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        {'$'.repeat(level)}
-                      </motion.button>
-                    ))}
+                  {/* Notes */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Notes
+                    </label>
+                    <div className="relative">
+                      <textarea
+                        value={formData.notes}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                        placeholder="Add notes about this place..."
+                        rows={4}
+                        className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300 resize-none"
+                      />
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    $ = Budget-friendly, $$ = Moderate, $$$ = Expensive, $$$$ = Luxury
-                  </p>
-                </div>
 
-                {/* Preferred Time */}
-                <div className="space-y-4">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Preferred Time
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {[
-                      { key: 'morning', label: 'Morning', icon: '🌅' },
-                      { key: 'afternoon', label: 'Afternoon', icon: '☀️' },
-                      { key: 'evening', label: 'Evening', icon: '🌆' },
-                      { key: 'any', label: 'Any time', icon: '🕐' }
-                    ].map((time) => (
-                      <motion.button
-                        key={time.key}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, timeSlot: time.key })}
-                        className={`p-4 rounded-2xl border-2 text-sm font-semibold transition-all duration-300 ${
-                          formData.timeSlot === time.key
-                            ? 'border-primary-300 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 shadow-glow'
-                            : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                        }`}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <div className="text-2xl mb-2">{time.icon}</div>
-                        {time.label}
-                      </motion.button>
-                    ))}
+                  {/* Action Buttons */}
+                  <div className="flex space-x-3 pt-4">
+                    <motion.button
+                      type="button"
+                      onClick={handleCancel}
+                      className="flex-1 px-6 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 text-slate-700 dark:text-slate-300 rounded-2xl hover:bg-slate-50/80 dark:hover:bg-slate-700/80 transition-all duration-300 font-semibold"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Cancel
+                    </motion.button>
+                    <motion.button
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 text-white rounded-2xl hover:from-primary-600 hover:via-secondary-600 hover:to-primary-700 transition-all duration-300 font-semibold shadow-glow hover:shadow-glow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+                      whileHover={!isSubmitting ? { scale: 1.02 } : {}}
+                      whileTap={!isSubmitting ? { scale: 0.98 } : {}}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <span className="relative z-10 flex items-center justify-center space-x-2">
+                        <Plus className="w-5 h-5" />
+                        <span>{isSubmitting ? 'Adding...' : 'Add to Trip'}</span>
+                      </span>
+                    </motion.button>
                   </div>
                 </div>
-
-                {/* Notes */}
-                <div className="space-y-4">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Notes
-                  </label>
-                  <div className="relative">
-                    <textarea
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      placeholder="Add notes about this place..."
-                      rows={4}
-                      className="w-full px-4 py-4 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300 resize-none"
-                    />
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex space-x-4 pt-4">
-                  <motion.button
-                    type="button"
-                    onClick={handleCancel}
-                    className="flex-1 px-6 py-4 border-2 border-slate-200/50 dark:border-slate-600/50 text-slate-700 dark:text-slate-300 rounded-2xl hover:bg-slate-50/80 dark:hover:bg-slate-700/80 transition-all duration-300 font-semibold"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Cancel
-                  </motion.button>
-                  <motion.button
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
-                    className="flex-1 px-6 py-4 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 text-white rounded-2xl hover:from-primary-600 hover:via-secondary-600 hover:to-primary-700 transition-all duration-300 font-semibold shadow-glow hover:shadow-glow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
-                    whileHover={!isSubmitting ? { scale: 1.02 } : {}}
-                    whileTap={!isSubmitting ? { scale: 0.98 } : {}}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <span className="relative z-10 flex items-center justify-center space-x-2">
-                      <Plus className="w-5 h-5" />
-                      <span>{isSubmitting ? 'Adding...' : 'Add to My Places'}</span>
-                    </span>
-                  </motion.button>
-                </div>
+              </motion.div>
+            ) : (
+              <div className="text-center py-12">
+                <motion.div
+                  className="w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-3xl flex items-center justify-center mx-auto mb-4"
+                  whileHover={{ scale: 1.05, rotate: 5 }}
+                >
+                  <Search className="w-8 h-8 text-slate-400" />
+                </motion.div>
+                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+                  Search for a place
+                </h3>
+                <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                  Use the search box to find places, then configure the details here
+                </p>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -2378,7 +2378,7 @@ async function performOptimizedGeographicSearch(
   // Step 1: Use bounding box for initial filtering (much faster than distance calculation)
   const bbox = getBoundingBox(searchParams.latitude, searchParams.longitude, radiusKm);
   
-  let query = supabase
+  const query = supabase
     .from('places')
     .select('*')
     .gte('latitude', bbox.minLat)
@@ -2449,7 +2449,7 @@ async function getPlacesInViewport(
   
   if (error) throw error;
   
-  let result: any = {
+  const result: any = {
     places,
     viewport_stats: {
       total_places: places.length,
@@ -4677,7 +4677,7 @@ async function analyzeUserPreferences(userId: string, supabase: any) {
   const categoryPreferences = {};
   const pricePreferences = {};
   let totalWishLevel = 0;
-  let totalPlaces = userPlaces.length;
+  const totalPlaces = userPlaces.length;
 
   userPlaces.forEach((place: any) => {
     // Category analysis
@@ -7743,7 +7743,7 @@ async function handleViewportSearch(
     };
 
     // Get places in viewport with optional clustering
-    let result = await getPlacesInViewport(supabase, viewport, {
+    const result = await getPlacesInViewport(supabase, viewport, {
       maxPlaces,
       clustering: enableClustering,
       clusterRadius

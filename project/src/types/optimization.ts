@@ -3,34 +3,102 @@
  * Phase 1: Complete optimization algorithm interfaces
  */
 
+// Error handling types
+export enum OptimizationErrorType {
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  TIMEOUT_ERROR = 'TIMEOUT_ERROR',
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
+  PERMISSION_ERROR = 'PERMISSION_ERROR',
+  RESOURCE_ERROR = 'RESOURCE_ERROR',
+  EDGE_FUNCTION_ERROR = 'EDGE_FUNCTION_ERROR',
+  DATABASE_ERROR = 'DATABASE_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR'
+}
+
+export interface EnhancedOptimizationError {
+  type: OptimizationErrorType;
+  message: string;
+  code: string;
+  stage: OptimizationStage;
+  retryable: boolean;
+  context?: Record<string, unknown>;
+  timestamp: string;
+  correlationId: string;
+}
+
+export interface LoadingState {
+  isLoading: boolean;
+  stage: OptimizationStage | null;
+  canCancel: boolean;
+  estimatedTimeRemaining?: number;
+  retryCount: number;
+  startTime?: number;
+}
+
 // Core data interfaces
 export interface Place {
   id: string;
   name: string;
   category: string;
-  latitude: number;
-  longitude: number;
+  address?: string;
+  latitude?: number; // 修正: nullable対応 (DB整合性)
+  longitude?: number; // 修正: nullable対応 (DB整合性)
   wish_level: number;
   stay_duration_minutes: number;
   user_id: string;
   trip_id: string;
-  normalized_wish_level?: number;
-  place_type: 'member_wish' | 'group_selected' | 'departure' | 'destination';
   
-  // Additional place metadata
-  google_place_id?: string;
-  formatted_address?: string;
+  // DB互換フィールド追加
   rating?: number;
-  user_ratings_total?: number;
   price_level?: number;
-  types?: string[];
-  vicinity?: string;
+  estimated_cost?: number;
+  opening_hours?: Record<string, any>;
+  image_url?: string;
+  images?: string[];
+  scheduled?: boolean;
+  scheduled_date?: string;
+  scheduled_time_start?: string;
+  scheduled_time_end?: string;
+  visit_date?: string;
+  preferred_time_slots?: string[];
+  transport_mode?: string;
+  travel_time_from_previous?: number;
+  notes?: string;
+  tags?: string[];
+  external_id?: string;
+  source?: string;
   
-  // Optimization metadata
+  // 最適化関連フィールド
+  normalized_weight?: number;
+  normalized_wish_level?: number;
+  user_avg_wish_level?: number;
   fairness_contribution_score?: number;
   is_selected_for_optimization?: boolean;
   selection_round?: number;
   optimization_metadata?: Record<string, any>;
+  place_type?: 'member_wish' | 'group_selected' | 'departure' | 'destination';
+  
+  // Google Places統合
+  google_place_id?: string;
+  google_rating?: number;
+  google_user_ratings_total?: number;
+  google_price_level?: number;
+  google_types?: string[];
+  google_photos_data?: Record<string, any>;
+  google_opening_hours?: Record<string, any>;
+  search_source_location?: string;
+  place_search_metadata?: Record<string, any>;
+  
+  // メンバーカラー関連
+  display_color?: string;
+  display_color_hex?: string;
+  color_type?: string;
+  member_contribution?: Record<string, any>;
+  member_contributors?: string[];
+  
+  // タイムスタンプ
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface User {
@@ -45,9 +113,21 @@ export interface Trip {
   id: string;
   name: string;
   description?: string;
+  destination?: string;
   start_date?: string;
   end_date?: string;
-  created_by: string;
+  owner_id: string; // 修正: created_by -> owner_id (DB整合性)
+  departure_location: string; // 追加: 必須フィールド
+  add_place_deadline?: string;
+  max_members?: number;
+  is_public?: boolean;
+  icon?: string;
+  tags?: string[];
+  budget_range?: Record<string, any>;
+  optimization_preferences?: Record<string, any>;
+  total_places?: number;
+  total_members?: number;
+  last_optimized_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -150,6 +230,7 @@ export interface OptimizationProgress {
   stage_message: string;
   execution_time_ms?: number;
   error_message?: string;
+  enhanced_error?: EnhancedOptimizationError;
   metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;

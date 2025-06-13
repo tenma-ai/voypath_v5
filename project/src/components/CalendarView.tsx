@@ -1,104 +1,23 @@
-import React, { useState } from 'react';
-import { Clock, Users, Calendar as CalendarIcon, Sparkles, Plus } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Clock, Users, Calendar as CalendarIcon, Sparkles, AlertCircle, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useStore } from '../store/useStore';
 
-const mockEvents = {
-  "2024-05-15": [
-    {
-      id: '1',
-      name: 'Senso-ji Temple',
-      time: '09:00',
-      duration: 120,
-      type: 'place',
-      priority: 5,
-      assignedTo: ['Alice', 'Bob'],
-      category: 'temple'
-    },
-    {
-      id: '2',
-      name: 'Tokyo Skytree',
-      time: '14:00',
-      duration: 180,
-      type: 'place',
-      priority: 4,
-      assignedTo: ['Charlie'],
-      category: 'attraction'
-    }
-  ],
-  "2024-05-16": [
-    {
-      id: '3',
-      name: 'Meiji Shrine',
-      time: '10:00',
-      duration: 90,
-      type: 'place',
-      priority: 4,
-      assignedTo: ['Alice', 'Diana'],
-      category: 'shrine'
-    },
-    {
-      id: '4',
-      name: 'Lunch at Tsukiji',
-      time: '12:30',
-      duration: 60,
-      type: 'meal',
-      priority: 3,
-      assignedTo: ['Alice', 'Bob', 'Charlie', 'Diana'],
-      category: 'food'
-    }
-  ],
-  "2024-05-17": [
-    {
-      id: '5',
-      name: 'Shibuya Crossing',
-      time: '16:00',
-      duration: 45,
-      type: 'place',
-      priority: 3,
-      assignedTo: ['Bob', 'Charlie'],
-      category: 'attraction'
-    }
-  ],
-  "2024-05-18": [
-    {
-      id: '6',
-      name: 'Tokyo Disney Resort',
-      time: '09:00',
-      duration: 600,
-      type: 'place',
-      priority: 5,
-      assignedTo: ['Alice', 'Bob', 'Charlie', 'Diana'],
-      category: 'attraction',
-      spanDays: 2,
-      isSpanning: true
-    }
-  ],
-  "2024-05-20": [
-    {
-      id: '7',
-      name: 'Harajuku',
-      time: '11:00',
-      duration: 120,
-      type: 'place',
-      priority: 4,
-      assignedTo: ['Alice'],
-      category: 'district'
-    },
-    {
-      id: '8',
-      name: 'Mount Fuji Trip',
-      time: '06:00',
-      duration: 1440,
-      type: 'trip',
-      priority: 5,
-      assignedTo: ['Alice', 'Bob', 'Charlie', 'Diana'],
-      category: 'nature',
-      spanDays: 3,
-      isSpanning: true
-    }
-  ]
-};
+interface CalendarEvent {
+  id: string;
+  name: string;
+  time?: string;
+  duration?: number;
+  type: 'place' | 'meal' | 'trip';
+  priority: number;
+  assignedTo?: string[];
+  category: string;
+  spanDays?: number;
+  isSpanning?: boolean;
+}
+
+type EventsByDate = Record<string, CalendarEvent[]>;
 
 // Member color mapping with gradients
 const getMemberColor = (memberName: string): string => {
@@ -138,19 +57,79 @@ const getEventBackgroundStyle = (assignedTo: string[]) => {
 
 export function CalendarView() {
   const navigate = useNavigate();
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   
-  // Trip period: May 15-22, 2024
-  const tripStart = new Date('2024-05-15');
-  const tripEnd = new Date('2024-05-22');
+  const { places, currentTrip, isLoading } = useStore();
+  
+  // Trip period - use real trip dates or default
+  const tripStart = currentTrip?.start_date ? new Date(currentTrip.start_date) : new Date('2024-05-15');
+  const tripEnd = currentTrip?.end_date ? new Date(currentTrip.end_date) : new Date('2024-05-22');
   
   const formatDate = (date: Date) => {
     return date.toISOString().split('T')[0];
   };
 
+  // Filter places for current trip
+  const tripPlaces = places.filter(place => 
+    currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false
+  );
+
+  // Generate trip period days
+  const getTripDays = useCallback(() => {
+    const days = [];
+    const currentDate = new Date(tripStart);
+    
+    while (currentDate <= tripEnd) {
+      days.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return days;
+  }, [tripStart, tripEnd]);
+
+  // Generate events from real data
+  const eventsByDate = useMemo(() => {
+    if (!currentTrip || tripPlaces.length === 0) return {};
+
+    const events: EventsByDate = {};
+    
+    // Get trip days for unscheduled places distribution
+    const tripDays = getTripDays();
+    let unscheduledIndex = 0;
+    
+    tripPlaces.forEach(place => {
+      let date = place.visit_date || place.scheduled_date;
+      
+      // If no date assigned, distribute unscheduled places across trip days
+      if (!date && tripDays.length > 0) {
+        const dayIndex = unscheduledIndex % tripDays.length;
+        date = formatDate(tripDays[dayIndex]);
+        unscheduledIndex++;
+      }
+      
+      if (date) {
+        if (!events[date]) events[date] = [];
+        events[date].push({
+          id: place.id,
+          name: place.name,
+          time: place.scheduled_time_start && place.scheduled_time_end 
+            ? `${place.scheduled_time_start} - ${place.scheduled_time_end}`
+            : place.scheduled ? 'Scheduled' : 'Unscheduled',
+          duration: place.stay_duration_minutes,
+          type: 'place' as const,
+          priority: place.wish_level >= 4 ? 4 : place.wish_level >= 3 ? 3 : place.wish_level,
+          assignedTo: place.user_id ? [place.user_id] : [],
+          category: place.category || 'attraction'
+        });
+      }
+    });
+    
+    return events;
+  }, [tripPlaces, currentTrip, getTripDays]);
+
   const getDayEvents = (date: Date) => {
     const dateStr = formatDate(date);
-    return mockEvents[dateStr as keyof typeof mockEvents] || [];
+    return eventsByDate[dateStr] || [];
   };
 
   const isToday = (date: Date) => {
@@ -182,30 +161,17 @@ export function CalendarView() {
     navigate('/add-place');
   };
 
-  // Generate trip period days
-  const getTripDays = () => {
-    const days = [];
-    const currentDate = new Date(tripStart);
-    
-    while (currentDate <= tripEnd) {
-      days.push(new Date(currentDate));
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-    
-    return days;
-  };
-
   const tripDays = getTripDays();
 
-  // Get spanning events that start on or before a given day and extend beyond it
-  const getSpanningEvents = () => {
-    const spanningEvents: any[] = [];
+  // Get spanning events (multi-day places)
+  const spanningEvents = useMemo(() => {
+    const spanningEvts: (CalendarEvent & { startDate: Date; endDate: Date })[] = [];
     
-    Object.entries(mockEvents).forEach(([dateStr, events]) => {
+    Object.entries(eventsByDate).forEach(([dateStr, events]) => {
       events.forEach(event => {
         if (event.isSpanning && event.spanDays) {
           const startDate = new Date(dateStr);
-          spanningEvents.push({
+          spanningEvts.push({
             ...event,
             startDate,
             endDate: new Date(startDate.getTime() + (event.spanDays - 1) * 24 * 60 * 60 * 1000)
@@ -214,24 +180,9 @@ export function CalendarView() {
       });
     });
     
-    return spanningEvents;
-  };
+    return spanningEvts;
+  }, [eventsByDate]);
 
-  const spanningEvents = getSpanningEvents();
-
-  // Check if a date is within a spanning event
-  const getSpanningEventForDate = (date: Date) => {
-    return spanningEvents.find(event => 
-      date >= event.startDate && date <= event.endDate
-    );
-  };
-
-  // Get the position of a spanning event (start, middle, end)
-  const getSpanningEventPosition = (date: Date, event: any) => {
-    if (date.toDateString() === event.startDate.toDateString()) return 'start';
-    if (date.toDateString() === event.endDate.toDateString()) return 'end';
-    return 'middle';
-  };
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative overflow-hidden">
@@ -266,90 +217,58 @@ export function CalendarView() {
         />
       </div>
 
-      {/* Enhanced Calendar Header */}
-      <div className="relative p-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
-        {/* Background Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary-50/50 via-transparent to-secondary-50/50 dark:from-primary-900/20 dark:via-transparent dark:to-secondary-900/20"></div>
-        
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <motion.div
-                className="w-12 h-12 bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600 rounded-3xl flex items-center justify-center shadow-glow"
-                whileHover={{ scale: 1.05, rotate: 5 }}
-                transition={{ duration: 0.3 }}
-              >
-                <CalendarIcon className="w-6 h-6 text-white" />
-              </motion.div>
-              <div>
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                  Trip Calendar
-                </h2>
-                <p className="text-slate-600 dark:text-slate-400">
-                  Plan your perfect journey
-                </p>
-              </div>
-            </div>
-            
-            <motion.div 
-              className="text-sm text-slate-600 dark:text-slate-400 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 px-4 py-2 rounded-2xl border border-primary-200/50 dark:border-primary-800/50 shadow-soft"
-              whileHover={{ scale: 1.02 }}
-            >
-              <div className="flex items-center space-x-2">
-                <CalendarIcon className="w-4 h-4 text-primary-500" />
-                <span className="font-medium">
-                  {tripStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {tripEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Add Place Button */}
-          <div className="mb-6 text-center">
-            <motion.button
-              onClick={handleAddPlace}
-              className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 text-white rounded-2xl hover:from-primary-600 hover:via-secondary-600 hover:to-primary-700 transition-all duration-300 font-semibold shadow-glow hover:shadow-glow-lg group"
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
-              <span>Add Place to Calendar</span>
-            </motion.button>
-          </div>
-
-          {/* Enhanced Member Legend */}
-          <div className="flex flex-wrap items-center gap-4 text-sm">
-            {['Alice', 'Bob', 'Charlie', 'Diana'].map((member, index) => (
-              <motion.div 
-                key={member} 
-                className="flex items-center space-x-3 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm px-3 py-2 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-soft hover:shadow-medium transition-all duration-300"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
-                whileHover={{ scale: 1.05, y: -2 }}
-              >
-                <div 
-                  className="w-5 h-5 rounded-full shadow-soft"
-                  style={{ background: getMemberColor(member) }}
-                ></div>
-                <span className="text-slate-700 dark:text-slate-300 font-medium">{member}</span>
-              </motion.div>
-            ))}
-            <motion.div 
-              className="flex items-center space-x-3 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm px-3 py-2 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-soft"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <div className="w-5 h-2 bg-gradient-to-r from-blue-500 via-red-500 to-green-500 rounded-full shadow-soft"></div>
-              <span className="text-slate-700 dark:text-slate-300 font-medium">Multi-member</span>
-            </motion.div>
-          </div>
-        </div>
-      </div>
 
       {/* Enhanced Trip Period Calendar */}
       <div className="flex-1 overflow-auto p-6">
+        {isLoading ? (
+          /* Loading State */
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/40 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <CalendarIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+              Loading Calendar...
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              Preparing your trip calendar
+            </p>
+          </div>
+        ) : !currentTrip ? (
+          /* No Trip State */
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+              No Trip Selected
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              Please select or create a trip to view the calendar
+            </p>
+          </div>
+        ) : tripPlaces.length === 0 ? (
+          /* Empty Calendar State */
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CalendarIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+              No Places Scheduled
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+              Add places to your trip to see them in the calendar
+            </p>
+            <motion.button
+              onClick={handleAddPlace}
+              className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Add Your First Place
+            </motion.button>
+          </div>
+        ) : (
+          <>
         {/* Days of week header with enhanced styling */}
         <div className="grid grid-cols-7 gap-3 mb-4">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
@@ -590,6 +509,8 @@ export function CalendarView() {
             })}
           </div>
         </div>
+          </>
+        )}
       </div>
 
 

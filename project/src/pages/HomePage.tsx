@@ -10,7 +10,7 @@ import { PremiumBadge } from '../components/PremiumBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function HomePage() {
-  const { user, trips, deleteTrip, canCreateTrip } = useStore();
+  const { user, trips, deleteTrip, canCreateTrip, setCurrentTrip, loadPlacesFromAPI } = useStore();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
@@ -286,7 +286,11 @@ export function HomePage() {
                     whileHover={{ y: -4 }}
                     className="group"
                   >
-                    <Link to="/my-trip" className="block">
+                    <Link 
+                      to="/my-trip" 
+                      className="block"
+                      onClick={() => setCurrentTrip(trip)}
+                    >
                       <div className="relative bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-6 border border-slate-200/50 dark:border-slate-700/50 hover:border-primary-300/50 dark:hover:border-primary-600/50 transition-all duration-300 shadow-soft hover:shadow-medium overflow-hidden">
                         {/* Background Gradient */}
                         <div className="absolute inset-0 bg-gradient-to-br from-primary-50/30 via-transparent to-secondary-50/30 dark:from-primary-900/10 dark:via-transparent dark:to-secondary-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Edge Functions with Auth</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #00ff00; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #333; background: #2a2a2a; }
+        .result { margin: 10px 0; padding: 10px; background: #333; border-radius: 4px; }
+        .success { border-left: 4px solid #00ff00; }
+        .error { border-left: 4px solid #ff0000; color: #ff6666; }
+        .warning { border-left: 4px solid #ffaa00; color: #ffcc66; }
+        button { background: #00ff00; color: #000; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #00cc00; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        .loading { color: #ffaa00; }
+        pre { white-space: pre-wrap; word-wrap: break-word; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Edge Functions Test Suite</h1>
+    <p>Testing new optimization functions with authentication</p>
+
+    <div class="test-section">
+        <h2>Authentication Status</h2>
+        <div id="auth-status">Checking authentication...</div>
+        <button onclick="signInAnonymously()" id="signin-btn">Sign In Anonymously</button>
+        <button onclick="signOut()" id="signout-btn" disabled>Sign Out</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Data Info</h2>
+        <div id="test-data-info">
+            <strong>Trip ID:</strong> 4126dd20-f7b3-4b3c-a639-a0e250c6d8f1<br>
+            <strong>Places:</strong> 12 places from 3 users<br>
+            <strong>Location:</strong> Tokyo, Japan
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔥 Keep-Alive Tests</h2>
+        <button onclick="testKeepAlive()" id="keepalive-btn">Test Keep-Alive</button>
+        <div id="keepalive-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧠 Normalize Preferences Test</h2>
+        <button onclick="testNormalizePreferences()" id="normalize-btn">Test Normalization</button>
+        <div id="normalize-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Select Optimal Places Test</h2>
+        <button onclick="testSelectOptimalPlaces()" id="select-btn">Test Place Selection</button>
+        <div id="select-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🚀 Complete Optimization Test</h2>
+        <button onclick="testCompleteOptimization()" id="optimize-btn">Test Full Optimization</button>
+        <div id="optimize-results"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTc5MzY5NDgsImV4cCI6MjAzMzUxMjk0OH0.YBBFEwGlJ_sSWWJXbM9qI_5gVTZnNacL0v72aODEJN8';
+        const TEST_TRIP_ID = '4126dd20-f7b3-4b3c-a639-a0e250c6d8f1';
+
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+
+        // Check initial auth state
+        supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                currentUser = session.user;
+                updateAuthStatus(session.user);
+            } else {
+                updateAuthStatus(null);
+            }
+        });
+
+        // Listen for auth changes
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                currentUser = session.user;
+                updateAuthStatus(session.user);
+            } else {
+                currentUser = null;
+                updateAuthStatus(null);
+            }
+        });
+
+        function updateAuthStatus(user) {
+            const statusEl = document.getElementById('auth-status');
+            const signinBtn = document.getElementById('signin-btn');
+            const signoutBtn = document.getElementById('signout-btn');
+
+            if (user) {
+                statusEl.innerHTML = `
+                    <div class="result success">
+                        ✅ Authenticated as: ${user.email || 'Anonymous User'}<br>
+                        User ID: ${user.id}<br>
+                        Provider: ${user.app_metadata?.provider || 'anonymous'}
+                    </div>
+                `;
+                signinBtn.disabled = true;
+                signoutBtn.disabled = false;
+                
+                // Enable test buttons
+                document.querySelectorAll('button[id$="-btn"]:not(#signin-btn):not(#signout-btn)').forEach(btn => {
+                    btn.disabled = false;
+                });
+            } else {
+                statusEl.innerHTML = `
+                    <div class="result error">
+                        ❌ Not authenticated
+                    </div>
+                `;
+                signinBtn.disabled = false;
+                signoutBtn.disabled = true;
+                
+                // Disable test buttons
+                document.querySelectorAll('button[id$="-btn"]:not(#signin-btn):not(#signout-btn)').forEach(btn => {
+                    btn.disabled = true;
+                });
+            }
+        }
+
+        async function signInAnonymously() {
+            try {
+                const { data, error } = await supabaseClient.auth.signInAnonymously();
+                if (error) throw error;
+                addResult('auth-status', '✅ Anonymous sign-in successful', 'success');
+            } catch (error) {
+                addResult('auth-status', `❌ Sign-in failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function signOut() {
+            try {
+                const { error } = await supabaseClient.auth.signOut();
+                if (error) throw error;
+                addResult('auth-status', '✅ Signed out successfully', 'success');
+            } catch (error) {
+                addResult('auth-status', `❌ Sign-out failed: ${error.message}`, 'error');
+            }
+        }
+
+        function addResult(containerId, message, type = '') {
+            const container = document.getElementById(containerId);
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+            container.appendChild(resultDiv);
+        }
+
+        async function testKeepAlive() {
+            const resultsContainer = document.getElementById('keepalive-results');
+            resultsContainer.innerHTML = '';
+            
+            const functions = ['normalize-preferences', 'select-optimal-places', 'optimize-route'];
+            
+            for (const functionName of functions) {
+                try {
+                    const startTime = Date.now();
+                    const { data, error } = await supabaseClient.functions.invoke(functionName, {
+                        body: { type: 'keep_alive' }
+                    });
+                    
+                    const responseTime = Date.now() - startTime;
+                    
+                    if (error) {
+                        addResult('keepalive-results', 
+                            `❌ ${functionName}: ${error.message}`, 'error');
+                    } else if (data.message === 'pong') {
+                        addResult('keepalive-results', 
+                            `✅ ${functionName}: ${responseTime}ms - ${data.message} (${data.timestamp})`, 'success');
+                    } else {
+                        addResult('keepalive-results', 
+                            `⚠️ ${functionName}: Unexpected response - ${JSON.stringify(data)}`, 'warning');
+                    }
+                } catch (error) {
+                    addResult('keepalive-results', 
+                        `❌ ${functionName}: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function testNormalizePreferences() {
+            const resultsContainer = document.getElementById('normalize-results');
+            resultsContainer.innerHTML = '';
+            
+            if (!currentUser) {
+                addResult('normalize-results', '❌ Please sign in first', 'error');
+                return;
+            }
+
+            try {
+                addResult('normalize-results', '🔄 Testing normalization...', 'loading');
+                
+                const startTime = Date.now();
+                const { data, error } = await supabaseClient.functions.invoke('normalize-preferences', {
+                    body: {
+                        trip_id: TEST_TRIP_ID,
+                        force_refresh: true
+                    }
+                });
+                
+                const responseTime = Date.now() - startTime;
+                
+                if (error) {
+                    addResult('normalize-results', 
+                        `❌ Normalization failed: ${error.message}`, 'error');
+                } else if (data.success) {
+                    const result = data.result;
+                    addResult('normalize-results', `
+                        ✅ Normalization successful (${responseTime}ms)<br>
+                        <strong>Results:</strong><br>
+                        • Algorithm Version: ${result.metadata.algorithmVersion}<br>
+                        • Total Places: ${result.totalPlaces}<br>
+                        • Normalized Users: ${result.normalizedUsers.length}<br>
+                        • Group Fairness Score: ${(result.groupFairnessScore * 100).toFixed(1)}%<br>
+                        • Execution Time: ${result.executionTimeMs}ms<br>
+                        • Edge Cases: ${result.metadata.edgeCaseHandling.join(', ') || 'None'}<br>
+                        • Cached: ${data.cached ? 'Yes' : 'No'}<br>
+                        <details>
+                            <summary>User Details</summary>
+                            <pre>${JSON.stringify(result.normalizedUsers, null, 2)}</pre>
+                        </details>
+                    `, 'success');
+                } else {
+                    addResult('normalize-results', 
+                        `❌ Normalization returned error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                addResult('normalize-results', 
+                    `❌ Normalization test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSelectOptimalPlaces() {
+            const resultsContainer = document.getElementById('select-results');
+            resultsContainer.innerHTML = '';
+            
+            if (!currentUser) {
+                addResult('select-results', '❌ Please sign in first', 'error');
+                return;
+            }
+
+            try {
+                addResult('select-results', '🔄 Testing place selection...', 'loading');
+                
+                const startTime = Date.now();
+                const { data, error } = await supabaseClient.functions.invoke('select-optimal-places', {
+                    body: {
+                        trip_id: TEST_TRIP_ID,
+                        max_places: 8,
+                        fairness_weight: 0.7
+                    }
+                });
+                
+                const responseTime = Date.now() - startTime;
+                
+                if (error) {
+                    addResult('select-results', 
+                        `❌ Place selection failed: ${error.message}`, 'error');
+                } else if (data.success) {
+                    const result = data.result;
+                    addResult('select-results', `
+                        ✅ Place selection successful (${responseTime}ms)<br>
+                        <strong>Results:</strong><br>
+                        • Algorithm Version: ${result.metadata.algorithmVersion}<br>
+                        • Places Considered: ${result.totalPlacesConsidered}<br>
+                        • Places Selected: ${result.selectedPlaces.length}<br>
+                        • Selection Rounds: ${result.selectionRounds}<br>
+                        • Final Fairness Score: ${(result.finalFairnessScore * 100).toFixed(1)}%<br>
+                        • Max Places: ${result.metadata.maxPlaces}<br>
+                        • Fairness Weight: ${result.metadata.fairnessWeight}<br>
+                        • Execution Time: ${result.executionTimeMs}ms<br>
+                        • Cached: ${data.cached ? 'Yes' : 'No'}<br>
+                        <details>
+                            <summary>Selected Places</summary>
+                            <pre>${result.selectedPlaces.map(sp => 
+                                `Round ${sp.selectionRound}: ${sp.place.name} (Score: ${sp.selectionScore.toFixed(3)})`
+                            ).join('\\n')}</pre>
+                        </details>
+                        <details>
+                            <summary>User Fairness Scores</summary>
+                            <pre>${JSON.stringify(result.userFairnessScores, null, 2)}</pre>
+                        </details>
+                    `, 'success');
+                } else {
+                    addResult('select-results', 
+                        `❌ Place selection returned error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                addResult('select-results', 
+                    `❌ Place selection test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCompleteOptimization() {
+            const resultsContainer = document.getElementById('optimize-results');
+            resultsContainer.innerHTML = '';
+            
+            if (!currentUser) {
+                addResult('optimize-results', '❌ Please sign in first', 'error');
+                return;
+            }
+
+            try {
+                addResult('optimize-results', '🔄 Testing complete optimization...', 'loading');
+                
+                const startTime = Date.now();
+                const { data, error } = await supabaseClient.functions.invoke('optimize-route', {
+                    body: {
+                        trip_id: TEST_TRIP_ID,
+                        settings: {
+                            fairness_weight: 0.6,
+                            efficiency_weight: 0.4,
+                            include_meals: true,
+                            preferred_transport: 'public_transport'
+                        }
+                    }
+                });
+                
+                const responseTime = Date.now() - startTime;
+                
+                if (error) {
+                    addResult('optimize-results', 
+                        `❌ Optimization failed: ${error.message}`, 'error');
+                } else if (data.success) {
+                    const result = data.optimization_result;
+                    addResult('optimize-results', `
+                        ✅ Optimization successful (${responseTime}ms)<br>
+                        <strong>Results:</strong><br>
+                        • Daily Schedules: ${result.daily_schedules.length}<br>
+                        • Total Travel Time: ${result.total_travel_time_minutes} minutes<br>
+                        • Total Visit Time: ${result.total_visit_time_minutes} minutes<br>
+                        • Overall Score: ${(result.optimization_score.overall * 100).toFixed(1)}%<br>
+                        • Fairness Score: ${(result.optimization_score.fairness * 100).toFixed(1)}%<br>
+                        • Efficiency Score: ${(result.optimization_score.efficiency * 100).toFixed(1)}%<br>
+                        • Execution Time: ${result.execution_time_ms}ms<br>
+                        • Created By: ${result.created_by}<br>
+                        • Cached: ${data.cached ? 'Yes' : 'No'}<br>
+                        <details>
+                            <summary>Daily Schedules</summary>
+                            <pre>${result.daily_schedules.map(day => 
+                                `${day.date}: ${day.scheduled_places.length} places, ${day.total_travel_time}min travel, ${day.total_visit_time}min visit`
+                            ).join('\\n')}</pre>
+                        </details>
+                        <details>
+                            <summary>Full Result</summary>
+                            <pre>${JSON.stringify(result, null, 2)}</pre>
+                        </details>
+                    `, 'success');
+                } else {
+                    addResult('optimize-results', 
+                        `❌ Optimization returned error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                addResult('optimize-results', 
+                    `❌ Optimization test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run keep-alive test when page loads and user is authenticated
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session) {
+                setTimeout(testKeepAlive, 1000);
+            }
+        });
+    </script>
+</body>
+</html>

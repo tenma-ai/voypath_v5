@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Functionality Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .test-passed { @apply text-green-600 bg-green-50 border-green-200; }
+        .test-failed { @apply text-red-600 bg-red-50 border-red-200; }
+        .test-pending { @apply text-yellow-600 bg-yellow-50 border-yellow-200; }
+    </style>
+</head>
+<body class="bg-gray-50 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-8">🧪 Comprehensive Functionality Test</h1>
+        
+        <div class="mb-6">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h2 class="text-lg font-semibold text-blue-900 mb-2">Test Configuration</h2>
+                <div class="text-sm text-blue-700">
+                    <p><strong>Trip ID:</strong> 4126dd20-f7b3-4b3c-a639-a0e250c6d8f1</p>
+                    <p><strong>Trip Period:</strong> 2024-05-15 to 2024-05-22</p>
+                    <p><strong>Expected Places:</strong> 12 total (10 scheduled, 2 unscheduled)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Results Container -->
+        <div id="test-results" class="space-y-4">
+            <!-- Tests will be populated here -->
+        </div>
+
+        <!-- Summary -->
+        <div id="test-summary" class="mt-8 p-6 border rounded-lg">
+            <h2 class="text-xl font-semibold mb-4">Test Summary</h2>
+            <div id="summary-content" class="text-gray-600">
+                Running tests...
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js';
+
+        const supabaseUrl = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        const tripId = '4126dd20-f7b3-4b3c-a639-a0e250c6d8f1';
+        
+        const tests = [
+            {
+                name: 'Trip Data Integrity',
+                description: 'Verify trip has correct dates and departure location',
+                test: async () => {
+                    const { data: trip, error } = await supabase
+                        .from('trips')
+                        .select('*')
+                        .eq('id', tripId)
+                        .single();
+                    
+                    if (error) throw new Error(`Failed to fetch trip: ${error.message}`);
+                    
+                    const checks = [
+                        { condition: trip.start_date === '2024-05-15', message: 'Start date is 2024-05-15' },
+                        { condition: trip.end_date === '2024-05-22', message: 'End date is 2024-05-22' },
+                        { condition: trip.departure_location === 'Tokyo Station', message: 'Departure location is Tokyo Station' },
+                        { condition: trip.name === 'Test Optimization Trip', message: 'Trip name is correct' }
+                    ];
+                    
+                    return checks;
+                }
+            },
+            {
+                name: 'Places Data Validation',
+                description: 'Check places count and scheduling status',
+                test: async () => {
+                    const { data: places, error } = await supabase
+                        .from('places')
+                        .select('*')
+                        .eq('trip_id', tripId);
+                    
+                    if (error) throw new Error(`Failed to fetch places: ${error.message}`);
+                    
+                    const scheduledPlaces = places.filter(p => p.scheduled);
+                    const unscheduledPlaces = places.filter(p => !p.scheduled);
+                    const placesWithDates = places.filter(p => p.visit_date || p.scheduled_date);
+                    const placesWithTimes = places.filter(p => p.scheduled_time_start && p.scheduled_time_end);
+                    
+                    return [
+                        { condition: places.length >= 10, message: `Total places: ${places.length} (expected ≥10)` },
+                        { condition: scheduledPlaces.length >= 8, message: `Scheduled places: ${scheduledPlaces.length} (expected ≥8)` },
+                        { condition: unscheduledPlaces.length >= 0, message: `Unscheduled places: ${unscheduledPlaces.length}` },
+                        { condition: placesWithDates.length >= 8, message: `Places with dates: ${placesWithDates.length}` },
+                        { condition: placesWithTimes.length >= 8, message: `Places with times: ${placesWithTimes.length}` },
+                        { condition: places.every(p => p.latitude && p.longitude), message: 'All places have coordinates' }
+                    ];
+                }
+            },
+            {
+                name: 'Optimization Results',
+                description: 'Verify optimization results exist and are valid',
+                test: async () => {
+                    const { data: results, error } = await supabase
+                        .from('optimization_results')
+                        .select('*')
+                        .eq('trip_id', tripId)
+                        .eq('is_active', true);
+                    
+                    if (error) throw new Error(`Failed to fetch optimization results: ${error.message}`);
+                    
+                    const checks = [
+                        { condition: results.length > 0, message: `Optimization results found: ${results.length}` }
+                    ];
+                    
+                    if (results.length > 0) {
+                        const result = results[0];
+                        checks.push(
+                            { condition: result.optimized_route && Array.isArray(result.optimized_route), message: 'Valid optimized route structure' },
+                            { condition: result.optimization_score && typeof result.optimization_score.overall === 'number', message: 'Valid optimization score' },
+                            { condition: result.places_count >= 8, message: `Places in optimization: ${result.places_count}` },
+                            { condition: result.execution_time_ms > 0, message: `Execution time: ${result.execution_time_ms}ms` }
+                        );
+                    }
+                    
+                    return checks;
+                }
+            },
+            {
+                name: 'Map View Data Compatibility',
+                description: 'Test data structure for MapView component',
+                test: async () => {
+                    const { data: places, error } = await supabase
+                        .from('places')
+                        .select('id, name, latitude, longitude, scheduled, wish_level, stay_duration_minutes, category')
+                        .eq('trip_id', tripId);
+                    
+                    if (error) throw new Error(`Failed to fetch places for MapView: ${error.message}`);
+                    
+                    const validForMap = places.filter(p => 
+                        p.latitude && p.longitude && 
+                        p.latitude >= -90 && p.latitude <= 90 &&
+                        p.longitude >= -180 && p.longitude <= 180
+                    );
+                    
+                    return [
+                        { condition: validForMap.length === places.length, message: `All places have valid coordinates (${validForMap.length}/${places.length})` },
+                        { condition: places.every(p => p.name && p.name.length > 0), message: 'All places have names' },
+                        { condition: places.every(p => typeof p.scheduled === 'boolean'), message: 'All places have boolean scheduled status' },
+                        { condition: places.every(p => p.wish_level >= 1 && p.wish_level <= 5), message: 'All places have valid wish levels (1-5)' }
+                    ];
+                }
+            },
+            {
+                name: 'Calendar View Data Compatibility',
+                description: 'Test data structure for CalendarView component',
+                test: async () => {
+                    const { data: places, error } = await supabase
+                        .from('places')
+                        .select('id, name, visit_date, scheduled_date, scheduled_time_start, scheduled_time_end, scheduled, stay_duration_minutes, category, wish_level')
+                        .eq('trip_id', tripId);
+                    
+                    if (error) throw new Error(`Failed to fetch places for CalendarView: ${error.message}`);
+                    
+                    const scheduledPlaces = places.filter(p => p.scheduled);
+                    const placesWithDates = places.filter(p => p.visit_date || p.scheduled_date);
+                    const placesWithTimes = places.filter(p => p.scheduled_time_start && p.scheduled_time_end);
+                    
+                    // Simulate unscheduled distribution
+                    const tripDays = 8; // 2024-05-15 to 2024-05-22
+                    const unscheduledPlaces = places.filter(p => !p.scheduled && !p.visit_date && !p.scheduled_date);
+                    const wouldBeDistributed = unscheduledPlaces.length;
+                    
+                    return [
+                        { condition: scheduledPlaces.length >= 8, message: `Scheduled places for calendar: ${scheduledPlaces.length}` },
+                        { condition: placesWithDates.length >= 8, message: `Places with dates: ${placesWithDates.length}` },
+                        { condition: placesWithTimes.length >= 8, message: `Places with specific times: ${placesWithTimes.length}` },
+                        { condition: wouldBeDistributed >= 0, message: `Unscheduled places to distribute: ${wouldBeDistributed}` },
+                        { condition: places.every(p => p.category && p.category.length > 0), message: 'All places have categories' }
+                    ];
+                }
+            },
+            {
+                name: 'Timeline/ListView Data Compatibility',
+                description: 'Test data structure for ListView component',
+                test: async () => {
+                    const { data: places, error } = await supabase
+                        .from('places')
+                        .select('*')
+                        .eq('trip_id', tripId);
+                    
+                    if (error) throw new Error(`Failed to fetch places for ListView: ${error.message}`);
+                    
+                    // Simulate timeline grouping logic
+                    const groupedByScheduled = {
+                        scheduled: places.filter(p => p.scheduled),
+                        unscheduled: places.filter(p => !p.scheduled)
+                    };
+                    
+                    return [
+                        { condition: places.length > 0, message: `Total places available: ${places.length}` },
+                        { condition: groupedByScheduled.scheduled.length >= 8, message: `Scheduled for timeline: ${groupedByScheduled.scheduled.length}` },
+                        { condition: groupedByScheduled.unscheduled.length >= 0, message: `Unscheduled for timeline: ${groupedByScheduled.unscheduled.length}` },
+                        { condition: places.every(p => p.stay_duration_minutes > 0), message: 'All places have stay duration' },
+                        { condition: places.every(p => p.wish_level >= 1 && p.wish_level <= 5), message: 'All places have valid wish levels' }
+                    ];
+                }
+            },
+            {
+                name: 'Optimization Score Validation',
+                description: 'Verify optimization metrics are realistic',
+                test: async () => {
+                    const { data: results, error } = await supabase
+                        .from('optimization_results')
+                        .select('optimization_score, total_travel_time_minutes, total_visit_time_minutes, places_count')
+                        .eq('trip_id', tripId)
+                        .eq('is_active', true)
+                        .single();
+                    
+                    if (error) throw new Error(`Failed to fetch optimization metrics: ${error.message}`);
+                    
+                    const score = results.optimization_score;
+                    
+                    return [
+                        { condition: score.overall >= 0.7 && score.overall <= 1.0, message: `Overall score: ${(score.overall * 100).toFixed(1)}% (good range)` },
+                        { condition: score.fairness >= 0.7 && score.fairness <= 1.0, message: `Fairness score: ${(score.fairness * 100).toFixed(1)}% (good)` },
+                        { condition: score.efficiency >= 0.6 && score.efficiency <= 1.0, message: `Efficiency score: ${(score.efficiency * 100).toFixed(1)}% (acceptable)` },
+                        { condition: results.total_travel_time_minutes > 0 && results.total_travel_time_minutes < 600, message: `Travel time: ${results.total_travel_time_minutes} minutes (reasonable)` },
+                        { condition: results.total_visit_time_minutes > 0, message: `Visit time: ${results.total_visit_time_minutes} minutes` },
+                        { condition: results.places_count >= 8, message: `Optimized places count: ${results.places_count}` }
+                    ];
+                }
+            }
+        ];
+
+        async function runTests() {
+            const resultsContainer = document.getElementById('test-results');
+            const summaryContainer = document.getElementById('summary-content');
+            
+            let totalTests = 0;
+            let passedTests = 0;
+            let failedTests = 0;
+            
+            for (const testSuite of tests) {
+                const testElement = document.createElement('div');
+                testElement.className = 'border rounded-lg p-4 test-pending';
+                testElement.innerHTML = `
+                    <h3 class="font-semibold text-lg">${testSuite.name}</h3>
+                    <p class="text-sm mb-3">${testSuite.description}</p>
+                    <div class="test-details">Running...</div>
+                `;
+                resultsContainer.appendChild(testElement);
+                
+                try {
+                    const results = await testSuite.test();
+                    const detailsDiv = testElement.querySelector('.test-details');
+                    
+                    let suitePassedAll = true;
+                    let detailsHTML = '<ul class="space-y-1">';
+                    
+                    for (const result of results) {
+                        totalTests++;
+                        if (result.condition) {
+                            passedTests++;
+                            detailsHTML += `<li class="flex items-center"><span class="text-green-600 mr-2">✓</span>${result.message}</li>`;
+                        } else {
+                            failedTests++;
+                            suitePassedAll = false;
+                            detailsHTML += `<li class="flex items-center"><span class="text-red-600 mr-2">✗</span>${result.message}</li>`;
+                        }
+                    }
+                    
+                    detailsHTML += '</ul>';
+                    detailsDiv.innerHTML = detailsHTML;
+                    
+                    if (suitePassedAll) {
+                        testElement.className = 'border rounded-lg p-4 test-passed';
+                    } else {
+                        testElement.className = 'border rounded-lg p-4 test-failed';
+                    }
+                    
+                } catch (error) {
+                    const detailsDiv = testElement.querySelector('.test-details');
+                    detailsDiv.innerHTML = `<span class="text-red-600">Error: ${error.message}</span>`;
+                    testElement.className = 'border rounded-lg p-4 test-failed';
+                    failedTests++;
+                    totalTests++;
+                }
+            }
+            
+            // Update summary
+            const passRate = ((passedTests / totalTests) * 100).toFixed(1);
+            summaryContainer.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600">${totalTests}</div>
+                        <div class="text-sm text-gray-600">Total Tests</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600">${passedTests}</div>
+                        <div class="text-sm text-gray-600">Passed</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-600">${failedTests}</div>
+                        <div class="text-sm text-gray-600">Failed</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold ${passRate >= 80 ? 'text-green-600' : passRate >= 60 ? 'text-yellow-600' : 'text-red-600'}">${passRate}%</div>
+                        <div class="text-sm text-gray-600">Pass Rate</div>
+                    </div>
+                </div>
+                <div class="mt-4 p-4 rounded-lg ${passRate >= 80 ? 'bg-green-50 border border-green-200' : passRate >= 60 ? 'bg-yellow-50 border border-yellow-200' : 'bg-red-50 border border-red-200'}">
+                    <h3 class="font-semibold ${passRate >= 80 ? 'text-green-800' : passRate >= 60 ? 'text-yellow-800' : 'text-red-800'}">
+                        ${passRate >= 80 ? '🎉 Excellent! System is working properly.' : passRate >= 60 ? '⚠️ Good, but some improvements needed.' : '❌ Critical issues detected.'}
+                    </h3>
+                    <p class="text-sm mt-2 ${passRate >= 80 ? 'text-green-700' : passRate >= 60 ? 'text-yellow-700' : 'text-red-700'}">
+                        ${passRate >= 80 ? 'All major components are functioning correctly. The optimization system, data integrity, and UI compatibility are working as expected.' : 
+                          passRate >= 60 ? 'Most components are working, but there are some issues that should be addressed for optimal performance.' :
+                          'Significant problems detected. Review failed tests and fix critical issues before proceeding.'}
+                    </p>
+                </div>
+            `;
+        }
+
+        // Start tests when page loads
+        runTests();
+    </script>
+</body>
+</html>

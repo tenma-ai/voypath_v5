@@ -25,8 +25,13 @@ export function MyPlacesPage() {
     });
   };
 
-  // Mock places data
-  const mockPlaces = places.length === 0 ? [
+  // Filter places for current trip
+  const tripPlaces = places.filter(place => 
+    currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false
+  );
+
+  // Mock places data if no real places exist for current trip
+  const mockPlaces = tripPlaces.length === 0 ? [
     {
       id: '1',
       name: 'Senso-ji Temple',
@@ -78,7 +83,7 @@ export function MyPlacesPage() {
       image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&h=200&fit=crop',
       scheduled: false,
     }
-  ] : places;
+  ] : tripPlaces;
 
   const filteredPlaces = mockPlaces.filter(place => {
     if (filter === 'scheduled') return place.scheduled;
@@ -105,6 +110,31 @@ export function MyPlacesPage() {
       />
     ));
   };
+
+  // Show message if no trip is selected
+  if (!currentTrip) {
+    return (
+      <div className="p-4 space-y-4">
+        <div className="text-center py-16">
+          <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-slate-400" />
+          </div>
+          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+            No Trip Selected
+          </h3>
+          <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+            Please select a trip from the home page to view and manage places
+          </p>
+          <Link 
+            to="/"
+            className="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+          >
+            Back to Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 space-y-4">
@@ -144,7 +174,7 @@ export function MyPlacesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-            My Places
+            {currentTrip.name || `${currentTrip.departureLocation} Trip`} - Places
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">
             {filteredPlaces.length} places • {filteredPlaces.filter(p => p.scheduled).length} scheduled

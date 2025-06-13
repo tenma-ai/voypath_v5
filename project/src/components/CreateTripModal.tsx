@@ -34,7 +34,7 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
     end: null
   });
 
-  const { addTrip, setCurrentTrip, user, createTripWithAPI } = useStore();
+  const { createTripWithAPI } = useStore();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 

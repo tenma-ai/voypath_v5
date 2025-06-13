@@ -6,7 +6,7 @@ import { Layout } from './components/Layout';
 import { HomePage } from './pages/HomePage';
 import { TripDetailPage } from './pages/TripDetailPage';
 import { MyPlacesPage } from './pages/MyPlacesPage';
-import { AddPlacePage } from './pages/AddPlacePage';
+import { PlaceSearchToDetail } from './components/PlaceSearchToDetail';
 import { ChatPage } from './pages/ChatPage';
 import { SharePage } from './pages/SharePage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -29,7 +29,7 @@ function App() {
               <Route path="my-trip/my-places" element={<MyPlacesPage />} />
               <Route path="my-trip/chat" element={<ChatPage />} />
               <Route path="my-trip/share" element={<SharePage />} />
-              <Route path="add-place" element={<AddPlacePage />} />
+              <Route path="add-place" element={<PlaceSearchToDetail />} />
               <Route path="profile" element={<ProfilePage />} />
             </Route>
             {/* Premium pages outside of main layout */}

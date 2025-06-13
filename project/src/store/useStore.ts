@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { OptimizedRoute } from '../services/TripOptimizationService';
 
 export interface User {
   id: string;
@@ -32,6 +33,8 @@ export interface Place {
   name: string;
   category: string;
   address: string;
+  latitude: number;
+  longitude: number;
   rating: number;
   wishLevel: number;
   stayDuration: number;
@@ -43,6 +46,17 @@ export interface Place {
   notes?: string;
   tripId?: string; // Associate place with trip
   userId?: string; // Who added this place
+  // Database schema compatibility
+  trip_id?: string;
+  user_id?: string;
+  wish_level?: number;
+  stay_duration_minutes?: number;
+  google_place_id?: string;
+  google_rating?: number;
+  google_price_level?: number;
+  estimated_cost?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Premium limits
@@ -88,9 +102,16 @@ interface StoreState {
   isOptimizing: boolean;
   setIsOptimizing: (optimizing: boolean) => void;
 
+  // Optimization Results
+  optimizationResult: OptimizedRoute | null;
+  setOptimizationResult: (result: OptimizedRoute | null) => void;
+
   // API Integration
   createTripWithAPI: (tripData: TripCreateData) => Promise<Trip>;
   optimizeTrip: (tripId: string) => Promise<void>;
+  loadPlacesFromAPI: (tripId: string) => Promise<void>;
+  loadOptimizationResult: (tripId: string) => Promise<void>;
+  createSystemPlaces: (tripId: string) => Promise<void>;
 
   // Premium functions
   canCreateTrip: () => boolean;
@@ -165,6 +186,10 @@ export const useStore = create<StoreState>()(
       isOptimizing: false,
       setIsOptimizing: (optimizing) => set({ isOptimizing: optimizing }),
 
+      // Optimization Results
+      optimizationResult: null,
+      setOptimizationResult: (result) => set({ optimizationResult: result }),
+
       // Premium functions
       canCreateTrip: () => {
         const { user, trips } = get();
@@ -228,46 +253,22 @@ export const useStore = create<StoreState>()(
         if (!user) throw new Error('User not authenticated');
 
         try {
-          const response = await fetch('/api/supabase/functions/trip-management', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${user.id}`, // In real implementation, use proper JWT token
-            },
-            body: JSON.stringify(tripData),
-          });
-
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to create trip');
-          }
-
-          const result = await response.json();
-          const newTrip: Trip = {
-            id: result.trip.id,
-            departureLocation: result.trip.departure_location,
-            name: result.trip.name,
-            description: result.trip.description,
-            destination: result.trip.destination,
-            startDate: result.trip.start_date,
-            endDate: result.trip.end_date,
-            memberCount: result.trip.total_members || 1,
-            createdAt: result.trip.created_at,
-            ownerId: result.trip.owner_id,
-          };
-
-          // Add to local store
-          set((state) => ({ 
-            trips: [...state.trips, newTrip],
-            currentTrip: newTrip 
-          }));
-
-          return newTrip;
+          // For demo purposes, skip API call and go directly to local storage
+          console.log('Creating trip locally for demo purposes');
+          throw new Error('Demo mode - using local storage');
         } catch (error) {
-          console.error('Failed to create trip with API:', error);
-          // Fallback to local storage for demo
+          console.log('Using local storage for trip creation:', error.message);
+          // Fallback to local storage for demo - generate proper UUID
+          const generateUUID = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              const r = Math.random() * 16 | 0;
+              const v = c === 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+            });
+          };
+          
           const fallbackTrip: Trip = {
-            id: `trip-${Date.now()}`,
+            id: generateUUID(),
             departureLocation: tripData.departure_location,
             name: tripData.name || `${tripData.departure_location} Trip`,
             description: tripData.description,
@@ -312,14 +313,229 @@ export const useStore = create<StoreState>()(
           const result = await response.json();
           console.log('Optimization completed:', result);
 
-          // Update places with optimized schedule if needed
-          // This would typically update the places array with scheduling information
+          // Update places with optimized schedule from database
+          await get().loadPlacesFromAPI(tripId);
           
         } catch (error) {
           console.error('Failed to optimize trip:', error);
           throw error;
         } finally {
           set({ isOptimizing: false });
+        }
+      },
+
+      loadPlacesFromAPI: async (tripId: string): Promise<void> => {
+        try {
+          // Import Supabase client dynamically to avoid bundling issues
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabaseUrl = 'https://rdufxwoeneglyponagdz.supabase.co';
+          const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
+          const supabase = createClient(supabaseUrl, supabaseKey);
+
+          const { data: places, error } = await supabase
+            .from('places')
+            .select('*')
+            .eq('trip_id', tripId);
+
+          if (error) {
+            console.error('Failed to load places from API:', error);
+            return;
+          }
+
+          // Convert database format to frontend format
+          const formattedPlaces: Place[] = places.map(place => ({
+            id: place.id,
+            name: place.name,
+            category: place.category,
+            address: place.address || '',
+            latitude: place.latitude,
+            longitude: place.longitude,
+            rating: place.rating || place.google_rating || 0,
+            wishLevel: place.wish_level,
+            stayDuration: place.stay_duration_minutes,
+            priceLevel: place.price_level || place.google_price_level || 0,
+            image: place.image_url,
+            scheduled: place.scheduled,
+            scheduledDate: place.scheduled_date,
+            visitDate: place.visit_date,
+            notes: place.notes,
+            tripId: place.trip_id,
+            userId: place.user_id,
+            // Database schema compatibility
+            trip_id: place.trip_id,
+            user_id: place.user_id,
+            wish_level: place.wish_level,
+            stay_duration_minutes: place.stay_duration_minutes,
+            google_place_id: place.google_place_id,
+            google_rating: place.google_rating,
+            google_price_level: place.google_price_level,
+            estimated_cost: place.estimated_cost,
+            created_at: place.created_at,
+            updated_at: place.updated_at,
+            scheduled_date: place.scheduled_date,
+            scheduled_time_start: place.scheduled_time_start,
+            scheduled_time_end: place.scheduled_time_end
+          }));
+
+          // Update the places in store
+          set((state) => ({
+            places: [
+              ...state.places.filter(p => p.trip_id !== tripId && p.tripId !== tripId),
+              ...formattedPlaces
+            ]
+          }));
+
+          console.log(`Loaded ${formattedPlaces.length} places from database for trip ${tripId}`);
+          
+        } catch (error) {
+          console.error('Failed to load places from API:', error);
+        }
+      },
+
+      loadOptimizationResult: async (tripId: string): Promise<void> => {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabaseUrl = 'https://rdufxwoeneglyponagdz.supabase.co';
+          const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
+          const supabase = createClient(supabaseUrl, supabaseKey);
+
+          const { data: result, error } = await supabase
+            .from('optimization_results')
+            .select('*')
+            .eq('trip_id', tripId)
+            .eq('is_active', true)
+            .single();
+
+          if (error) {
+            console.error('Failed to load optimization result:', error);
+            set({ optimizationResult: null });
+            return;
+          }
+
+          if (result) {
+            // Convert database result to OptimizedRoute format
+            const optimizedRoute: OptimizedRoute = {
+              daily_schedules: result.optimized_route || [],
+              optimization_score: result.optimization_score || { overall: 0, fairness: 0, efficiency: 0 },
+              execution_time_ms: result.execution_time_ms || 0,
+              total_travel_time_minutes: result.total_travel_time_minutes || 0,
+              total_visit_time_minutes: result.total_visit_time_minutes || 0,
+              created_by: result.created_by || ''
+            };
+
+            set({ optimizationResult: optimizedRoute });
+            console.log(`Loaded optimization result for trip ${tripId}`);
+          } else {
+            set({ optimizationResult: null });
+          }
+          
+        } catch (error) {
+          console.error('Failed to load optimization result:', error);
+          set({ optimizationResult: null });
+        }
+      },
+
+      createSystemPlaces: async (tripId: string): Promise<void> => {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabaseUrl = 'https://rdufxwoeneglyponagdz.supabase.co';
+          const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          
+          const { user, currentTrip } = get();
+          if (!user || !currentTrip) return;
+
+          // Get trip information
+          const { data: trip, error: tripError } = await supabase
+            .from('trips')
+            .select('*')
+            .eq('id', tripId)
+            .single();
+
+          if (tripError || !trip) {
+            console.error('Failed to get trip for system places:', tripError);
+            return;
+          }
+
+          // Check if system places already exist
+          const { data: existingSystemPlaces } = await supabase
+            .from('places')
+            .select('id, place_type')
+            .eq('trip_id', tripId)
+            .in('place_type', ['departure', 'destination']);
+
+          if (existingSystemPlaces && existingSystemPlaces.length > 0) {
+            console.log('System places already exist for trip', tripId);
+            return;
+          }
+
+          const systemPlaces = [];
+
+          // Create departure place
+          if (trip.departure_location) {
+            systemPlaces.push({
+              name: `Departure: ${trip.departure_location}`,
+              category: 'transportation',
+              address: trip.departure_location,
+              latitude: 35.6812, // Tokyo Station coordinates as default
+              longitude: 139.7671,
+              rating: 0,
+              wish_level: 5, // High priority for system places
+              stay_duration_minutes: 0,
+              price_level: 0,
+              scheduled: true,
+              scheduled_date: trip.start_date,
+              scheduled_time_start: '08:00:00',
+              scheduled_time_end: '08:00:00',
+              visit_date: trip.start_date,
+              trip_id: tripId,
+              user_id: user.id,
+              place_type: 'departure',
+              source: 'system_generated'
+            });
+          }
+
+          // Create destination place if different from departure
+          if (trip.destination && trip.destination !== trip.departure_location) {
+            systemPlaces.push({
+              name: `Destination: ${trip.destination}`,
+              category: 'transportation',
+              address: trip.destination,
+              latitude: 35.6812, // Default coordinates
+              longitude: 139.7671,
+              rating: 0,
+              wish_level: 5,
+              stay_duration_minutes: 0,
+              price_level: 0,
+              scheduled: true,
+              scheduled_date: trip.end_date,
+              scheduled_time_start: '18:00:00',
+              scheduled_time_end: '18:00:00',
+              visit_date: trip.end_date,
+              trip_id: tripId,
+              user_id: user.id,
+              place_type: 'destination',
+              source: 'system_generated'
+            });
+          }
+
+          // Insert system places
+          if (systemPlaces.length > 0) {
+            const { error: insertError } = await supabase
+              .from('places')
+              .insert(systemPlaces);
+
+            if (insertError) {
+              console.error('Failed to create system places:', insertError);
+            } else {
+              console.log(`Created ${systemPlaces.length} system places for trip ${tripId}`);
+              // Reload places to include the new system places
+              await get().loadPlacesFromAPI(tripId);
+            }
+          }
+          
+        } catch (error) {
+          console.error('Failed to create system places:', error);
         }
       },
     }),

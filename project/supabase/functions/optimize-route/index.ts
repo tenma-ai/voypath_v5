@@ -4,11 +4,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 interface OptimizeRouteRequest {
-  trip_id: string;
+  trip_id?: string;
   settings?: OptimizationSettings;
+  type?: 'keep_alive' | 'optimization';
 }
 
 interface OptimizationSettings {
@@ -96,7 +98,31 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 405,
+      }
+    );
+  }
+
   try {
+    const requestData: OptimizeRouteRequest = await req.json();
+    
+    // Handle keep-alive ping first (no auth required)
+    if (requestData.type === 'keep_alive') {
+      return new Response(
+        JSON.stringify({ message: 'pong', timestamp: new Date().toISOString() }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // For all other operations, require authentication
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -121,18 +147,6 @@ serve(async (req) => {
         }
       );
     }
-
-    if (req.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 405,
-        }
-      );
-    }
-
-    const requestData: OptimizeRouteRequest = await req.json();
     
     if (!requestData.trip_id) {
       throw new Error('trip_id is required');
@@ -310,9 +324,41 @@ async function optimizeRoute(
     ...settings
   };
 
+  // Use pre-selected places from place selection Edge Function
+  let selectedPlaces: Place[];
+  
+  try {
+    // Call place selection Edge Function to get optimally selected places
+    const selectionResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/select-optimal-places`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`
+      },
+      body: JSON.stringify({
+        trip_id: trip.id,
+        max_places: finalSettings.max_places_per_day || 20,
+        fairness_weight: finalSettings.fairness_weight || 0.6
+      })
+    });
+
+    if (selectionResponse.ok) {
+      const selectionResult = await selectionResponse.json();
+      selectedPlaces = selectionResult.result.selectedPlaces.map((sp: any) => sp.place);
+      console.log(`Using ${selectedPlaces.length} pre-selected places from selection service`);
+    } else {
+      // Fallback to original logic if selection service fails
+      console.warn('Place selection service failed, using fallback selection');
+      selectedPlaces = places;
+    }
+  } catch (error) {
+    console.warn('Error calling place selection service:', error);
+    selectedPlaces = places;
+  }
+
   // Separate system-generated places (departure/destination) from user places
-  const systemPlaces = places.filter(p => p.source === 'system');
-  const userPlaces = places.filter(p => p.source !== 'system');
+  const systemPlaces = selectedPlaces.filter(p => p.source === 'system');
+  const userPlaces = selectedPlaces.filter(p => p.source !== 'system');
 
   // Find departure and destination places
   const departurePlace = systemPlaces.find(p => 
@@ -327,13 +373,10 @@ async function optimizeRoute(
     throw new Error('Departure location not found in places');
   }
 
-  // Normalize user weights for fairness
-  const normalizedPlaces = normalizeUserWeights(userPlaces, members);
-
   // Group places by day if dates are available
   const dailySchedules = trip.start_date && trip.end_date
-    ? optimizeScheduledTrip(trip, departurePlace, destinationPlace, normalizedPlaces, finalSettings)
-    : optimizeUnscheduledTrip(trip, departurePlace, destinationPlace, normalizedPlaces, finalSettings);
+    ? optimizeScheduledTrip(trip, departurePlace, destinationPlace, userPlaces, finalSettings)
+    : optimizeUnscheduledTrip(trip, departurePlace, destinationPlace, userPlaces, finalSettings);
 
   // Calculate optimization score
   const optimizationScore = calculateOptimizationScore(dailySchedules, finalSettings);
@@ -462,7 +505,7 @@ function optimizeSingleDay(
   }
 
   // Use nearest neighbor heuristic with 2-opt improvement
-  let currentRoute = [departure];
+  const currentRoute = [departure];
   const unvisited = [...optimizablePlaces];
   let currentPlace = departure;
 

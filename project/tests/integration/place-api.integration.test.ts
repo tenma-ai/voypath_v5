@@ -216,7 +216,7 @@ describe('Place API Integration Tests', () => {
   })
 
   describe('Place Search Integration', () => {
-    let searchTestPlaces: string[] = []
+    const searchTestPlaces: string[] = []
 
     beforeEach(async () => {
       // Create test places for searching
