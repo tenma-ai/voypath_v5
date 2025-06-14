@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { StripeProvider } from './components/StripeProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -12,8 +12,34 @@ import { SharePage } from './pages/SharePage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PremiumSuccessPage } from './pages/PremiumSuccessPage';
 import { PremiumCancelPage } from './pages/PremiumCancelPage';
+import { useStore } from './store/useStore';
 
 function App() {
+  const { initializeFromDatabase, setUser } = useStore();
+
+  useEffect(() => {
+    // Initialize app with database data and demo user
+    const initializeApp = async () => {
+      try {
+        // Set a demo user for development
+        setUser({
+          id: '033523e2-377c-4479-a5cd-90d8905f7bd0',
+          name: 'Demo User',
+          email: 'demo@voypath.com',
+          isGuest: false,
+          isPremium: false
+        });
+
+        // Load data from database
+        await initializeFromDatabase();
+        console.log('✅ App initialized with database data');
+      } catch (error) {
+        console.error('❌ Failed to initialize app:', error);
+      }
+    };
+
+    initializeApp();
+  }, [initializeFromDatabase, setUser]);
   return (
     <ErrorBoundary>
       <StripeProvider>

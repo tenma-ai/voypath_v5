@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, Clock, Star, Users, ChevronRight, Eye, EyeOff, Sparkles, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Star, Users, ChevronRight, Eye, EyeOff, Sparkles, AlertCircle, Navigation } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
@@ -34,22 +34,54 @@ interface DaySchedule {
   events: ScheduleEvent[];
 }
 
-// Member color mapping with gradients
-const getMemberColor = (memberName: string): string => {
-  const memberColors: Record<string, string> = {
-    'Alice': 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-    'Bob': 'linear-gradient(135deg, #ef4444, #dc2626)',
-    'Charlie': 'linear-gradient(135deg, #10b981, #059669)',
-    'Diana': 'linear-gradient(135deg, #f59e0b, #d97706)',
+// Dynamic member color system using user IDs
+const getMemberColor = (userId: string): string => {
+  // Generate colors based on user ID hash for consistency
+  const hash = userId.split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
+  
+  const colors = [
+    'linear-gradient(135deg, #3b82f6, #1d4ed8)', // Blue
+    'linear-gradient(135deg, #ef4444, #dc2626)', // Red
+    'linear-gradient(135deg, #10b981, #059669)', // Green
+    'linear-gradient(135deg, #f59e0b, #d97706)', // Orange
+    'linear-gradient(135deg, #8b5cf6, #7c3aed)', // Purple
+    'linear-gradient(135deg, #06b6d4, #0891b2)', // Cyan
+    'linear-gradient(135deg, #f59e0b, #ea580c)', // Amber
+    'linear-gradient(135deg, #84cc16, #65a30d)', // Lime
+  ];
+  
+  return colors[Math.abs(hash) % colors.length];
+};
+
+// Transportation mode colors (車・飛行機・徒歩のみ)
+const transportColors = {
+  walking: '#10B981',        // Green
+  car: '#6B7280',            // Gray
+  flight: '#EC4899',         // Pink
+  travel: '#3B82F6',         // Blue for generic travel
+  default: '#3B82F6'         // Blue default
+};
+
+// Transportation mode icons (車・飛行機・徒歩のみ)
+const getTransportIcon = (mode: string): string => {
+  const transportIcons: Record<string, string> = {
+    walking: '🚶',
+    car: '🚗',
+    flight: '✈️',
+    travel: '🚗',
+    default: '🚶'
   };
   
-  return memberColors[memberName] || 'linear-gradient(135deg, #6b7280, #4b5563)';
+  return transportIcons[mode] || transportIcons.default;
 };
 
 
 export function ListView() {
   const navigate = useNavigate();
-  const { places, currentTrip, isLoading } = useStore();
+  const { places, currentTrip, isLoading, optimizationResult } = useStore();
   const [selectedDay, setSelectedDay] = useState(new Date().toISOString().split('T')[0]);
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,10 +93,102 @@ export function ListView() {
 
   // Generate schedule from real data
   const schedule = useMemo(() => {
-    if (!currentTrip || tripPlaces.length === 0) return [];
+    if (!currentTrip) return [];
     
-    // Group places by scheduled status and date availability
-    const scheduledPlaces = tripPlaces.filter(place => place.scheduled);
+    // Check if we have optimization results with detailed schedule
+    if (optimizationResult?.detailedSchedule) {
+      const scheduleDays: DaySchedule[] = [];
+      
+      optimizationResult.detailedSchedule.forEach((daySchedule, dayIndex) => {
+        const events: ScheduleEvent[] = [];
+        
+        // Get departure and destination with fallback for different field naming
+        const departureLocation = currentTrip.departureLocation || (currentTrip as any).departure_location;
+        const destination = currentTrip.destination || (currentTrip as any).destination;
+        
+        // Add departure for first day
+        if (dayIndex === 0 && departureLocation) {
+          events.push({
+            id: 'departure',
+            type: 'travel',
+            name: `Departure from ${departureLocation}`,
+            time: 'Trip Start',
+            mode: 'travel',
+            from: departureLocation,
+            to: daySchedule.places.length > 0 ? daySchedule.places[0].name : 'First destination'
+          });
+        }
+        
+        // Add places with actual travel segments
+        daySchedule.places.forEach((place, placeIndex) => {
+          // Add place event
+          events.push({
+            id: place.id,
+            type: 'place',
+            name: place.name,
+            time: place.arrival_time && place.departure_time 
+              ? `${new Date(place.arrival_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - ${new Date(place.departure_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+              : 'Scheduled',
+            duration: place.visit_duration 
+              ? `${Math.floor(place.visit_duration / 60)}h ${place.visit_duration % 60}m`
+              : undefined,
+            category: place.category,
+            rating: place.rating,
+            assignedTo: place.member_preferences?.map(pref => pref.member_id) || [],
+            image: place.photos?.[0]?.url,
+            description: place.description,
+            priority: place.member_preferences?.[0]?.preference_score >= 4 ? 'high' : 
+                     place.member_preferences?.[0]?.preference_score >= 3 ? 'medium' : 'low'
+          });
+          
+          // Add travel segment to next place
+          if (placeIndex < daySchedule.places.length - 1) {
+            const travelSegment = daySchedule.travel_segments?.[placeIndex];
+            const nextPlace = daySchedule.places[placeIndex + 1];
+            
+            if (travelSegment && nextPlace) {
+              events.push({
+                id: `travel-${place.id}-to-${nextPlace.id}`,
+                type: 'travel',
+                name: `Travel to ${nextPlace.name}`,
+                time: 'Transit',
+                duration: `${Math.floor(travelSegment.duration / 60)}h ${travelSegment.duration % 60}m`,
+                mode: travelSegment.mode || 'public_transport',
+                distance: `${Math.round(travelSegment.distance * 100) / 100}km`,
+                from: place.name,
+                to: nextPlace.name
+              });
+            }
+          }
+        });
+        
+        // Add return for last day
+        if (dayIndex === optimizationResult.detailedSchedule.length - 1 && (destination || departureLocation)) {
+          const lastPlace = daySchedule.places[daySchedule.places.length - 1];
+          events.push({
+            id: 'return',
+            type: 'travel',
+            name: `Return to ${destination || departureLocation}`,
+            time: 'Trip End',
+            mode: 'travel',
+            from: lastPlace ? lastPlace.name : 'Last destination',
+            to: destination || departureLocation
+          });
+        }
+        
+        scheduleDays.push({
+          date: new Date(Date.now() + dayIndex * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          day: `Day ${dayIndex + 1}`,
+          dayName: new Date(Date.now() + dayIndex * 24 * 60 * 60 * 1000).toLocaleDateString('en', { weekday: 'long' }),
+          events
+        });
+      });
+      
+      return scheduleDays;
+    }
+    
+    // Fallback: Group places by scheduled status and date availability
+    const scheduledPlaces = tripPlaces.filter(place => place.is_selected_for_optimization);
     const placesWithDates = scheduledPlaces.filter(place => 
       place.visit_date || place.scheduled_date
     );
@@ -86,7 +210,30 @@ export function ListView() {
         date,
         day: `Day ${index + 1}`,
         dayName: new Date(date).toLocaleDateString('en', { weekday: 'long' }),
-        events: places.map(place => ({
+        events: []
+      };
+      
+      // Get departure and destination with fallback for different field naming
+      const departureLocation = currentTrip.departureLocation || (currentTrip as any).departure_location;
+      const destination = currentTrip.destination || (currentTrip as any).destination;
+      
+      // Add departure information to first day
+      if (index === 0 && departureLocation) {
+        daySchedule.events.push({
+          id: 'departure',
+          type: 'travel',
+          name: `Departure from ${departureLocation}`,
+          time: 'Trip Start',
+          mode: 'travel',
+          from: departureLocation,
+          to: places.length > 0 ? places[0].name : 'First destination'
+        });
+      }
+      
+      // Add place events with interspersed travel events
+      places.forEach((place, placeIndex) => {
+        // Add place event
+        daySchedule.events.push({
           id: place.id,
           type: 'place' as const,
           name: place.name,
@@ -102,8 +249,39 @@ export function ListView() {
           image: place.image_url,
           description: place.notes,
           priority: place.wish_level >= 4 ? 'high' : place.wish_level >= 3 ? 'medium' : 'low'
-        }))
-      };
+        });
+
+        // Add travel event to next place (except for last place)
+        if (placeIndex < places.length - 1) {
+          const nextPlace = places[placeIndex + 1];
+          daySchedule.events.push({
+            id: `travel-${place.id}-to-${nextPlace.id}`,
+            type: 'travel',
+            name: `Travel to ${nextPlace.name}`,
+            time: 'Transit',
+            duration: '15m', // Default duration, could be calculated
+            mode: 'public_transport', // Default mode, could be from optimization data
+            distance: '1.2km', // Default distance, could be calculated
+            from: place.name,
+            to: nextPlace.name
+          });
+        }
+      });
+      
+      // Add return information to last day
+      const isLastDay = index === Object.keys(dateGroups).length - 1;
+      if (isLastDay && (destination || departureLocation)) {
+        daySchedule.events.push({
+          id: 'return',
+          type: 'travel',
+          name: `Return to ${destination || departureLocation}`,
+          time: 'Trip End',
+          mode: 'travel',
+          from: places.length > 0 ? places[places.length - 1].name : 'Last destination',
+          to: destination || departureLocation
+        });
+      }
+      
       scheduleDays.push(daySchedule);
     });
     
@@ -148,12 +326,34 @@ export function ListView() {
     }
 
     // If no scheduled places exist, create a default day with all places
-    if (scheduleDays.length === 0 && tripPlaces.length > 0) {
+    if (scheduleDays.length === 0) {
       const defaultDay: DaySchedule = {
         date: new Date().toISOString().split('T')[0],
         day: 'Day 1',
         dayName: 'Trip Day',
-        events: tripPlaces.map(place => ({
+        events: []
+      };
+      
+      // Get departure and destination with fallback for different field naming
+      const departureLocation = currentTrip.departureLocation || (currentTrip as any).departure_location;
+      const destination = currentTrip.destination || (currentTrip as any).destination;
+      
+      // Add departure
+      if (departureLocation) {
+        defaultDay.events.push({
+          id: 'departure',
+          type: 'travel',
+          name: `Departure from ${departureLocation}`,
+          time: 'Trip Start',
+          mode: 'travel',
+          from: departureLocation,
+          to: tripPlaces.length > 0 ? tripPlaces[0].name : 'Destination'
+        });
+      }
+      
+      // Add places
+      if (tripPlaces.length > 0) {
+        defaultDay.events.push(...tripPlaces.map(place => ({
           id: place.id,
           type: 'place' as const,
           name: place.name,
@@ -166,13 +366,27 @@ export function ListView() {
           image: place.image_url,
           description: place.notes,
           priority: place.wish_level >= 4 ? 'high' : place.wish_level >= 3 ? 'medium' : 'low'
-        }))
-      };
+        })));
+      }
+      
+      // Add return
+      if (destination || departureLocation) {
+        defaultDay.events.push({
+          id: 'return',
+          type: 'travel',
+          name: `Return to ${destination || departureLocation}`,
+          time: 'Trip End',
+          mode: 'travel',
+          from: tripPlaces.length > 0 ? tripPlaces[tripPlaces.length - 1].name : 'Last destination',
+          to: destination || departureLocation
+        });
+      }
+      
       scheduleDays.push(defaultDay);
     }
     
     return scheduleDays;
-  }, [tripPlaces, currentTrip]);
+  }, [tripPlaces, currentTrip, optimizationResult]);
 
   const selectedSchedule = schedule.find(s => s.date === selectedDay) || schedule[0];
 
@@ -203,16 +417,15 @@ export function ListView() {
 
   const getModeIcon = (mode: string) => {
     switch (mode) {
-      case 'subway':
-        return '🚇';
+      case 'walking':
       case 'walk':
         return '🚶';
-      case 'taxi':
-        return '🚕';
-      case 'bus':
-        return '🚌';
+      case 'car':
+        return '🚗';
+      case 'flight':
+        return '✈️';
       default:
-        return '🚶';
+        return '🚗'; // デフォルトは車
     }
   };
 
@@ -371,12 +584,24 @@ export function ListView() {
                   >
                     {event.type === 'place' ? (
                       <>
-                        {/* Compact Timeline Node */}
-                        <motion.div 
-                          className="relative z-10 w-3 h-3 bg-gradient-to-br from-primary-400 to-secondary-600 rounded-full shadow-glow border-2 border-white dark:border-slate-900 mt-3"
-                          whileHover={{ scale: 1.2 }}
-                          transition={{ duration: 0.2 }}
-                        />
+                        {/* Compact Timeline Node with Connection Preview */}
+                        <div className="relative">
+                          <motion.div 
+                            className="relative z-10 w-3 h-3 bg-gradient-to-br from-primary-400 to-secondary-600 rounded-full shadow-glow border-2 border-white dark:border-slate-900 mt-3"
+                            whileHover={{ scale: 1.2 }}
+                            transition={{ duration: 0.2 }}
+                          />
+                          
+                          {/* Preview line to next travel event */}
+                          {index < selectedSchedule.events.length - 1 && selectedSchedule.events[index + 1]?.type === 'travel' && (
+                            <div 
+                              className="absolute left-1/2 top-6 w-0.5 h-6 transform -translate-x-1/2 opacity-40"
+                              style={{ 
+                                backgroundColor: transportColors[selectedSchedule.events[index + 1].mode as keyof typeof transportColors] || transportColors.default 
+                              }}
+                            />
+                          )}
+                        </div>
                         
                         {/* Compact Horizontal Place Card */}
                         <motion.div 
@@ -509,27 +734,63 @@ export function ListView() {
                       </>
                     ) : event.type === 'travel' ? (
                       <>
-                        {/* Enhanced Travel Node */}
+                        {/* Enhanced Travel Node with Color */}
                         <motion.div 
-                          className="relative z-10 w-4 h-4 bg-gradient-to-br from-slate-400 to-slate-600 rounded-full border-4 border-white dark:border-slate-900 mt-4 shadow-soft"
+                          className="relative z-10 w-4 h-4 rounded-full border-4 border-white dark:border-slate-900 mt-4 shadow-soft"
+                          style={{ 
+                            background: `linear-gradient(135deg, ${transportColors[event.mode as keyof typeof transportColors] || transportColors.default}, ${transportColors[event.mode as keyof typeof transportColors] || transportColors.default}dd)` 
+                          }}
                           whileHover={{ scale: 1.2 }}
                         />
                         
-                        {/* Enhanced Travel Info */}
-                        <div className="flex-1 py-2">
+                        {/* Enhanced Travel Info with Color Line */}
+                        <div className="flex-1 py-2 relative">
+                          {/* Colored connection line to next event */}
+                          <div 
+                            className="absolute left-2 top-0 w-1 h-full rounded-full opacity-60"
+                            style={{ backgroundColor: transportColors[event.mode as keyof typeof transportColors] || transportColors.default }}
+                          />
+                          
                           <motion.div 
-                            className="flex items-center space-x-4 text-sm bg-gradient-to-r from-slate-100/80 to-slate-200/80 dark:from-slate-800/80 dark:to-slate-700/80 backdrop-blur-sm rounded-3xl px-6 py-4 border border-slate-200/50 dark:border-slate-700/50 shadow-soft hover:shadow-medium transition-all duration-300"
+                            className="ml-6 flex items-center space-x-4 text-sm backdrop-blur-sm rounded-2xl px-4 py-3 border shadow-soft hover:shadow-medium transition-all duration-300 relative overflow-hidden"
+                            style={{
+                              backgroundColor: `${transportColors[event.mode as keyof typeof transportColors] || transportColors.default}15`,
+                              borderColor: `${transportColors[event.mode as keyof typeof transportColors] || transportColors.default}40`
+                            }}
                             whileHover={{ scale: 1.01, y: -1 }}
                           >
-                            <span className="text-3xl">{getModeIcon(event.mode)}</span>
+                            {/* Transport Mode Icon */}
+                            <div className="flex items-center justify-center w-10 h-10 rounded-full text-white font-bold shadow-sm"
+                                 style={{ backgroundColor: transportColors[event.mode as keyof typeof transportColors] || transportColors.default }}>
+                              <span className="text-lg">{getTransportIcon(event.mode || 'default')}</span>
+                            </div>
+                            
+                            {/* Travel Information */}
                             <div className="flex-1">
-                              <div className="font-semibold text-slate-700 dark:text-slate-300">
-                                {event.from} → {event.to}
+                              <div className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                <span>{event.from} → {event.to}</span>
+                                {/* Mode Badge */}
+                                <span 
+                                  className="px-2 py-1 rounded-full text-xs font-semibold text-white"
+                                  style={{ backgroundColor: transportColors[event.mode as keyof typeof transportColors] || transportColors.default }}
+                                >
+                                  {(event.mode || 'travel').replace('_', ' ').toUpperCase()}
+                                </span>
                               </div>
-                              <div className="text-slate-500 dark:text-slate-400 flex items-center space-x-3 mt-1">
-                                <span>{event.duration}</span>
-                                <span>•</span>
-                                <span>{event.distance}</span>
+                              <div className="text-slate-500 dark:text-slate-400 flex items-center space-x-3 mt-1 text-xs">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  <span className="font-medium">{event.duration}</span>
+                                </div>
+                                {event.distance && (
+                                  <>
+                                    <span>•</span>
+                                    <div className="flex items-center gap-1">
+                                      <Navigation className="w-3 h-3" />
+                                      <span>{event.distance}</span>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </motion.div>

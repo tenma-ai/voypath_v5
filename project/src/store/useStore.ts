@@ -49,6 +49,10 @@ export interface Place {
   // Database schema compatibility
   trip_id?: string;
   user_id?: string;
+  // Optimization fields from database
+  is_selected_for_optimization?: boolean;
+  normalized_wish_level?: number;
+  selection_round?: number;
   wish_level?: number;
   stay_duration_minutes?: number;
   google_place_id?: string;
@@ -245,6 +249,118 @@ export const useStore = create<StoreState>()(
             premiumExpiresAt: premiumExpiresAt.toISOString(),
           }
         });
+      },
+
+      // Database Loading Functions
+      loadTripsFromDatabase: async (): Promise<void> => {
+        try {
+          const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/rest/v1/rpc/execute_sql', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08',
+              'Content-Type': 'application/json',
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08'
+            },
+            body: JSON.stringify({
+              query: `
+                SELECT 
+                  id, name, departure_location, description, destination, 
+                  start_date, end_date, owner_id, created_at
+                FROM trips 
+                ORDER BY created_at DESC 
+                LIMIT 20;
+              `
+            })
+          });
+          
+          const tripsData = await response.json();
+          
+          if (tripsData && Array.isArray(tripsData)) {
+            const trips: Trip[] = tripsData.map(trip => ({
+              id: trip.id,
+              name: trip.name || `${trip.departure_location} Trip`,
+              departureLocation: trip.departure_location,
+              description: trip.description,
+              destination: trip.destination,
+              startDate: trip.start_date,
+              endDate: trip.end_date,
+              memberCount: 1,
+              createdAt: trip.created_at,
+              ownerId: trip.owner_id
+            }));
+            
+            set({ trips });
+            
+            // Set the first trip as current if no current trip is set
+            if (!get().currentTrip && trips.length > 0) {
+              set({ currentTrip: trips[0] });
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load trips from database:', error);
+        }
+      },
+
+      loadPlacesFromDatabase: async (tripId?: string): Promise<void> => {
+        try {
+          const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/rest/v1/rpc/execute_sql', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08',
+              'Content-Type': 'application/json',
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08'
+            },
+            body: JSON.stringify({
+              query: `
+                SELECT 
+                  id, name, category, place_type, wish_level, stay_duration_minutes,
+                  latitude, longitude, is_selected_for_optimization, 
+                  normalized_wish_level, selection_round, trip_id, user_id, created_at
+                FROM places 
+                ${tripId ? `WHERE trip_id = '${tripId}'` : ''}
+                ORDER BY created_at;
+              `
+            })
+          });
+          
+          const placesData = await response.json();
+          
+          if (placesData && Array.isArray(placesData)) {
+            const places: Place[] = placesData.map(place => ({
+              id: place.id,
+              name: place.name,
+              category: place.category,
+              address: `${place.name} Location`,
+              latitude: place.latitude || 35.6762,
+              longitude: place.longitude || 139.6503,
+              rating: 4.5,
+              wishLevel: place.wish_level || 5,
+              stayDuration: (place.stay_duration_minutes || 120) / 60,
+              priceLevel: 2,
+              scheduled: place.is_selected_for_optimization || false,
+              scheduledDate: place.is_selected_for_optimization ? '7/1' : undefined,
+              tripId: place.trip_id,
+              trip_id: place.trip_id,
+              userId: place.user_id,
+              user_id: place.user_id,
+              is_selected_for_optimization: place.is_selected_for_optimization,
+              normalized_wish_level: place.normalized_wish_level,
+              selection_round: place.selection_round,
+              wish_level: place.wish_level,
+              stay_duration_minutes: place.stay_duration_minutes
+            }));
+            
+            set({ places });
+          }
+        } catch (error) {
+          console.error('Failed to load places from database:', error);
+        }
+      },
+
+      initializeFromDatabase: async (): Promise<void> => {
+        const { loadTripsFromDatabase, loadPlacesFromDatabase } = get();
+        await loadTripsFromDatabase();
+        await loadPlacesFromDatabase();
       },
 
       // API Integration

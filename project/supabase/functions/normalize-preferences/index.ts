@@ -144,6 +144,9 @@ serve(async (req) => {
     const normalizationResult = await normalizePreferences(supabaseClient, requestData.trip_id);
     const executionTime = Date.now() - startTime;
 
+    // Update database with normalized values
+    await updatePlacesWithNormalizedValues(supabaseClient, normalizationResult);
+
     // Cache the result
     await setCachedNormalization(supabaseClient, requestData.trip_id, normalizationResult);
 
@@ -151,7 +154,8 @@ serve(async (req) => {
     await recordNormalizationEvent(supabaseClient, user.id, requestData.trip_id, {
       execution_time_ms: executionTime,
       total_places: normalizationResult.totalPlaces,
-      users_count: normalizationResult.normalizedUsers.length
+      users_count: normalizationResult.normalizedUsers.length,
+      places_updated: normalizationResult.normalizedUsers.reduce((sum, user) => sum + user.normalizedPlaces.length, 0)
     });
 
     return new Response(
@@ -467,6 +471,59 @@ function generateNormalizationHash(result: NormalizationResult): string {
     .join('|');
   
   return btoa(hashInput).slice(0, 32);
+}
+
+async function updatePlacesWithNormalizedValues(supabase: any, result: NormalizationResult) {
+  try {
+    console.log(`Updating normalized values for ${result.totalPlaces} places`);
+    
+    // Prepare updates for all places
+    const updates: Array<{
+      place_id: string;
+      normalized_wish_level: number;
+      user_avg_wish_level: number;
+      fairness_contribution_score: number;
+    }> = [];
+
+    for (const user of result.normalizedUsers) {
+      for (const place of user.normalizedPlaces) {
+        updates.push({
+          place_id: place.placeId,
+          normalized_wish_level: place.normalizedWishLevel,
+          user_avg_wish_level: user.avgWishLevel,
+          fairness_contribution_score: place.fairnessScore
+        });
+      }
+    }
+
+    // Batch update places in groups of 100 to avoid hitting limits
+    const batchSize = 100;
+    for (let i = 0; i < updates.length; i += batchSize) {
+      const batch = updates.slice(i, i + batchSize);
+      
+      // Use individual updates as upsert with complex conditions is not reliable
+      for (const update of batch) {
+        const { error } = await supabase
+          .from('places')
+          .update({
+            normalized_wish_level: update.normalized_wish_level,
+            user_avg_wish_level: update.user_avg_wish_level,
+            fairness_contribution_score: update.fairness_contribution_score,
+            normalization_updated_at: new Date().toISOString()
+          })
+          .eq('id', update.place_id);
+
+        if (error) {
+          console.error(`Failed to update place ${update.place_id}:`, error);
+        }
+      }
+    }
+
+    console.log(`Successfully updated ${updates.length} places with normalized values`);
+  } catch (error) {
+    console.error('Failed to update places with normalized values:', error);
+    throw new Error(`Database update failed: ${error.message}`);
+  }
 }
 
 async function recordNormalizationEvent(supabase: any, userId: string, tripId: string, metadata: any) {

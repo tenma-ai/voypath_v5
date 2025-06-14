@@ -160,17 +160,27 @@ export interface MealBreakSettings {
 
 // Route constraint interfaces
 export interface RouteConstraints {
-  maxDailyHours: 8;
+  maxDailyHours: number;
   mealBreaks: {
-    breakfast: { start: 8; duration: 45 };
-    lunch: { start: 12; duration: 60 };
-    dinner: { start: 18; duration: 90 };
+    breakfast: { start: number; duration: number };
+    lunch: { start: number; duration: number };
+    dinner: { start: number; duration: number };
   };
   transportModes: {
-    walkingMaxKm: 0.8;
-    carMinKm: 15;
-    flightMinKm: 500;
+    walkingMaxKm: number;
+    carMinKm: number;
+    flightMinKm: number;
   };
+}
+
+// Meal break interface for constrained route generation
+export interface MealBreak {
+  type: 'breakfast' | 'lunch' | 'dinner';
+  startTime: string;
+  endTime: string;
+  duration: number;
+  suggestedLocation?: string;
+  estimatedCost?: number;
 }
 
 export type TransportMode = 'walking' | 'public_transport' | 'car' | 'flight';

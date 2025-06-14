@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transport Mode Decision Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #results {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Transport Mode Decision Logic Test</h1>
+    
+    <div class="test-section info">
+        <h3>Test Overview</h3>
+        <p>Testing transportation mode decision logic with real data:</p>
+        <ul>
+            <li><strong>Tokyo → New York</strong>: ~10,876km (should be flight)</li>
+            <li><strong>Tokyo → PARI Equipment</strong>: ~0km (should be walking)</li>
+            <li><strong>New York → Tokyo</strong>: ~10,876km (should be flight)</li>
+        </ul>
+        <p>Expected behavior: Long distances (>200km) should use flight if airports available</p>
+    </div>
+
+    <div class="test-section">
+        <h3>🛫 Test Optimize Route with Transport Modes</h3>
+        <button onclick="testOptimizeRoute()">Run Optimize Route Test</button>
+        <button onclick="testConstrainedRoute()">Run Constrained Route Test</button>
+        <button onclick="testAirportDetection()">Test Airport Detection</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQzNzU4OTAsImV4cCI6MjA0OTk1MTg5MH0.gEKhlmrz46c8pu-NQSM_zCObJOJPUHwWG_8vMI4j5Nc';
+
+        function addResult(title, content, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-section ${type}`;
+            resultDiv.innerHTML = `
+                <h4>${title}</h4>
+                <pre>${typeof content === 'object' ? JSON.stringify(content, null, 2) : content}</pre>
+            `;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        async function testOptimizeRoute() {
+            try {
+                addResult('🔄 Starting Optimize Route Test...', 'Testing transport mode selection logic', 'info');
+                
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/optimize-route`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({
+                        tripId: 'a1b2c3d4-5e6f-7890-abcd-ef1234567890',
+                        userId: 'test-user-id',
+                        constraints: {
+                            maxDailyHours: 12,
+                            mealBreaks: {
+                                breakfast: { start: 8, duration: 60 },
+                                lunch: { start: 12, duration: 90 },
+                                dinner: { start: 18, duration: 120 }
+                            }
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success && data.route) {
+                    addResult('✅ Optimize Route Success', {
+                        routeLength: data.route.length,
+                        transportModes: data.route.map(place => ({
+                            name: place.name,
+                            transportToNext: place.transportToNext,
+                            travelDistance: place.travelDistance
+                        })),
+                        executionTime: `${data.executionTimeMs}ms`
+                    }, 'success');
+                    
+                    // 交通手段チェック
+                    const flightSegments = data.route.filter(p => p.transportToNext === 'flight');
+                    if (flightSegments.length > 0) {
+                        addResult('🛫 Flight Mode Detected', `Found ${flightSegments.length} flight segments`, 'success');
+                    } else {
+                        addResult('⚠️ No Flight Mode', 'No flight transport detected despite long distances', 'error');
+                    }
+                    
+                } else {
+                    addResult('❌ Optimize Route Failed', data, 'error');
+                }
+
+            } catch (error) {
+                addResult('❌ Test Error', error.message, 'error');
+            }
+        }
+
+        async function testConstrainedRoute() {
+            try {
+                addResult('🔄 Starting Constrained Route Test...', 'Testing constrained route generation with AirportDB', 'info');
+                
+                // First get the places for this trip
+                const placesResponse = await fetch(`${SUPABASE_URL}/rest/v1/places?trip_id=eq.a1b2c3d4-5e6f-7890-abcd-ef1234567890&select=*`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+                
+                const places = await placesResponse.json();
+                
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/constrained-route-generation`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({
+                        tripId: 'a1b2c3d4-5e6f-7890-abcd-ef1234567890',
+                        userId: 'test-user-id',
+                        places: places,
+                        departure: places[0], // Use first place as departure
+                        destination: null,
+                        constraints: {
+                            maxDailyHours: 12,
+                            mealBreaks: {
+                                breakfast: { start: 8, duration: 60 },
+                                lunch: { start: 12, duration: 90 },
+                                dinner: { start: 18, duration: 120 }
+                            },
+                            transportModes: {
+                                walkingMaxKm: 1,
+                                publicTransportMaxKm: 20,
+                                carMinKm: 20,
+                                flightMinKm: 200  // 200km以上で飛行機検討
+                            }
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success && data.result) {
+                    addResult('✅ Constrained Route Success', {
+                        totalDays: data.result.totalDays,
+                        dailyRoutes: data.result.dailyRoutes.map(day => ({
+                            date: day.date,
+                            places: day.places.map(place => ({
+                                name: place.name,
+                                transportToNext: place.transportToNext,
+                                travelDistance: place.travelDistance,
+                                arrivalTime: place.arrivalTime,
+                                departureTime: place.departureTime
+                            }))
+                        })),
+                        executionTime: `${data.executionTimeMs}ms`
+                    }, 'success');
+                    
+                    // 飛行機使用チェック
+                    const allPlaces = data.result.dailyRoutes.flatMap(day => day.places);
+                    const flightSegments = allPlaces.filter(p => p.transportToNext === 'flight');
+                    if (flightSegments.length > 0) {
+                        addResult('🛫 Flight Mode in Constrained Route', `Found ${flightSegments.length} flight segments`, 'success');
+                    } else {
+                        addResult('⚠️ No Flight in Constrained Route', 'Long distances not using flight mode', 'error');
+                    }
+                    
+                } else {
+                    addResult('❌ Constrained Route Failed', data, 'error');
+                }
+
+            } catch (error) {
+                addResult('❌ Constrained Route Test Error', error.message, 'error');
+            }
+        }
+
+        async function testAirportDetection() {
+            try {
+                addResult('🔄 Testing Airport Detection...', 'Testing AirportDB API integration', 'info');
+                
+                const testCoordinates = [
+                    { name: 'Tokyo', latitude: 35.6762, longitude: 139.6503 },
+                    { name: 'New York', latitude: 40.7128, longitude: -74.006 },
+                    { name: 'Rural Area', latitude: 36.0, longitude: 138.0 }
+                ];
+                
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/detect-airports-airportdb`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({
+                        coordinates: testCoordinates
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success && data.results) {
+                    addResult('✅ Airport Detection Success', {
+                        results: data.results.map(result => ({
+                            location: result.location,
+                            hasAirport: result.hasAirport,
+                            airportCount: result.airports ? result.airports.length : 0,
+                            nearestAirport: result.airports && result.airports.length > 0 ? result.airports[0].name : 'None'
+                        }))
+                    }, 'success');
+                } else {
+                    addResult('❌ Airport Detection Failed', data, 'error');
+                }
+
+            } catch (error) {
+                addResult('❌ Airport Detection Test Error', error.message, 'error');
+            }
+        }
+
+        // Run tests on page load
+        window.onload = function() {
+            addResult('🚀 Test Environment Ready', 'Click buttons above to run transport mode tests', 'info');
+        };
+    </script>
+</body>
+</html>

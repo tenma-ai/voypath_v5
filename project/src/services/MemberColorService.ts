@@ -46,8 +46,8 @@ export class MemberColorService {
   ];
 
   private static supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    import.meta.env.VITE_SUPABASE_URL!,
+    import.meta.env.VITE_SUPABASE_ANON_KEY!
   );
 
   /**
@@ -211,6 +211,115 @@ export class MemberColorService {
    */
   static getAllColors(): RefinedColor[] {
     return [...this.COLORS];
+  }
+
+  /**
+   * Get a simple color mapping for frontend use (member_id -> hex color)
+   */
+  static async getSimpleColorMapping(tripId: string): Promise<Record<string, string>> {
+    try {
+      const assignments = await this.getTripMemberColors(tripId);
+      const mapping: Record<string, string> = {};
+      
+      assignments.forEach(assignment => {
+        mapping[assignment.userId] = assignment.color.hex;
+      });
+      
+      return mapping;
+    } catch (error) {
+      console.error('Error getting simple color mapping:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Auto-assign colors to all members who don't have one
+   */
+  static async autoAssignMissingColors(tripId: string): Promise<boolean> {
+    try {
+      const { data: members } = await this.supabase
+        .from('trip_members')
+        .select('user_id, assigned_color_index')
+        .eq('trip_id', tripId);
+
+      if (!members) return false;
+
+      const membersWithoutColors = members.filter(m => !m.assigned_color_index);
+      
+      for (const member of membersWithoutColors) {
+        try {
+          await this.assignColorToMember(tripId, member.user_id);
+        } catch (error) {
+          console.error(`Failed to assign color to member ${member.user_id}:`, error);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error auto-assigning colors:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get color for optimization results (fallback to index-based assignment)
+   */
+  static getColorForOptimization(memberId: string, memberColors: Record<string, string>): string {
+    // First check if we have a specific color assignment
+    if (memberColors[memberId]) {
+      return memberColors[memberId];
+    }
+
+    // Fallback to deterministic color based on member ID
+    const memberIndex = parseInt(memberId.replace(/\D/g, '')) || 1;
+    const colorIndex = ((memberIndex - 1) % 20) + 1;
+    return this.COLORS[colorIndex - 1].hex;
+  }
+
+  /**
+   * Get contrasting text color for a background color
+   */
+  static getContrastColor(hexColor: string): string {
+    // Remove # if present
+    const color = hexColor.replace('#', '');
+    
+    // Convert to RGB
+    const r = parseInt(color.substr(0, 2), 16);
+    const g = parseInt(color.substr(2, 2), 16);
+    const b = parseInt(color.substr(4, 2), 16);
+    
+    // Calculate luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    
+    return luminance > 0.5 ? '#000000' : '#FFFFFF';
+  }
+
+  /**
+   * Get lighter/darker variants of a color for UI elements
+   */
+  static getColorVariants(hexColor: string): {
+    light: string;
+    dark: string;
+    lighter: string;
+    darker: string;
+  } {
+    const color = hexColor.replace('#', '');
+    const r = parseInt(color.substr(0, 2), 16);
+    const g = parseInt(color.substr(2, 2), 16);
+    const b = parseInt(color.substr(4, 2), 16);
+
+    const lighter = (value: number, factor: number) => 
+      Math.min(255, Math.round(value + (255 - value) * factor));
+    
+    const darker = (value: number, factor: number) => 
+      Math.max(0, Math.round(value * (1 - factor)));
+
+    return {
+      light: `#${lighter(r, 0.3).toString(16).padStart(2, '0')}${lighter(g, 0.3).toString(16).padStart(2, '0')}${lighter(b, 0.3).toString(16).padStart(2, '0')}`,
+      dark: `#${darker(r, 0.3).toString(16).padStart(2, '0')}${darker(g, 0.3).toString(16).padStart(2, '0')}${darker(b, 0.3).toString(16).padStart(2, '0')}`,
+      lighter: `#${lighter(r, 0.6).toString(16).padStart(2, '0')}${lighter(g, 0.6).toString(16).padStart(2, '0')}${lighter(b, 0.6).toString(16).padStart(2, '0')}`,
+      darker: `#${darker(r, 0.6).toString(16).padStart(2, '0')}${darker(g, 0.6).toString(16).padStart(2, '0')}${darker(b, 0.6).toString(16).padStart(2, '0')}`
+    };
   }
 
   /**

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Grid3X3, List, Star, Clock, AlertCircle, Plus } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion } from 'framer-motion';
@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 export function MyPlacesPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filter, setFilter] = useState('all');
-  const { places, currentTrip } = useStore();
+  const { places, currentTrip, trips, initializeFromDatabase } = useStore();
 
   // Check if deadline has passed
   const isDeadlinePassed = () => {
@@ -16,78 +16,52 @@ export function MyPlacesPage() {
   };
 
   const formatDeadline = (deadline: string) => {
-    const date = new Date(deadline);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    try {
+      const date = new Date(deadline);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
+
+  // Load data from database on component mount
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        // Initialize data from database
+        await initializeFromDatabase();
+      } catch (error) {
+        console.error('Failed to initialize data from database:', error);
+      }
+    };
+
+    if (trips.length === 0 || places.length === 0) {
+      initializeData();
+    }
+  }, [trips.length, places.length, initializeFromDatabase]);
 
   // Filter places for current trip
   const tripPlaces = places.filter(place => 
     currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false
   );
 
-  // Mock places data if no real places exist for current trip
-  const mockPlaces = tripPlaces.length === 0 ? [
-    {
-      id: '1',
-      name: 'Senso-ji Temple',
-      category: 'Temple',
-      address: '2-3-1 Asakusa, Taito City, Tokyo',
-      rating: 4.5,
-      wishLevel: 5,
-      stayDuration: 2,
-      priceLevel: 1,
-      image: 'https://images.unsplash.com/photo-1478436127897-769e1b3f0f36?w=300&h=200&fit=crop',
-      scheduled: true,
-      scheduledDate: '5/15',
-      notes: 'Beautiful historic temple in Asakusa'
-    },
-    {
-      id: '2',
-      name: 'Tokyo Skytree',
-      category: 'Attraction',
-      address: '1-1-2 Oshiage, Sumida City, Tokyo',
-      rating: 4.8,
-      wishLevel: 4,
-      stayDuration: 3,
-      priceLevel: 3,
-      image: 'https://images.unsplash.com/photo-1533619239233-6280475a633a?w=300&h=200&fit=crop',
-      scheduled: true,
-      scheduledDate: '5/15',
-    },
-    {
-      id: '3',
-      name: 'Meiji Shrine',
-      category: 'Shrine',
-      address: '1-1 Kamizono-cho, Shibuya City, Tokyo',
-      rating: 4.6,
-      wishLevel: 4,
-      stayDuration: 1.5,
-      priceLevel: 1,
-      image: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=300&h=200&fit=crop',
-      scheduled: false,
-    },
-    {
-      id: '4',
-      name: 'Tsukiji Outer Market',
-      category: 'Food',
-      address: '4-16-2 Tsukiji, Chuo City, Tokyo',
-      rating: 4.4,
-      wishLevel: 5,
-      stayDuration: 2,
-      priceLevel: 2,
-      image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&h=200&fit=crop',
-      scheduled: false,
-    }
-  ] : tripPlaces;
+  // Use only real database data
+  const displayPlaces = tripPlaces;
 
-  const filteredPlaces = mockPlaces.filter(place => {
-    if (filter === 'scheduled') return place.scheduled;
-    if (filter === 'unscheduled') return !place.scheduled;
+  const filteredPlaces = displayPlaces.filter(place => {
+    // Use database field is_selected_for_optimization for scheduled status
+    const isScheduled = place.is_selected_for_optimization || false;
+    
+    if (filter === 'scheduled') return isScheduled;
+    if (filter === 'unscheduled') return !isScheduled;
     return true;
   });
 
@@ -177,7 +151,11 @@ export function MyPlacesPage() {
             {currentTrip.name || `${currentTrip.departureLocation} Trip`} - Places
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            {filteredPlaces.length} places • {filteredPlaces.filter(p => p.scheduled).length} scheduled
+            {filteredPlaces.length} places • {filteredPlaces.filter(p => 
+              p.is_selected_for_optimization !== undefined 
+                ? p.is_selected_for_optimization 
+                : p.scheduled
+            ).length} scheduled
           </p>
         </div>
         <div className="flex space-x-2">
@@ -207,9 +185,21 @@ export function MyPlacesPage() {
       {/* Filters */}
       <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
         {[
-          { key: 'all', label: 'All', count: mockPlaces.length },
-          { key: 'scheduled', label: 'Scheduled', count: mockPlaces.filter(p => p.scheduled).length },
-          { key: 'unscheduled', label: 'Unscheduled', count: mockPlaces.filter(p => !p.scheduled).length },
+          { key: 'all', label: 'All', count: displayPlaces.length },
+          { 
+            key: 'scheduled', 
+            label: 'Scheduled', 
+            count: displayPlaces.filter(p => p.is_selected_for_optimization !== undefined 
+              ? p.is_selected_for_optimization 
+              : p.scheduled).length 
+          },
+          { 
+            key: 'unscheduled', 
+            label: 'Unscheduled', 
+            count: displayPlaces.filter(p => p.is_selected_for_optimization !== undefined 
+              ? !p.is_selected_for_optimization 
+              : !p.scheduled).length 
+          },
         ].map(({ key, label, count }) => (
           <button
             key={key}
@@ -243,13 +233,20 @@ export function MyPlacesPage() {
                   className="w-full h-32 object-cover"
                 />
                 <div className="absolute top-2 right-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    place.scheduled
-                      ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/20 dark:text-primary-300'
-                      : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                  }`}>
-                    {place.scheduled ? place.scheduledDate : 'Not scheduled'}
-                  </span>
+                  {(() => {
+                    const isScheduled = place.is_selected_for_optimization !== undefined 
+                      ? place.is_selected_for_optimization 
+                      : place.scheduled;
+                    return (
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        isScheduled
+                          ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/20 dark:text-primary-300'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                      }`}>
+                        {isScheduled ? (place.scheduledDate || 'Scheduled') : 'Not scheduled'}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               

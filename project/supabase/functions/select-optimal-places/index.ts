@@ -164,6 +164,9 @@ serve(async (req) => {
     );
     const executionTime = Date.now() - startTime;
 
+    // Update database with selection results
+    await updatePlacesWithSelectionResults(supabaseClient, selectionResult);
+
     // Cache the result
     await setCachedSelection(supabaseClient, requestData.trip_id, selectionResult);
 
@@ -172,7 +175,8 @@ serve(async (req) => {
       execution_time_ms: executionTime,
       places_selected: selectionResult.selectedPlaces.length,
       places_considered: selectionResult.totalPlacesConsidered,
-      fairness_score: selectionResult.finalFairnessScore
+      fairness_score: selectionResult.finalFairnessScore,
+      places_updated: selectionResult.totalPlacesConsidered
     });
 
     return new Response(
@@ -224,6 +228,31 @@ async function selectOptimalPlaces(
 ): Promise<PlaceSelectionResult> {
   const startTime = Date.now();
 
+  // Get trip details and validate date constraints
+  const { data: tripData, error: tripError } = await supabase
+    .from('trips')
+    .select('start_date, end_date, name')
+    .eq('id', tripId)
+    .single();
+
+  if (tripError) {
+    throw new Error(`Failed to fetch trip details: ${tripError.message}`);
+  }
+
+  // Validate trip dates
+  if (!tripData.start_date || !tripData.end_date) {
+    throw new Error('Trip must have valid start and end dates for place selection');
+  }
+
+  const tripStartDate = new Date(tripData.start_date);
+  const tripEndDate = new Date(tripData.end_date);
+  const tripDurationDays = Math.ceil((tripEndDate.getTime() - tripStartDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Adjust max places based on trip duration (rule of thumb: max 3-4 places per day)
+  const durationBasedMaxPlaces = Math.max(5, Math.min(maxPlaces, tripDurationDays * 3));
+  
+  console.log(`Trip duration: ${tripDurationDays} days, adjusted max places: ${durationBasedMaxPlaces}`);
+
   // Get normalized preferences (call normalization function first)
   const normalizationResult = await getNormalizedPreferences(supabase, tripId);
   
@@ -257,7 +286,7 @@ async function selectOptimalPlaces(
   const selectedPlaces = performIterativeFairSelection(
     enhancedPlaces, 
     normalizationResult.normalizedUsers,
-    maxPlaces, 
+    durationBasedMaxPlaces, 
     fairnessWeight
   );
 
@@ -602,6 +631,49 @@ function generatePlacesHash(places: Place[]): string {
     .join('|');
   
   return btoa(hashInput).slice(0, 32);
+}
+
+async function updatePlacesWithSelectionResults(supabase: any, result: PlaceSelectionResult) {
+  try {
+    console.log(`Updating selection results for ${result.totalPlacesConsidered} places`);
+    
+    // First, reset all places for this trip to unselected
+    const { error: resetError } = await supabase
+      .from('places')
+      .update({
+        is_selected_for_optimization: false,
+        selection_round: null,
+        selection_score: null,
+        selection_updated_at: new Date().toISOString()
+      })
+      .eq('trip_id', result.tripId);
+
+    if (resetError) {
+      console.error('Failed to reset place selections:', resetError);
+    }
+
+    // Update selected places
+    for (const selectedPlace of result.selectedPlaces) {
+      const { error } = await supabase
+        .from('places')
+        .update({
+          is_selected_for_optimization: true,
+          selection_round: selectedPlace.selectionRound,
+          selection_score: selectedPlace.selectionScore,
+          selection_updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedPlace.place.id);
+
+      if (error) {
+        console.error(`Failed to update place ${selectedPlace.place.id}:`, error);
+      }
+    }
+
+    console.log(`Successfully updated ${result.selectedPlaces.length} selected places`);
+  } catch (error) {
+    console.error('Failed to update places with selection results:', error);
+    throw new Error(`Database update failed: ${error.message}`);
+  }
 }
 
 async function recordSelectionEvent(supabase: any, userId: string, tripId: string, metadata: any) {

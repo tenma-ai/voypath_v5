@@ -135,56 +135,43 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       return;
     }
 
-    // For demo purposes, simulate optimization process
+    // Execute real optimization process
     setIsOptimizing(true);
     setShowProgress(true);
     setError(null);
     setProgress({ stage: 'collecting', progress: 0, message: 'Starting optimization...' });
 
     try {
-      // Simulate optimization stages
-      const stages = [
-        { stage: 'collecting', progress: 20, message: 'Collecting trip data...', duration: 1000 },
-        { stage: 'normalizing', progress: 40, message: 'Normalizing preferences...', duration: 1500 },
-        { stage: 'selecting', progress: 60, message: 'Selecting optimal places...', duration: 1200 },
-        { stage: 'routing', progress: 85, message: 'Optimizing route...', duration: 2000 },
-        { stage: 'complete', progress: 100, message: 'Optimization complete!', duration: 500 }
-      ];
-
-      for (const stageData of stages) {
-        await new Promise(resolve => setTimeout(resolve, stageData.duration));
-        setProgress({
-          stage: stageData.stage as any,
-          progress: stageData.progress,
-          message: stageData.message
-        });
-      }
-
-      // Create a mock optimization result
-      const mockResult = {
-        daily_schedules: [
-          {
-            day_number: 1,
-            scheduled_places: tripPlaces.slice(0, Math.min(3, tripPlaces.length)).map((place, index) => ({
-              place,
-              order_in_day: index + 1,
-              arrival_time: new Date(Date.now() + (index * 2 * 60 * 60 * 1000)).toISOString(),
-              departure_time: new Date(Date.now() + ((index * 2 + 1) * 60 * 60 * 1000)).toISOString(),
-              visit_duration: place.stay_duration_minutes || 120,
-              travel_time_from_previous: index > 0 ? 30 : 0,
-              transport_mode: 'transit'
-            }))
-          }
-        ],
-        optimization_score: {
-          fairness: 0.85,
-          efficiency: 0.78
+      // Execute real optimization
+      const result = await TripOptimizationService.optimizeTrip(
+        tripId,
+        {
+          fairness_weight: 0.6,
+          efficiency_weight: 0.4,
+          include_meals: true,
+          preferred_transport: 'car' // Use car/flight/walking only
         },
-        execution_time_ms: 4000,
-        selectedPlaces: tripPlaces.slice(0, Math.min(3, tripPlaces.length))
-      };
+        (progressUpdate) => {
+          setProgress(progressUpdate);
+        }
+      );
 
-      setOptimizationResult(mockResult);
+      if (result.success && result.optimization_result) {
+        setOptimizationResult(result.optimization_result);
+        
+        // Refresh places data to show updated schedule
+        const { data: updatedPlaces } = await supabase
+          .from('places')
+          .select('*')
+          .eq('trip_id', tripId);
+          
+        if (updatedPlaces) {
+          // Update store with refreshed places
+          const { places: allPlaces } = useStore.getState();
+          const otherTripPlaces = allPlaces.filter(p => p.trip_id !== tripId && p.tripId !== tripId);
+          useStore.setState({ places: [...otherTripPlaces, ...updatedPlaces] });
+        }
+      }
 
       setTimeout(() => {
         setIsOptimizing(false);

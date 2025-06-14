@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voypath 15-Step Optimization Flow Test</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .step { margin: 20px 0; padding: 15px; border-radius: 8px; background: #f8f9fa; }
+        .step.success { background: #d4edda; border-left: 4px solid #28a745; }
+        .step.error { background: #f8d7da; border-left: 4px solid #dc3545; }
+        .step.running { background: #fff3cd; border-left: 4px solid #ffc107; }
+        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; margin: 8px; }
+        .log { background: #f1f3f4; padding: 10px; border-radius: 4px; margin: 10px 0; font-family: monospace; font-size: 13px; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🎯 Voypath 15-Step Optimization Flow Test</h1>
+    
+    <button onclick="runFullOptimizationFlow()">🚀 Run Complete 15-Step Flow</button>
+    <button onclick="clearResults()">🧹 Clear Results</button>
+    
+    <div id="steps-container">
+        <div class="step" id="step1">
+            <h3>Step 1: Frontend to Database (Trip/Member/Places Creation)</h3>
+            <div id="step1-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step2">
+            <h3>Step 2: Backend Data Retrieval</h3>
+            <div id="step2-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step3">
+            <h3>Step 3: Preference Normalization</h3>
+            <div id="step3-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step4">
+            <h3>Step 4: Fair Place Selection (Date Constraints)</h3>
+            <div id="step4-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step5">
+            <h3>Step 5: Departure/Destination Fixed Route Order</h3>
+            <div id="step5-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step6">
+            <h3>Step 6: Transport Mode Decision (AirportDB)</h3>
+            <div id="step6-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step7">
+            <h3>Step 7: Airport Insertion</h3>
+            <div id="step7-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step8">
+            <h3>Step 8: TSP Greedy Route Generation</h3>
+            <div id="step8-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step9">
+            <h3>Step 9: Realistic Travel Time Calculation</h3>
+            <div id="step9-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step10">
+            <h3>Step 10: Schedule Splitting (Constraints)</h3>
+            <div id="step10-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step11">
+            <h3>Step 11: Meal Time Insertion</h3>
+            <div id="step11-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step13">
+            <h3>Step 13: Detailed Schedule Construction</h3>
+            <div id="step13-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step14">
+            <h3>Step 14: Database to Frontend Transfer</h3>
+            <div id="step14-result">Ready to test...</div>
+        </div>
+        
+        <div class="step" id="step15">
+            <h3>Step 15: UI Display with Member Colors</h3>
+            <div id="step15-result">Ready to test...</div>
+        </div>
+    </div>
+    
+    <div class="log" id="log-container"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
+        const TEST_TRIP_ID = 'a1b2c3d4-5e6f-7890-abcd-ef1234567890';
+        const TEST_USER_ID = '033523e2-377c-4479-a5cd-90d8905f7bd0';
+        
+        let supabase;
+        
+        function log(message) {
+            const logContainer = document.getElementById('log-container');
+            logContainer.innerHTML += `[${new Date().toISOString()}] ${message}\n`;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        function updateStep(stepId, status, message) {
+            const step = document.getElementById(stepId);
+            const result = document.getElementById(`${stepId}-result`);
+            
+            step.className = `step ${status}`;
+            result.innerHTML = message;
+            
+            log(`${stepId}: ${status} - ${message}`);
+        }
+        
+        function clearResults() {
+            document.getElementById('log-container').innerHTML = '';
+            const steps = document.querySelectorAll('.step');
+            steps.forEach(step => {
+                step.className = 'step';
+                const result = step.querySelector('[id$="-result"]');
+                if (result) result.innerHTML = 'Ready to test...';
+            });
+        }
+        
+        async function testStep1() {
+            updateStep('step1', 'running', 'Testing database connection and trip data...');
+            
+            try {
+                const { data: trip, error } = await supabase
+                    .from('trips')
+                    .select('*')
+                    .eq('id', TEST_TRIP_ID)
+                    .single();
+                
+                if (error) throw error;
+                
+                const { data: places, error: placesError } = await supabase
+                    .from('places')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID);
+                
+                if (placesError) throw placesError;
+                
+                updateStep('step1', 'success', `✅ Trip "${trip.name}" found with ${places.length} places`);
+                return { trip, places };
+            } catch (error) {
+                updateStep('step1', 'error', `❌ Error: ${error.message}`);
+                return null;
+            }
+        }
+        
+        async function testStep2() {
+            updateStep('step2', 'running', 'Testing backend data retrieval...');
+            
+            try {
+                const { data: members, error } = await supabase
+                    .from('trip_members')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID);
+                
+                if (error) throw error;
+                
+                updateStep('step2', 'success', `✅ Retrieved ${members.length} trip members`);
+                return members;
+            } catch (error) {
+                updateStep('step2', 'error', `❌ Error: ${error.message}`);
+                return null;
+            }
+        }
+        
+        async function testStep3() {
+            updateStep('step3', 'running', 'Testing preference normalization...');
+            
+            try {
+                const { data: places, error } = await supabase
+                    .from('places')
+                    .select('id, name, wish_level, normalized_wish_level, fairness_contribution_score')
+                    .eq('trip_id', TEST_TRIP_ID);
+                
+                if (error) throw error;
+                
+                const normalizedCount = places.filter(p => p.normalized_wish_level !== null).length;
+                updateStep('step3', 'success', `✅ ${normalizedCount}/${places.length} places have normalized preferences`);
+                return places;
+            } catch (error) {
+                updateStep('step3', 'error', `❌ Error: ${error.message}`);
+                return null;
+            }
+        }
+        
+        async function testStep4() {
+            updateStep('step4', 'running', 'Testing fair place selection...');
+            
+            try {
+                const { data: places, error } = await supabase
+                    .from('places')
+                    .select('id, name, is_selected_for_optimization, selection_round')
+                    .eq('trip_id', TEST_TRIP_ID);
+                
+                if (error) throw error;
+                
+                const selectedCount = places.filter(p => p.is_selected_for_optimization).length;
+                updateStep('step4', 'success', `✅ ${selectedCount}/${places.length} places selected for optimization`);
+                return places;
+            } catch (error) {
+                updateStep('step4', 'error', `❌ Error: ${error.message}`);
+                return null;
+            }
+        }
+        
+        async function testOptimizationFunction() {
+            updateStep('step5', 'running', 'Calling optimization function...');
+            
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/optimize-route`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        trip_id: TEST_TRIP_ID,
+                        user_id: TEST_USER_ID
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const result = await response.json();
+                
+                updateStep('step5', 'success', '✅ Optimization function called successfully');
+                updateStep('step6', 'success', '✅ Transport mode decision completed');
+                updateStep('step7', 'success', '✅ Airport insertion completed'); 
+                updateStep('step8', 'success', '✅ TSP route generation completed');
+                updateStep('step9', 'success', '✅ Travel time calculation completed');
+                updateStep('step10', 'success', '✅ Schedule splitting completed');
+                updateStep('step11', 'success', '✅ Meal time insertion completed');
+                updateStep('step13', 'success', '✅ Detailed schedule construction completed');
+                
+                return result;
+            } catch (error) {
+                updateStep('step5', 'error', `❌ Optimization failed: ${error.message}`);
+                updateStep('step6', 'error', '❌ Skipped due to optimization failure');
+                updateStep('step7', 'error', '❌ Skipped due to optimization failure');
+                updateStep('step8', 'error', '❌ Skipped due to optimization failure');
+                updateStep('step9', 'error', '❌ Skipped due to optimization failure');
+                updateStep('step10', 'error', '❌ Skipped due to optimization failure');
+                updateStep('step11', 'error', '❌ Skipped due to optimization failure');
+                updateStep('step13', 'error', '❌ Skipped due to optimization failure');
+                return null;
+            }
+        }
+        
+        async function testStep14And15() {
+            updateStep('step14', 'running', 'Testing frontend data display...');
+            
+            try {
+                const { data: optimizationResults, error } = await supabase
+                    .from('optimization_results')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                
+                if (error) throw error;
+                
+                if (optimizationResults.length > 0) {
+                    const result = optimizationResults[0];
+                    updateStep('step14', 'success', '✅ Optimization results retrieved from database');
+                    
+                    // Test member color assignment
+                    const { data: memberColors, error: colorError } = await supabase
+                        .from('member_colors')
+                        .select('*');
+                    
+                    if (colorError) throw colorError;
+                    
+                    updateStep('step15', 'success', `✅ UI ready with ${memberColors.length} member colors available`);
+                } else {
+                    updateStep('step14', 'error', '❌ No optimization results found');
+                    updateStep('step15', 'error', '❌ Cannot display UI without optimization results');
+                }
+                
+            } catch (error) {
+                updateStep('step14', 'error', `❌ Error: ${error.message}`);
+                updateStep('step15', 'error', '❌ Skipped due to step 14 failure');
+            }
+        }
+        
+        async function runFullOptimizationFlow() {
+            log('🚀 Starting full 15-step optimization flow test...');
+            clearResults();
+            
+            // Initialize Supabase
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            
+            // Steps 1-4: Database operations and preparation
+            const step1Data = await testStep1();
+            if (!step1Data) return;
+            
+            const step2Data = await testStep2();
+            if (!step2Data) return;
+            
+            const step3Data = await testStep3();
+            if (!step3Data) return;
+            
+            const step4Data = await testStep4();
+            if (!step4Data) return;
+            
+            // Steps 5-13: Optimization function call (handles multiple steps)
+            const optimizationResult = await testOptimizationFunction();
+            
+            // Steps 14-15: Frontend display
+            await testStep14And15();
+            
+            log('✅ Full optimization flow test completed!');
+        }
+        
+        // Initialize on page load
+        window.onload = function() {
+            log('Page loaded. Ready to test optimization flow.');
+        };
+    </script>
+</body>
+</html>

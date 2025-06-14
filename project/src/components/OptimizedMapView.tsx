@@ -1,12 +1,25 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Route, AlertCircle, Loader } from 'lucide-react';
+import { Route, AlertCircle, Loader, Clock, MapPin, Navigation, Eye, EyeOff, Filter } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { Place, DetailedSchedule } from '../types/optimization';
+import { Place, DetailedSchedule, OptimizedTrip, OptimizedPlace } from '../types/optimization';
 
 interface OptimizedMapViewProps {
   optimizationResult?: DetailedSchedule;
+  optimizedTrip?: OptimizedTrip;
+  memberColors?: Record<string, string>;
+  selectedDay?: number;
+  onPlaceSelect?: (place: OptimizedPlace | Place) => void;
+  onRouteVisualizationChange?: (settings: RouteVisualizationSettings) => void;
   className?: string;
+}
+
+interface RouteVisualizationSettings {
+  showTravelTimes: boolean;
+  showMemberPreferences: boolean;
+  showOnlyScheduledPlaces: boolean;
+  routeMode: 'transit' | 'walking' | 'driving';
+  colorByMember: boolean;
 }
 
 interface MapMarker {
@@ -16,7 +29,15 @@ interface MapMarker {
   order?: number;
 }
 
-export function OptimizedMapView({ optimizationResult, className = '' }: OptimizedMapViewProps) {
+export function OptimizedMapView({ 
+  optimizationResult, 
+  optimizedTrip,
+  memberColors = {},
+  selectedDay = 0,
+  onPlaceSelect,
+  onRouteVisualizationChange,
+  className = '' 
+}: OptimizedMapViewProps) {
   const { places, currentTrip } = useStore();
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -24,6 +45,15 @@ export function OptimizedMapView({ optimizationResult, className = '' }: Optimiz
   const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [routeSettings, setRouteSettings] = useState<RouteVisualizationSettings>({
+    showTravelTimes: true,
+    showMemberPreferences: true,
+    showOnlyScheduledPlaces: false,
+    routeMode: 'transit',
+    colorByMember: false
+  });
+  const [showControls, setShowControls] = useState(false);
+  const [infoWindows, setInfoWindows] = useState<google.maps.InfoWindow[]>([]);
 
   // Get trip places
   const tripPlaces = places.filter(place => 

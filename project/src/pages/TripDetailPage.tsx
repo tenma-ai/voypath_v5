@@ -16,32 +16,52 @@ export function TripDetailPage() {
   const [tripIcon, setTripIcon] = useState<string | null>(null);
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
   const [optimizationProgress, setOptimizationProgress] = useState(0);
-  const { currentTrip, places, isOptimizing, optimizationResult, setOptimizationResult, setIsOptimizing, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces } = useStore();
+  const { currentTrip, places, trips, isOptimizing, optimizationResult, setOptimizationResult, setIsOptimizing, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, initializeFromDatabase } = useStore();
 
-  // Mock trip data if no current trip
-  const trip = currentTrip || {
-    id: '1',
-    departureLocation: 'Tokyo Station',
-    name: 'Tokyo Adventure',
-    description: 'Exploring the vibrant culture and cuisine of Tokyo',
-    destination: 'Tokyo, Japan',
-    startDate: '2024-05-15',
-    endDate: '2024-05-22',
-    memberCount: 4,
-    createdAt: '2024-01-15',
-    ownerId: 'user1',
-    addPlaceDeadline: '2024-05-10T23:59:59Z',
-    icon: tripIcon || undefined,
-  };
+  // Initialize data from database if needed
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        if (trips.length === 0 || places.length === 0) {
+          await initializeFromDatabase();
+        }
+      } catch (error) {
+        console.error('Failed to initialize trip data:', error);
+      }
+    };
+
+    initializeData();
+  }, [trips.length, places.length, initializeFromDatabase]);
+
+  // Use current trip - redirect to home if none selected
+  if (!currentTrip) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+          </div>
+          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+            No Trip Selected
+          </h3>
+          <p className="text-slate-500 dark:text-slate-400 max-w-sm">
+            Please select or create a trip to view details
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const trip = currentTrip;
 
   // Load places and optimization result on component mount
   useEffect(() => {
-    if (trip.id && trip.id !== '1') { // Skip loading for mock trip
-      createSystemPlaces(trip.id); // Creates system places if they don't exist
-      loadPlacesFromAPI(trip.id);
-      loadOptimizationResult(trip.id);
+    if (trip.id) { // Load for all real trips
+      createSystemPlaces?.(trip.id); // Creates system places if they don't exist
+      loadPlacesFromAPI?.(trip.id);
+      loadOptimizationResult?.(trip.id);
     }
-  }, [trip.id, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces]);
+  }, [trip.id, currentTrip, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces]);
 
   // Get places for current trip
   const tripPlaces = places.filter(place => 
@@ -67,38 +87,33 @@ export function TripDetailPage() {
     setOptimizationError(null);
 
     try {
-      // Simulate optimization process with progress updates
-      const progressSteps = [0, 25, 50, 75, 90, 100];
-      for (let i = 0; i < progressSteps.length; i++) {
-        setOptimizationProgress(progressSteps[i]);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
-      // Create mock optimization result
-      const mockResult = {
-        daily_schedules: [
-          {
-            day_number: 1,
-            scheduled_places: tripPlaces.slice(0, Math.min(3, tripPlaces.length)).map((place, index) => ({
-              place,
-              order_in_day: index + 1,
-              arrival_time: new Date(Date.now() + (index * 2 * 60 * 60 * 1000)).toISOString(),
-              departure_time: new Date(Date.now() + ((index * 2 + 1) * 60 * 60 * 1000)).toISOString(),
-              visit_duration: place.stay_duration_minutes || 120,
-              travel_time_from_previous: index > 0 ? 30 : 0,
-              transport_mode: 'transit'
-            }))
-          }
-        ],
-        optimization_score: {
-          fairness: 0.85,
-          efficiency: 0.78
+      // Import TripOptimizationService dynamically
+      const { TripOptimizationService } = await import('../services/TripOptimizationService');
+      
+      // Execute real optimization
+      const result = await TripOptimizationService.optimizeTrip(
+        trip.id,
+        {
+          fairness_weight: 0.6,
+          efficiency_weight: 0.4,
+          include_meals: true,
+          preferred_transport: 'car' // Use car/flight/walking only
         },
-        execution_time_ms: 3000,
-        selectedPlaces: tripPlaces.slice(0, Math.min(3, tripPlaces.length))
-      };
+        (progress) => {
+          setOptimizationProgress(progress.progress);
+        }
+      );
 
-      setOptimizationResult(mockResult);
+      if (result.success && result.optimization_result) {
+        setOptimizationResult(result.optimization_result);
+        
+        // Refresh places data to show updated schedule
+        if (loadPlacesFromAPI) {
+          await loadPlacesFromAPI(trip.id);
+        }
+      } else {
+        throw new Error('Optimization failed to return valid results');
+      }
     } catch (error) {
       console.error('Optimization failed:', error);
       setOptimizationError(error instanceof Error ? error.message : 'Optimization failed');

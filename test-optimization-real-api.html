@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Real Optimization API</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .step { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .loading { background: #fff3cd; border-color: #ffeaa7; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; font-size: 12px; }
+        .result { margin-top: 10px; }
+        .progress { margin: 10px 0; }
+        .progress-bar { width: 100%; height: 20px; background: #e9ecef; border-radius: 10px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #007bff; transition: width 0.3s ease; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Real Optimization API Test</h1>
+        <p>Testing actual optimization pipeline for trip: a1b2c3d4-5e6f-7890-abcd-ef1234567890</p>
+
+        <div id="testSteps">
+            <div class="step" id="step1">
+                <h3>Step 1: Supabase Connection Test</h3>
+                <button onclick="testConnection()">Test Connection</button>
+                <div id="connectionResult" class="result"></div>
+            </div>
+
+            <div class="step" id="step2">
+                <h3>Step 2: Edge Functions Connectivity</h3>
+                <button onclick="testEdgeFunctions()">Test Edge Functions</button>
+                <div id="edgeFunctionsResult" class="result"></div>
+            </div>
+
+            <div class="step" id="step3">
+                <h3>Step 3: Check Current Trip Data</h3>
+                <button onclick="checkTripData()">Check Trip Data</button>
+                <div id="tripDataResult" class="result"></div>
+            </div>
+
+            <div class="step" id="step4">
+                <h3>Step 4: Test Preference Normalization</h3>
+                <button onclick="testNormalization()">Test Normalization</button>
+                <div id="normalizationResult" class="result"></div>
+            </div>
+
+            <div class="step" id="step5">
+                <h3>Step 5: Test Place Selection</h3>
+                <button onclick="testPlaceSelection()">Test Place Selection</button>
+                <div id="placeSelectionResult" class="result"></div>
+            </div>
+
+            <div class="step" id="step6">
+                <h3>Step 6: Test Route Optimization</h3>
+                <button onclick="testRouteOptimization()">Test Route Optimization</button>
+                <div id="routeOptimizationResult" class="result"></div>
+            </div>
+
+            <div class="step" id="step7">
+                <h3>Step 7: Test Full Optimization Pipeline</h3>
+                <button onclick="testFullOptimization()">Run Full Optimization</button>
+                <div class="progress" id="optimizationProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+                    </div>
+                    <div id="progressText">Starting...</div>
+                </div>
+                <div id="fullOptimizationResult" class="result"></div>
+            </div>
+
+            <div class="step" id="step8">
+                <h3>Step 8: Check Optimization Results</h3>
+                <button onclick="checkOptimizationResults()">Check Results in DB</button>
+                <div id="resultsCheckResult" class="result"></div>
+            </div>
+
+            <div class="step" id="step9">
+                <h3>Step 9: Check Places Schedule Status</h3>
+                <button onclick="checkPlacesStatus()">Check Places</button>
+                <div id="placesStatusResult" class="result"></div>
+            </div>
+
+            <div class="step" id="step10">
+                <h3>Step 10: Test Airport Detection</h3>
+                <button onclick="testAirportDetection()">Test Airport Detection</button>
+                <div id="airportDetectionResult" class="result"></div>
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>📝 Summary</h3>
+            <div id="summary"></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTgwNTk0NTgsImV4cCI6MjAzMzYzNTQ1OH0.TojCnqKpN-2EqoEaP8AsmLGjTShQKjNagNEhMPRYKm0';
+        const TEST_TRIP_ID = 'a1b2c3d4-5e6f-7890-abcd-ef1234567890';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        let testResults = {};
+
+        async function testConnection() {
+            updateStep('step1', 'loading');
+            try {
+                const { data, error } = await supabase.from('trips').select('id').limit(1);
+                if (error) throw error;
+                
+                updateStepResult('connectionResult', 'success', 'Connection successful!', { data });
+                updateStep('step1', 'success');
+                testResults.connection = true;
+            } catch (error) {
+                updateStepResult('connectionResult', 'error', 'Connection failed!', { error: error.message });
+                updateStep('step1', 'error');
+                testResults.connection = false;
+            }
+        }
+
+        async function testEdgeFunctions() {
+            updateStep('step2', 'loading');
+            const functions = ['normalize-preferences', 'select-optimal-places', 'optimize-route'];
+            const results = {};
+
+            for (const func of functions) {
+                try {
+                    console.log(`Testing ${func}...`);
+                    const { data, error } = await supabase.functions.invoke(func, {
+                        body: { type: 'keep_alive' }
+                    });
+                    
+                    results[func] = data?.message === 'pong' ? 'OK' : 'ERROR';
+                } catch (error) {
+                    console.error(`Error testing ${func}:`, error);
+                    results[func] = 'FAILED';
+                }
+            }
+
+            const allWorking = Object.values(results).every(r => r === 'OK');
+            updateStepResult('edgeFunctionsResult', allWorking ? 'success' : 'error', 
+                'Edge Functions Test Results', results);
+            updateStep('step2', allWorking ? 'success' : 'error');
+            testResults.edgeFunctions = allWorking;
+        }
+
+        async function checkTripData() {
+            updateStep('step3', 'loading');
+            try {
+                // Check trip
+                const { data: trip, error: tripError } = await supabase
+                    .from('trips')
+                    .select('*')
+                    .eq('id', TEST_TRIP_ID)
+                    .single();
+
+                if (tripError) throw tripError;
+
+                // Check places
+                const { data: places, error: placesError } = await supabase
+                    .from('places')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID);
+
+                if (placesError) throw placesError;
+
+                // Check trip members
+                const { data: members, error: membersError } = await supabase
+                    .from('trip_members')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID);
+
+                if (membersError) throw membersError;
+
+                const result = {
+                    trip: trip,
+                    places: places,
+                    members: members,
+                    placesCount: places.length,
+                    membersCount: members.length
+                };
+
+                updateStepResult('tripDataResult', 'success', 'Trip data retrieved successfully', result);
+                updateStep('step3', 'success');
+                testResults.tripData = true;
+            } catch (error) {
+                updateStepResult('tripDataResult', 'error', 'Failed to retrieve trip data', { error: error.message });
+                updateStep('step3', 'error');
+                testResults.tripData = false;
+            }
+        }
+
+        async function testNormalization() {
+            updateStep('step4', 'loading');
+            try {
+                const { data, error } = await supabase.functions.invoke('normalize-preferences', {
+                    body: {
+                        trip_id: TEST_TRIP_ID,
+                        force_refresh: true
+                    }
+                });
+
+                if (error) throw error;
+
+                updateStepResult('normalizationResult', 'success', 'Normalization completed', data);
+                updateStep('step4', 'success');
+                testResults.normalization = true;
+            } catch (error) {
+                updateStepResult('normalizationResult', 'error', 'Normalization failed', { error: error.message });
+                updateStep('step4', 'error');
+                testResults.normalization = false;
+            }
+        }
+
+        async function testPlaceSelection() {
+            updateStep('step5', 'loading');
+            try {
+                const { data, error } = await supabase.functions.invoke('select-optimal-places', {
+                    body: {
+                        trip_id: TEST_TRIP_ID,
+                        max_places: 20,
+                        fairness_weight: 0.6
+                    }
+                });
+
+                if (error) throw error;
+
+                updateStepResult('placeSelectionResult', 'success', 'Place selection completed', data);
+                updateStep('step5', 'success');
+                testResults.placeSelection = true;
+            } catch (error) {
+                updateStepResult('placeSelectionResult', 'error', 'Place selection failed', { error: error.message });
+                updateStep('step5', 'error');
+                testResults.placeSelection = false;
+            }
+        }
+
+        async function testRouteOptimization() {
+            updateStep('step6', 'loading');
+            try {
+                const { data, error } = await supabase.functions.invoke('optimize-route', {
+                    body: {
+                        trip_id: TEST_TRIP_ID,
+                        settings: {
+                            fairness_weight: 0.6,
+                            efficiency_weight: 0.4,
+                            include_meals: true,
+                            preferred_transport: 'car'
+                        }
+                    }
+                });
+
+                if (error) throw error;
+
+                updateStepResult('routeOptimizationResult', 'success', 'Route optimization completed', data);
+                updateStep('step6', 'success');
+                testResults.routeOptimization = true;
+            } catch (error) {
+                updateStepResult('routeOptimizationResult', 'error', 'Route optimization failed', { error: error.message });
+                updateStep('step6', 'error');
+                testResults.routeOptimization = false;
+            }
+        }
+
+        async function testFullOptimization() {
+            updateStep('step7', 'loading');
+            document.getElementById('optimizationProgress').style.display = 'block';
+            
+            try {
+                // Stage 1: Normalize
+                updateProgress(20, 'Normalizing preferences...');
+                const normResult = await supabase.functions.invoke('normalize-preferences', {
+                    body: { trip_id: TEST_TRIP_ID, force_refresh: true }
+                });
+                if (normResult.error) throw normResult.error;
+
+                // Stage 2: Select places
+                updateProgress(50, 'Selecting optimal places...');
+                const selectResult = await supabase.functions.invoke('select-optimal-places', {
+                    body: { trip_id: TEST_TRIP_ID, max_places: 20, fairness_weight: 0.6 }
+                });
+                if (selectResult.error) throw selectResult.error;
+
+                // Stage 3: Optimize route
+                updateProgress(80, 'Optimizing route...');
+                const routeResult = await supabase.functions.invoke('optimize-route', {
+                    body: {
+                        trip_id: TEST_TRIP_ID,
+                        settings: {
+                            fairness_weight: 0.6,
+                            efficiency_weight: 0.4,
+                            include_meals: true,
+                            preferred_transport: 'car'
+                        }
+                    }
+                });
+                if (routeResult.error) throw routeResult.error;
+
+                updateProgress(100, 'Optimization completed!');
+
+                const fullResult = {
+                    normalization: normResult.data,
+                    placeSelection: selectResult.data,
+                    routeOptimization: routeResult.data
+                };
+
+                updateStepResult('fullOptimizationResult', 'success', 'Full optimization pipeline completed', fullResult);
+                updateStep('step7', 'success');
+                testResults.fullOptimization = true;
+
+                // Hide progress after success
+                setTimeout(() => {
+                    document.getElementById('optimizationProgress').style.display = 'none';
+                }, 2000);
+
+            } catch (error) {
+                updateStepResult('fullOptimizationResult', 'error', 'Full optimization failed', { error: error.message });
+                updateStep('step7', 'error');
+                testResults.fullOptimization = false;
+                document.getElementById('optimizationProgress').style.display = 'none';
+            }
+        }
+
+        async function checkOptimizationResults() {
+            updateStep('step8', 'loading');
+            try {
+                const { data, error } = await supabase
+                    .from('optimization_results')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (error) throw error;
+
+                updateStepResult('resultsCheckResult', 'success', 
+                    `Found ${data.length} optimization result(s)`, data);
+                updateStep('step8', 'success');
+                testResults.optimizationResults = data.length > 0;
+            } catch (error) {
+                updateStepResult('resultsCheckResult', 'error', 'Failed to check optimization results', { error: error.message });
+                updateStep('step8', 'error');
+                testResults.optimizationResults = false;
+            }
+        }
+
+        async function checkPlacesStatus() {
+            updateStep('step9', 'loading');
+            try {
+                const { data, error } = await supabase
+                    .from('places')
+                    .select('id, name, scheduled, scheduled_date, scheduled_time_start, scheduled_time_end, transport_mode')
+                    .eq('trip_id', TEST_TRIP_ID);
+
+                if (error) throw error;
+
+                const scheduledCount = data.filter(p => p.scheduled).length;
+                const unscheduledCount = data.filter(p => !p.scheduled).length;
+
+                const result = {
+                    places: data,
+                    total: data.length,
+                    scheduled: scheduledCount,
+                    unscheduled: unscheduledCount
+                };
+
+                updateStepResult('placesStatusResult', 
+                    scheduledCount > 0 ? 'success' : 'error', 
+                    `Places status: ${scheduledCount} scheduled, ${unscheduledCount} unscheduled`, 
+                    result);
+                updateStep('step9', scheduledCount > 0 ? 'success' : 'error');
+                testResults.placesStatus = scheduledCount > 0;
+            } catch (error) {
+                updateStepResult('placesStatusResult', 'error', 'Failed to check places status', { error: error.message });
+                updateStep('step9', 'error');
+                testResults.placesStatus = false;
+            }
+        }
+
+        async function testAirportDetection() {
+            updateStep('step10', 'loading');
+            try {
+                const testLocations = [
+                    { name: 'Yokohama', lat: 35.4437, lng: 139.6380 },
+                    { name: 'Paris', lat: 48.8566, lng: 2.3522 },
+                    { name: 'Jamaica', lat: 18.1096, lng: -77.2975 }
+                ];
+
+                const results = {};
+                
+                for (const location of testLocations) {
+                    try {
+                        const { data, error } = await supabase.functions.invoke('detect-airports-airportdb', {
+                            body: {
+                                latitude: location.lat,
+                                longitude: location.lng,
+                                radius_km: 100
+                            }
+                        });
+
+                        if (error) throw error;
+                        results[location.name] = data;
+                    } catch (error) {
+                        results[location.name] = { error: error.message };
+                    }
+                }
+
+                updateStepResult('airportDetectionResult', 'success', 'Airport detection test completed', results);
+                updateStep('step10', 'success');
+                testResults.airportDetection = true;
+            } catch (error) {
+                updateStepResult('airportDetectionResult', 'error', 'Airport detection test failed', { error: error.message });
+                updateStep('step10', 'error');
+                testResults.airportDetection = false;
+            }
+        }
+
+        function updateStep(stepId, status) {
+            const step = document.getElementById(stepId);
+            step.className = `step ${status}`;
+        }
+
+        function updateStepResult(elementId, status, message, data) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${status}`;
+            element.innerHTML = `
+                <strong>${message}</strong>
+                ${data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : ''}
+            `;
+        }
+
+        function updateProgress(percentage, message) {
+            document.getElementById('progressFill').style.width = `${percentage}%`;
+            document.getElementById('progressText').textContent = message;
+        }
+
+        // Auto-summarize results
+        setInterval(() => {
+            const summary = document.getElementById('summary');
+            const totalTests = Object.keys(testResults).length;
+            const passedTests = Object.values(testResults).filter(r => r === true).length;
+            
+            if (totalTests > 0) {
+                summary.innerHTML = `
+                    <p><strong>Test Results: ${passedTests}/${totalTests} passed</strong></p>
+                    <ul>
+                        ${Object.entries(testResults).map(([test, result]) => 
+                            `<li>${test}: ${result ? '✅ PASS' : '❌ FAIL'}</li>`
+                        ).join('')}
+                    </ul>
+                `;
+            }
+        }, 1000);
+
+        console.log('🧪 Real Optimization API Test initialized');
+        console.log('📋 Test Trip ID:', TEST_TRIP_ID);
+    </script>
+</body>
+</html>

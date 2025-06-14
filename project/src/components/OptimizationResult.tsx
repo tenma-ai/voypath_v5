@@ -46,11 +46,16 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
 
   const getTransportIcon = (mode: string): string => {
     switch (mode?.toLowerCase()) {
-      case 'driving': return '🚗';
-      case 'walking': return '🚶';
-      case 'transit': return '🚇';
-      case 'bicycling': return '🚲';
-      default: return '🚶';
+      case 'driving':
+      case 'car':
+        return '🚗';
+      case 'walking':
+      case 'walk':
+        return '🚶';
+      case 'flight':
+        return '✈️';
+      default:
+        return '🚗'; // デフォルトは車
     }
   };
 

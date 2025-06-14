@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { MapPin, Navigation, Layers, AlertCircle, Loader } from 'lucide-react';
+import { MapPin, Navigation, Layers, AlertCircle, Loader, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Polyline } from '@react-google-maps/api';
@@ -7,6 +7,7 @@ import { useStore } from '../store/useStore';
 import { Place } from '../types/optimization';
 import { PlaceSearchInput } from './common/PlaceSearchInput';
 import { GooglePlace } from '../services/PlaceSearchService';
+import { MemberColorService } from '../services/MemberColorService';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -29,6 +30,8 @@ export function MapView() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [showRoute, setShowRoute] = useState(true);
+  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
+  const [showMemberColors, setShowMemberColors] = useState(true);
   const mapRef = useRef<google.maps.Map | null>(null);
 
   // Load Google Maps API
@@ -43,7 +46,97 @@ export function MapView() {
     currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false
   );
 
-  // Generate route path for optimization results
+  // Add departure and destination as special places
+  const [departureCoords, setDepartureCoords] = useState<{lat: number, lng: number} | null>(null);
+  const [destinationCoords, setDestinationCoords] = useState<{lat: number, lng: number} | null>(null);
+
+  // Transportation mode colors (車・飛行機・徒歩のみ)
+  const transportColors = {
+    walking: '#10B981',        // Green
+    car: '#6B7280',            // Gray
+    flight: '#EC4899',         // Pink
+    default: '#3B82F6'         // Blue default
+  };
+
+  // Route segments with transport mode information
+  const [routeSegments, setRouteSegments] = useState<Array<{
+    path: {lat: number, lng: number}[];
+    mode: string;
+    color: string;
+    duration?: number;
+    distance?: number;
+  }>>([]);
+
+  // Generate route segments with transport mode information
+  const generateRouteSegments = useCallback(() => {
+    if (!optimizationResult || !showRoute) return [];
+
+    const segments: Array<{
+      path: {lat: number, lng: number}[];
+      mode: string;
+      color: string;
+      duration?: number;
+      distance?: number;
+    }> = [];
+
+    // Check if we have detailed schedule with travel segments
+    if (optimizationResult.detailedSchedule) {
+      optimizationResult.detailedSchedule.forEach(daySchedule => {
+        const places = daySchedule.places;
+        const travelSegments = daySchedule.travel_segments || [];
+
+        for (let i = 0; i < places.length - 1; i++) {
+          const fromPlace = places[i];
+          const toPlace = places[i + 1];
+          const travelSegment = travelSegments[i];
+
+          if (fromPlace.latitude && fromPlace.longitude && 
+              toPlace.latitude && toPlace.longitude) {
+            
+            const mode = travelSegment?.mode || 'walking';
+            const color = transportColors[mode as keyof typeof transportColors] || transportColors.default;
+
+            segments.push({
+              path: [
+                { lat: fromPlace.latitude, lng: fromPlace.longitude },
+                { lat: toPlace.latitude, lng: toPlace.longitude }
+              ],
+              mode,
+              color,
+              duration: travelSegment?.duration,
+              distance: travelSegment?.distance
+            });
+          }
+        }
+      });
+    } else {
+      // Fallback: simple route between scheduled places
+      const scheduledPlaces = optimizationResult.selectedPlaces || tripPlaces.filter(place => place.scheduled);
+      const validPlaces = scheduledPlaces.filter(place => 
+        place.latitude && place.longitude &&
+        place.latitude >= -90 && place.latitude <= 90 &&
+        place.longitude >= -180 && place.longitude <= 180
+      );
+
+      for (let i = 0; i < validPlaces.length - 1; i++) {
+        const fromPlace = validPlaces[i];
+        const toPlace = validPlaces[i + 1];
+
+        segments.push({
+          path: [
+            { lat: fromPlace.latitude, lng: fromPlace.longitude },
+            { lat: toPlace.latitude, lng: toPlace.longitude }
+          ],
+          mode: 'public_transport', // Default mode
+          color: transportColors.public_transport
+        });
+      }
+    }
+
+    return segments;
+  }, [optimizationResult, tripPlaces, showRoute, transportColors]);
+
+  // Generate route path for optimization results (legacy function)
   const getRoutePath = useCallback(() => {
     if (!optimizationResult || !showRoute) return [];
     
@@ -62,6 +155,70 @@ export function MapView() {
     }));
   }, [optimizationResult, tripPlaces, showRoute]);
 
+  // Geocode departure and destination locations
+  useEffect(() => {
+    const geocodeAddress = async (address: string) => {
+      return new Promise<{lat: number, lng: number}>((resolve, reject) => {
+        if (!window.google?.maps) {
+          reject(new Error('Google Maps not loaded'));
+          return;
+        }
+        
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address }, (results, status) => {
+          if (status === 'OK' && results?.[0]) {
+            const location = results[0].geometry.location;
+            resolve({ lat: location.lat(), lng: location.lng() });
+          } else {
+            reject(new Error(`Geocoding failed for ${address}`));
+          }
+        });
+      });
+    };
+
+    if (isLoaded && currentTrip) {
+      // Get departure and destination with fallback for different field naming
+      const departureLocation = currentTrip.departureLocation || (currentTrip as any).departure_location;
+      const destination = currentTrip.destination || (currentTrip as any).destination;
+      
+      // Geocode departure location
+      if (departureLocation) {
+        geocodeAddress(departureLocation)
+          .then(coords => setDepartureCoords(coords))
+          .catch(error => console.error('Failed to geocode departure location:', error));
+      }
+      
+      // Geocode destination location
+      if (destination) {
+        geocodeAddress(destination)
+          .then(coords => setDestinationCoords(coords))
+          .catch(error => console.error('Failed to geocode destination location:', error));
+      }
+    }
+  }, [isLoaded, currentTrip]);
+
+  // Update route segments when optimization result changes
+  useEffect(() => {
+    const segments = generateRouteSegments();
+    setRouteSegments(segments);
+  }, [generateRouteSegments]);
+
+  // Load member colors for current trip
+  useEffect(() => {
+    const loadMemberColors = async () => {
+      if (!currentTrip?.id) return;
+      
+      try {
+        const colors = await MemberColorService.getTripMemberColors(currentTrip.id);
+        setMemberColors(colors);
+      } catch (error) {
+        console.error('Failed to load member colors:', error);
+      }
+    };
+
+    loadMemberColors();
+  }, [currentTrip?.id]);
+
   // Debug logging
   useEffect(() => {
     console.log('MapView Debug Info:');
@@ -71,7 +228,10 @@ export function MapView() {
     console.log('Places with coordinates:', tripPlaces.filter(p => p.latitude && p.longitude));
     console.log('Optimization Result:', optimizationResult);
     console.log('Route Path:', getRoutePath());
-  }, [currentTrip, places, tripPlaces, optimizationResult, getRoutePath]);
+    console.log('Route Segments:', routeSegments);
+    console.log('Departure Coords:', departureCoords);
+    console.log('Destination Coords:', destinationCoords);
+  }, [currentTrip, places, tripPlaces, optimizationResult, getRoutePath, routeSegments, departureCoords, destinationCoords]);
 
   // const handleAddPlace = () => {
   //   navigate('/add-place');
@@ -82,47 +242,136 @@ export function MapView() {
     navigate('/add-place', { state: { selectedPlace: place } });
   };
 
-  // Calculate map center based on places
+  // Calculate map center based on places and departure/destination
   const getMapCenter = useCallback(() => {
-    if (tripPlaces.length === 0) return defaultCenter;
+    const allCoords = [];
     
+    // Add trip places
     const validPlaces = tripPlaces.filter(place => 
       place.latitude && place.longitude && 
       place.latitude >= -90 && place.latitude <= 90 &&
       place.longitude >= -180 && place.longitude <= 180
     );
+    allCoords.push(...validPlaces.map(place => ({ lat: place.latitude, lng: place.longitude })));
     
-    if (validPlaces.length === 0) return defaultCenter;
+    // Add departure coords
+    if (departureCoords) {
+      allCoords.push(departureCoords);
+    }
     
-    const avgLat = validPlaces.reduce((sum, place) => sum + place.latitude, 0) / validPlaces.length;
-    const avgLng = validPlaces.reduce((sum, place) => sum + place.longitude, 0) / validPlaces.length;
+    // Add destination coords
+    if (destinationCoords) {
+      allCoords.push(destinationCoords);
+    }
+    
+    if (allCoords.length === 0) return defaultCenter;
+    
+    const avgLat = allCoords.reduce((sum, coord) => sum + coord.lat, 0) / allCoords.length;
+    const avgLng = allCoords.reduce((sum, coord) => sum + coord.lng, 0) / allCoords.length;
     
     return { lat: avgLat, lng: avgLng };
-  }, [tripPlaces]);
+  }, [tripPlaces, departureCoords, destinationCoords]);
+
+  // Auto-fit map to show entire route centered
+  const fitMapToRoute = useCallback((mapInstance: google.maps.Map) => {
+    if (!mapInstance) return;
+    
+    const bounds = new window.google.maps.LatLngBounds();
+    let hasBounds = false;
+    
+    // Add trip places to bounds
+    tripPlaces.forEach(place => {
+      if (place.latitude && place.longitude && 
+          place.latitude >= -90 && place.latitude <= 90 &&
+          place.longitude >= -180 && place.longitude <= 180) {
+        bounds.extend({ lat: place.latitude, lng: place.longitude });
+        hasBounds = true;
+      }
+    });
+    
+    // Add departure to bounds
+    if (departureCoords) {
+      bounds.extend(departureCoords);
+      hasBounds = true;
+    }
+    
+    // Add destination to bounds
+    if (destinationCoords) {
+      bounds.extend(destinationCoords);
+      hasBounds = true;
+    }
+    
+    if (hasBounds && !bounds.isEmpty()) {
+      try {
+        // Add padding to ensure all points are well visible
+        mapInstance.fitBounds(bounds, {
+          top: 120,    // Space for search bar
+          right: 100,  // Space for controls
+          bottom: 120, // Space for legend
+          left: 100    // General padding
+        });
+      } catch (error) {
+        console.error('Error fitting bounds:', error);
+        // Fallback to simple center and zoom
+        mapInstance.setCenter(getMapCenter());
+        mapInstance.setZoom(12);
+      }
+    }
+  }, [tripPlaces, departureCoords, destinationCoords, getMapCenter]);
+
+  // Create custom marker icon with member color
+  const createColoredMarkerIcon = useCallback((color: string, isSelected: boolean = false) => {
+    if (!window.google?.maps) return undefined;
+
+    const size = isSelected ? 48 : 36;
+    const scale = isSelected ? 1.2 : 1.0;
+    
+    // Create SVG path for custom colored marker
+    const svgMarker = `
+      <svg width="${size}" height="${size}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+              fill="${color}" 
+              stroke="#fff" 
+              stroke-width="2"/>
+        <circle cx="12" cy="9" r="3" fill="#fff"/>
+      </svg>
+    `;
+    
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgMarker)}`,
+      scaledSize: new window.google.maps.Size(size, size),
+      anchor: new window.google.maps.Point(size / 2, size),
+      origin: new window.google.maps.Point(0, 0)
+    };
+  }, []);
+
+  // Get place marker color based on member color or optimization status
+  const getPlaceMarkerColor = useCallback((place: Place) => {
+    if (showMemberColors && place.user_id && memberColors[place.user_id]) {
+      return memberColors[place.user_id];
+    }
+    
+    // Fallback to optimization-based colors
+    if (place.is_selected_for_optimization) {
+      return '#10B981'; // Green for selected
+    }
+    
+    if (place.display_color_hex) {
+      return place.display_color_hex;
+    }
+    
+    return '#6B7280'; // Gray default
+  }, [memberColors, showMemberColors]);
 
   const onLoad = useCallback((map: google.maps.Map) => {
     setMap(map);
     mapRef.current = map;
     
-    // Fit bounds to show all places if any exist
-    if (tripPlaces.length > 0) {
-      const bounds = new window.google.maps.LatLngBounds();
-      tripPlaces.forEach(place => {
-        if (place.latitude && place.longitude) {
-          bounds.extend({ lat: place.latitude, lng: place.longitude });
-        }
-      });
-      
-      if (!bounds.isEmpty()) {
-        map.fitBounds(bounds);
-        // Set a maximum zoom level
-        const listener = window.google.maps.event.addListener(map, 'idle', () => {
-          if (map.getZoom()! > 15) map.setZoom(15);
-          window.google.maps.event.removeListener(listener);
-        });
-      }
-    }
-  }, [tripPlaces]);
+    // Small delay to ensure map is fully loaded before fitting bounds
+    setTimeout(() => {
+      fitMapToRoute(map);
+    }, 100);
+  }, [fitMapToRoute]);
 
   const onUnmount = useCallback(() => {
     setMap(null);
@@ -136,6 +385,18 @@ export function MapView() {
       setMapError(null);
     }
   }, [currentTrip]);
+
+  // Auto-fit map when trip places, departure, or destination change
+  useEffect(() => {
+    if (map && (tripPlaces.length > 0 || departureCoords || destinationCoords)) {
+      // Small delay to ensure coordinates are properly loaded
+      const timeoutId = setTimeout(() => {
+        fitMapToRoute(map);
+      }, 300);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [map, tripPlaces, departureCoords, destinationCoords, fitMapToRoute]);
 
   // Handle map load error
   if (loadError) {
@@ -204,6 +465,13 @@ export function MapView() {
                 streetViewControl: false,
                 mapTypeControl: false,
                 fullscreenControl: false,
+                gestureHandling: 'auto',
+                disableDefaultUI: false,
+                clickableIcons: true,
+                draggable: true,
+                scrollwheel: true,
+                disableDoubleClickZoom: false,
+                keyboardShortcuts: true,
               }}
             />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -245,8 +513,61 @@ export function MapView() {
               streetViewControl: false,
               mapTypeControl: false,
               fullscreenControl: false,
+              gestureHandling: 'auto',
+              disableDefaultUI: false,
+              clickableIcons: true,
+              draggable: true,
+              scrollwheel: true,
+              disableDoubleClickZoom: false,
+              keyboardShortcuts: true,
             }}
           >
+            {/* Departure marker */}
+            {departureCoords && (
+              <Marker
+                position={departureCoords}
+                onClick={() => {/* Could show departure info */}}
+                icon={{
+                  path: google.maps.SymbolPath.CIRCLE,
+                  fillColor: '#22C55E', // Green for departure
+                  fillOpacity: 1,
+                  strokeColor: '#FFFFFF',
+                  strokeWeight: 3,
+                  scale: 12,
+                }}
+                label={{
+                  text: 'D',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '14px',
+                }}
+                title={`Departure: ${currentTrip?.departureLocation || (currentTrip as any)?.departure_location}`}
+              />
+            )}
+            
+            {/* Destination marker */}
+            {destinationCoords && (
+              <Marker
+                position={destinationCoords}
+                onClick={() => {/* Could show destination info */}}
+                icon={{
+                  path: google.maps.SymbolPath.CIRCLE,
+                  fillColor: '#EF4444', // Red for destination
+                  fillOpacity: 1,
+                  strokeColor: '#FFFFFF',
+                  strokeWeight: 3,
+                  scale: 12,
+                }}
+                label={{
+                  text: 'A',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '14px',
+                }}
+                title={`Destination: ${currentTrip?.destination || (currentTrip as any)?.destination}`}
+              />
+            )}
+
             {/* Render markers for each place */}
             {tripPlaces.map((place, index) => (
               place.latitude && place.longitude ? (
@@ -254,14 +575,10 @@ export function MapView() {
                   key={place.id}
                   position={{ lat: place.latitude, lng: place.longitude }}
                   onClick={() => setSelectedPlace(place)}
-                  icon={{
-                    path: google.maps.SymbolPath.CIRCLE,
-                    fillColor: place.scheduled ? '#3B82F6' : '#10B981', // Blue for scheduled, Green for unscheduled
-                    fillOpacity: 0.9,
-                    strokeColor: '#FFFFFF',
-                    strokeWeight: 2,
-                    scale: 8,
-                  }}
+                  icon={createColoredMarkerIcon(
+                    getPlaceMarkerColor(place), 
+                    selectedPlace?.id === place.id
+                  )}
                   label={{
                     text: (index + 1).toString(),
                     color: 'white',
@@ -272,15 +589,41 @@ export function MapView() {
               ) : null
             ))}
 
-            {/* Route Polyline */}
-            {showRoute && getRoutePath().length > 1 && (
+            {/* Route Polylines with Transport Mode Colors */}
+            {showRoute && routeSegments.map((segment, index) => (
+              <Polyline
+                key={`route-segment-${index}`}
+                path={segment.path}
+                options={{
+                  strokeColor: segment.color,
+                  strokeOpacity: 0.8,
+                  strokeWeight: 5,
+                  geodesic: true,
+                  icons: [{
+                    icon: {
+                      path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                      scale: 3,
+                      fillColor: segment.color,
+                      fillOpacity: 1,
+                      strokeWeight: 1,
+                      strokeColor: '#FFFFFF'
+                    },
+                    repeat: '100px'
+                  }]
+                }}
+              />
+            ))}
+
+            {/* Fallback: Simple route for non-optimized trips */}
+            {showRoute && routeSegments.length === 0 && getRoutePath().length > 1 && (
               <Polyline
                 path={getRoutePath()}
                 options={{
-                  strokeColor: '#3B82F6',
-                  strokeOpacity: 0.8,
-                  strokeWeight: 4,
+                  strokeColor: transportColors.default,
+                  strokeOpacity: 0.6,
+                  strokeWeight: 3,
                   geodesic: true,
+                  strokePattern: [10, 5], // Dashed line for fallback
                 }}
               />
             )}
@@ -325,19 +668,11 @@ export function MapView() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => {
-            if (map && tripPlaces.length > 0) {
-              const bounds = new window.google.maps.LatLngBounds();
-              tripPlaces.forEach(place => {
-                if (place.latitude && place.longitude) {
-                  bounds.extend({ lat: place.latitude, lng: place.longitude });
-                }
-              });
-              if (!bounds.isEmpty()) {
-                map.fitBounds(bounds);
-              }
+            if (map) {
+              fitMapToRoute(map);
             }
           }}
-          title="Fit to places"
+          title="Fit route to view"
         >
           <Navigation className="w-5 h-5 text-slate-600 dark:text-slate-400" />
         </motion.button>
@@ -355,7 +690,7 @@ export function MapView() {
         >
           <Layers className="w-5 h-5 text-slate-600 dark:text-slate-400" />
         </motion.button>
-        {optimizationResult && getRoutePath().length > 1 && (
+        {(routeSegments.length > 0 || getRoutePath().length > 1) && (
           <motion.button 
             className={`w-10 h-10 rounded-lg shadow-md flex items-center justify-center hover:shadow-lg transition-all ${
               showRoute 
@@ -365,20 +700,54 @@ export function MapView() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowRoute(!showRoute)}
-            title={showRoute ? 'Hide route' : 'Show route'}
+            title={`${showRoute ? 'Hide' : 'Show'} route with transport modes`}
           >
             <div className="w-5 h-5 flex items-center justify-center">
-              <div className={`w-3 h-1 rounded ${showRoute ? 'bg-white' : 'bg-blue-500'}`} />
+              {routeSegments.length > 0 ? (
+                // Multi-colored lines to indicate transport modes
+                <div className="flex flex-col gap-0.5">
+                  <div className={`w-3 h-0.5 rounded ${showRoute ? 'bg-white' : 'bg-green-500'}`} />
+                  <div className={`w-3 h-0.5 rounded ${showRoute ? 'bg-white' : 'bg-blue-500'}`} />
+                  <div className={`w-3 h-0.5 rounded ${showRoute ? 'bg-white' : 'bg-orange-500'}`} />
+                </div>
+              ) : (
+                <div className={`w-3 h-1 rounded ${showRoute ? 'bg-white' : 'bg-blue-500'}`} />
+              )}
             </div>
+          </motion.button>
+        )}
+        {/* Member Color Toggle */}
+        {Object.keys(memberColors).length > 0 && (
+          <motion.button 
+            className={`w-10 h-10 rounded-lg shadow-md flex items-center justify-center hover:shadow-lg transition-all ${
+              showMemberColors 
+                ? 'bg-purple-500 hover:bg-purple-600 text-white' 
+                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+            }`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowMemberColors(!showMemberColors)}
+            title={`${showMemberColors ? 'Hide' : 'Show'} member colors`}
+          >
+            <Users className="w-5 h-5" />
           </motion.button>
         )}
       </div>
 
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-lg shadow-md p-3 z-20">
+      <div className="absolute bottom-4 left-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-lg shadow-md p-3 z-20 max-h-80 overflow-y-auto">
         <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">Legend</h4>
         <div className="space-y-1 text-xs">
+          {/* Places */}
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-green-500 rounded-full mr-2 text-white text-center font-bold text-xs leading-3">D</div>
+            <span className="text-slate-600 dark:text-slate-400">Departure</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-red-500 rounded-full mr-2 text-white text-center font-bold text-xs leading-3">A</div>
+            <span className="text-slate-600 dark:text-slate-400">Destination</span>
+          </div>
           <div className="flex items-center">
             <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
             <span className="text-slate-600 dark:text-slate-400">Scheduled</span>
@@ -387,10 +756,68 @@ export function MapView() {
             <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
             <span className="text-slate-600 dark:text-slate-400">Unscheduled</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-3 h-1 bg-primary-500 mr-2"></div>
-            <span className="text-slate-600 dark:text-slate-400">Route</span>
-          </div>
+          
+          {/* Transportation Modes */}
+          {routeSegments.length > 0 && (
+            <>
+              <div className="border-t border-slate-200 dark:border-slate-600 my-2"></div>
+              <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Transportation</div>
+              {Object.entries(transportColors).map(([mode, color]) => {
+                const hasSegment = routeSegments.some(segment => segment.mode === mode);
+                if (!hasSegment && mode !== 'default') return null;
+                
+                const modeNames: Record<string, string> = {
+                  walking: '🚶 Walking',
+                  public_transport: '🚌 Public Transport',
+                  subway: '🚇 Subway',
+                  train: '🚆 Train',
+                  bus: '🚌 Bus',
+                  car: '🚗 Car',
+                  taxi: '🚕 Taxi',
+                  bicycle: '🚴 Bicycle',
+                  flight: '✈️ Flight',
+                  ferry: '⛴️ Ferry',
+                  default: '➡️ Default Route'
+                };
+                
+                return (
+                  <div key={mode} className="flex items-center">
+                    <div 
+                      className="w-4 h-1 mr-2 rounded"
+                      style={{ backgroundColor: color }}
+                    ></div>
+                    <span className="text-slate-600 dark:text-slate-400">
+                      {modeNames[mode] || mode}
+                    </span>
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* Member Colors */}
+          {showMemberColors && Object.keys(memberColors).length > 0 && (
+            <>
+              <div className="border-t border-slate-200 dark:border-slate-600 my-2"></div>
+              <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Member Colors</div>
+              {Object.entries(memberColors).map(([userId, color]) => {
+                const memberPlaces = tripPlaces.filter(place => place.user_id === userId);
+                if (memberPlaces.length === 0) return null;
+                
+                return (
+                  <div key={userId} className="flex items-center">
+                    <div 
+                      className="w-3 h-3 rounded-full mr-2"
+                      style={{ backgroundColor: color }}
+                    ></div>
+                    <span className="text-slate-600 dark:text-slate-400">
+                      Member {userId.slice(0, 8)} ({memberPlaces.length} places)
+                    </span>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
         {tripPlaces.length > 0 && (
           <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-600">

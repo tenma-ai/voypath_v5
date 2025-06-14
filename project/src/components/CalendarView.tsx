@@ -19,26 +19,36 @@ interface CalendarEvent {
 
 type EventsByDate = Record<string, CalendarEvent[]>;
 
-// Member color mapping with gradients
-const getMemberColor = (memberName: string): string => {
-  const memberColors: Record<string, string> = {
-    'Alice': 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-    'Bob': 'linear-gradient(135deg, #ef4444, #dc2626)',
-    'Charlie': 'linear-gradient(135deg, #10b981, #059669)',
-    'Diana': 'linear-gradient(135deg, #f59e0b, #d97706)',
-  };
+// Dynamic member color system using user IDs
+const getMemberColor = (userId: string): string => {
+  // Generate colors based on user ID hash for consistency
+  const hash = userId.split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
   
-  return memberColors[memberName] || 'linear-gradient(135deg, #6b7280, #4b5563)';
+  const colors = [
+    'linear-gradient(135deg, #3b82f6, #1d4ed8)', // Blue
+    'linear-gradient(135deg, #ef4444, #dc2626)', // Red
+    'linear-gradient(135deg, #10b981, #059669)', // Green
+    'linear-gradient(135deg, #f59e0b, #d97706)', // Orange
+    'linear-gradient(135deg, #8b5cf6, #7c3aed)', // Purple
+    'linear-gradient(135deg, #06b6d4, #0891b2)', // Cyan
+    'linear-gradient(135deg, #f59e0b, #ea580c)', // Amber
+    'linear-gradient(135deg, #84cc16, #65a30d)', // Lime
+  ];
+  
+  return colors[Math.abs(hash) % colors.length];
 };
 
 // Create gradient for multiple members
-const createMultiMemberGradient = (members: string[]): string => {
-  if (members.length === 1) {
-    return getMemberColor(members[0]);
+const createMultiMemberGradient = (userIds: string[]): string => {
+  if (userIds.length === 1) {
+    return getMemberColor(userIds[0]);
   }
   
-  const colors = members.map(member => {
-    const gradient = getMemberColor(member);
+  const colors = userIds.map(userId => {
+    const gradient = getMemberColor(userId);
     // Extract the first color from the gradient
     const match = gradient.match(/#[a-fA-F0-9]{6}/);
     return match ? match[0] : '#6b7280';
@@ -89,12 +99,68 @@ export function CalendarView() {
 
   // Generate events from real data
   const eventsByDate = useMemo(() => {
-    if (!currentTrip || tripPlaces.length === 0) return {};
+    if (!currentTrip) return {};
+
+    console.log('CalendarView Debug:', {
+      currentTrip,
+      // Check both camelCase and snake_case
+      departureLocation: currentTrip.departureLocation,
+      departure_location: (currentTrip as any).departure_location,
+      destination: currentTrip.destination,
+      destination_snake: (currentTrip as any).destination,
+      startDate: currentTrip.start_date || (currentTrip as any).startDate,
+      endDate: currentTrip.end_date || (currentTrip as any).endDate,
+      tripStart,
+      tripEnd,
+      tripDaysLength: getTripDays().length
+    });
 
     const events: EventsByDate = {};
     
-    // Get trip days for unscheduled places distribution
+    // Get trip days for departure/arrival information
     const tripDays = getTripDays();
+    
+    // Add departure and arrival events to first and last days
+    if (tripDays.length > 0) {
+      const firstDay = formatDate(tripDays[0]);
+      const lastDay = formatDate(tripDays[tripDays.length - 1]);
+      
+      // Get departure and destination with fallback for different field naming
+      const departureLocation = currentTrip.departureLocation || (currentTrip as any).departure_location;
+      const destination = currentTrip.destination || (currentTrip as any).destination;
+      
+      // Add departure event to first day
+      if (departureLocation) {
+        if (!events[firstDay]) events[firstDay] = [];
+        events[firstDay].push({
+          id: 'departure',
+          name: `Departure from ${departureLocation}`,
+          time: 'Start of trip',
+          type: 'trip' as const,
+          priority: 5,
+          assignedTo: [],
+          category: 'travel',
+          isSpanning: false
+        });
+      }
+      
+      // Add arrival event to last day (return to destination or departure location)
+      if (destination || departureLocation) {
+        if (!events[lastDay]) events[lastDay] = [];
+        events[lastDay].push({
+          id: 'arrival',
+          name: `Return to ${destination || departureLocation}`,
+          time: 'End of trip',
+          type: 'trip' as const,
+          priority: 5,
+          assignedTo: [],
+          category: 'travel',
+          isSpanning: false
+        });
+      }
+    }
+    
+    // Get trip days for unscheduled places distribution
     let unscheduledIndex = 0;
     
     tripPlaces.forEach(place => {
@@ -114,7 +180,9 @@ export function CalendarView() {
           name: place.name,
           time: place.scheduled_time_start && place.scheduled_time_end 
             ? `${place.scheduled_time_start} - ${place.scheduled_time_end}`
-            : place.scheduled ? 'Scheduled' : 'Unscheduled',
+            : (place.is_selected_for_optimization !== undefined 
+               ? place.is_selected_for_optimization 
+               : place.scheduled) ? 'Scheduled' : 'Unscheduled',
           duration: place.stay_duration_minutes,
           type: 'place' as const,
           priority: place.wish_level >= 4 ? 4 : place.wish_level >= 3 ? 3 : place.wish_level,
@@ -151,6 +219,7 @@ export function CalendarView() {
       case 'nature':
         return '🏔️';
       case 'trip':
+      case 'travel':
         return '🚌';
       default:
         return '📍';

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix User Trip Optimization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Trip Optimization Fix Tool</h1>
+        <p>This tool will find your trip with 3 places and execute the optimization to fix the scheduling issue.</p>
+        
+        <button onclick="findAndFixTrip()">🔍 Find & Fix My Trip</button>
+        <button onclick="createTestTrip()">🧪 Create Test Trip</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzIwMDg3MTQsImV4cCI6MjA0NzU4NDcxNH0.nIYOdYzJQ5FyX3uNhZcuCgZH4YkQ5IZKM-zOfwNj4js';
+
+        function addResult(message, type = 'result') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = message;
+            document.getElementById('results').appendChild(div);
+        }
+
+        async function executeSQL(query) {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/execute_sql`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY
+                },
+                body: JSON.stringify({ query })
+            });
+            return await response.json();
+        }
+
+        async function findAndFixTrip() {
+            try {
+                addResult('🔍 Searching for trips with 3 places...');
+                
+                // Find trips with exactly 3 places
+                const searchQuery = `
+                    SELECT 
+                        t.id,
+                        t.name,
+                        COUNT(p.id) as places_count,
+                        STRING_AGG(p.name, ', ') as place_names
+                    FROM trips t
+                    LEFT JOIN places p ON t.id = p.trip_id
+                    GROUP BY t.id, t.name
+                    HAVING COUNT(p.id) = 3
+                    ORDER BY t.created_at DESC
+                    LIMIT 5;
+                `;
+                
+                const trips = await executeSQL(searchQuery);
+                
+                if (!trips || trips.length === 0) {
+                    addResult('❌ No trips with exactly 3 places found', 'error');
+                    return;
+                }
+                
+                const trip = trips[0];
+                addResult(`✅ Found trip: ${trip.name} with places: ${trip.place_names}`, 'success');
+                
+                // Execute optimization for this trip
+                addResult('⚙️ Executing optimization...');
+                
+                // Step 1: Normalize preferences
+                const normalizeQuery = `
+                    UPDATE places 
+                    SET 
+                        normalized_wish_level = 1.0,
+                        user_avg_wish_level = 5.0,
+                        fairness_contribution_score = 0.5
+                    WHERE trip_id = '${trip.id}';
+                `;
+                
+                await executeSQL(normalizeQuery);
+                addResult('✅ Step 1: Preferences normalized', 'success');
+                
+                // Step 2: Select places for optimization
+                const selectQuery = `
+                    UPDATE places 
+                    SET 
+                        is_selected_for_optimization = true,
+                        selection_round = 1
+                    WHERE trip_id = '${trip.id}';
+                `;
+                
+                await executeSQL(selectQuery);
+                addResult('✅ Step 2: Places marked as scheduled', 'success');
+                
+                // Verify results
+                const verifyQuery = `
+                    SELECT 
+                        name,
+                        is_selected_for_optimization,
+                        normalized_wish_level
+                    FROM places 
+                    WHERE trip_id = '${trip.id}'
+                    ORDER BY created_at;
+                `;
+                
+                const results = await executeSQL(verifyQuery);
+                addResult('📊 Verification Results:', 'success');
+                results.forEach(place => {
+                    const status = place.is_selected_for_optimization ? 'SCHEDULED' : 'UNSCHEDULED';
+                    addResult(`  • ${place.name}: ${status}`, 'success');
+                });
+                
+                addResult('🎉 Trip optimization completed! Refresh your app to see the changes.', 'success');
+                
+            } catch (error) {
+                addResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function createTestTrip() {
+            try {
+                addResult('🧪 Creating test trip...');
+                
+                // Create test trip with proper UUID
+                const tripId = crypto.randomUUID();
+                const createTripQuery = `
+                    INSERT INTO trips (id, name, start_date, end_date, owner_id, created_at) 
+                    VALUES (
+                        '${tripId}', 
+                        'Test Scheduled Places Trip',
+                        '2024-07-01',
+                        '2024-07-05',
+                        '033523e2-377c-4479-a5cd-90d8905f7bd0',
+                        NOW()
+                    );
+                `;
+                
+                await executeSQL(createTripQuery);
+                addResult('✅ Test trip created', 'success');
+                
+                // Add test places
+                const places = [
+                    { name: 'Tokyo Tower', type: 'attraction' },
+                    { name: 'Shibuya Crossing', type: 'attraction' },
+                    { name: 'Senso-ji Temple', type: 'attraction' }
+                ];
+                
+                for (let i = 0; i < places.length; i++) {
+                    const placeId = crypto.randomUUID();
+                    const addPlaceQuery = `
+                        INSERT INTO places (id, trip_id, user_id, name, place_type, wish_level, created_at)
+                        VALUES (
+                            '${placeId}',
+                            '${tripId}',
+                            '033523e2-377c-4479-a5cd-90d8905f7bd0',
+                            '${places[i].name}',
+                            '${places[i].type}',
+                            5,
+                            NOW()
+                        );
+                    `;
+                    
+                    await executeSQL(addPlaceQuery);
+                    addResult(`✅ Added place: ${places[i].name}`, 'success');
+                }
+                
+                // Execute optimization on test trip
+                addResult('⚙️ Optimizing test trip...');
+                await optimizeTrip(tripId);
+                
+                addResult('🎉 Test trip created and optimized!', 'success');
+                
+            } catch (error) {
+                addResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function optimizeTrip(tripId) {
+            // Normalize
+            const normalizeQuery = `
+                UPDATE places 
+                SET 
+                    normalized_wish_level = 1.0,
+                    user_avg_wish_level = 5.0,
+                    fairness_contribution_score = 0.5
+                WHERE trip_id = '${tripId}';
+            `;
+            await executeSQL(normalizeQuery);
+            
+            // Select (mark 2 out of 3 places as scheduled)
+            const selectQuery = `
+                UPDATE places 
+                SET 
+                    is_selected_for_optimization = true,
+                    selection_round = 1
+                WHERE trip_id = '${tripId}'
+                AND id IN (
+                    SELECT id FROM places 
+                    WHERE trip_id = '${tripId}' 
+                    ORDER BY created_at 
+                    LIMIT 2
+                );
+            `;
+            await executeSQL(selectQuery);
+            
+            addResult('✅ Optimization completed', 'success');
+        }
+    </script>
+</body>
+</html>

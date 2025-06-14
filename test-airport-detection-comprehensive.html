@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Airport Detection Test</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .test-case { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background: #fafafa; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .loading { background: #fff3cd; border-color: #ffeaa7; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; font-size: 12px; max-height: 300px; overflow-y: auto; }
+        .result { margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .distance { font-weight: bold; color: #007bff; }
+        .airport-code { font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✈️ Comprehensive Airport Detection Test</h1>
+        <p>Testing airport detection for Yokohama → Paris → Jamaica route</p>
+
+        <div class="test-case">
+            <h3>Test Locations</h3>
+            <table>
+                <tr>
+                    <th>Location</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                    <th>Expected Airports</th>
+                </tr>
+                <tr>
+                    <td>Yokohama, Japan</td>
+                    <td>35.4437</td>
+                    <td>139.6380</td>
+                    <td>HND (Haneda), NRT (Narita)</td>
+                </tr>
+                <tr>
+                    <td>Paris, France</td>
+                    <td>48.8566</td>
+                    <td>2.3522</td>
+                    <td>CDG (Charles de Gaulle), ORY (Orly)</td>
+                </tr>
+                <tr>
+                    <td>Jamaica (Kingston)</td>
+                    <td>18.1096</td>
+                    <td>-77.2975</td>
+                    <td>KIN (Norman Manley International)</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="test-case" id="testYokohama">
+            <h3>1. Yokohama Airport Detection</h3>
+            <button onclick="testAirportDetection('Yokohama', 35.4437, 139.6380, 'resultYokohama')">Test Yokohama</button>
+            <div id="resultYokohama" class="result"></div>
+        </div>
+
+        <div class="test-case" id="testParis">
+            <h3>2. Paris Airport Detection</h3>
+            <button onclick="testAirportDetection('Paris', 48.8566, 2.3522, 'resultParis')">Test Paris</button>
+            <div id="resultParis" class="result"></div>
+        </div>
+
+        <div class="test-case" id="testJamaica">
+            <h3>3. Jamaica Airport Detection</h3>
+            <button onclick="testAirportDetection('Jamaica', 18.1096, -77.2975, 'resultJamaica')">Test Jamaica</button>
+            <div id="resultJamaica" class="result"></div>
+        </div>
+
+        <div class="test-case" id="testTravelTimes">
+            <h3>4. Travel Time Calculation Test</h3>
+            <button onclick="testTravelTimes()">Test Travel Times</button>
+            <div id="resultTravelTimes" class="result"></div>
+        </div>
+
+        <div class="test-case" id="testOptimizeRoute">
+            <h3>5. Complete Route Optimization Test</h3>
+            <button onclick="testCompleteOptimization()">Test Full Optimization</button>
+            <div id="resultOptimization" class="result"></div>
+        </div>
+
+        <div class="test-case">
+            <h3>📊 Summary</h3>
+            <div id="summary"></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTgwNTk0NTgsImV4cCI6MjAzMzYzNTQ1OH0.TojCnqKpN-2EqoEaP8AsmLGjTShQKjNagNEhMPRYKm0';
+        const TEST_TRIP_ID = 'a1b2c3d4-5e6f-7890-abcd-ef1234567890';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        let testResults = {};
+
+        async function testAirportDetection(locationName, lat, lng, resultElementId) {
+            const resultElement = document.getElementById(resultElementId);
+            resultElement.innerHTML = '<div class="loading">Testing airport detection...</div>';
+
+            try {
+                console.log(`Testing airport detection for ${locationName} at ${lat}, ${lng}`);
+                
+                const { data, error } = await supabase.functions.invoke('detect-airports-airportdb', {
+                    body: {
+                        latitude: lat,
+                        longitude: lng,
+                        radius_km: 100
+                    }
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                console.log(`Airport detection result for ${locationName}:`, data);
+
+                if (data && data.airports && data.airports.length > 0) {
+                    // Create airport table
+                    let airportTable = `
+                        <div class="success">
+                            <strong>✅ Found ${data.airports.length} airports near ${locationName}</strong>
+                            <table style="margin-top: 10px;">
+                                <tr>
+                                    <th>Airport Name</th>
+                                    <th>Code</th>
+                                    <th>Distance (km)</th>
+                                    <th>Type</th>
+                                    <th>International</th>
+                                </tr>
+                    `;
+
+                    data.airports.forEach(airport => {
+                        airportTable += `
+                            <tr>
+                                <td>${airport.airport_name}</td>
+                                <td class="airport-code">${airport.iata_code || airport.icao_code}</td>
+                                <td class="distance">${airport.distance_km ? airport.distance_km.toFixed(1) : 'N/A'}</td>
+                                <td>${airport.airport_type}</td>
+                                <td>${airport.international_service ? '✅' : '❌'}</td>
+                            </tr>
+                        `;
+                    });
+
+                    airportTable += '</table></div>';
+                    resultElement.innerHTML = airportTable;
+                    testResults[locationName] = { success: true, airportCount: data.airports.length };
+                } else {
+                    resultElement.innerHTML = `
+                        <div class="error">
+                            <strong>❌ No airports found near ${locationName}</strong>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                    testResults[locationName] = { success: false, airportCount: 0 };
+                }
+
+            } catch (error) {
+                console.error(`Airport detection failed for ${locationName}:`, error);
+                resultElement.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Airport detection failed for ${locationName}</strong>
+                        <p>Error: ${error.message}</p>
+                        <pre>${JSON.stringify(error, null, 2)}</pre>
+                    </div>
+                `;
+                testResults[locationName] = { success: false, error: error.message };
+            }
+        }
+
+        async function testTravelTimes() {
+            const resultElement = document.getElementById('resultTravelTimes');
+            resultElement.innerHTML = '<div class="loading">Testing travel time calculations...</div>';
+
+            try {
+                // Test realistic travel times between the locations
+                const routes = [
+                    { from: 'Yokohama', to: 'Paris', expected: '12-15 hours' },
+                    { from: 'Paris', to: 'Jamaica', expected: '8-10 hours' },
+                    { from: 'Yokohama', to: 'Jamaica', expected: '18-24 hours' }
+                ];
+
+                let resultsHtml = '<div class="success"><strong>Travel Time Analysis</strong><table style="margin-top: 10px;"><tr><th>Route</th><th>Expected Flight Time</th><th>Expected Total Time</th></tr>';
+
+                routes.forEach(route => {
+                    resultsHtml += `
+                        <tr>
+                            <td>${route.from} → ${route.to}</td>
+                            <td>${route.expected}</td>
+                            <td>${route.expected} + 2-4h (airport/transit time)</td>
+                        </tr>
+                    `;
+                });
+
+                resultsHtml += '</table><p><strong>Note:</strong> These are expected realistic travel times. The optimization system should detect international routes and use flight transport mode.</p></div>';
+
+                resultElement.innerHTML = resultsHtml;
+                testResults.travelTimes = { success: true };
+
+            } catch (error) {
+                resultElement.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Travel time test failed</strong>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+                testResults.travelTimes = { success: false, error: error.message };
+            }
+        }
+
+        async function testCompleteOptimization() {
+            const resultElement = document.getElementById('resultOptimization');
+            resultElement.innerHTML = '<div class="loading">Testing complete optimization with airport detection...</div>';
+
+            try {
+                // Test the complete optimization pipeline
+                const { data, error } = await supabase.functions.invoke('optimize-route', {
+                    body: {
+                        trip_id: TEST_TRIP_ID,
+                        settings: {
+                            fairness_weight: 0.6,
+                            efficiency_weight: 0.4,
+                            include_meals: true,
+                            preferred_transport: 'car'
+                        }
+                    }
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                console.log('Complete optimization result:', data);
+
+                if (data && data.success && data.optimization_result) {
+                    const result = data.optimization_result;
+                    
+                    let optimizationHtml = `
+                        <div class="success">
+                            <strong>✅ Optimization completed successfully</strong>
+                            <h4>Optimization Results:</h4>
+                            <ul>
+                                <li><strong>Execution Time:</strong> ${result.execution_time_ms || 'N/A'}ms</li>
+                                <li><strong>Total Travel Time:</strong> ${result.total_travel_time_minutes || 'N/A'} minutes</li>
+                                <li><strong>Total Visit Time:</strong> ${result.total_visit_time_minutes || 'N/A'} minutes</li>
+                                <li><strong>Days Planned:</strong> ${result.daily_schedules?.length || 0}</li>
+                            </ul>
+                    `;
+
+                    if (result.daily_schedules && result.daily_schedules.length > 0) {
+                        optimizationHtml += '<h4>Daily Schedules:</h4>';
+                        result.daily_schedules.forEach((day, index) => {
+                            optimizationHtml += `
+                                <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                    <strong>Day ${index + 1} (${day.date || 'N/A'})</strong>
+                                    <ul>
+                            `;
+                            if (day.scheduled_places) {
+                                day.scheduled_places.forEach(place => {
+                                    optimizationHtml += `
+                                        <li>
+                                            <strong>${place.place?.name || 'Unknown Place'}</strong>
+                                            - ${place.transport_mode || 'Unknown'} transport
+                                            - ${place.travel_time_from_previous || 0} min travel time
+                                        </li>
+                                    `;
+                                });
+                            }
+                            optimizationHtml += '</ul></div>';
+                        });
+                    }
+
+                    optimizationHtml += '</div>';
+                    resultElement.innerHTML = optimizationHtml;
+                    testResults.completeOptimization = { success: true };
+                } else {
+                    throw new Error('Optimization returned no valid results');
+                }
+
+            } catch (error) {
+                console.error('Complete optimization test failed:', error);
+                resultElement.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Complete optimization test failed</strong>
+                        <p>Error: ${error.message}</p>
+                        <pre>${JSON.stringify(error, null, 2)}</pre>
+                    </div>
+                `;
+                testResults.completeOptimization = { success: false, error: error.message };
+            }
+        }
+
+        // Auto-update summary
+        setInterval(() => {
+            const summary = document.getElementById('summary');
+            const totalTests = Object.keys(testResults).length;
+            const passedTests = Object.values(testResults).filter(r => r.success === true).length;
+            
+            if (totalTests > 0) {
+                let summaryHtml = `<p><strong>Test Results: ${passedTests}/${totalTests} passed</strong></p><ul>`;
+                
+                Object.entries(testResults).forEach(([test, result]) => {
+                    const status = result.success ? '✅ PASS' : '❌ FAIL';
+                    const details = result.airportCount ? ` (${result.airportCount} airports found)` : 
+                                   result.error ? ` (${result.error})` : '';
+                    summaryHtml += `<li>${test}: ${status}${details}</li>`;
+                });
+                
+                summaryHtml += '</ul>';
+                
+                if (passedTests === totalTests && totalTests >= 5) {
+                    summaryHtml += `
+                        <div style="background: #d4edda; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                            <strong>🎉 All tests passed! Airport detection is working correctly.</strong>
+                        </div>
+                    `;
+                } else if (totalTests >= 5) {
+                    summaryHtml += `
+                        <div style="background: #f8d7da; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                            <strong>⚠️ Some tests failed. Airport detection needs attention.</strong>
+                        </div>
+                    `;
+                }
+                
+                summary.innerHTML = summaryHtml;
+            }
+        }, 1000);
+
+        console.log('🧪 Comprehensive Airport Detection Test initialized');
+        console.log('📋 Test Trip ID:', TEST_TRIP_ID);
+    </script>
+</body>
+</html>

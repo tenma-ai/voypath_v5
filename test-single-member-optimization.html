@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Single Member Trip Optimization Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f5f5f5;
+        }
+        .container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; text-align: center; }
+        .test-button { 
+            background: #4f46e5; 
+            color: white; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            margin: 10px; 
+            font-size: 16px;
+        }
+        .test-button:hover { background: #4338ca; }
+        .result { 
+            margin: 10px 0; 
+            padding: 15px; 
+            border-radius: 6px; 
+            font-family: monospace; 
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        .success { background: #d1fae5; border: 1px solid #10b981; color: #065f46; }
+        .error { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+        .info { background: #dbeafe; border: 1px solid #3b82f6; color: #1e40af; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Single Member Trip Optimization Test</h1>
+        <p>Testing optimization workflow for a single-member trip with 2 places.</p>
+        
+        <div>
+            <button class="test-button" onclick="testNormalization()">1. Test Normalization</button>
+            <button class="test-button" onclick="testPlaceSelection()">2. Test Place Selection</button>
+            <button class="test-button" onclick="testRouteOptimization()">3. Test Route Optimization</button>
+            <button class="test-button" onclick="checkResults()">4. Check Results</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM3NjA5NjgsImV4cCI6MjA0OTMzNjk2OH0.wgVJaqjWQMcIH-JkL1awNV7F8m2VfNWP9wL06_j-RVM';
+        const TEST_TRIP_ID = '737a36f2-66b0-4dfa-a764-3d6e305faf11'; // Single member trip with 2 places
+        
+        function log(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        async function testNormalization() {
+            log('🔄 Testing wish level normalization for single member...', 'info');
+            
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/normalize-preferences`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({
+                        trip_id: TEST_TRIP_ID,
+                        force_refresh: true
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        log('✅ Normalization successful!', 'success');
+                        log(`📊 Processed ${result.result.totalPlaces} places for ${result.result.normalizedUsers.length} users`, 'success');
+                        log(`⚖️ Group fairness score: ${(result.result.groupFairnessScore * 100).toFixed(1)}%`, 'success');
+                        
+                        // Log detailed results
+                        result.result.normalizedUsers.forEach(user => {
+                            log(`👤 User ${user.userId.slice(0, 8)}: ${user.totalPlaces} places, avg wish ${user.avgWishLevel.toFixed(2)}`, 'info');
+                            user.normalizedPlaces.forEach(place => {
+                                log(`  📍 ${place.placeName}: ${place.originalWishLevel} → ${place.normalizedWishLevel.toFixed(2)}`, 'info');
+                            });
+                        });
+                    } else {
+                        log(`❌ Normalization failed: ${result.error}`, 'error');
+                    }
+                } else {
+                    log(`❌ HTTP Error: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPlaceSelection() {
+            log('🔄 Testing place selection for single member...', 'info');
+            
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/select-optimal-places`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({
+                        trip_id: TEST_TRIP_ID,
+                        max_places: 10,
+                        fairness_weight: 0.6
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        log('✅ Place selection successful!', 'success');
+                        log(`🎯 Selected ${result.result.selectedPlaces.length} places from ${result.result.totalPlacesConsidered} candidates`, 'success');
+                        log(`⚖️ Final fairness score: ${(result.result.finalFairnessScore * 100).toFixed(1)}%`, 'success');
+                        
+                        result.result.selectedPlaces.forEach((selected, index) => {
+                            log(`${index + 1}. ${selected.place.name} (Round ${selected.selectionRound}, Score: ${selected.selectionScore.toFixed(3)})`, 'info');
+                        });
+                    } else {
+                        log(`❌ Place selection failed: ${result.error}`, 'error');
+                    }
+                } else {
+                    log(`❌ HTTP Error: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testRouteOptimization() {
+            log('🔄 Testing route optimization for single member...', 'info');
+            
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/constrained-route-generation`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({
+                        trip_id: TEST_TRIP_ID,
+                        departure_location: "Tokyo Station",
+                        destination_location: "Tokyo Station"
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        log('✅ Route optimization successful!', 'success');
+                        log(`🗺️ Generated route with ${result.result.routeSegments?.length || 0} segments`, 'success');
+                        if (result.result.totalTravelTime) {
+                            log(`⏱️ Total travel time: ${Math.round(result.result.totalTravelTime / 60)} hours`, 'success');
+                        }
+                        if (result.result.detailedSchedule) {
+                            log(`📅 Generated ${result.result.detailedSchedule.length} day(s) of schedule`, 'success');
+                        }
+                    } else {
+                        log(`❌ Route optimization failed: ${result.error}`, 'error');
+                    }
+                } else {
+                    log(`❌ HTTP Error: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkResults() {
+            log('🔄 Checking database results...', 'info');
+            
+            try {
+                // Check places status
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/execute_sql`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({
+                        query: `
+                            SELECT 
+                                p.name,
+                                p.wish_level,
+                                p.normalized_wish_level,
+                                p.is_selected_for_optimization,
+                                p.selection_round
+                            FROM places p
+                            WHERE p.trip_id = '${TEST_TRIP_ID}'
+                            ORDER BY p.created_at;
+                        `
+                    })
+                });
+                
+                if (response.ok) {
+                    const places = await response.json();
+                    log('📊 Current place status:', 'info');
+                    places.forEach(place => {
+                        log(`📍 ${place.name}:`, 'info');
+                        log(`  Wish Level: ${place.wish_level}`, 'info');
+                        log(`  Normalized: ${place.normalized_wish_level || 'NULL'}`, 'info');
+                        log(`  Selected: ${place.is_selected_for_optimization || false}`, 'info');
+                        log(`  Round: ${place.selection_round || 'NULL'}`, 'info');
+                    });
+                    
+                    const selectedCount = places.filter(p => p.is_selected_for_optimization).length;
+                    const normalizedCount = places.filter(p => p.normalized_wish_level !== null).length;
+                    
+                    log(`✅ Summary: ${selectedCount}/${places.length} places selected, ${normalizedCount}/${places.length} normalized`, 'success');
+                } else {
+                    log(`❌ Database query failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run initial check
+        setTimeout(checkResults, 1000);
+    </script>
+</body>
+</html>

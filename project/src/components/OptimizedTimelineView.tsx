@@ -24,7 +24,7 @@ interface PlaceWithTiming {
   departureTime: string;
   stayDuration: number;
   travelTimeToNext?: number;
-  transportMode?: 'walking' | 'transit' | 'car';
+  transportMode?: 'walking' | 'car' | 'flight';
   order: number;
   isSelected: boolean;
 }
@@ -126,7 +126,7 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
         departureTime: departureTimeStr,
         stayDuration,
         travelTimeToNext,
-        transportMode: 'transit' as const,
+        transportMode: 'car' as const,
         order: index + 1,
         isSelected: true
       };
@@ -156,10 +156,15 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
 
   const getTransportIcon = (mode: string) => {
     switch (mode) {
-      case 'walking': return '🚶';
-      case 'car': return Car;
-      case 'transit': return Train;
-      default: return Train;
+      case 'walking':
+      case 'walk':
+        return '🚶';
+      case 'car':
+        return '🚗';
+      case 'flight':
+        return '✈️';
+      default:
+        return '🚗'; // デフォルトは車
     }
   };
 

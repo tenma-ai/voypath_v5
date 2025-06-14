@@ -20,7 +20,7 @@ export interface OptimizationSettings {
   fairness_weight?: number // 0.0 to 1.0, default 0.6
   efficiency_weight?: number // 0.0 to 1.0, default 0.4
   include_meals?: boolean // default true
-  preferred_transport?: 'walking' | 'public_transport' | 'car'
+  preferred_transport?: 'walking' | 'car' | 'flight'
 }
 
 export interface OptimizedRoute {
@@ -45,7 +45,7 @@ export interface ScheduledPlace {
   arrival_time: string
   departure_time: string
   travel_time_from_previous: number
-  transport_mode: 'walking' | 'public_transport' | 'car'
+  transport_mode: 'walking' | 'car' | 'flight'
   order_in_day: number
 }
 
@@ -121,7 +121,7 @@ export class TripOptimizationService {
     fairness_weight: 0.6,
     efficiency_weight: 0.4,
     include_meals: true,
-    preferred_transport: 'public_transport'
+    preferred_transport: 'car'
   }
 
   /**
@@ -167,25 +167,25 @@ export class TripOptimizationService {
         throw new Error('Place selection failed')
       }
 
-      // Stage 3: Optimize route
+      // Stage 3: Optimize route using constrained generation
       onProgress?.({ 
         stage: 'routing', 
         progress: 70, 
         message: 'Optimizing route and scheduling...' 
       })
 
-      const response = await supabase.functions.invoke('optimize-route', {
-        body: {
-          trip_id: tripId,
-          settings: optimizationSettings
-        }
-      })
-
-      if (response.error) {
-        throw new Error(response.error.message || 'Route optimization failed')
+      const result = await this.optimizeRouteWithConstraints(tripId, optimizationSettings)
+      
+      // Stage 4: Update places with schedule information
+      if (result.success && result.optimization_result) {
+        onProgress?.({ 
+          stage: 'complete', 
+          progress: 90, 
+          message: 'Updating place schedules...' 
+        })
+        
+        await this.updatePlacesWithSchedule(tripId, result.optimization_result)
       }
-
-      const result = response.data as OptimizationResult
       
       onProgress?.({ 
         stage: 'complete', 
@@ -263,6 +263,159 @@ export class TripOptimizationService {
     } catch (error) {
       console.error('Place selection error:', error)
       throw error
+    }
+  }
+
+  /**
+   * Step 3: Optimize route using comprehensive constrained route generation
+   */
+  static async optimizeRouteWithConstraints(
+    tripId: string, 
+    settings: OptimizationSettings = {}
+  ): Promise<OptimizationResult> {
+    console.log('Optimizing route with constrained generation for trip:', tripId)
+    
+    // First, get trip data to extract places and departure info
+    const { data: trip, error: tripError } = await supabase
+      .from('trips')
+      .select('*')
+      .eq('id', tripId)
+      .single()
+
+    if (tripError) {
+      throw new Error(`Failed to get trip data: ${tripError.message}`)
+    }
+
+    // Get places for the trip
+    const { data: places, error: placesError } = await supabase
+      .from('places')
+      .select('*')
+      .eq('trip_id', tripId)
+      .order('created_at')
+
+    if (placesError) {
+      throw new Error(`Failed to get places: ${placesError.message}`)
+    }
+
+    // Separate system places (departure/destination) from user places
+    const systemPlaces = places?.filter(p => p.source === 'system') || []
+    const userPlaces = places?.filter(p => p.source !== 'system') || []
+    
+    const departurePlace = systemPlaces.find(p => 
+      p.category === 'departure_point' || p.place_type === 'departure'
+    ) || userPlaces[0] // Fallback to first user place if no system departure
+
+    if (!departurePlace) {
+      throw new Error('No departure location found for trip')
+    }
+
+    const destinationPlace = systemPlaces.find(p => 
+      p.category === 'destination_point' || p.place_type === 'destination'
+    )
+
+    const constraintsSettings = {
+      maxDailyHours: 12,
+      mealBreaks: {
+        breakfast: { start: 8, duration: 60 },
+        lunch: { start: 12, duration: 90 },
+        dinner: { start: 18, duration: 120 }
+      },
+      transportModes: {
+        walkingMaxKm: 1,
+        publicTransportMaxKm: 20,
+        carMinKm: 20,
+        flightMinKm: 200
+      }
+    }
+
+    const response = await supabase.functions.invoke('constrained-route-generation', {
+      body: {
+        tripId: tripId,
+        userId: trip.owner_id,
+        places: userPlaces.map(p => ({
+          id: p.id,
+          name: p.name,
+          latitude: parseFloat(p.latitude),
+          longitude: parseFloat(p.longitude),
+          wish_level: p.wish_level,
+          stay_duration_minutes: p.stay_duration_minutes,
+          user_id: p.user_id,
+          category: p.category
+        })),
+        departure: {
+          id: departurePlace.id,
+          name: departurePlace.name,
+          latitude: parseFloat(departurePlace.latitude),
+          longitude: parseFloat(departurePlace.longitude),
+          wish_level: departurePlace.wish_level,
+          stay_duration_minutes: departurePlace.stay_duration_minutes,
+          user_id: departurePlace.user_id,
+          category: departurePlace.category
+        },
+        destination: destinationPlace ? {
+          id: destinationPlace.id,
+          name: destinationPlace.name,
+          latitude: parseFloat(destinationPlace.latitude),
+          longitude: parseFloat(destinationPlace.longitude),
+          wish_level: destinationPlace.wish_level,
+          stay_duration_minutes: destinationPlace.stay_duration_minutes,
+          user_id: destinationPlace.user_id,
+          category: destinationPlace.category
+        } : null,
+        constraints: constraintsSettings
+      }
+    })
+
+    if (response.error) {
+      throw new Error(response.error.message || 'Constrained route generation failed')
+    }
+
+    // Convert the constrained route format to the expected OptimizationResult format
+    const constrainedResult = response.data
+    
+    const optimizedRoute: OptimizedRoute = {
+      daily_schedules: constrainedResult.result.dailyRoutes.map((route: any) => ({
+        date: route.date,
+        scheduled_places: route.places.map((place: any, index: number) => ({
+          place: {
+            id: place.id,
+            name: place.name,
+            category: place.category,
+            latitude: place.latitude,
+            longitude: place.longitude,
+            wish_level: place.wish_level,
+            stay_duration_minutes: place.stay_duration_minutes,
+            user_id: place.user_id,
+            trip_id: tripId
+          },
+          arrival_time: place.arrivalTime,
+          departure_time: place.departureTime,
+          travel_time_from_previous: place.travelTimeMinutes || 0,
+          transport_mode: place.transportToNext || 'walking',
+          order_in_day: index + 1
+        })),
+        meal_breaks: route.mealBreaks.map((meal: any) => ({
+          type: meal.type,
+          start_time: meal.startTime,
+          end_time: meal.endTime,
+          estimated_cost: meal.type === 'breakfast' ? 800 : meal.type === 'lunch' ? 1200 : 2000
+        })),
+        total_travel_time: constrainedResult.result.totalTravelTime,
+        total_visit_time: constrainedResult.result.totalVisitTime
+      })),
+      optimization_score: constrainedResult.result.optimizationScore,
+      execution_time_ms: constrainedResult.executionTimeMs,
+      total_travel_time_minutes: constrainedResult.result.totalTravelTime,
+      total_visit_time_minutes: constrainedResult.result.totalVisitTime,
+      created_by: trip.owner_id
+    }
+
+    return {
+      success: true,
+      optimization_result: optimizedRoute,
+      execution_time_ms: constrainedResult.executionTimeMs,
+      cached: false,
+      message: 'Route optimized successfully with constrained generation'
     }
   }
 
@@ -390,13 +543,15 @@ export class TripOptimizationService {
    */
   static getTransportIcon(mode: string): string {
     switch (mode) {
-      case 'walking': return '🚶'
-      case 'public_transport': return '🚇'
-      case 'car': return '🚗'
-      case 'bicycle': return '🚲'
-      case 'taxi': return '🚕'
-      case 'flight': return '✈️'
-      default: return '🚶'
+      case 'walking':
+      case 'walk':
+        return '🚶'
+      case 'car':
+        return '🚗'
+      case 'flight':
+        return '✈️'
+      default:
+        return '🚗' // デフォルトは車
     }
   }
 
@@ -458,6 +613,51 @@ export class TripOptimizationService {
       case 'default':
       default:
         return RetryHandler.DEFAULT_RETRY_CONFIG;
+    }
+  }
+
+  /**
+   * Update places with schedule information from optimization result
+   */
+  static async updatePlacesWithSchedule(tripId: string, optimizedRoute: OptimizedRoute): Promise<void> {
+    try {
+      console.log('Updating places with schedule for trip:', tripId)
+      
+      // First, reset all places to unscheduled
+      await supabase
+        .from('places')
+        .update({
+          scheduled: false,
+          scheduled_date: null,
+          scheduled_time_start: null,
+          scheduled_time_end: null,
+          transport_mode: null,
+          travel_time_from_previous: null
+        })
+        .eq('trip_id', tripId)
+
+      // Then update scheduled places from optimization result
+      for (const daySchedule of optimizedRoute.daily_schedules) {
+        for (const scheduledPlace of daySchedule.scheduled_places) {
+          await supabase
+            .from('places')
+            .update({
+              scheduled: true,
+              scheduled_date: daySchedule.date,
+              scheduled_time_start: scheduledPlace.arrival_time,
+              scheduled_time_end: scheduledPlace.departure_time,
+              transport_mode: scheduledPlace.transport_mode,
+              travel_time_from_previous: scheduledPlace.travel_time_from_previous
+            })
+            .eq('id', scheduledPlace.place.id)
+            .eq('trip_id', tripId)
+        }
+      }
+      
+      console.log('Places updated with schedule successfully')
+    } catch (error) {
+      console.error('Error updating places with schedule:', error)
+      throw error
     }
   }
 
