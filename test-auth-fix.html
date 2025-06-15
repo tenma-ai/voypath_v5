@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auth Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Authentication Fix Test</h1>
+    <button onclick="testOptimizeRoute()">Test Optimize Route</button>
+    <button onclick="testPreferenceNormalization()">Test Preference Normalization</button>
+    <button onclick="testPlaceSelection()">Test Place Selection</button>
+    <div id="results"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQzNzU4OTAsImV4cCI6MjA0OTk1MTg5MH0.gEKhlmrz46c8pu-NQSM_zCObJOJPUHwWG_8vMI4j5Nc';
+        const TEST_TRIP_ID = 'a1b2c3d4-5e6f-7890-abcd-ef1234567890';
+
+        function addResult(message, type = 'success') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+            document.getElementById('results').appendChild(div);
+        }
+
+        async function testPreferenceNormalization() {
+            addResult('Testing preference normalization...', 'info');
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/normalize-preferences`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'X-Test-Mode': 'true'
+                    },
+                    body: JSON.stringify({
+                        trip_id: TEST_TRIP_ID,
+                        force_refresh: true
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Preference Normalization: ${data.success ? 'SUCCESS' : 'FAILED'}`, data.success ? 'success' : 'error');
+                    addResult(`Details: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    const errorData = await response.text();
+                    addResult(`❌ HTTP ${response.status}: ${errorData}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPlaceSelection() {
+            addResult('Testing place selection...', 'info');
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/select-optimal-places`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'X-Test-Mode': 'true'
+                    },
+                    body: JSON.stringify({
+                        trip_id: TEST_TRIP_ID,
+                        max_places: 10,
+                        fairness_weight: 0.7
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Place Selection: ${data.success ? 'SUCCESS' : 'FAILED'}`, data.success ? 'success' : 'error');
+                    addResult(`Details: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    const errorData = await response.text();
+                    addResult(`❌ HTTP ${response.status}: ${errorData}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testOptimizeRoute() {
+            addResult('Testing route optimization...', 'info');
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/optimize-route`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'X-Test-Mode': 'true'
+                    },
+                    body: JSON.stringify({
+                        trip_id: TEST_TRIP_ID,
+                        test_mode: true,
+                        settings: {
+                            fairness_weight: 0.7,
+                            efficiency_weight: 0.3,
+                            include_meals: true
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Route Optimization: ${data.success ? 'SUCCESS' : 'FAILED'}`, data.success ? 'success' : 'error');
+                    addResult(`Details: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    const errorData = await response.text();
+                    addResult(`❌ HTTP ${response.status}: ${errorData}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

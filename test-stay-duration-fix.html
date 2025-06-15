@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Stay Duration Fix</title>
+</head>
+<body>
+    <h1>Testing Stay Duration Minutes Constraint Fix</h1>
+    <div id="results"></div>
+
+    <script>
+        async function testStayDurationFix() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Starting stay duration constraint test...</p>';
+
+            try {
+                // Test creating a place with various stay duration values
+                const testCases = [
+                    { name: 'Zero Duration Test', stayDuration: 0 },
+                    { name: 'Low Duration Test', stayDuration: 0.25 }, // 15 minutes
+                    { name: 'Normal Duration Test', stayDuration: 2 }, // 120 minutes
+                ];
+
+                for (const testCase of testCases) {
+                    resultsDiv.innerHTML += `<h3>Testing: ${testCase.name}</h3>`;
+                    
+                    const testPlace = {
+                        id: `test-place-${Date.now()}-${Math.random()}`,
+                        name: `Test Place ${testCase.name}`,
+                        category: 'attraction',
+                        latitude: 35.6762,
+                        longitude: 139.6503,
+                        wishLevel: 3,
+                        stayDuration: testCase.stayDuration,
+                        trip_id: '737a36f2-66b0-4dfa-a764-3d6e305faf11',
+                        user_id: '033523e2-377c-4479-a5cd-90d8905f7bd0'
+                    };
+
+                    console.log('Testing place:', testPlace);
+                    
+                    // Test the addPlaceToDatabase function directly
+                    const response = await fetch('http://localhost:5174/api/test-place-add', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(testPlace)
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        resultsDiv.innerHTML += `<p style="color: green;">✅ ${testCase.name}: Success - stay_duration_minutes set to ${result.stay_duration_minutes || 'N/A'}</p>`;
+                    } else {
+                        const error = await response.text();
+                        resultsDiv.innerHTML += `<p style="color: red;">❌ ${testCase.name}: Failed - ${error}</p>`;
+                    }
+                }
+
+                // Test system places creation
+                resultsDiv.innerHTML += '<h3>Testing System Places Creation</h3>';
+                
+                const systemPlaceTest = {
+                    trip_id: '737a36f2-66b0-4dfa-a764-3d6e305faf11'
+                };
+
+                console.log('Testing system places creation for trip:', systemPlaceTest.trip_id);
+                
+                const systemResponse = await fetch('http://localhost:5174/api/test-system-places', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(systemPlaceTest)
+                });
+
+                if (systemResponse.ok) {
+                    const result = await systemResponse.json();
+                    resultsDiv.innerHTML += `<p style="color: green;">✅ System Places: Success - created ${result.count || 0} system places</p>`;
+                } else {
+                    const error = await systemResponse.text();
+                    resultsDiv.innerHTML += `<p style="color: red;">❌ System Places: Failed - ${error}</p>`;
+                }
+
+            } catch (error) {
+                resultsDiv.innerHTML += `<p style="color: red;">❌ Test failed with error: ${error.message}</p>`;
+                console.error('Test error:', error);
+            }
+
+            resultsDiv.innerHTML += '<p><strong>Test completed</strong></p>';
+        }
+
+        // Run test when page loads
+        window.addEventListener('load', testStayDurationFix);
+    </script>
+</body>
+</html>

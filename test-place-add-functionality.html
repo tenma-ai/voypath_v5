@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Place Add Functionality</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px 12px;
+            margin: 5px 0;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        .place-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .scheduled { background: #d4edda; }
+        .unscheduled { background: #f8d7da; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Place Add Functionality</h1>
+        <p>Test adding places to trips and verifying they appear in My Places</p>
+    </div>
+
+    <div class="container">
+        <h2>Step 1: Select Trip</h2>
+        <select id="tripSelect">
+            <option value="">Loading trips...</option>
+        </select>
+        <button onclick="loadTrips()" id="loadTripsBtn">🔄 Reload Trips</button>
+    </div>
+
+    <div class="container">
+        <h2>Step 2: Add New Place</h2>
+        <input type="text" id="placeName" placeholder="Place name (e.g., Tokyo Tower)" value="Tokyo Tower">
+        <input type="number" id="wishLevel" placeholder="Wish level (1-5)" value="5" min="1" max="5">
+        <input type="number" id="duration" placeholder="Duration (hours)" value="2" min="0.5" step="0.5">
+        <button onclick="addPlace()" id="addPlaceBtn">➕ Add Place</button>
+    </div>
+
+    <div class="container">
+        <h2>Step 3: View Places</h2>
+        <button onclick="loadPlaces()" id="loadPlacesBtn">🔍 Load Places</button>
+        <button onclick="clearPlaces()">🧹 Clear Display</button>
+        <div id="placesList"></div>
+    </div>
+
+    <div class="container">
+        <h2>Log</h2>
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        let currentTripId = null;
+        let currentUserId = '033523e2-377c-4479-a5cd-90d8905f7bd0'; // Default test user
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function ensureAuth() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                log('No session found, signing in anonymously...', 'info');
+                const { data, error } = await supabase.auth.signInAnonymously();
+                if (error) {
+                    log(`Anonymous sign-in failed: ${error.message}`, 'error');
+                    throw error;
+                }
+                log('Signed in anonymously', 'success');
+            } else {
+                log('Using existing session', 'success');
+            }
+        }
+
+        async function loadTrips() {
+            const btn = document.getElementById('loadTripsBtn');
+            btn.disabled = true;
+            
+            try {
+                await ensureAuth();
+                
+                const { data: trips, error } = await supabase
+                    .from('trips')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const select = document.getElementById('tripSelect');
+                select.innerHTML = '<option value="">Select a trip...</option>';
+                
+                trips.forEach(trip => {
+                    const option = document.createElement('option');
+                    option.value = trip.id;
+                    option.textContent = `${trip.name} (${trip.id.substr(0, 8)}...)`;
+                    select.appendChild(option);
+                });
+
+                log(`✅ Loaded ${trips.length} trips`, 'success');
+                
+                // Auto-select first trip
+                if (trips.length > 0 && !currentTripId) {
+                    select.value = trips[0].id;
+                    currentTripId = trips[0].id;
+                    log(`📍 Auto-selected trip: ${trips[0].name}`, 'info');
+                }
+            } catch (error) {
+                log(`❌ Failed to load trips: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        document.getElementById('tripSelect').addEventListener('change', (e) => {
+            currentTripId = e.target.value;
+            if (currentTripId) {
+                log(`📍 Selected trip: ${currentTripId}`, 'info');
+                loadPlaces();
+            }
+        });
+
+        async function addPlace() {
+            const btn = document.getElementById('addPlaceBtn');
+            btn.disabled = true;
+            
+            try {
+                if (!currentTripId) {
+                    throw new Error('Please select a trip first');
+                }
+
+                const placeName = document.getElementById('placeName').value;
+                const wishLevel = parseInt(document.getElementById('wishLevel').value);
+                const duration = parseFloat(document.getElementById('duration').value);
+
+                if (!placeName) {
+                    throw new Error('Please enter a place name');
+                }
+
+                log(`➕ Adding place: ${placeName}...`, 'info');
+
+                const placeData = {
+                    id: crypto.randomUUID(),
+                    name: placeName,
+                    category: 'attraction',
+                    latitude: 35.6762 + (Math.random() - 0.5) * 0.1, // Random location near Tokyo
+                    longitude: 139.6503 + (Math.random() - 0.5) * 0.1,
+                    wish_level: wishLevel,
+                    stay_duration_minutes: duration * 60,
+                    trip_id: currentTripId,
+                    user_id: currentUserId,
+                    place_type: 'member_wish',
+                    source: 'user',
+                    is_selected_for_optimization: false,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                const { data, error } = await supabase
+                    .from('places')
+                    .insert([placeData])
+                    .select();
+
+                if (error) throw error;
+
+                log(`✅ Place added successfully: ${data[0].name} (ID: ${data[0].id})`, 'success');
+                
+                // Clear form
+                document.getElementById('placeName').value = '';
+                
+                // Automatically reload places
+                setTimeout(() => loadPlaces(), 500);
+                
+            } catch (error) {
+                log(`❌ Failed to add place: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function loadPlaces() {
+            const btn = document.getElementById('loadPlacesBtn');
+            btn.disabled = true;
+            
+            try {
+                if (!currentTripId) {
+                    throw new Error('Please select a trip first');
+                }
+
+                log(`🔍 Loading places for trip ${currentTripId}...`, 'info');
+
+                const { data: places, error } = await supabase
+                    .from('places')
+                    .select('*')
+                    .eq('trip_id', currentTripId)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const placesList = document.getElementById('placesList');
+                placesList.innerHTML = '';
+
+                if (places.length === 0) {
+                    placesList.innerHTML = '<p>No places found for this trip</p>';
+                } else {
+                    log(`✅ Found ${places.length} places`, 'success');
+                    
+                    places.forEach(place => {
+                        const div = document.createElement('div');
+                        div.className = `place-item ${place.is_selected_for_optimization ? 'scheduled' : 'unscheduled'}`;
+                        div.innerHTML = `
+                            <strong>${place.name}</strong> 
+                            <span style="color: #666;">(${place.category})</span><br>
+                            Wish Level: ${place.wish_level}/5 | 
+                            Duration: ${place.stay_duration_minutes / 60}h | 
+                            Status: ${place.is_selected_for_optimization ? '📅 Scheduled' : '⏸️ Unscheduled'}<br>
+                            <small>ID: ${place.id}</small>
+                        `;
+                        placesList.appendChild(div);
+                    });
+                }
+            } catch (error) {
+                log(`❌ Failed to load places: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function clearPlaces() {
+            document.getElementById('placesList').innerHTML = '';
+            log('🧹 Cleared places display', 'info');
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            log('🚀 Test tool initialized', 'info');
+            loadTrips();
+        });
+    </script>
+</body>
+</html>
