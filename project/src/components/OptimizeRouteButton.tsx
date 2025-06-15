@@ -57,6 +57,19 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
   const tripPlaces = places.filter(place => place.trip_id === tripId || place.tripId === tripId);
   const hasPlaces = tripPlaces.length > 0;
   const isReady = hasPlaces && currentUser && !isOptimizing;
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('OptimizeRouteButton Debug:', {
+      tripId,
+      placesCount: places.length,
+      tripPlacesCount: tripPlaces.length,
+      hasPlaces,
+      currentUser: !!currentUser,
+      isOptimizing,
+      isReady
+    });
+  }, [tripId, places.length, tripPlaces.length, hasPlaces, currentUser, isOptimizing, isReady]);
 
   useEffect(() => {
     checkConnectivity();

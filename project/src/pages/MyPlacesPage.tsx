@@ -32,21 +32,23 @@ export function MyPlacesPage() {
     }
   };
 
-  // Load data from database on component mount
+  // Load data from database on component mount and when currentTrip changes
   useEffect(() => {
-    const initializeData = async () => {
-      try {
-        // Initialize data from database
-        await initializeFromDatabase();
-      } catch (error) {
-        console.error('Failed to initialize data from database:', error);
+    const loadPlacesForCurrentTrip = async () => {
+      if (currentTrip) {
+        try {
+          const { loadPlacesFromDatabase } = useStore.getState();
+          await loadPlacesFromDatabase(currentTrip.id);
+          console.log(`📍 Loaded places for trip: ${currentTrip.name}`);
+        } catch (error) {
+          console.error('Failed to load places from database:', error);
+        }
       }
     };
 
-    if (trips.length === 0 || places.length === 0) {
-      initializeData();
-    }
-  }, [trips.length, places.length, initializeFromDatabase]);
+    // Always load places when currentTrip changes or when component mounts
+    loadPlacesForCurrentTrip();
+  }, [currentTrip?.id]); // Re-run when currentTrip changes
 
   // Filter places for current trip
   const tripPlaces = places.filter(place => 
@@ -228,7 +230,7 @@ export function MyPlacesPage() {
             >
               <div className="relative">
                 <img
-                  src={place.image}
+                  src={place.image_url || place.image || '/api/placeholder/400/300'}
                   alt={place.name}
                   className="w-full h-32 object-cover"
                 />
@@ -286,7 +288,7 @@ export function MyPlacesPage() {
             >
               <div className="flex items-start space-x-3">
                 <img
-                  src={place.image}
+                  src={place.image_url || place.image || '/api/placeholder/400/300'}
                   alt={place.name}
                   className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                 />

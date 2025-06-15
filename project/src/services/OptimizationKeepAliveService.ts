@@ -25,13 +25,19 @@ export class OptimizationKeepAliveService {
 
     console.log('🔥 Starting optimization keep-alive service');
     
-    // Initial ping
-    this.pingAllFunctions();
-    
-    // Set up periodic pinging
-    this.keepAliveInterval = setInterval(() => {
+    // Initial ping (disabled in development to avoid errors)
+    if (import.meta.env.PROD) {
       this.pingAllFunctions();
-    }, this.PING_INTERVAL);
+    } else {
+      console.log('⚠️ Keep-alive disabled in development mode');
+    }
+    
+    // Set up periodic pinging (disabled in development)
+    if (import.meta.env.PROD) {
+      this.keepAliveInterval = setInterval(() => {
+        this.pingAllFunctions();
+      }, this.PING_INTERVAL);
+    }
   }
 
   /**

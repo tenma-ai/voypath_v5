@@ -1,7 +1,13 @@
 import { loadStripe } from '@stripe/stripe-js';
 
-// Stripeの公開可能キーを環境変数から取得
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_...');
+// Stripeの公開可能キーを環境変数から取得（開発環境では無効化）
+const isDevelopment = import.meta.env.DEV;
+const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+
+// 開発環境でStripeキーが設定されていない場合は無効化
+const stripePromise = isDevelopment && !stripeKey ? 
+  Promise.resolve(null) : 
+  loadStripe(stripeKey || 'pk_test_demo_key');
 
 export { stripePromise };
 

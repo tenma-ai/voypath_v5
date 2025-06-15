@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { StripeProvider } from './components/StripeProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SimpleAuth } from './components/SimpleAuth';
 import { Layout } from './components/Layout';
 import { HomePage } from './pages/HomePage';
 import { TripDetailPage } from './pages/TripDetailPage';
@@ -16,30 +17,70 @@ import { useStore } from './store/useStore';
 
 function App() {
   const { initializeFromDatabase, setUser } = useStore();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    // Initialize app with database data and demo user
-    const initializeApp = async () => {
+    // Check if user is already authenticated
+    const checkAuth = async () => {
       try {
-        // Set a demo user for development
-        setUser({
-          id: '033523e2-377c-4479-a5cd-90d8905f7bd0',
-          name: 'Demo User',
-          email: 'demo@voypath.com',
-          isGuest: false,
-          isPremium: false
-        });
-
-        // Load data from database
-        await initializeFromDatabase();
-        console.log('✅ App initialized with database data');
+        const { getSession } = await import('./lib/supabase');
+        const session = await getSession();
+        
+        if (session && session.user) {
+          console.log('✅ Found existing session:', session.user.id);
+          await handleAuthenticated(session.user);
+        } else {
+          console.log('❌ No existing session found');
+          setIsAuthenticated(false);
+        }
       } catch (error) {
-        console.error('❌ Failed to initialize app:', error);
+        console.error('❌ Auth check failed:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setIsCheckingAuth(false);
       }
     };
 
-    initializeApp();
-  }, [initializeFromDatabase, setUser]);
+    checkAuth();
+  }, []);
+
+  const handleAuthenticated = async (user: any) => {
+    try {
+      // Set the authenticated user
+      setUser({
+        id: user.id,
+        name: user.user_metadata?.name || 'User',
+        email: user.email,
+        isGuest: user.is_anonymous || false,
+        isPremium: false
+      });
+
+      // Load data from database
+      await initializeFromDatabase();
+      setIsAuthenticated(true);
+      console.log('✅ App initialized with authentication and database data');
+    } catch (error) {
+      console.error('❌ Failed to initialize app after auth:', error);
+      setIsAuthenticated(false);
+    }
+  };
+
+  // Show loading spinner while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Show authentication form if not authenticated
+  if (!isAuthenticated) {
+    return <SimpleAuth onAuthenticated={handleAuthenticated} />;
+  }
+
+  // Main app content for authenticated users
   return (
     <ErrorBoundary>
       <StripeProvider>

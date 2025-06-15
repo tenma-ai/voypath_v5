@@ -68,7 +68,7 @@ export function MapView() {
   }>>([]);
 
   // Generate route segments with transport mode information
-  const generateRouteSegments = useCallback(() => {
+  const generateRouteSegments = () => {
     if (!optimizationResult || !showRoute) return [];
 
     const segments: Array<{
@@ -134,7 +134,7 @@ export function MapView() {
     }
 
     return segments;
-  }, [optimizationResult, tripPlaces, showRoute, transportColors]);
+  };
 
   // Generate route path for optimization results (legacy function)
   const getRoutePath = useCallback(() => {
@@ -201,7 +201,7 @@ export function MapView() {
   useEffect(() => {
     const segments = generateRouteSegments();
     setRouteSegments(segments);
-  }, [generateRouteSegments]);
+  }, [optimizationResult, showRoute, tripPlaces.length]);
 
   // Load member colors for current trip
   useEffect(() => {
@@ -219,19 +219,17 @@ export function MapView() {
     loadMemberColors();
   }, [currentTrip?.id]);
 
-  // Debug logging
+  // Debug logging (only log when trip changes)
   useEffect(() => {
-    console.log('MapView Debug Info:');
-    console.log('Current Trip:', currentTrip);
-    console.log('All Places:', places);
-    console.log('Filtered Trip Places:', tripPlaces);
-    console.log('Places with coordinates:', tripPlaces.filter(p => p.latitude && p.longitude));
-    console.log('Optimization Result:', optimizationResult);
-    console.log('Route Path:', getRoutePath());
-    console.log('Route Segments:', routeSegments);
-    console.log('Departure Coords:', departureCoords);
-    console.log('Destination Coords:', destinationCoords);
-  }, [currentTrip, places, tripPlaces, optimizationResult, getRoutePath, routeSegments, departureCoords, destinationCoords]);
+    if (currentTrip) {
+      console.log('MapView Debug Info:');
+      console.log('Current Trip:', currentTrip);
+      console.log('All Places:', places.length);
+      console.log('Filtered Trip Places:', tripPlaces.length);
+      console.log('Places with coordinates:', tripPlaces.filter(p => p.latitude && p.longitude).length);
+      console.log('Has Optimization Result:', !!optimizationResult);
+    }
+  }, [currentTrip?.id]);
 
   // const handleAddPlace = () => {
   //   navigate('/add-place');

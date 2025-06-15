@@ -138,6 +138,8 @@ export class TripOptimizationService {
       console.log('Starting full optimization pipeline for trip:', tripId)
       console.log('Settings:', optimizationSettings)
 
+      // Always use production Edge Functions (no demo mode)
+
       // Stage 1: Normalize preferences
       onProgress?.({ 
         stage: 'normalizing', 
@@ -216,18 +218,15 @@ export class TripOptimizationService {
     try {
       console.log('Normalizing preferences for trip:', tripId)
 
-      const response = await supabase.functions.invoke('normalize-preferences', {
-        body: {
-          trip_id: tripId,
-          force_refresh: false
-        }
+      // Use production Edge Function with proper authentication
+      const { callSupabaseFunction } = await import('../lib/supabase');
+      
+      const response = await callSupabaseFunction('normalize-preferences', {
+        trip_id: tripId,
+        force_refresh: false
       })
 
-      if (response.error) {
-        throw new Error(response.error.message || 'Normalization failed')
-      }
-
-      return response.data as NormalizationResult
+      return response as NormalizationResult
     } catch (error) {
       console.error('Preference normalization error:', error)
       throw error
@@ -247,19 +246,16 @@ export class TripOptimizationService {
     try {
       console.log('Selecting optimal places for trip:', tripId)
 
-      const response = await supabase.functions.invoke('select-optimal-places', {
-        body: {
-          trip_id: tripId,
-          max_places: options.max_places || 20,
-          fairness_weight: options.fairness_weight || 0.6
-        }
+      // Use production Edge Function with proper authentication
+      const { callSupabaseFunction } = await import('../lib/supabase');
+      
+      const response = await callSupabaseFunction('select-optimal-places', {
+        trip_id: tripId,
+        max_places: options.max_places || 20,
+        fairness_weight: options.fairness_weight || 0.6
       })
 
-      if (response.error) {
-        throw new Error(response.error.message || 'Place selection failed')
-      }
-
-      return response.data as PlaceSelectionResult
+      return response as PlaceSelectionResult
     } catch (error) {
       console.error('Place selection error:', error)
       throw error
@@ -328,94 +324,30 @@ export class TripOptimizationService {
       }
     }
 
-    const response = await supabase.functions.invoke('constrained-route-generation', {
-      body: {
-        tripId: tripId,
-        userId: trip.owner_id,
-        places: userPlaces.map(p => ({
-          id: p.id,
-          name: p.name,
-          latitude: parseFloat(p.latitude),
-          longitude: parseFloat(p.longitude),
-          wish_level: p.wish_level,
-          stay_duration_minutes: p.stay_duration_minutes,
-          user_id: p.user_id,
-          category: p.category
-        })),
-        departure: {
-          id: departurePlace.id,
-          name: departurePlace.name,
-          latitude: parseFloat(departurePlace.latitude),
-          longitude: parseFloat(departurePlace.longitude),
-          wish_level: departurePlace.wish_level,
-          stay_duration_minutes: departurePlace.stay_duration_minutes,
-          user_id: departurePlace.user_id,
-          category: departurePlace.category
-        },
-        destination: destinationPlace ? {
-          id: destinationPlace.id,
-          name: destinationPlace.name,
-          latitude: parseFloat(destinationPlace.latitude),
-          longitude: parseFloat(destinationPlace.longitude),
-          wish_level: destinationPlace.wish_level,
-          stay_duration_minutes: destinationPlace.stay_duration_minutes,
-          user_id: destinationPlace.user_id,
-          category: destinationPlace.category
-        } : null,
-        constraints: constraintsSettings
+    // Use production Edge Function with proper authentication
+    const { callSupabaseFunction } = await import('../lib/supabase');
+    
+    const result = await callSupabaseFunction('optimize-route', {
+      trip_id: tripId,
+      settings: {
+        fairness_weight: settings.fairness_weight || 0.7,
+        efficiency_weight: settings.efficiency_weight || 0.3,
+        include_meals: settings.include_meals !== false,
+        preferred_transport: settings.preferred_transport || 'car'
       }
     })
-
-    if (response.error) {
-      throw new Error(response.error.message || 'Constrained route generation failed')
-    }
-
-    // Convert the constrained route format to the expected OptimizationResult format
-    const constrainedResult = response.data
     
-    const optimizedRoute: OptimizedRoute = {
-      daily_schedules: constrainedResult.result.dailyRoutes.map((route: any) => ({
-        date: route.date,
-        scheduled_places: route.places.map((place: any, index: number) => ({
-          place: {
-            id: place.id,
-            name: place.name,
-            category: place.category,
-            latitude: place.latitude,
-            longitude: place.longitude,
-            wish_level: place.wish_level,
-            stay_duration_minutes: place.stay_duration_minutes,
-            user_id: place.user_id,
-            trip_id: tripId
-          },
-          arrival_time: place.arrivalTime,
-          departure_time: place.departureTime,
-          travel_time_from_previous: place.travelTimeMinutes || 0,
-          transport_mode: place.transportToNext || 'walking',
-          order_in_day: index + 1
-        })),
-        meal_breaks: route.mealBreaks.map((meal: any) => ({
-          type: meal.type,
-          start_time: meal.startTime,
-          end_time: meal.endTime,
-          estimated_cost: meal.type === 'breakfast' ? 800 : meal.type === 'lunch' ? 1200 : 2000
-        })),
-        total_travel_time: constrainedResult.result.totalTravelTime,
-        total_visit_time: constrainedResult.result.totalVisitTime
-      })),
-      optimization_score: constrainedResult.result.optimizationScore,
-      execution_time_ms: constrainedResult.executionTimeMs,
-      total_travel_time_minutes: constrainedResult.result.totalTravelTime,
-      total_visit_time_minutes: constrainedResult.result.totalVisitTime,
-      created_by: trip.owner_id
+    if (!result.success) {
+      throw new Error(result.error || 'Route optimization failed')
     }
 
     return {
       success: true,
-      optimization_result: optimizedRoute,
-      execution_time_ms: constrainedResult.executionTimeMs,
-      cached: false,
-      message: 'Route optimized successfully with constrained generation'
+      optimization_result: result.optimization_result,
+      execution_time_ms: result.execution_time_ms,
+      result_id: result.result_id,
+      cached: result.cached || false,
+      message: result.message || 'Route optimized successfully'
     }
   }
 
@@ -639,18 +571,33 @@ export class TripOptimizationService {
       // Then update scheduled places from optimization result
       for (const daySchedule of optimizedRoute.daily_schedules) {
         for (const scheduledPlace of daySchedule.scheduled_places) {
-          await supabase
+          // Try to find the place by name if ID doesn't exist
+          const { data: existingPlaces } = await supabase
             .from('places')
-            .update({
-              scheduled: true,
-              scheduled_date: daySchedule.date,
-              scheduled_time_start: scheduledPlace.arrival_time,
-              scheduled_time_end: scheduledPlace.departure_time,
-              transport_mode: scheduledPlace.transport_mode,
-              travel_time_from_previous: scheduledPlace.travel_time_from_previous
-            })
-            .eq('id', scheduledPlace.place.id)
+            .select('id')
             .eq('trip_id', tripId)
+            .or(`id.eq.${scheduledPlace.place.id},name.eq.${scheduledPlace.place.name}`)
+            .limit(1)
+
+          if (existingPlaces && existingPlaces.length > 0) {
+            const { error } = await supabase
+              .from('places')
+              .update({
+                scheduled: true,
+                scheduled_date: daySchedule.date,
+                scheduled_time_start: scheduledPlace.arrival_time,
+                scheduled_time_end: scheduledPlace.departure_time,
+                transport_mode: scheduledPlace.transport_mode,
+                travel_time_from_previous: scheduledPlace.travel_time_from_previous
+              })
+              .eq('id', existingPlaces[0].id)
+
+            if (error) {
+              console.warn(`Failed to update place ${scheduledPlace.place.name}:`, error.message)
+            }
+          } else {
+            console.warn(`Place not found: ${scheduledPlace.place.name} (${scheduledPlace.place.id})`)
+          }
         }
       }
       

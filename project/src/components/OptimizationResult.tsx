@@ -12,20 +12,31 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
   // const [activeView, setActiveView] = useState<'summary'>('summary');
   // Format optimization result for display
   const formatOptimizationResult = (result: OptimizedRoute) => {
+    // Safety check for required properties
+    if (!result || !result.daily_schedules || !Array.isArray(result.daily_schedules)) {
+      console.error('Invalid optimization result structure:', result);
+      return {
+        schedulesByDay: {},
+        totalStats: { places: 0, travelTime: 0, visitTime: 0, score: 0 },
+        summary: 'No optimization data available'
+      };
+    }
+
     const schedulesByDay = result.daily_schedules.reduce((acc, schedule) => {
-      const dayKey = `day-${schedule.day_number}`;
+      const dayKey = schedule.day_number ? `day-${schedule.day_number}` : schedule.date || `day-${Object.keys(acc).length + 1}`;
       if (!acc[dayKey]) acc[dayKey] = [];
-      acc[dayKey] = schedule.scheduled_places.sort((a, b) => a.order_in_day - b.order_in_day);
+      acc[dayKey] = (schedule.scheduled_places || []).sort((a, b) => (a.order_in_day || 0) - (b.order_in_day || 0));
       return acc;
-    }, {} as Record<string, typeof result.daily_schedules[0]['scheduled_places']>);
+    }, {} as Record<string, any[]>);
 
     const totalStats = {
-      places: result.daily_schedules.reduce((sum, day) => sum + day.scheduled_places.length, 0),
+      places: result.daily_schedules.reduce((sum, day) => sum + (day.scheduled_places?.length || 0), 0),
       travelTime: result.daily_schedules.reduce((sum, day) => 
-        sum + day.scheduled_places.reduce((daySum, place) => daySum + (place.travel_time_from_previous || 0), 0), 0),
+        sum + (day.scheduled_places || []).reduce((daySum, place) => daySum + (place.travel_time_from_previous || 0), 0), 0),
       visitTime: result.daily_schedules.reduce((sum, day) => 
-        sum + day.scheduled_places.reduce((daySum, place) => daySum + (place.visit_duration || 0), 0), 0),
-      score: (result.optimization_score.fairness + result.optimization_score.efficiency) / 2
+        sum + (day.scheduled_places || []).reduce((daySum, place) => daySum + (place.visit_duration || 0), 0), 0),
+      score: result.optimization_score ? 
+        ((result.optimization_score.fairness || 0) + (result.optimization_score.efficiency || 0)) / 2 : 0
     };
 
     return {
@@ -139,13 +150,13 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
             <div className="flex justify-between text-sm">
               <span className="text-slate-600 dark:text-slate-400">Fairness</span>
               <span className="font-medium text-slate-900 dark:text-slate-100">
-                {Math.round(result.optimization_score.fairness * 100)}%
+                {Math.round((result.optimization_score?.fairness || 0) * 100)}%
               </span>
             </div>
             <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2 mt-1">
               <div 
                 className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${result.optimization_score.fairness * 100}%` }}
+                style={{ width: `${(result.optimization_score?.fairness || 0) * 100}%` }}
               />
             </div>
           </div>
@@ -154,13 +165,13 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
             <div className="flex justify-between text-sm">
               <span className="text-slate-600 dark:text-slate-400">Efficiency</span>
               <span className="font-medium text-slate-900 dark:text-slate-100">
-                {Math.round(result.optimization_score.efficiency * 100)}%
+                {Math.round((result.optimization_score?.efficiency || 0) * 100)}%
               </span>
             </div>
             <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2 mt-1">
               <div 
                 className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${result.optimization_score.efficiency * 100}%` }}
+                style={{ width: `${(result.optimization_score?.efficiency || 0) * 100}%` }}
               />
             </div>
           </div>

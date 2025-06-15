@@ -15,23 +15,34 @@ export function TripDetailPage() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [tripIcon, setTripIcon] = useState<string | null>(null);
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
-  const [optimizationProgress, setOptimizationProgress] = useState(0);
-  const { currentTrip, places, trips, isOptimizing, optimizationResult, setOptimizationResult, setIsOptimizing, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, initializeFromDatabase } = useStore();
-
-  // Initialize data from database if needed
+  
+  // Auto-clear error after 5 seconds
   useEffect(() => {
-    const initializeData = async () => {
+    if (optimizationError) {
+      const timer = setTimeout(() => {
+        setOptimizationError(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [optimizationError]);
+  const [optimizationProgress, setOptimizationProgress] = useState(0);
+  const { currentTrip, places, trips, isOptimizing, optimizationResult, setOptimizationResult, setIsOptimizing, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase } = useStore();
+
+  // Load fresh data from database when page loads or trip changes
+  useEffect(() => {
+    const loadData = async () => {
       try {
-        if (trips.length === 0 || places.length === 0) {
-          await initializeFromDatabase();
+        console.log('🔄 TripDetailPage: Loading fresh data from database...');
+        if (currentTrip) {
+          await loadPlacesFromDatabase(currentTrip.id);
         }
       } catch (error) {
-        console.error('Failed to initialize trip data:', error);
+        console.error('Failed to load trip data:', error);
       }
     };
 
-    initializeData();
-  }, [trips.length, places.length, initializeFromDatabase]);
+    loadData();
+  }, [currentTrip?.id, loadPlacesFromDatabase]);
 
   // Use current trip - redirect to home if none selected
   if (!currentTrip) {
@@ -68,6 +79,18 @@ export function TripDetailPage() {
     trip ? (place.trip_id === trip.id || place.tripId === trip.id) : false
   );
   const hasPlaces = tripPlaces.length > 0;
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('TripDetailPage Debug:', {
+      tripId: trip?.id,
+      totalPlaces: places.length,
+      tripPlacesCount: tripPlaces.length,
+      hasPlaces,
+      isOptimizing,
+      user: !!user
+    });
+  }, [trip?.id, places.length, tripPlaces.length, hasPlaces, isOptimizing, user]);
 
   // Handle optimization
   const handleOptimization = async () => {
@@ -104,8 +127,8 @@ export function TripDetailPage() {
         }
       );
 
-      if (result.success && result.optimization_result) {
-        setOptimizationResult(result.optimization_result);
+      if (result) {
+        setOptimizationResult(result);
         
         // Refresh places data to show updated schedule
         if (loadPlacesFromAPI) {
@@ -525,6 +548,25 @@ export function TripDetailPage() {
         onClose={() => setShowSettingsModal(false)}
       />
       
+      {/* Error Toast */}
+      <AnimatePresence>
+        {optimizationError && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-20 right-4 z-50 bg-red-500 text-white px-6 py-3 rounded-2xl shadow-lg"
+          >
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{optimizationError}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Optimization Result Display */}
       <AnimatePresence>
         {optimizationResult && (

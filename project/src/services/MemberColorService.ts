@@ -3,7 +3,7 @@
  * Manages automatic color assignment and persistence for trip members
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 
 export interface RefinedColor {
   id: number;
@@ -45,10 +45,6 @@ export class MemberColorService {
     { id: 20, name: 'Maroon', hex: '#800000', rgb: 'rgb(128,0,0)', hsl: 'hsl(0,100%,25%)' }
   ];
 
-  private static supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
-  );
 
   /**
    * Assign a color to a trip member
@@ -57,7 +53,7 @@ export class MemberColorService {
   static async assignColorToMember(tripId: string, userId: string): Promise<RefinedColor> {
     try {
       // Check if user already has a color assigned in this trip
-      const { data: existingAssignment } = await this.supabase
+      const { data: existingAssignment } = await supabase
         .from('trip_members')
         .select('assigned_color_index')
         .eq('trip_id', tripId)
@@ -69,7 +65,7 @@ export class MemberColorService {
       }
 
       // Get all assigned colors in this trip
-      const { data: assignedColors } = await this.supabase
+      const { data: assignedColors } = await supabase
         .from('trip_members')
         .select('assigned_color_index')
         .eq('trip_id', tripId)
@@ -88,7 +84,7 @@ export class MemberColorService {
       }
 
       // Assign the color
-      const { error } = await this.supabase
+      const { error } = await supabase
         .from('trip_members')
         .update({
           assigned_color_index: availableIndex,
@@ -113,7 +109,7 @@ export class MemberColorService {
    */
   static async getMemberColor(tripId: string, userId: string): Promise<RefinedColor | null> {
     try {
-      const { data: member } = await this.supabase
+      const { data: member } = await supabase
         .from('trip_members')
         .select('assigned_color_index')
         .eq('trip_id', tripId)
@@ -136,7 +132,7 @@ export class MemberColorService {
    */
   static async getAvailableColors(tripId: string): Promise<RefinedColor[]> {
     try {
-      const { data: assignedColors } = await this.supabase
+      const { data: assignedColors } = await supabase
         .from('trip_members')
         .select('assigned_color_index')
         .eq('trip_id', tripId)
@@ -156,7 +152,7 @@ export class MemberColorService {
    */
   static async getTripMemberColors(tripId: string): Promise<MemberColorAssignment[]> {
     try {
-      const { data: members } = await this.supabase
+      const { data: members } = await supabase
         .from('trip_members')
         .select('user_id, assigned_color_index, color_assigned_at')
         .eq('trip_id', tripId)
@@ -182,7 +178,7 @@ export class MemberColorService {
    */
   static async recycleMemberColor(tripId: string, userId: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase
+      const { error } = await supabase
         .from('trip_members')
         .update({
           assigned_color_index: null,
@@ -237,7 +233,7 @@ export class MemberColorService {
    */
   static async autoAssignMissingColors(tripId: string): Promise<boolean> {
     try {
-      const { data: members } = await this.supabase
+      const { data: members } = await supabase
         .from('trip_members')
         .select('user_id, assigned_color_index')
         .eq('trip_id', tripId);
@@ -332,7 +328,7 @@ export class MemberColorService {
     maxColors: number;
   }> {
     try {
-      const { data: members } = await this.supabase
+      const { data: members } = await supabase
         .from('trip_members')
         .select('user_id, assigned_color_index')
         .eq('trip_id', tripId);

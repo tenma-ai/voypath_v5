@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { OptimizedRoute } from '../services/TripOptimizationService';
+import { supabase, callSupabaseFunction } from '../lib/supabase';
 
 export interface User {
   id: string;
@@ -98,9 +98,9 @@ interface StoreState {
 
   // Places
   places: Place[];
-  addPlace: (place: Place) => void;
-  updatePlace: (id: string, updates: Partial<Place>) => void;
-  deletePlace: (id: string) => void;
+  addPlace: (place: Place) => Promise<void>;
+  updatePlace: (id: string, updates: Partial<Place>) => Promise<void>;
+  deletePlace: (id: string) => Promise<void>;
 
   // UI State
   isOptimizing: boolean;
@@ -134,9 +134,7 @@ export interface TripCreateData {
   end_date?: string;
 }
 
-export const useStore = create<StoreState>()(
-  persist(
-    (set, get) => ({
+export const useStore = create<StoreState>()((set, get) => ({
       // Theme
       theme: 'light',
       toggleTheme: () =>
@@ -150,7 +148,17 @@ export const useStore = create<StoreState>()(
 
       // Current trip
       currentTrip: null,
-      setCurrentTrip: (trip) => set({ currentTrip: trip }),
+      setCurrentTrip: async (trip) => {
+        set({ currentTrip: trip, places: [] }); // Clear places when switching trips
+        if (trip) {
+          try {
+            await get().loadPlacesFromDatabase(trip.id);
+            console.log(`🔄 Switched to trip: ${trip.name}, loaded places for trip ${trip.id}`);
+          } catch (error) {
+            console.error('Failed to load places for new trip:', error);
+          }
+        }
+      },
 
       // Trips
       trips: [],
@@ -173,18 +181,127 @@ export const useStore = create<StoreState>()(
 
       // Places
       places: [],
-      addPlace: (place) =>
-        set((state) => ({ places: [...state.places, place] })),
-      updatePlace: (id, updates) =>
+      addPlace: async (place) => {
+        const { currentTrip, user } = get();
+        
+        // Ensure we have current trip and user
+        if (!currentTrip) {
+          throw new Error('No current trip selected');
+        }
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
+        // Ensure place has correct trip and user IDs
+        const placeWithIds = {
+          ...place,
+          trip_id: currentTrip.id,
+          tripId: currentTrip.id,
+          user_id: user.id,
+          userId: user.id
+        };
+        
+        // Persist to database first for consistency
+        try {
+          const { addPlaceToDatabase } = await import('../lib/supabase');
+          
+          const placeData = {
+            id: placeWithIds.id,
+            name: placeWithIds.name,
+            category: placeWithIds.category || 'attraction',
+            latitude: placeWithIds.latitude,
+            longitude: placeWithIds.longitude,
+            wish_level: placeWithIds.wish_level || placeWithIds.wishLevel || 5,
+            stay_duration_minutes: Math.max(30, placeWithIds.stay_duration_minutes || (placeWithIds.stayDuration || 2) * 60),
+            trip_id: currentTrip.id,
+            user_id: user.id,
+            display_color_hex: placeWithIds.display_color_hex || '#0077BE',
+            color_type: placeWithIds.color_type || 'single',
+            place_type: placeWithIds.place_type || 'member_wish',
+            source: placeWithIds.source || 'user',
+            address: placeWithIds.address,
+            rating: placeWithIds.rating,
+            price_level: placeWithIds.price_level || placeWithIds.priceLevel,
+            estimated_cost: placeWithIds.estimated_cost,
+            google_place_id: placeWithIds.google_place_id,
+            google_rating: placeWithIds.google_rating,
+            google_price_level: placeWithIds.google_price_level,
+            google_types: placeWithIds.google_types,
+            notes: placeWithIds.notes,
+            image_url: placeWithIds.image_url,
+            images: placeWithIds.images
+          };
+
+          const result = await addPlaceToDatabase(placeData);
+          console.log('✅ Place saved to database:', result);
+          
+          // Reload places for current trip to ensure consistency
+          await get().loadPlacesFromDatabase(currentTrip.id);
+          
+        } catch (error) {
+          console.error('Failed to save place to database:', error);
+          throw error;
+        }
+      },
+      updatePlace: async (id, updates) => {
+        // Update local state immediately
         set((state) => ({
           places: state.places.map((place) =>
             place.id === id ? { ...place, ...updates } : place
           ),
-        })),
-      deletePlace: (id) =>
+        }));
+
+        // Persist to database
+        try {
+          const { supabase } = await import('../lib/supabase');
+          
+          const updateData: any = {};
+          if (updates.name) updateData.name = updates.name;
+          if (updates.wishLevel !== undefined) updateData.wish_level = updates.wishLevel;
+          if (updates.stayDuration !== undefined) updateData.stay_duration_minutes = updates.stayDuration * 60;
+          if (updates.scheduled !== undefined) updateData.is_selected_for_optimization = updates.scheduled;
+          if (updates.visitDate) updateData.visit_date = updates.visitDate;
+          if (updates.notes) updateData.notes = updates.notes;
+
+          const { error } = await supabase
+            .from('places')
+            .update(updateData)
+            .eq('id', id);
+
+          if (error) {
+            console.error('Failed to update place in database:', error);
+            // Could implement rollback here if needed
+          } else {
+            console.log('✅ Place updated in database successfully');
+          }
+        } catch (error) {
+          console.error('Failed to update place:', error);
+        }
+      },
+      deletePlace: async (id) => {
+        // Remove from local state immediately
         set((state) => ({
           places: state.places.filter((place) => place.id !== id),
-        })),
+        }));
+
+        // Delete from database
+        try {
+          const { supabase } = await import('../lib/supabase');
+          
+          const { error } = await supabase
+            .from('places')
+            .delete()
+            .eq('id', id);
+
+          if (error) {
+            console.error('Failed to delete place from database:', error);
+          } else {
+            console.log('✅ Place deleted from database successfully');
+          }
+        } catch (error) {
+          console.error('Failed to delete place:', error);
+        }
+      },
 
       // UI State
       isOptimizing: false,
@@ -254,27 +371,29 @@ export const useStore = create<StoreState>()(
       // Database Loading Functions
       loadTripsFromDatabase: async (): Promise<void> => {
         try {
-          const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/rest/v1/rpc/execute_sql', {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08',
-              'Content-Type': 'application/json',
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08'
-            },
-            body: JSON.stringify({
-              query: `
-                SELECT 
-                  id, name, departure_location, description, destination, 
-                  start_date, end_date, owner_id, created_at
-                FROM trips 
-                ORDER BY created_at DESC 
-                LIMIT 20;
-              `
-            })
-          });
+          const { user } = get();
+          if (!user) {
+            console.log('No user found, skipping trips loading');
+            return;
+          }
+
+          // Load trips where user is owner or member
+          // Note: For now, we'll just load trips by owner_id to avoid the complex OR query
+          const { data: tripsData, error } = await supabase
+            .from('trips')
+            .select(`
+              id, name, departure_location, description, destination, 
+              start_date, end_date, owner_id, created_at
+            `)
+            .eq('owner_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(20);
           
-          const tripsData = await response.json();
-          
+          if (error) {
+            console.error('Failed to load trips from database:', error);
+            return;
+          }
+
           if (tripsData && Array.isArray(tripsData)) {
             const trips: Trip[] = tripsData.map(trip => ({
               id: trip.id,
@@ -290,6 +409,7 @@ export const useStore = create<StoreState>()(
             }));
             
             set({ trips });
+            console.log(`✅ Loaded ${trips.length} trips from database`);
             
             // Set the first trip as current if no current trip is set
             if (!get().currentTrip && trips.length > 0) {
@@ -303,30 +423,39 @@ export const useStore = create<StoreState>()(
 
       loadPlacesFromDatabase: async (tripId?: string): Promise<void> => {
         try {
-          const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/rest/v1/rpc/execute_sql', {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08',
-              'Content-Type': 'application/json',
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08'
-            },
-            body: JSON.stringify({
-              query: `
-                SELECT 
-                  id, name, category, place_type, wish_level, stay_duration_minutes,
-                  latitude, longitude, is_selected_for_optimization, 
-                  normalized_wish_level, selection_round, trip_id, user_id, created_at
-                FROM places 
-                ${tripId ? `WHERE trip_id = '${tripId}'` : ''}
-                ORDER BY created_at;
-              `
-            })
-          });
-          
-          const placesData = await response.json();
+          const { user, currentTrip } = get();
+          if (!user) {
+            console.log('No user found, skipping places loading');
+            return;
+          }
+
+          // Use current trip if no tripId specified
+          const targetTripId = tripId || currentTrip?.id;
+          if (!targetTripId) {
+            console.log('⚠️ No trip ID specified, cannot load places');
+            set({ places: [] }); // Clear places if no trip selected
+            return;
+          }
+
+          // Always filter by specific trip to avoid mixing places
+          const { data: placesData, error } = await supabase
+            .from('places')
+            .select(`
+              id, name, category, place_type, wish_level, stay_duration_minutes,
+              latitude, longitude, is_selected_for_optimization, 
+              normalized_wish_level, selection_round, trip_id, user_id, created_at,
+              scheduled, scheduled_date, scheduled_time_start, scheduled_time_end
+            `)
+            .eq('trip_id', targetTripId)
+            .order('created_at', { ascending: true });
+
+          if (error) {
+            console.error('Failed to load places from database:', error);
+            return;
+          }
           
           if (placesData && Array.isArray(placesData)) {
-            const places: Place[] = placesData.map(place => ({
+            const dbPlaces: Place[] = placesData.map(place => ({
               id: place.id,
               name: place.name,
               category: place.category,
@@ -350,7 +479,14 @@ export const useStore = create<StoreState>()(
               stay_duration_minutes: place.stay_duration_minutes
             }));
             
-            set({ places });
+            set({ places: dbPlaces });
+            console.log(`✅ Loaded ${dbPlaces.length} places from database${targetTripId ? ` for trip ${targetTripId}` : ''}`);
+            
+            // Debug: Log places for current trip
+            if (targetTripId) {
+              const tripPlaces = dbPlaces.filter(p => p.trip_id === targetTripId);
+              console.log(`📍 Places for current trip (${targetTripId}):`, tripPlaces.length);
+            }
           }
         } catch (error) {
           console.error('Failed to load places from database:', error);
@@ -359,8 +495,22 @@ export const useStore = create<StoreState>()(
 
       initializeFromDatabase: async (): Promise<void> => {
         const { loadTripsFromDatabase, loadPlacesFromDatabase } = get();
-        await loadTripsFromDatabase();
-        await loadPlacesFromDatabase();
+        
+        // Always load from database for scalable architecture
+        try {
+          await loadTripsFromDatabase();
+          
+          // Load places only for current trip (if any)
+          const { currentTrip } = get();
+          if (currentTrip) {
+            await loadPlacesFromDatabase(currentTrip.id);
+            console.log(`🔄 Initialized app with fresh database data for trip: ${currentTrip.name}`);
+          } else {
+            console.log('🔄 Initialized app with trips data (no current trip selected)');
+          }
+        } catch (error) {
+          console.error('Failed to initialize from database:', error);
+        }
       },
 
       // API Integration
@@ -369,12 +519,9 @@ export const useStore = create<StoreState>()(
         if (!user) throw new Error('User not authenticated');
 
         try {
-          // For demo purposes, skip API call and go directly to local storage
-          console.log('Creating trip locally for demo purposes');
-          throw new Error('Demo mode - using local storage');
-        } catch (error) {
-          console.log('Using local storage for trip creation:', error.message);
-          // Fallback to local storage for demo - generate proper UUID
+          // For development, create trip in local state only
+          console.log('Creating trip in local state for development');
+          
           const generateUUID = () => {
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
               const r = Math.random() * 16 | 0;
@@ -382,26 +529,47 @@ export const useStore = create<StoreState>()(
               return v.toString(16);
             });
           };
-          
-          const fallbackTrip: Trip = {
-            id: generateUUID(),
-            departureLocation: tripData.departure_location,
+
+          const tripId = generateUUID();
+          const createdTrip = {
+            id: tripId,
             name: tripData.name || `${tripData.departure_location} Trip`,
+            departure_location: tripData.departure_location,
             description: tripData.description,
             destination: tripData.destination,
-            startDate: tripData.start_date,
-            endDate: tripData.end_date,
-            memberCount: 1,
-            createdAt: new Date().toISOString(),
-            ownerId: user.id,
+            start_date: tripData.start_date,
+            end_date: tripData.end_date,
+            owner_id: user.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           };
 
+          console.log('Trip created successfully:', createdTrip);
+
+          // Convert to frontend format
+          const newTrip: Trip = {
+            id: createdTrip.id,
+            name: createdTrip.name,
+            departureLocation: createdTrip.departure_location,
+            description: createdTrip.description,
+            destination: createdTrip.destination,
+            startDate: createdTrip.start_date,
+            endDate: createdTrip.end_date,
+            memberCount: 1,
+            createdAt: createdTrip.created_at,
+            ownerId: createdTrip.owner_id,
+          };
+
+          // Update store state
           set((state) => ({ 
-            trips: [...state.trips, fallbackTrip],
-            currentTrip: fallbackTrip 
+            trips: [...state.trips, newTrip],
+            currentTrip: newTrip 
           }));
 
-          return fallbackTrip;
+          return newTrip;
+        } catch (error) {
+          console.error('Failed to create trip:', error);
+          throw error;
         }
       },
 
@@ -412,25 +580,33 @@ export const useStore = create<StoreState>()(
         set({ isOptimizing: true });
 
         try {
-          const response = await fetch('/api/supabase/functions/optimize-route', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${user.id}`, // In real implementation, use proper JWT token
+          // Use TripOptimizationService for production optimization
+          const { TripOptimizationService } = await import('../services/TripOptimizationService');
+          
+          const result = await TripOptimizationService.optimizeTrip(
+            tripId,
+            {
+              fairness_weight: 0.6,
+              efficiency_weight: 0.4,
+              include_meals: true,
+              preferred_transport: 'car'
             },
-            body: JSON.stringify({ trip_id: tripId }),
-          });
+            (progress) => {
+              console.log('Optimization progress:', progress);
+            }
+          );
 
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to optimize trip');
+          if (result.success && result.optimization_result) {
+            // Store the complete optimization result structure
+            set({ optimizationResult: result.optimization_result });
+            
+            // Refresh places data to get updated schedules
+            await get().loadPlacesFromDatabase(tripId);
+            
+            console.log('Optimization completed successfully:', result);
+          } else {
+            throw new Error('Optimization failed to return valid results');
           }
-
-          const result = await response.json();
-          console.log('Optimization completed:', result);
-
-          // Update places with optimized schedule from database
-          await get().loadPlacesFromAPI(tripId);
           
         } catch (error) {
           console.error('Failed to optimize trip:', error);
@@ -442,11 +618,6 @@ export const useStore = create<StoreState>()(
 
       loadPlacesFromAPI: async (tripId: string): Promise<void> => {
         try {
-          // Import Supabase client dynamically to avoid bundling issues
-          const { createClient } = await import('@supabase/supabase-js');
-          const supabaseUrl = 'https://rdufxwoeneglyponagdz.supabase.co';
-          const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
-          const supabase = createClient(supabaseUrl, supabaseKey);
 
           const { data: places, error } = await supabase
             .from('places')
@@ -510,20 +681,17 @@ export const useStore = create<StoreState>()(
 
       loadOptimizationResult: async (tripId: string): Promise<void> => {
         try {
-          const { createClient } = await import('@supabase/supabase-js');
-          const supabaseUrl = 'https://rdufxwoeneglyponagdz.supabase.co';
-          const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
-          const supabase = createClient(supabaseUrl, supabaseKey);
-
+          // Check if table exists before querying
           const { data: result, error } = await supabase
             .from('optimization_results')
             .select('*')
             .eq('trip_id', tripId)
             .eq('is_active', true)
-            .single();
+            .maybeSingle(); // Use maybeSingle instead of single to handle no results
 
           if (error) {
-            console.error('Failed to load optimization result:', error);
+            // If table doesn't exist or query fails, just set null result
+            console.warn('Optimization results table not found or query failed:', error.message);
             set({ optimizationResult: null });
             return;
           }
@@ -553,10 +721,6 @@ export const useStore = create<StoreState>()(
 
       createSystemPlaces: async (tripId: string): Promise<void> => {
         try {
-          const { createClient } = await import('@supabase/supabase-js');
-          const supabaseUrl = 'https://rdufxwoeneglyponagdz.supabase.co';
-          const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
-          const supabase = createClient(supabaseUrl, supabaseKey);
           
           const { user, currentTrip } = get();
           if (!user || !currentTrip) return;
@@ -597,8 +761,8 @@ export const useStore = create<StoreState>()(
               longitude: 139.7671,
               rating: 0,
               wish_level: 5, // High priority for system places
-              stay_duration_minutes: 0,
-              price_level: 0,
+              stay_duration_minutes: 60, // Minimum 60 minutes for system places
+              price_level: 1,
               scheduled: true,
               scheduled_date: trip.start_date,
               scheduled_time_start: '08:00:00',
@@ -621,8 +785,8 @@ export const useStore = create<StoreState>()(
               longitude: 139.7671,
               rating: 0,
               wish_level: 5,
-              stay_duration_minutes: 0,
-              price_level: 0,
+              stay_duration_minutes: 60, // Minimum 60 minutes for system places
+              price_level: 1,
               scheduled: true,
               scheduled_date: trip.end_date,
               scheduled_time_start: '18:00:00',
@@ -654,19 +818,7 @@ export const useStore = create<StoreState>()(
           console.error('Failed to create system places:', error);
         }
       },
-    }),
-    {
-      name: 'voypath-storage',
-      partialize: (state) => ({
-        theme: state.theme,
-        user: state.user,
-        trips: state.trips,
-        places: state.places,
-        currentTrip: state.currentTrip,
-      }),
-    }
-  )
-);
+    }));
 
 // Apply theme to document
 if (typeof window !== 'undefined') {

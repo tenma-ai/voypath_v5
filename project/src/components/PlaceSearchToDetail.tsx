@@ -97,11 +97,11 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
           : selectedPlace.geometry?.location?.lng || 0,
         rating: selectedPlace.rating || 0,
         wishLevel: formData.visitPriority,
-        stayDuration: formData.duration,
+        stayDuration: formData.duration / 60, // Convert minutes to hours for UI
         priceLevel: selectedPlace.price_level || formData.budget,
         scheduled: false,
         visitDate: formData.visitDate || undefined,
-        notes: '',
+        notes: formData.notes || '',
         tripId: currentTrip.id,
         userId: user.id,
         // Additional properties to match database schema
@@ -112,13 +112,20 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
         google_place_id: selectedPlace.place_id,
         google_rating: selectedPlace.rating,
         google_price_level: selectedPlace.price_level,
+        google_types: selectedPlace.types,
         estimated_cost: formData.budget * 10, // Rough estimate
+        image_url: selectedPlace.photos && selectedPlace.photos.length > 0 
+          ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${selectedPlace.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
+          : undefined,
+        images: selectedPlace.photos ? selectedPlace.photos.map(photo => 
+          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photo.photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
+        ) : [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
       
       // Add to store
-      addPlace(newPlace);
+      await addPlace(newPlace);
       
       console.log('Place added successfully:', newPlace);
       

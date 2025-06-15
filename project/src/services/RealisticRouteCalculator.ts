@@ -175,10 +175,6 @@ export class RealisticRouteCalculator {
     'public_transport_over_water'
   ];
 
-  private static supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL!,
-    import.meta.env.VITE_SUPABASE_ANON_KEY!
-  );
 
   /**
    * Calculate distance between two points using Haversine formula
