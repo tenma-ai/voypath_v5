@@ -521,12 +521,11 @@ export const useStore = create<StoreState>()((set, get) => ({
         try {
           console.log('Creating trip in Supabase database');
           
+          // Generate UUID with timestamp to avoid conflicts
           const generateUUID = () => {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-              const r = Math.random() * 16 | 0;
-              const v = c === 'x' ? r : (r & 0x3 | 0x8);
-              return v.toString(16);
-            });
+            const timestamp = Date.now().toString(16);
+            const randomPart = Math.random().toString(16).substring(2, 10);
+            return `${timestamp.substring(0, 8)}-${randomPart.substring(0, 4)}-4${randomPart.substring(4, 7)}-a${timestamp.substring(8, 11)}-${randomPart}${timestamp.substring(11)}`.substring(0, 36);
           };
 
           const tripId = generateUUID();
@@ -541,16 +540,36 @@ export const useStore = create<StoreState>()((set, get) => ({
             owner_id: user.id,
           };
 
-          // Save to Supabase database
-          const { data: savedTrip, error } = await supabase
-            .from('trips')
-            .insert(createdTrip)
-            .select()
-            .single();
+          // Save to Supabase database with retry on conflict
+          let savedTrip;
+          let attempts = 0;
+          const maxAttempts = 3;
+          
+          while (attempts < maxAttempts) {
+            const { data, error } = await supabase
+              .from('trips')
+              .insert(createdTrip)
+              .select()
+              .single();
 
-          if (error) {
-            console.error('Failed to save trip to database:', error);
-            throw error;
+            if (!error) {
+              savedTrip = data;
+              break;
+            }
+
+            if (error.code === '23505' || error.code === '409') {
+              // UUID conflict, generate new one and retry
+              attempts++;
+              createdTrip.id = generateUUID();
+              console.log(`Trip ID conflict, retrying with new ID: ${createdTrip.id} (attempt ${attempts})`);
+            } else {
+              console.error('Failed to save trip to database:', error);
+              throw error;
+            }
+          }
+
+          if (!savedTrip) {
+            throw new Error('Failed to create trip after multiple attempts');
           }
 
           console.log('Trip created successfully in database:', savedTrip);

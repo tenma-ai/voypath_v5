@@ -27,9 +27,9 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
   },
   server: {
-    host: '0.0.0.0',
-    port: 8080,
-    open: false,
+    host: 'localhost',
+    port: 3000,
+    open: true,
     strictPort: false,
     fs: {
       strict: false,
