@@ -519,8 +519,7 @@ export const useStore = create<StoreState>()((set, get) => ({
         if (!user) throw new Error('User not authenticated');
 
         try {
-          // For development, create trip in local state only
-          console.log('Creating trip in local state for development');
+          console.log('Creating trip in Supabase database');
           
           const generateUUID = () => {
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -540,24 +539,66 @@ export const useStore = create<StoreState>()((set, get) => ({
             start_date: tripData.start_date,
             end_date: tripData.end_date,
             owner_id: user.id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
           };
 
-          console.log('Trip created successfully:', createdTrip);
+          // Save to Supabase database
+          const { data: savedTrip, error } = await supabase
+            .from('trips')
+            .insert(createdTrip)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Failed to save trip to database:', error);
+            throw error;
+          }
+
+          console.log('Trip created successfully in database:', savedTrip);
+
+          // Add user to users table if not exists
+          const { error: userError } = await supabase
+            .from('users')
+            .upsert({
+              id: user.id,
+              email: user.email,
+              name: user.name || user.email?.split('@')[0] || 'User'
+            });
+
+          if (userError) {
+            console.warn('Failed to upsert user:', userError);
+          }
+
+          // Add owner as trip member
+          const { error: memberError } = await supabase
+            .from('trip_members')
+            .insert({
+              trip_id: savedTrip.id,
+              user_id: user.id,
+              role: 'admin',
+              joined_at: new Date().toISOString(),
+              can_add_places: true,
+              can_edit_places: true,
+              can_optimize: true,
+              can_invite_members: true
+            });
+
+          if (memberError) {
+            console.error('Failed to add trip member:', memberError);
+            throw memberError;
+          }
 
           // Convert to frontend format
           const newTrip: Trip = {
-            id: createdTrip.id,
-            name: createdTrip.name,
-            departureLocation: createdTrip.departure_location,
-            description: createdTrip.description,
-            destination: createdTrip.destination,
-            startDate: createdTrip.start_date,
-            endDate: createdTrip.end_date,
+            id: savedTrip.id,
+            name: savedTrip.name,
+            departureLocation: savedTrip.departure_location,
+            description: savedTrip.description,
+            destination: savedTrip.destination,
+            startDate: savedTrip.start_date,
+            endDate: savedTrip.end_date,
             memberCount: 1,
-            createdAt: createdTrip.created_at,
-            ownerId: createdTrip.owner_id,
+            createdAt: savedTrip.created_at,
+            ownerId: savedTrip.owner_id,
           };
 
           // Update store state

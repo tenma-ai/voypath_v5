@@ -1,54 +1,97 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Copy, RefreshCw, Users, Settings, Crown, MoreVertical, Share2, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ShareTripModal } from '../components/ShareTripModal';
 import { useStore } from '../store/useStore';
+import { supabase } from '../lib/supabase';
 
-const mockMembers = [
-  {
-    id: '1',
-    name: 'Alice Johnson',
-    avatar: 'A',
-    role: 'Owner',
-    isOnline: true,
-    joinedAt: '5 days ago',
-  },
-  {
-    id: '2',
-    name: 'Bob Smith',
-    avatar: 'B',
-    role: 'Member',
-    isOnline: true,
-    joinedAt: '4 days ago',
-  },
-  {
-    id: '3',
-    name: 'Charlie Brown',
-    avatar: 'C',
-    role: 'Member',
-    isOnline: false,
-    joinedAt: '3 days ago',
-  },
-  {
-    id: '4',
-    name: 'Diana Prince',
-    avatar: 'D',
-    role: 'Member',
-    isOnline: true,
-    joinedAt: '2 days ago',
-  },
-];
+interface TripMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  joined_at: string;
+}
 
 export function SharePage() {
-  const { currentTrip } = useStore();
-  const [joinCode] = useState('ABC-123-XYZ');
+  const { currentTrip, user } = useStore();
+  const [joinCode, setJoinCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [members, setMembers] = useState<TripMember[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (currentTrip) {
+      loadTripMembers();
+      generateJoinCode();
+    }
+  }, [currentTrip]);
+
+  const loadTripMembers = async () => {
+    if (!currentTrip) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('trip_members')
+        .select(`
+          user_id,
+          role,
+          joined_at,
+          users (
+            id,
+            name,
+            email
+          )
+        `)
+        .eq('trip_id', currentTrip.id);
+
+      if (error) throw error;
+
+      const membersData = data?.map(member => ({
+        id: member.user_id,
+        name: member.users?.name || 'Unknown User',
+        email: member.users?.email || '',
+        role: member.role,
+        joined_at: member.joined_at
+      })) || [];
+
+      setMembers(membersData);
+    } catch (error) {
+      console.error('Failed to load trip members:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateJoinCode = () => {
+    // Generate a simple join code
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) code += '-';
+      for (let j = 0; j < 3; j++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+    }
+    setJoinCode(code);
+  };
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(joinCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const formatJoinedDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) return 'today';
+    if (diffDays === 2) return 'yesterday';
+    return `${diffDays} days ago`;
   };
 
   return (
@@ -112,7 +155,7 @@ export function SharePage() {
       <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Members ({mockMembers.length})
+            Members ({members.length})
           </h3>
           <button className="flex items-center space-x-2 px-3 py-1 bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded-lg text-sm font-medium hover:bg-primary-200 dark:hover:bg-primary-900/30 transition-colors">
             <Users className="w-4 h-4" />
@@ -120,50 +163,56 @@ export function SharePage() {
           </button>
         </div>
 
-        <div className="space-y-3">
-          {mockMembers.map((member, index) => (
-            <motion.div
-              key={member.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-medium">{member.avatar}</span>
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-slate-600 dark:text-slate-400 mt-2">Loading members...</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {members.map((member, index) => (
+              <motion.div
+                key={member.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center">
+                      <span className="text-white font-medium">
+                        {member.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
                   </div>
-                  {member.isOnline && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-white dark:border-slate-800 rounded-full"></div>
-                  )}
+                  
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                        {member.name}
+                      </span>
+                      {member.role === 'admin' && (
+                        <Crown className="w-4 h-4 text-yellow-500" />
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
+                      <span>{member.role === 'admin' ? 'Owner' : 'Member'}</span>
+                      <span>•</span>
+                      <span>Joined {formatJoinedDate(member.joined_at)}</span>
+                    </div>
+                  </div>
                 </div>
-                
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {member.name}
-                    </span>
-                    {member.role === 'Owner' && (
-                      <Crown className="w-4 h-4 text-yellow-500" />
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
-                    <span>{member.role}</span>
-                    <span>•</span>
-                    <span>Joined {member.joinedAt}</span>
-                  </div>
-                </div>
-              </div>
 
-              {member.role !== 'Owner' && (
-                <button className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
-                  <MoreVertical className="w-4 h-4 text-slate-500" />
-                </button>
-              )}
-            </motion.div>
-          ))}
-        </div>
+                {member.role !== 'admin' && user?.id === currentTrip?.ownerId && (
+                  <button className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                    <MoreVertical className="w-4 h-4 text-slate-500" />
+                  </button>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Share Modal */}
