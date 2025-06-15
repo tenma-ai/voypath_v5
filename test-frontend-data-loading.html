@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step 14: Frontend Data Loading Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .trip-data { margin: 10px 0; }
+        .place-item { margin: 5px 0; padding: 8px; background-color: #f8f9fa; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Step 14: Frontend Data Loading Test</h1>
+    <p>Testing if the frontend can retrieve and display optimized trip data from the database.</p>
+    
+    <div class="test-section info">
+        <h3>Test Configuration</h3>
+        <p><strong>Trip ID:</strong> a1b2c3d4-e5f6-7890-abcd-ef1234567890</p>
+        <p><strong>Test User:</strong> test@example.com</p>
+        <p><strong>Expected Data:</strong> Tokyo trip with 6 scheduled places and member colors</p>
+    </div>
+
+    <div class="test-section">
+        <h3>Authentication Test</h3>
+        <button onclick="signInUser()">Sign In Test User</button>
+        <button onclick="checkCurrentUser()">Check Current User</button>
+        <div id="auth-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Database Connection Test</h3>
+        <button onclick="testDatabaseConnection()">Test Database Connection</button>
+        <div id="db-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Trip Data Loading Test</h3>
+        <button onclick="loadTripData()">Load Trip Data</button>
+        <div id="trip-status"></div>
+        <div id="trip-details"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Places Data Loading Test</h3>
+        <button onclick="loadPlacesData()">Load Places Data</button>
+        <div id="places-status"></div>
+        <div id="places-details"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Member Colors Test</h3>
+        <button onclick="testMemberColors()">Test Member Colors</button>
+        <div id="colors-status"></div>
+        <div id="colors-details"></div>
+    </div>
+
+    <script>
+        // Initialize Supabase client
+        const { createClient } = supabase;
+        const supabaseClient = createClient(
+            'https://rdufxwoeneglyponagdz.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM3NDE1NDgsImV4cCI6MjA0OTMxNzU0OH0.P4nN3r2XHwLUJ7K6k6UjQgHITkn0OTaKKi2kNfgJ_w8'
+        );
+
+        const TEST_TRIP_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+        let currentUserId = null;
+
+        function updateStatus(elementId, content, className = '') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = content;
+            element.className = className;
+        }
+
+        async function signInUser() {
+            try {
+                updateStatus('auth-status', 'Attempting to sign in...', 'info');
+                
+                // Try to sign in with test user credentials
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email: 'test@example.com',
+                    password: 'testpassword123'
+                });
+
+                if (error) {
+                    updateStatus('auth-status', `Sign in failed: ${error.message}`, 'error');
+                } else {
+                    currentUserId = data.user.id;
+                    updateStatus('auth-status', `✅ Signed in successfully! User ID: ${data.user.id}`, 'success');
+                }
+            } catch (error) {
+                updateStatus('auth-status', `Sign in error: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkCurrentUser() {
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                
+                if (session && session.user) {
+                    currentUserId = session.user.id;
+                    updateStatus('auth-status', `✅ Current user: ${session.user.email} (ID: ${session.user.id})`, 'success');
+                } else {
+                    updateStatus('auth-status', '❌ No current user session', 'error');
+                }
+            } catch (error) {
+                updateStatus('auth-status', `Check user error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDatabaseConnection() {
+            try {
+                updateStatus('db-status', 'Testing database connection...', 'info');
+                
+                const { data, error } = await supabaseClient
+                    .from('trips')
+                    .select('id, name')
+                    .limit(1);
+
+                if (error) {
+                    updateStatus('db-status', `❌ Database connection failed: ${error.message}`, 'error');
+                } else {
+                    updateStatus('db-status', `✅ Database connection successful! Found ${data.length} trip(s)`, 'success');
+                }
+            } catch (error) {
+                updateStatus('db-status', `Database connection error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadTripData() {
+            try {
+                updateStatus('trip-status', 'Loading trip data...', 'info');
+                
+                const { data, error } = await supabaseClient
+                    .from('trips')
+                    .select('*')
+                    .eq('id', TEST_TRIP_ID)
+                    .single();
+
+                if (error) {
+                    updateStatus('trip-status', `❌ Failed to load trip data: ${error.message}`, 'error');
+                    return;
+                }
+
+                updateStatus('trip-status', '✅ Trip data loaded successfully!', 'success');
+                
+                const tripHtml = `
+                    <div class="trip-data">
+                        <h4>Trip Details:</h4>
+                        <p><strong>Name:</strong> ${data.name}</p>
+                        <p><strong>Start Date:</strong> ${data.start_date}</p>
+                        <p><strong>End Date:</strong> ${data.end_date}</p>
+                        <p><strong>Status:</strong> ${data.status || 'N/A'}</p>
+                        <p><strong>Created:</strong> ${new Date(data.created_at).toLocaleString()}</p>
+                    </div>
+                `;
+                
+                document.getElementById('trip-details').innerHTML = tripHtml;
+            } catch (error) {
+                updateStatus('trip-status', `Trip loading error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadPlacesData() {
+            try {
+                updateStatus('places-status', 'Loading places data...', 'info');
+                
+                const { data, error } = await supabaseClient
+                    .from('places')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID)
+                    .order('scheduled_date, scheduled_time_start');
+
+                if (error) {
+                    updateStatus('places-status', `❌ Failed to load places data: ${error.message}`, 'error');
+                    return;
+                }
+
+                updateStatus('places-status', `✅ Loaded ${data.length} places successfully!`, 'success');
+                
+                let placesHtml = '<div class="trip-data"><h4>Places (Scheduled Order):</h4>';
+                
+                data.forEach((place, index) => {
+                    const scheduleInfo = place.scheduled 
+                        ? `${place.scheduled_date} ${place.scheduled_time_start}-${place.scheduled_time_end}`
+                        : 'Not scheduled';
+                    
+                    placesHtml += `
+                        <div class="place-item" style="border-left: 4px solid ${place.display_color_hex || '#ccc'}">
+                            <strong>${index + 1}. ${place.name}</strong><br>
+                            📅 ${scheduleInfo}<br>
+                            🚗 ${place.transport_mode || 'N/A'} (${place.travel_time_from_previous || 0} min)<br>
+                            ⭐ Wish Level: ${place.normalized_wish_level || 'N/A'}<br>
+                            🎨 Color: ${place.display_color_hex || 'No color'}<br>
+                            ✅ Selected: ${place.is_selected_for_optimization ? 'Yes' : 'No'}
+                        </div>
+                    `;
+                });
+                
+                placesHtml += '</div>';
+                document.getElementById('places-details').innerHTML = placesHtml;
+            } catch (error) {
+                updateStatus('places-status', `Places loading error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testMemberColors() {
+            try {
+                updateStatus('colors-status', 'Testing member colors...', 'info');
+                
+                // Check member colors table
+                const { data: memberColors, error: mcError } = await supabaseClient
+                    .from('member_colors')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID);
+
+                if (mcError) {
+                    updateStatus('colors-status', `❌ Failed to load member colors: ${mcError.message}`, 'error');
+                    return;
+                }
+
+                // Check trip members
+                const { data: tripMembers, error: tmError } = await supabaseClient
+                    .from('trip_members')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID);
+
+                if (tmError) {
+                    updateStatus('colors-status', `❌ Failed to load trip members: ${tmError.message}`, 'error');
+                    return;
+                }
+
+                updateStatus('colors-status', `✅ Found ${memberColors.length} member colors and ${tripMembers.length} trip members`, 'success');
+                
+                let colorsHtml = '<div class="trip-data">';
+                colorsHtml += '<h4>Member Colors:</h4>';
+                
+                memberColors.forEach(mc => {
+                    colorsHtml += `
+                        <div class="place-item" style="border-left: 4px solid ${mc.color_hex}">
+                            <strong>User ID:</strong> ${mc.user_id}<br>
+                            <strong>Color:</strong> ${mc.color_name} (${mc.color_hex})<br>
+                            <strong>Color Number:</strong> ${mc.color_number}
+                        </div>
+                    `;
+                });
+                
+                colorsHtml += '<h4>Trip Members:</h4>';
+                tripMembers.forEach(tm => {
+                    colorsHtml += `
+                        <div class="place-item">
+                            <strong>User ID:</strong> ${tm.user_id}<br>
+                            <strong>Role:</strong> ${tm.role}<br>
+                            <strong>Joined:</strong> ${new Date(tm.created_at).toLocaleString()}
+                        </div>
+                    `;
+                });
+                
+                colorsHtml += '</div>';
+                document.getElementById('colors-details').innerHTML = colorsHtml;
+            } catch (error) {
+                updateStatus('colors-status', `Member colors error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-check current user on page load
+        window.onload = function() {
+            checkCurrentUser();
+        };
+    </script>
+</body>
+</html>

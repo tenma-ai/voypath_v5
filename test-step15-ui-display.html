@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step 15: UI Display with Member Colors Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .test-section { 
+            margin: 20px 0; 
+            padding: 20px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        .place-card { 
+            margin: 10px 0; 
+            padding: 15px; 
+            background-color: #fff; 
+            border-radius: 8px; 
+            border-left: 6px solid;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .place-card:hover { transform: translateY(-2px); }
+        .timeline { position: relative; padding-left: 30px; }
+        .timeline-item { 
+            position: relative; 
+            margin-bottom: 20px; 
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            border-left: 4px solid;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -15px;
+            top: 20px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #007bff;
+        }
+        .schedule-info { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .time-badge { 
+            background-color: #007bff; 
+            color: white; 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .transport-badge { 
+            background-color: #28a745; 
+            color: white; 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            font-size: 12px;
+        }
+        .wish-level { 
+            font-size: 14px; 
+            color: #6c757d; 
+        }
+        .member-color-demo { 
+            display: inline-block; 
+            width: 20px; 
+            height: 20px; 
+            border-radius: 50%; 
+            margin-right: 8px;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 1px #ddd;
+        }
+        .stats { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 15px; 
+            margin: 20px 0;
+        }
+        .stat-card { 
+            padding: 15px; 
+            background-color: #f8f9fa; 
+            border-radius: 8px; 
+            text-align: center;
+        }
+        .stat-number { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #007bff; 
+        }
+        button { 
+            padding: 12px 24px; 
+            margin: 8px; 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: #0056b3; }
+        .day-header { 
+            background-color: #343a40; 
+            color: white; 
+            padding: 10px 15px; 
+            margin: 20px 0 10px 0; 
+            border-radius: 6px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 Step 15: UI Display with Member Colors Test</h1>
+    <p>Testing UI display of optimized trip data with member colors and schedule visualization.</p>
+    
+    <div class="test-section info">
+        <h3>📊 Test Configuration</h3>
+        <p><strong>Trip ID:</strong> a1b2c3d4-e5f6-7890-abcd-ef1234567890</p>
+        <p><strong>Expected:</strong> Tokyo trip with scheduled places displaying member colors</p>
+        <p><strong>Features to Test:</strong> Schedule timeline, member colors, transport modes, optimization results</p>
+    </div>
+
+    <div class="test-section">
+        <h3>🔄 Load Trip Data</h3>
+        <button onclick="loadAndDisplayTrip()">Load Trip with UI Display</button>
+        <div id="trip-status"></div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="total-places">-</div>
+                <div>Total Places</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="scheduled-places">-</div>
+                <div>Scheduled Places</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="trip-days">-</div>
+                <div>Trip Days</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="total-members">-</div>
+                <div>Members</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>👥 Member Colors</h3>
+        <div id="member-colors-display"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>📅 Optimized Schedule Timeline</h3>
+        <div id="schedule-timeline"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>🗺️ Places Overview</h3>
+        <div id="places-overview"></div>
+    </div>
+
+    <script>
+        const { createClient } = supabase;
+        const supabaseClient = createClient(
+            'https://rdufxwoeneglyponagdz.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzM3NDE1NDgsImV4cCI6MjA0OTMxNzU0OH0.P4nN3r2XHwLUJ7K6k6UjQgHITkn0OTaKKi2kNfgJ_w8'
+        );
+
+        const TEST_TRIP_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
+        function updateStatus(elementId, content, className = '') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = content;
+            if (className) element.className = className;
+        }
+
+        function formatTime(timeString) {
+            if (!timeString) return 'N/A';
+            return timeString.substring(0, 5); // HH:MM format
+        }
+
+        function getTransportIcon(mode) {
+            const icons = {
+                'car': '🚗',
+                'walking': '🚶',
+                'flight': '✈️',
+                'train': '🚅'
+            };
+            return icons[mode] || '🚗';
+        }
+
+        async function loadAndDisplayTrip() {
+            try {
+                updateStatus('trip-status', '🔄 Loading trip data...', 'info');
+
+                // Load trip details
+                const { data: tripData, error: tripError } = await supabaseClient
+                    .from('trips')
+                    .select('*')
+                    .eq('id', TEST_TRIP_ID)
+                    .single();
+
+                if (tripError) throw tripError;
+
+                // Load places with schedule data
+                const { data: placesData, error: placesError } = await supabaseClient
+                    .from('places')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID)
+                    .order('scheduled_date, scheduled_time_start');
+
+                if (placesError) throw placesError;
+
+                // Load member colors
+                const { data: memberColors, error: colorsError } = await supabaseClient
+                    .from('member_colors')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID);
+
+                if (colorsError) throw colorsError;
+
+                // Load trip members
+                const { data: tripMembers, error: membersError } = await supabaseClient
+                    .from('trip_members')
+                    .select('*')
+                    .eq('trip_id', TEST_TRIP_ID);
+
+                if (membersError) throw membersError;
+
+                updateStatus('trip-status', '✅ Trip data loaded successfully!', 'success');
+
+                // Update statistics
+                const scheduledPlaces = placesData.filter(p => p.scheduled);
+                document.getElementById('total-places').textContent = placesData.length;
+                document.getElementById('scheduled-places').textContent = scheduledPlaces.length;
+                document.getElementById('total-members').textContent = tripMembers.length;
+                
+                const startDate = new Date(tripData.start_date);
+                const endDate = new Date(tripData.end_date);
+                const tripDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                document.getElementById('trip-days').textContent = tripDays;
+
+                // Display member colors
+                displayMemberColors(memberColors, tripMembers);
+
+                // Display schedule timeline
+                displayScheduleTimeline(scheduledPlaces, tripData);
+
+                // Display places overview
+                displayPlacesOverview(placesData);
+
+            } catch (error) {
+                updateStatus('trip-status', `❌ Error loading trip: ${error.message}`, 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        function displayMemberColors(memberColors, tripMembers) {
+            let html = '<h4>Member Color Assignments:</h4>';
+            
+            if (memberColors.length === 0) {
+                html += '<p class="text-muted">No member colors assigned</p>';
+            } else {
+                memberColors.forEach(mc => {
+                    const member = tripMembers.find(tm => tm.user_id === mc.user_id);
+                    html += `
+                        <div style="display: flex; align-items: center; margin: 10px 0; padding: 10px; background-color: #f8f9fa; border-radius: 6px;">
+                            <div class="member-color-demo" style="background-color: ${mc.color_hex}"></div>
+                            <div>
+                                <strong>${mc.color_name}</strong> (${mc.color_hex})<br>
+                                <small>User: ${mc.user_id.substring(0, 8)}... | Role: ${member?.role || 'N/A'}</small>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            document.getElementById('member-colors-display').innerHTML = html;
+        }
+
+        function displayScheduleTimeline(scheduledPlaces, tripData) {
+            let html = '<div class="timeline">';
+            
+            if (scheduledPlaces.length === 0) {
+                html += '<p class="text-muted">No scheduled places found</p>';
+            } else {
+                // Group places by date
+                const placesByDate = {};
+                scheduledPlaces.forEach(place => {
+                    const date = place.scheduled_date;
+                    if (!placesByDate[date]) placesByDate[date] = [];
+                    placesByDate[date].push(place);
+                });
+
+                // Display each day
+                Object.keys(placesByDate).sort().forEach(date => {
+                    const dateObj = new Date(date);
+                    const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                    
+                    html += `<div class="day-header">📅 ${dayName}</div>`;
+                    
+                    placesByDate[date].forEach((place, index) => {
+                        const borderColor = place.display_color_hex || '#6c757d';
+                        html += `
+                            <div class="timeline-item" style="border-left-color: ${borderColor}">
+                                <div class="schedule-info">
+                                    <div>
+                                        <strong style="color: ${borderColor}">${place.name}</strong>
+                                        <div class="wish-level">
+                                            ⭐ Wish Level: ${place.normalized_wish_level ? (parseFloat(place.normalized_wish_level) * 100).toFixed(0) + '%' : 'N/A'}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span class="time-badge">
+                                            ${formatTime(place.scheduled_time_start)} - ${formatTime(place.scheduled_time_end)}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-top: 10px;">
+                                    ${place.transport_mode ? `
+                                        <span class="transport-badge">
+                                            ${getTransportIcon(place.transport_mode)} ${place.transport_mode}
+                                            ${place.travel_time_from_previous ? `(${place.travel_time_from_previous} min)` : ''}
+                                        </span>
+                                    ` : ''}
+                                    
+                                    ${place.stay_duration_minutes ? `
+                                        <span style="color: #6c757d; font-size: 14px; margin-left: 10px;">
+                                            ⏱️ Stay: ${place.stay_duration_minutes} min
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                });
+            }
+            
+            html += '</div>';
+            document.getElementById('schedule-timeline').innerHTML = html;
+        }
+
+        function displayPlacesOverview(placesData) {
+            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">';
+            
+            placesData.forEach(place => {
+                const borderColor = place.display_color_hex || '#6c757d';
+                const isScheduled = place.scheduled;
+                
+                html += `
+                    <div class="place-card" style="border-left-color: ${borderColor}">
+                        <h4 style="margin: 0 0 10px 0; color: ${borderColor}">
+                            ${place.name}
+                            ${isScheduled ? '✅' : '⏸️'}
+                        </h4>
+                        
+                        <div style="font-size: 14px; color: #6c757d; line-height: 1.4;">
+                            <div><strong>Category:</strong> ${place.category || 'N/A'}</div>
+                            <div><strong>Type:</strong> ${place.place_type || 'N/A'}</div>
+                            <div><strong>Wish Level:</strong> ${place.wish_level}/10</div>
+                            <div><strong>Normalized:</strong> ${place.normalized_wish_level ? (parseFloat(place.normalized_wish_level) * 100).toFixed(0) + '%' : 'N/A'}</div>
+                            <div><strong>Selected for Optimization:</strong> ${place.is_selected_for_optimization ? 'Yes' : 'No'}</div>
+                            
+                            ${isScheduled ? `
+                                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+                                    <div><strong>📅 Date:</strong> ${place.scheduled_date}</div>
+                                    <div><strong>⏰ Time:</strong> ${formatTime(place.scheduled_time_start)} - ${formatTime(place.scheduled_time_end)}</div>
+                                    ${place.transport_mode ? `<div><strong>🚗 Transport:</strong> ${place.transport_mode}</div>` : ''}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            document.getElementById('places-overview').innerHTML = html;
+        }
+
+        // Auto-load data on page load
+        window.onload = function() {
+            loadAndDisplayTrip();
+        };
+    </script>
+</body>
+</html>

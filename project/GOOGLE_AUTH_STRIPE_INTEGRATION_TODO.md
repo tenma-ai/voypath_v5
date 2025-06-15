@@ -61,6 +61,7 @@ interface User {
   stripe_customer_id?: string; // 既存フィールド
   stripe_subscription_id?: string; // 既存フィールド
   created_at: string;   // 既存フィールド
+  
   last_active_at?: string; // 既存フィールド
 }
 
