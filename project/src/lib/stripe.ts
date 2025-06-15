@@ -11,24 +11,32 @@ const stripePromise = isDevelopment && !stripeKey ?
 
 export { stripePromise };
 
-// 価格設定
+// 価格設定（税込み対応）
 export const STRIPE_PRICES = {
   PREMIUM_YEARLY: {
     priceId: 'price_1234567890', // 実際のStripe価格IDに置き換える
-    amount: 999, // $9.99 in cents
+    amount: 900, // $9.00 in cents (税別)
     currency: 'usd',
     interval: 'year',
-    displayPrice: '$9.99',
-    displayInterval: 'year'
-  },
-  PREMIUM_MONTHLY: {
-    priceId: 'price_0987654321', // 実際のStripe価格IDに置き換える
-    amount: 199, // $1.99 in cents
-    currency: 'usd',
-    interval: 'month',
-    displayPrice: '$1.99',
-    displayInterval: 'month'
+    displayPrice: '$9.00',
+    displayInterval: 'year',
+    taxInclusive: false, // 自動税計算対応
+    features: [
+      '無制限旅行作成',
+      '高度な共有機能',
+      'パスワード保護',
+      'アクセス解析',
+      '優先サポート'
+    ]
   }
+} as const;
+
+// 税金設定
+export const TAX_CONFIG = {
+  enabled: true,
+  defaultTaxCode: 'txcd_10000000', // SaaS/デジタルサービス
+  collectTaxId: false, // 個人向けサービスのため
+  automaticTax: true
 } as const;
 
 // Stripe Checkout セッション作成
