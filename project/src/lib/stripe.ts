@@ -14,7 +14,7 @@ export { stripePromise };
 // 価格設定（税込み対応）
 export const STRIPE_PRICES = {
   PREMIUM_YEARLY: {
-    priceId: 'price_1234567890', // 実際のStripe価格IDに置き換える
+    priceId: process.env.NODE_ENV === 'production' ? 'price_live_...' : 'price_test_...', // 環境に応じた実際のPriceID
     amount: 900, // $9.00 in cents (税別)
     currency: 'usd',
     interval: 'year',
@@ -39,19 +39,32 @@ export const TAX_CONFIG = {
   automaticTax: true
 } as const;
 
+// Get auth headers for Supabase requests
+const getAuthHeaders = async () => {
+  const { supabase } = await import('./supabase');
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session) {
+    throw new Error('Not authenticated');
+  }
+
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${session.access_token}`,
+    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+  };
+};
+
 // Stripe Checkout セッション作成
-export const createCheckoutSession = async (priceId: string, userId: string) => {
+export const createCheckoutSession = async () => {
   try {
-    const response = await fetch('/api/create-checkout-session', {
+    const headers = await getAuthHeaders();
+    
+    const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/stripe-subscription-management', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
-        priceId,
-        userId,
-        successUrl: `${window.location.origin}/premium/success`,
-        cancelUrl: `${window.location.origin}/premium/cancel`,
+        action: 'create_checkout_session',
       }),
     });
 
@@ -59,8 +72,8 @@ export const createCheckoutSession = async (priceId: string, userId: string) => 
       throw new Error('Failed to create checkout session');
     }
 
-    const { sessionId } = await response.json();
-    return sessionId;
+    const { sessionId, url } = await response.json();
+    return { sessionId, url };
   } catch (error) {
     console.error('Error creating checkout session:', error);
     throw error;
@@ -68,16 +81,15 @@ export const createCheckoutSession = async (priceId: string, userId: string) => 
 };
 
 // カスタマーポータルセッション作成
-export const createCustomerPortalSession = async (customerId: string) => {
+export const createCustomerPortalSession = async () => {
   try {
-    const response = await fetch('/api/create-portal-session', {
+    const headers = await getAuthHeaders();
+    
+    const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/stripe-subscription-management', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
-        customerId,
-        returnUrl: `${window.location.origin}/profile`,
+        action: 'create_portal_session',
       }),
     });
 
@@ -89,6 +101,30 @@ export const createCustomerPortalSession = async (customerId: string) => {
     return url;
   } catch (error) {
     console.error('Error creating portal session:', error);
+    throw error;
+  }
+};
+
+// サブスクリプション状態確認
+export const checkSubscriptionStatus = async () => {
+  try {
+    const headers = await getAuthHeaders();
+    
+    const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/stripe-subscription-management', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        action: 'check_subscription',
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to check subscription status');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error checking subscription status:', error);
     throw error;
   }
 };

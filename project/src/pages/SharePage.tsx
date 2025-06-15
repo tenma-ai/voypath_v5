@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Copy, RefreshCw, Users, Settings, Crown, MoreVertical } from 'lucide-react';
+import { Copy, RefreshCw, Users, Settings, Crown, MoreVertical, Share2, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { ShareTripModal } from '../components/ShareTripModal';
+import { useStore } from '../store/useStore';
 
 const mockMembers = [
   {
@@ -38,8 +40,10 @@ const mockMembers = [
 ];
 
 export function SharePage() {
+  const { currentTrip } = useStore();
   const [joinCode] = useState('ABC-123-XYZ');
   const [copied, setCopied] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(joinCode);
@@ -49,10 +53,33 @@ export function SharePage() {
 
   return (
     <div className="p-4 space-y-6">
+      {/* External Share Section */}
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            External Sharing
+          </h2>
+          <button
+            onClick={() => setIsShareModalOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Create Share Link</span>
+          </button>
+        </div>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+          Create shareable links for people outside your trip. Control permissions and access.
+        </p>
+        <div className="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
+          <ExternalLink className="w-4 h-4" />
+          <span>Share with anyone, even without an account</span>
+        </div>
+      </div>
+
       {/* Join Code Section */}
       <div className="bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-xl p-6 border border-primary-200 dark:border-primary-800">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-          Trip Join Code
+          Member Invitation Code
         </h2>
         
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 mb-4">
@@ -138,6 +165,15 @@ export function SharePage() {
           ))}
         </div>
       </div>
+
+      {/* Share Modal */}
+      {currentTrip && (
+        <ShareTripModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          tripId={currentTrip.id}
+        />
+      )}
     </div>
   );
 }

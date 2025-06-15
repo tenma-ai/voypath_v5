@@ -13,7 +13,10 @@ import { SharePage } from './pages/SharePage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PremiumSuccessPage } from './pages/PremiumSuccessPage';
 import { PremiumCancelPage } from './pages/PremiumCancelPage';
+import { AuthCallback } from './components/AuthCallback';
+import { SharedTripView } from './components/SharedTripView';
 import { useStore } from './store/useStore';
+import { supabase } from './lib/supabase';
 
 function App() {
   const { initializeFromDatabase, setUser } = useStore();
@@ -24,8 +27,7 @@ function App() {
     // Check if user is already authenticated
     const checkAuth = async () => {
       try {
-        const { getSession } = await import('./lib/supabase');
-        const session = await getSession();
+        const { data: { session } } = await supabase.auth.getSession();
         
         if (session && session.user) {
           console.log('✅ Found existing session:', session.user.id);
@@ -43,6 +45,22 @@ function App() {
     };
 
     checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 Auth state changed:', event, session?.user?.id);
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        await handleAuthenticated(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const handleAuthenticated = async (user: any) => {
@@ -75,33 +93,36 @@ function App() {
     );
   }
 
-  // Show authentication form if not authenticated
-  if (!isAuthenticated) {
-    return <SimpleAuth onAuthenticated={handleAuthenticated} />;
-  }
-
-  // Main app content for authenticated users
+  // Main app with routing that handles both authenticated and public routes
   return (
     <ErrorBoundary>
       <StripeProvider>
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
           <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route index element={<HomePage />} />
-              <Route path="my-trip" element={
-                <ErrorBoundary>
-                  <TripDetailPage />
-                </ErrorBoundary>
-              } />
-              <Route path="my-trip/my-places" element={<MyPlacesPage />} />
-              <Route path="my-trip/chat" element={<ChatPage />} />
-              <Route path="my-trip/share" element={<SharePage />} />
-              <Route path="add-place" element={<PlaceSearchToDetail />} />
-              <Route path="profile" element={<ProfilePage />} />
-            </Route>
-            {/* Premium pages outside of main layout */}
+            {/* Public routes (no auth required) */}
+            <Route path="auth/callback" element={<AuthCallback />} />
+            <Route path="shared/:shareToken" element={<SharedTripView />} />
             <Route path="premium/success" element={<PremiumSuccessPage />} />
             <Route path="premium/cancel" element={<PremiumCancelPage />} />
+            
+            {/* Protected routes */}
+            {isAuthenticated ? (
+              <Route path="/" element={<Layout />}>
+                <Route index element={<HomePage />} />
+                <Route path="my-trip" element={
+                  <ErrorBoundary>
+                    <TripDetailPage />
+                  </ErrorBoundary>
+                } />
+                <Route path="my-trip/my-places" element={<MyPlacesPage />} />
+                <Route path="my-trip/chat" element={<ChatPage />} />
+                <Route path="my-trip/share" element={<SharePage />} />
+                <Route path="add-place" element={<PlaceSearchToDetail />} />
+                <Route path="profile" element={<ProfilePage />} />
+              </Route>
+            ) : (
+              <Route path="*" element={<SimpleAuth onAuthenticated={handleAuthenticated} />} />
+            )}
           </Routes>
         </div>
       </StripeProvider>
