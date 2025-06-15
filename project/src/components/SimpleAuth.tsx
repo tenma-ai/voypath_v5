@@ -46,7 +46,13 @@ export function SimpleAuth({ onAuthenticated }: SimpleAuthProps) {
           }
         });
         
-        if (error) throw error;
+        if (error) {
+          // Handle rate limiting gracefully
+          if (error.status === 429 || error.message?.includes('rate')) {
+            throw new Error('Too many sign up attempts. Please wait a moment and try again.');
+          }
+          throw error;
+        }
         if (data.user) {
           console.log('✅ User signed up:', data.user.id);
           // For development, proceed without email confirmation

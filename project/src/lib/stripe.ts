@@ -7,7 +7,7 @@ const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 // 開発環境でStripeキーが設定されていない場合は無効化
 const stripePromise = isDevelopment && !stripeKey ? 
   Promise.resolve(null) : 
-  loadStripe(stripeKey || 'pk_test_demo_key');
+  stripeKey ? loadStripe(stripeKey) : Promise.resolve(null);
 
 export { stripePromise };
 
