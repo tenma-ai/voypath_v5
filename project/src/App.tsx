@@ -27,6 +27,11 @@ function App() {
     // Check if user is already authenticated
     const checkAuth = async () => {
       try {
+        // Log local storage for debugging
+        console.log('🔍 Checking localStorage for session...');
+        const storageKeys = Object.keys(localStorage).filter(key => key.includes('supabase'));
+        console.log('📦 Supabase storage keys:', storageKeys);
+        
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session && session.user) {
@@ -65,13 +70,18 @@ function App() {
 
   const handleAuthenticated = async (user: any) => {
     try {
+      // Create or update user profile in database
+      const { createOrUpdateUserProfile } = await import('./lib/supabase');
+      await createOrUpdateUserProfile(user);
+      
       // Set the authenticated user
       setUser({
         id: user.id,
-        name: user.user_metadata?.name || 'User',
+        name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
         email: user.email,
         isGuest: user.is_anonymous || false,
-        isPremium: false
+        isPremium: false,
+        avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture
       });
 
       // Load data from database

@@ -523,10 +523,44 @@ export const useStore = create<StoreState>()((set, get) => ({
           
           // Generate UUID with timestamp to avoid conflicts
           const generateUUID = () => {
-            const timestamp = Date.now().toString(16);
-            const randomPart = Math.random().toString(16).substring(2, 10);
-            return `${timestamp.substring(0, 8)}-${randomPart.substring(0, 4)}-4${randomPart.substring(4, 7)}-a${timestamp.substring(8, 11)}-${randomPart}${timestamp.substring(11)}`.substring(0, 36);
+            const hex = (n: number) => n.toString(16).padStart(2, '0');
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            
+            // Set version (4) and variant bits
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            
+            const uuid = [
+              bytes.slice(0, 4),
+              bytes.slice(4, 6),
+              bytes.slice(6, 8),
+              bytes.slice(8, 10),
+              bytes.slice(10, 16)
+            ].map((group, i) => 
+              Array.from(group).map(hex).join('')
+            ).join('-');
+            
+            return uuid;
           };
+
+          // First ensure user exists in database
+          const { error: userError } = await supabase
+            .from('users')
+            .upsert({
+              id: user.id,
+              email: user.email || 'dev@voypath.com',
+              name: user.name || user.user_metadata?.name || 'Development User',
+              is_guest: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              last_active_at: new Date().toISOString()
+            }, { onConflict: 'id' });
+
+          if (userError) {
+            console.error('Failed to ensure user exists:', userError);
+            throw userError;
+          }
 
           const tripId = generateUUID();
           const createdTrip = {
@@ -574,18 +608,7 @@ export const useStore = create<StoreState>()((set, get) => ({
 
           console.log('Trip created successfully in database:', savedTrip);
 
-          // Add user to users table if not exists
-          const { error: userError } = await supabase
-            .from('users')
-            .upsert({
-              id: user.id,
-              email: user.email,
-              name: user.name || user.email?.split('@')[0] || 'User'
-            });
-
-          if (userError) {
-            console.warn('Failed to upsert user:', userError);
-          }
+          // User already added at the beginning of the function
 
           // Add owner as trip member
           const { error: memberError } = await supabase

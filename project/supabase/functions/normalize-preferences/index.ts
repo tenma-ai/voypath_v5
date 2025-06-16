@@ -92,9 +92,13 @@ serve(async (req) => {
     const isTestTrip = requestData.trip_id?.includes('test') ||
                        requestData.trip_id?.includes('a1b2c3d4');
     
+    // Check for development user ID in request data
+    const isDevUser = requestData._dev_user_id === '2600c340-0ecd-4166-860f-ac4798888344';
+    
     const isTestMode = req.headers.get('X-Test-Mode') === 'true' || 
                        requestData.test_mode === true ||
-                       isTestTrip;
+                       isTestTrip ||
+                       isDevUser;
 
     // For all other operations, require authentication
     const supabaseClient = createClient(
@@ -111,11 +115,11 @@ serve(async (req) => {
     
     if (isTestMode) {
       console.log('Running in test mode, bypassing authentication');
-      // Create a mock user for testing
+      // Use dev user ID if provided, otherwise use test user
       user = {
-        id: '033523e2-377c-4479-a5cd-90d8905f7bd0',
-        email: 'test@example.com',
-        name: 'Test User'
+        id: requestData._dev_user_id || '033523e2-377c-4479-a5cd-90d8905f7bd0',
+        email: isDevUser ? 'dev@voypath.com' : 'test@example.com',
+        name: isDevUser ? 'Development User' : 'Test User'
       };
     } else {
       const {

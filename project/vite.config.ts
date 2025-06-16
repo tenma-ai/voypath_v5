@@ -28,7 +28,7 @@ export default defineConfig({
   },
   server: {
     host: '127.0.0.1',
-    port: 5173,
+    port: 8080,
     open: true,
     strictPort: false,
     fs: {
@@ -36,6 +36,8 @@ export default defineConfig({
     },
   },
   esbuild: {
-    logOverride: { 'this-is-undefined-in-esm': 'silent' }
+    logOverride: { 'this-is-undefined-in-esm': 'silent' },
+    target: 'es2020',
+    logLevel: 'silent'
   },
 });

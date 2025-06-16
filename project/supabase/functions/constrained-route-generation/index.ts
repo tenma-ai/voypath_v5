@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-test-mode',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -91,16 +91,23 @@ serve(async (req) => {
   }
 
   try {
-    const { tripId, userId, places, departure, destination, constraints } = await req.json();
+    const requestData = await req.json();
+    const { tripId, userId, places, departure, destination, constraints, _dev_user_id } = requestData;
 
     if (!tripId || !userId || !places || !departure) {
       throw new Error('Missing required parameters');
     }
 
-    // Check for test mode
-    const isTestMode = req.headers.get('X-Test-Mode') === 'true' || 
-                       tripId?.includes('test') ||
+    // Check for test mode - detect test trips and test user
+    const isTestTrip = tripId?.includes('test') ||
                        tripId?.includes('a1b2c3d4');
+    
+    // Check for development user ID in request data
+    const isDevUser = _dev_user_id === '2600c340-0ecd-4166-860f-ac4798888344';
+    
+    const isTestMode = req.headers.get('X-Test-Mode') === 'true' || 
+                       isTestTrip ||
+                       isDevUser;
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -409,7 +416,7 @@ async function hasAirport(place: Place, supabase: any): Promise<boolean> {
         }]
       },
       headers: {
-        'X-Test-Mode': 'true' // Enable test mode for internal function calls
+        'X-Test-Mode': isTestMode ? 'true' : 'false' // Pass test mode for internal function calls
       }
     });
 

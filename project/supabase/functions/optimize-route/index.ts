@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-test-mode',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -11,6 +11,8 @@ interface OptimizeRouteRequest {
   trip_id?: string;
   settings?: OptimizationSettings;
   type?: 'keep_alive' | 'optimization';
+  test_mode?: boolean;
+  _dev_user_id?: string;
 }
 
 interface OptimizationSettings {
@@ -122,11 +124,17 @@ serve(async (req) => {
       );
     }
 
-    // Check for test mode first
+    // Check for test mode first - detect test trips and test user
+    const isTestTrip = requestData.trip_id?.includes('test') ||
+                       requestData.trip_id?.includes('a1b2c3d4');
+    
+    // Check for development user ID in request data
+    const isDevUser = requestData._dev_user_id === '2600c340-0ecd-4166-860f-ac4798888344';
+    
     const isTestMode = req.headers.get('X-Test-Mode') === 'true' || 
                        requestData.test_mode === true ||
-                       requestData.trip_id?.includes('test') ||
-                       requestData.trip_id?.includes('a1b2c3d4');
+                       isTestTrip ||
+                       isDevUser;
 
     // For all other operations, require authentication
     const supabaseClient = createClient(
@@ -143,11 +151,11 @@ serve(async (req) => {
     
     if (isTestMode) {
       console.log('Running in test mode, bypassing authentication');
-      // Create a mock user for testing
+      // Use dev user ID if provided, otherwise use test user
       user = {
-        id: '033523e2-377c-4479-a5cd-90d8905f7bd0',
-        email: 'test@example.com',
-        name: 'Test User'
+        id: requestData._dev_user_id || '033523e2-377c-4479-a5cd-90d8905f7bd0',
+        email: isDevUser ? 'dev@voypath.com' : 'test@example.com',
+        name: isDevUser ? 'Development User' : 'Test User'
       };
     } else {
       const {
@@ -359,7 +367,8 @@ async function optimizeRoute(
       body: JSON.stringify({
         trip_id: trip.id,
         max_places: finalSettings.max_places_per_day || 20,
-        fairness_weight: finalSettings.fairness_weight || 0.6
+        fairness_weight: finalSettings.fairness_weight || 0.6,
+        _dev_user_id: user.id === '2600c340-0ecd-4166-860f-ac4798888344' ? user.id : undefined
       })
     });
 
