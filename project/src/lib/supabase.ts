@@ -179,19 +179,51 @@ export const createOrUpdateUserProfile = async (authUser: any, additionalData?: 
   
   console.log('Creating/updating user profile:', profileData);
   
-  const { data, error } = await supabase
-    .from('users')
-    .upsert(profileData, { onConflict: 'id' })
-    .select()
-    .single()
+  // Add timeout wrapper
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('User profile update timeout after 5 seconds')), 5000);
+  });
   
-  if (error) {
-    console.error('User profile upsert error:', error)
-    throw error
+  try {
+    const upsertPromise = supabase
+      .from('users')
+      .upsert(profileData, { onConflict: 'id' })
+      .select()
+      .single();
+    
+    const { data, error } = await Promise.race([upsertPromise, timeoutPromise]) as any;
+    
+    if (error) {
+      console.error('User profile upsert error:', error);
+      throw error;
+    }
+    
+    console.log('User profile created/updated successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('User profile operation failed:', error);
+    
+    // For timeout or other errors, try a simple update instead
+    if (error instanceof Error && error.message.includes('timeout')) {
+      console.log('⚠️ Upsert timed out, trying simple update...');
+      try {
+        const { data, error: updateError } = await supabase
+          .from('users')
+          .update({ last_active_at: new Date().toISOString() })
+          .eq('id', authUser.id)
+          .select()
+          .single();
+        
+        if (updateError) throw updateError;
+        console.log('✅ Simple user update successful:', data);
+        return data;
+      } catch (fallbackError) {
+        console.error('❌ Fallback update also failed:', fallbackError);
+      }
+    }
+    
+    throw error;
   }
-  
-  console.log('User profile created/updated successfully:', data);
-  return data
 }
 
 export const signOut = async () => {

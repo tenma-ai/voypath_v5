@@ -5,6 +5,12 @@ import App from './App.tsx';
 import './index.css';
 import { OptimizationKeepAliveService } from './services/OptimizationKeepAliveService';
 
+// Debug environment variables
+console.log('🔧 Environment Debug:');
+console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+console.log('VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Not set');
+console.log('DEV mode:', import.meta.env.DEV);
+
 // Start optimization keep-alive service for better performance
 OptimizationKeepAliveService.startKeepAlive();
 

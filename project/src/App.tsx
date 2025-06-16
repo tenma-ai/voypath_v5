@@ -22,6 +22,7 @@ function App() {
   const { initializeFromDatabase, setUser } = useStore();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isHandlingAuth, setIsHandlingAuth] = useState(false);
 
   useEffect(() => {
     // Check if user is already authenticated
@@ -69,12 +70,18 @@ function App() {
   }, []);
 
   const handleAuthenticated = async (user: any) => {
+    // Prevent multiple simultaneous authentication handling
+    if (isHandlingAuth) {
+      console.log('⚠️ Authentication already in progress, skipping...');
+      return;
+    }
+    
+    setIsHandlingAuth(true);
+    
     try {
-      // Create or update user profile in database
-      const { createOrUpdateUserProfile } = await import('./lib/supabase');
-      await createOrUpdateUserProfile(user);
+      console.log('🔄 Starting handleAuthenticated for user:', user.id);
       
-      // Set the authenticated user
+      // Set the authenticated user first
       setUser({
         id: user.id,
         name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
@@ -84,13 +91,46 @@ function App() {
         avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture
       });
 
-      // Load data from database
-      await initializeFromDatabase();
+      // Set authenticated state immediately
       setIsAuthenticated(true);
-      console.log('✅ App initialized with authentication and database data');
+      console.log('✅ User authenticated successfully');
+
+      // Background tasks with timeout
+      const backgroundTasks = async () => {
+        try {
+          // Try to create/update user profile in background (non-blocking)
+          const { createOrUpdateUserProfile } = await import('./lib/supabase');
+          await Promise.race([
+            createOrUpdateUserProfile(user),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Profile update timeout')), 3000))
+          ]);
+          console.log('✅ User profile updated');
+        } catch (profileError) {
+          console.warn('⚠️ Failed to update user profile (continuing anyway):', profileError);
+        }
+
+        try {
+          // Load data from database in background
+          await Promise.race([
+            initializeFromDatabase(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Database load timeout')), 3000))
+          ]);
+          console.log('✅ Database data loaded');
+        } catch (dbError) {
+          console.warn('⚠️ Failed to load database data (continuing anyway):', dbError);
+        }
+      };
+
+      // Run background tasks without blocking UI
+      backgroundTasks().finally(() => {
+        console.log('✅ App initialization completed');
+      });
+      
     } catch (error) {
-      console.error('❌ Failed to initialize app after auth:', error);
+      console.error('❌ Critical error in handleAuthenticated:', error);
       setIsAuthenticated(false);
+    } finally {
+      setIsHandlingAuth(false);
     }
   };
 

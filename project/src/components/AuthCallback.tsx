@@ -8,16 +8,32 @@ export function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        console.log('🔄 Auth callback started, URL:', window.location.href);
+        console.log('🔄 URL params:', new URLSearchParams(window.location.search).toString());
+        
+        // Check for error in URL params
+        const urlParams = new URLSearchParams(window.location.search);
+        const authError = urlParams.get('error');
+        const errorDescription = urlParams.get('error_description');
+        
+        if (authError) {
+          console.error('❌ OAuth error in URL:', authError, errorDescription);
+          navigate('/?error=' + encodeURIComponent(`OAuth Error: ${authError} - ${errorDescription}`));
+          return;
+        }
+        
         const { data, error } = await supabase.auth.getSession();
+        console.log('🔄 Session data:', data);
         
         if (error) {
-          console.error('Auth callback error:', error);
+          console.error('❌ Auth callback error:', error);
           navigate('/?error=' + encodeURIComponent(error.message));
           return;
         }
 
         if (data.session && data.session.user) {
           console.log('✅ Auth callback successful:', data.session.user.id);
+          console.log('✅ Provider:', data.session.user.app_metadata?.provider);
           // The main App component will handle the authentication state change
           navigate('/');
         } else {
@@ -25,7 +41,7 @@ export function AuthCallback() {
           navigate('/');
         }
       } catch (error) {
-        console.error('Auth callback error:', error);
+        console.error('❌ Auth callback error:', error);
         navigate('/');
       }
     };

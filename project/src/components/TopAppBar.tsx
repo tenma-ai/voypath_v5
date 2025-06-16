@@ -5,6 +5,7 @@ import { useStore } from '../store/useStore';
 import { PremiumBadge } from './PremiumBadge';
 import { PremiumModal } from './PremiumModal';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../lib/supabase';
 
 const routeTitles: Record<string, { title: string; subtitle?: string; icon?: any; gradient?: string }> = {
   '/': { 
@@ -95,6 +96,7 @@ function TopAppBar() {
   const handleProfileMenuToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log('🔄 Profile menu clicked, current state:', showProfileMenu);
     setShowProfileMenu(!showProfileMenu);
     setShowVoypathMenu(false);
   };
@@ -102,6 +104,7 @@ function TopAppBar() {
   const handleVoypathMenuToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log('🔄 Voypath menu clicked, current state:', showVoypathMenu);
     setShowVoypathMenu(!showVoypathMenu);
     setShowProfileMenu(false);
   };
@@ -138,10 +141,36 @@ function TopAppBar() {
         setShowPremiumModal(true);
         break;
       case 'logout':
-        console.log('Logging out...');
+        handleLogout();
         break;
       default:
         break;
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      console.log('🔄 Logging out...');
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('❌ Logout error:', error);
+      } else {
+        console.log('✅ Successfully logged out');
+      }
+      
+      // Clear local storage
+      localStorage.clear();
+      
+      // Refresh the page to reset all state
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('❌ Logout failed:', error);
+      // Fallback: clear storage and reload anyway
+      localStorage.clear();
+      window.location.reload();
     }
   };
 
@@ -471,6 +500,13 @@ function TopAppBar() {
 
             {/* Right Section */}
             <div className="flex items-center space-x-1.5 ml-auto flex-shrink-0">
+              {/* Temporary Logout Button for Debug */}
+              <button
+                onClick={handleLogout}
+                className="px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Logout
+              </button>
               {/* Theme Toggle */}
               <motion.button
                 onClick={toggleTheme}
