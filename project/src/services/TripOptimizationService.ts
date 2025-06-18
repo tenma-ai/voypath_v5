@@ -529,26 +529,56 @@ export class TripOptimizationService {
       throw new Error('No optimization data returned from edge function');
     }
 
-    // Extract places from the edge function response structure
-    // Try multiple possible locations for the optimized places
-    let optimizedPlaces = [];
+    console.log('🔍 [TripOptimizationService] Full optimization data structure:', JSON.stringify(optimizationData, null, 2));
+
+    // Extract ALL places from daily schedules across ALL days
+    let allOptimizedPlaces = [];
     
-    if (optimizationData.daily_schedules?.[0]?.places) {
-      optimizedPlaces = optimizationData.daily_schedules[0].places;
-      console.log('🔍 [TripOptimizationService] Found places in daily_schedules[0].places:', optimizedPlaces.length);
-    } else if (optimizationData.optimized_route?.daily_schedules?.[0]?.places) {
-      optimizedPlaces = optimizationData.optimized_route.daily_schedules[0].places;
-      console.log('🔍 [TripOptimizationService] Found places in optimized_route.daily_schedules[0].places:', optimizedPlaces.length);
-    } else if (optimizationData.places) {
-      optimizedPlaces = optimizationData.places;
-      console.log('🔍 [TripOptimizationService] Found places in places array:', optimizedPlaces.length);
+    if (optimizationData.daily_schedules && Array.isArray(optimizationData.daily_schedules)) {
+      // Extract places from ALL daily schedules, not just the first one
+      for (const daySchedule of optimizationData.daily_schedules) {
+        if (daySchedule.places && Array.isArray(daySchedule.places)) {
+          allOptimizedPlaces.push(...daySchedule.places);
+          console.log(`🔍 [TripOptimizationService] Found ${daySchedule.places.length} places in day ${daySchedule.day || 'unknown'}`);
+        }
+      }
+      console.log('🔍 [TripOptimizationService] Total places from all daily schedules:', allOptimizedPlaces.length);
+    } else if (optimizationData.optimized_route?.daily_schedules && Array.isArray(optimizationData.optimized_route.daily_schedules)) {
+      // Fallback: check optimized_route structure
+      for (const daySchedule of optimizationData.optimized_route.daily_schedules) {
+        if (daySchedule.places && Array.isArray(daySchedule.places)) {
+          allOptimizedPlaces.push(...daySchedule.places);
+          console.log(`🔍 [TripOptimizationService] Found ${daySchedule.places.length} places in day ${daySchedule.day || 'unknown'} (from optimized_route)`);
+        }
+      }
+      console.log('🔍 [TripOptimizationService] Total places from optimized_route daily schedules:', allOptimizedPlaces.length);
+    } else if (optimizationData.places && Array.isArray(optimizationData.places)) {
+      // Final fallback: direct places array
+      allOptimizedPlaces = optimizationData.places;
+      console.log('🔍 [TripOptimizationService] Found places in direct places array:', allOptimizedPlaces.length);
     } else {
       console.warn('❌ [TripOptimizationService] No places found in response. Available keys:', Object.keys(optimizationData));
-      console.warn('❌ [TripOptimizationService] Full response:', optimizationData);
+      console.warn('❌ [TripOptimizationService] Full response structure:');
+      console.warn('  - daily_schedules:', optimizationData.daily_schedules);
+      console.warn('  - optimized_route:', optimizationData.optimized_route);
+      console.warn('  - places:', optimizationData.places);
     }
     
-    console.log('🔍 [TripOptimizationService] Final extracted optimized places:', optimizedPlaces.length);
-    console.log('🔍 [TripOptimizationService] Places names:', optimizedPlaces.map((p: any) => p.name));
+    console.log('🔍 [TripOptimizationService] Final extracted optimized places:', allOptimizedPlaces.length);
+    console.log('🔍 [TripOptimizationService] All place names:', allOptimizedPlaces.map((p: any) => p.name));
+
+    // Remove duplicates by ID while preserving order
+    const uniquePlaces = [];
+    const seenIds = new Set();
+    for (const place of allOptimizedPlaces) {
+      if (!seenIds.has(place.id)) {
+        seenIds.add(place.id);
+        uniquePlaces.push(place);
+      }
+    }
+    
+    console.log('🔍 [TripOptimizationService] Unique places after deduplication:', uniquePlaces.length);
+    const optimizedPlaces = uniquePlaces;
 
     return {
       success: true,

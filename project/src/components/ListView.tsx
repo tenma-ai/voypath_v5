@@ -165,9 +165,39 @@ export function ListView() {
     allStorePlaces: places.length,
     storePlacesForTrip: places.filter(p => p.trip_id === currentTrip?.id || p.tripId === currentTrip?.id).length,
     // CRITICAL: Log full optimization result structure
-    optimizationResultFull: optimizationResult,
-    dailySchedulesFull: optimizationResult?.optimization?.daily_schedules
+    optimizationResultStructure: optimizationResult ? {
+      hasOptimization: !!optimizationResult.optimization,
+      hasDailySchedules: !!optimizationResult.optimization?.daily_schedules,
+      dailySchedulesCount: optimizationResult.optimization?.daily_schedules?.length || 0,
+      totalPlacesInAllDays: optimizationResult.optimization?.daily_schedules?.reduce((total, day) => 
+        total + (day.scheduled_places?.length || 0), 0) || 0,
+      dailyBreakdown: optimizationResult.optimization?.daily_schedules?.map((day, index) => ({
+        dayIndex: index,
+        dayNumber: day.day || index + 1,
+        placesCount: day.scheduled_places?.length || 0,
+        placeNames: day.scheduled_places?.map(sp => sp.place?.name || sp.name) || []
+      })) || []
+    } : null
   });
+
+  // Log detailed daily schedules for debugging
+  if (optimizationResult?.optimization?.daily_schedules) {
+    console.log('📅 ListView: Detailed daily schedules analysis:');
+    optimizationResult.optimization.daily_schedules.forEach((daySchedule, dayIndex) => {
+      console.log(`  Day ${dayIndex + 1}:`, {
+        date: daySchedule.date,
+        scheduledPlacesCount: daySchedule.scheduled_places?.length || 0,
+        scheduledPlaces: daySchedule.scheduled_places?.map(sp => ({
+          id: sp.place?.id || sp.id,
+          name: sp.place?.name || sp.name,
+          arrivalTime: sp.arrival_time,
+          departureTime: sp.departure_time,
+          transportMode: sp.transport_mode,
+          order: sp.order_in_day
+        })) || []
+      });
+    });
+  }
 
   // Display schedule from optimization results ONLY
   const schedule = useMemo(() => {
@@ -199,39 +229,54 @@ export function ListView() {
         }
         
         // Add scheduled places for this day
-        daySchedule.scheduled_places.forEach((place, placeIndex) => {
+        daySchedule.scheduled_places.forEach((scheduledPlace, placeIndex) => {
+          // Handle both scheduledPlace.place.name and scheduledPlace.name structures
+          const place = scheduledPlace.place || scheduledPlace;
+          const placeName = place.name || scheduledPlace.name || 'Unknown Place';
+          const placeId = place.id || scheduledPlace.id || `place-${dayIndex}-${placeIndex}`;
+          
+          console.log(`📍 Processing scheduled place ${placeIndex + 1} on day ${dayIndex + 1}:`, {
+            scheduledPlace,
+            extractedPlace: place,
+            placeName,
+            placeId
+          });
+          
           // Add travel time before each place (except first after departure)
           if (placeIndex > 0 || (dayIndex === 0 && placeIndex === 0 && departureLocation)) {
-            const previousPlace = placeIndex > 0 
+            const previousScheduledPlace = placeIndex > 0 
               ? daySchedule.scheduled_places[placeIndex - 1]
               : dayIndex > 0 
                 ? optimizationResult.optimization.daily_schedules[dayIndex - 1]?.scheduled_places.slice(-1)[0]
                 : null;
-              
-            const previousName = previousPlace?.name || (dayIndex === 0 && placeIndex === 0 ? departureLocation : 'Previous location');
+            
+            const previousPlace = previousScheduledPlace?.place || previousScheduledPlace;
+            const previousName = previousPlace?.name || previousScheduledPlace?.name || 
+                               (dayIndex === 0 && placeIndex === 0 ? departureLocation : 'Previous location');
             
             events.push({
               id: `travel-${dayIndex}-${placeIndex}`,
               type: 'travel',
-              name: getTransportIcon(place.transport_mode || 'car'),
-              mode: place.transport_mode || 'car',
-              duration: `${place.travel_time_from_previous || 30}分`,
+              name: getTransportIcon(scheduledPlace.transport_mode || 'car'),
+              mode: scheduledPlace.transport_mode || 'car',
+              duration: `${scheduledPlace.travel_time_from_previous || 30}分`,
               from: previousName,
-              to: place.name
+              to: placeName
             });
           }
           
           events.push({
-            id: place.id,
+            id: placeId,
             type: 'place',
-            name: place.name,
-            time: place.arrival_time,
-            duration: `${place.stay_duration_minutes || 60}分滞在`,
+            name: placeName,
+            time: scheduledPlace.arrival_time,
+            duration: `${place.stay_duration_minutes || scheduledPlace.stay_duration_minutes || 60}分滞在`,
             category: place.place_type === 'airport' ? 'airport' : place.category || 'Other',
             rating: place.rating,
             assignedTo: place.user_id ? [place.user_id] : [],
-            description: place.notes || place.description,
-            priority: place.wish_level >= 8 ? 'high' : place.wish_level >= 5 ? 'medium' : 'low'
+            description: place.notes || place.description || scheduledPlace.notes,
+            priority: (place.wish_level || scheduledPlace.wish_level) >= 8 ? 'high' : 
+                     (place.wish_level || scheduledPlace.wish_level) >= 5 ? 'medium' : 'low'
           });
         });
         
