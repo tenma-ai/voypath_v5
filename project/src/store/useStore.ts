@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { OptimizedRoute } from '../services/TripOptimizationService';
+import { OptimizationResult } from '../types/optimization';
 import { supabase, callSupabaseFunction } from '../lib/supabase';
 
 export interface User {
@@ -108,8 +108,8 @@ interface StoreState {
   isCreatingSystemPlaces: boolean;
 
   // Optimization Results
-  optimizationResult: OptimizedRoute | null;
-  setOptimizationResult: (result: OptimizedRoute | null) => void;
+  optimizationResult: OptimizationResult | null;
+  setOptimizationResult: (result: OptimizationResult | null) => void;
 
   // API Integration
   createTripWithAPI: (tripData: TripCreateData) => Promise<Trip>;
@@ -150,13 +150,28 @@ export const useStore = create<StoreState>()((set, get) => ({
       // Current trip
       currentTrip: null,
       setCurrentTrip: async (trip) => {
-        set({ currentTrip: trip, places: [] }); // Clear places when switching trips
+        const currentOptimizationResult = get().optimizationResult;
+        const currentTripId = get().currentTrip?.id;
+        
+        set({ currentTrip: trip }); // Don't clear places immediately to avoid animation flicker
+        
         if (trip) {
           try {
-            await get().loadPlacesFromDatabase(trip.id);
-            console.log(`🔄 Switched to trip: ${trip.name}, loaded places for trip ${trip.id}`);
+            // Only reload data if switching to a different trip
+            if (currentTripId !== trip.id) {
+              console.log(`🔄 Switching to trip: ${trip.name}`);
+              await get().loadPlacesFromDatabase(trip.id);
+              await get().loadOptimizationResult(trip.id);
+            } else {
+              console.log(`✅ Already on trip: ${trip.name}, preserving optimization results`);
+              // Preserve optimization results if staying on same trip
+              if (currentOptimizationResult) {
+                set({ optimizationResult: currentOptimizationResult });
+              }
+            }
+            console.log(`🔄 Current trip set to: ${trip.name} (${trip.id})`);
           } catch (error) {
-            console.error('Failed to load places for new trip:', error);
+            console.error('Failed to load data for new trip:', error);
           }
         }
       },
@@ -230,7 +245,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             google_types: placeWithIds.google_types,
             notes: placeWithIds.notes,
             image_url: placeWithIds.image_url,
-            images: placeWithIds.images
+            images: placeWithIds.images,
+            is_selected_for_optimization: true  // Automatically select new places for optimization
           };
 
           const result = await addPlaceToDatabase(placeData);
@@ -494,9 +510,14 @@ export const useStore = create<StoreState>()((set, get) => ({
             }
             
             // Create system places if they don't exist (only once per trip load)
-            if (targetTripId && !get().isCreatingSystemPlaces) {
+            // Only create system places if this is the first load for this trip
+            const systemPlacesExist = dbPlaces.some(p => p.place_type === 'departure' || p.place_type === 'destination');
+            if (targetTripId && !get().isCreatingSystemPlaces && !systemPlacesExist) {
+              console.log('🔧 No system places found, creating them for trip:', targetTripId);
               const { createSystemPlaces } = get();
               await createSystemPlaces(targetTripId);
+            } else if (systemPlacesExist) {
+              console.log('✅ System places already exist for trip:', targetTripId);
             }
           }
         } catch (error) {
@@ -505,22 +526,41 @@ export const useStore = create<StoreState>()((set, get) => ({
       },
 
       initializeFromDatabase: async (): Promise<void> => {
-        const { loadTripsFromDatabase, loadPlacesFromDatabase } = get();
+        const { loadTripsFromDatabase, optimizationResult } = get();
         
-        // Always load from database for scalable architecture
+        // Preserve existing optimization results during initialization
+        const existingOptimizationResult = optimizationResult;
+        
         try {
           await loadTripsFromDatabase();
           
-          // Load places only for current trip (if any)
+          // Only refresh data if we don't have optimization results
           const { currentTrip } = get();
           if (currentTrip) {
-            await loadPlacesFromDatabase(currentTrip.id);
-            console.log(`🔄 Initialized app with fresh database data for trip: ${currentTrip.name}`);
+            console.log(`🔄 Initializing data for trip: ${currentTrip.name}`);
+            
+            // Load places data
+            await get().loadPlacesFromDatabase(currentTrip.id);
+            
+            // Only load optimization results if we don't already have them
+            if (!existingOptimizationResult?.optimization?.daily_schedules?.length) {
+              console.log('📊 Loading optimization results from database');
+              await get().loadOptimizationResult(currentTrip.id);
+            } else {
+              console.log('✅ Preserving existing optimization results');
+              set({ optimizationResult: existingOptimizationResult });
+            }
+            
+            console.log(`✅ Initialized app with data for trip: ${currentTrip.name}`);
           } else {
             console.log('🔄 Initialized app with trips data (no current trip selected)');
           }
         } catch (error) {
           console.error('Failed to initialize from database:', error);
+          // Restore optimization results even if initialization fails
+          if (existingOptimizationResult) {
+            set({ optimizationResult: existingOptimizationResult });
+          }
         }
       },
 
@@ -790,17 +830,25 @@ export const useStore = create<StoreState>()((set, get) => ({
 
       loadOptimizationResult: async (tripId: string): Promise<void> => {
         try {
-          // Clear any cached optimization results and always start fresh
-          console.log('🗑️ Clearing cached optimization results for trip:', tripId);
-          set({ optimizationResult: null });
+          // Check if we already have optimization results for this trip
+          const currentResult = get().optimizationResult;
+          if (currentResult && currentResult.optimization?.daily_schedules?.length > 0) {
+            console.log('✅ Optimization results already loaded, skipping reload');
+            return;
+          }
+          
+          console.log('🔍 Loading optimization results for trip:', tripId);
           
           // Check if table exists before querying
-          const { data: result, error } = await supabase
+          const { data: results, error } = await supabase
             .from('optimization_results')
             .select('*')
             .eq('trip_id', tripId)
             .eq('is_active', true)
-            .maybeSingle(); // Use maybeSingle instead of single to handle no results
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          const result = results?.[0] || null;
 
           if (error) {
             // If table doesn't exist or query fails, just set null result
@@ -814,20 +862,24 @@ export const useStore = create<StoreState>()((set, get) => ({
             console.log('🔍 [useStore] optimized_route:', result.optimized_route);
             console.log('🔍 [useStore] daily_schedules:', result.optimized_route?.daily_schedules);
             
-            // Convert database result to OptimizedRoute format
-            const optimizedRoute: OptimizedRoute = {
-              daily_schedules: result.optimized_route?.daily_schedules || [],
-              optimization_score: result.optimization_score || { overall: 0, fairness: 0, efficiency: 0 },
-              execution_time_ms: result.execution_time_ms || 0,
-              total_travel_time_minutes: result.total_travel_time_minutes || 0,
-              total_visit_time_minutes: result.total_visit_time_minutes || 0,
-              created_by: result.created_by || ''
+            // Convert database result to OptimizationResult format
+            const optimizationResult: OptimizationResult = {
+              success: true,
+              optimization: {
+                daily_schedules: result.optimized_route?.daily_schedules || [],
+                optimization_score: result.optimization_score || { total_score: 0, fairness_score: 0, efficiency_score: 0, details: { user_adoption_balance: 0, wish_satisfaction_balance: 0, travel_efficiency: 0, time_constraint_compliance: 0 } },
+                optimized_route: { daily_schedules: result.optimized_route?.daily_schedules || [] },
+                total_duration_minutes: result.total_travel_time_minutes + result.total_visit_time_minutes || 0,
+                places: [],
+                execution_time_ms: result.execution_time_ms || 0
+              },
+              message: 'Optimization loaded from database'
             };
 
-            console.log('🔍 [useStore] Converted optimizedRoute:', optimizedRoute);
-            console.log('🔍 [useStore] Converted daily_schedules:', optimizedRoute.daily_schedules);
+            console.log('🔍 [useStore] Converted optimizationResult:', optimizationResult);
+            console.log('🔍 [useStore] Converted daily_schedules:', optimizationResult.optimization.daily_schedules);
 
-            set({ optimizationResult: optimizedRoute });
+            set({ optimizationResult: optimizationResult });
             console.log(`✅ Loaded optimization result for trip ${tripId}`);
           } else {
             set({ optimizationResult: null });
@@ -877,23 +929,13 @@ export const useStore = create<StoreState>()((set, get) => ({
           console.log('🗑️ Trip departure_location:', trip.departure_location);
           console.log('🗑️ Trip destination:', trip.destination);
 
-          // Always recreate system places to ensure they exist correctly
+          // Only recreate system places if they don't exist or are incomplete
           if (existingSystemPlaces && existingSystemPlaces.length > 0) {
-            console.log('🗑️ Deleting existing system places for trip', tripId);
-            const { error: deleteError } = await supabase
-              .from('places')
-              .delete()
-              .eq('trip_id', tripId)
-              .or('place_type.in.(departure,destination),source.eq.system');
-            
-            if (deleteError) {
-              console.error('❌ Failed to delete existing system places:', deleteError);
-            } else {
-              console.log('✅ Existing system places deleted successfully');
-            }
+            console.log('✅ System places already exist for trip', tripId, '- skipping creation');
+            return; // Don't recreate if they already exist
           }
           
-          console.log('✅ No existing system places found - creating new ones');
+          console.log('🔧 Creating new system places for trip:', tripId);
 
           const systemPlaces = [];
 
@@ -921,8 +963,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             });
           }
 
-          // Create destination place only if different from departure
-          if (trip.destination && trip.destination !== 'same as departure location') {
+          // Create destination place (always create for round trips)
+          if (trip.destination) {
             systemPlaces.push({
               name: trip.destination === 'same as departure location' || trip.destination === trip.departure_location 
                 ? `Destination: ${trip.departure_location}` 

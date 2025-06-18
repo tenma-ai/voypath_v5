@@ -1,8 +1,11 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Clock, Users, Calendar as CalendarIcon, Sparkles, AlertCircle, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
+import { Place, TripMember } from '../types/optimization';
+import { PlaceColorCalculator } from '../utils/PlaceColorCalculator';
+import { calculatePlaceColor, getCSSProperties, PlaceColorResult } from '../utils/PlaceColorHelper';
+import { supabase } from '../lib/supabase';
 
 interface CalendarEvent {
   id: string;
@@ -15,74 +18,116 @@ interface CalendarEvent {
   category: string;
   spanDays?: number;
   isSpanning?: boolean;
+  place?: Place;
 }
 
 type EventsByDate = Record<string, CalendarEvent[]>;
 
-// Dynamic member color system using user IDs
-const getMemberColor = (userId: string): string => {
-  // Generate colors based on user ID hash for consistency
-  const hash = userId.split('').reduce((a, b) => {
-    a = ((a << 5) - a) + b.charCodeAt(0);
-    return a & a;
-  }, 0);
-  
-  const colors = [
-    'linear-gradient(135deg, #3b82f6, #1d4ed8)', // Blue
-    'linear-gradient(135deg, #ef4444, #dc2626)', // Red
-    'linear-gradient(135deg, #10b981, #059669)', // Green
-    'linear-gradient(135deg, #f59e0b, #d97706)', // Orange
-    'linear-gradient(135deg, #8b5cf6, #7c3aed)', // Purple
-    'linear-gradient(135deg, #06b6d4, #0891b2)', // Cyan
-    'linear-gradient(135deg, #f59e0b, #ea580c)', // Amber
-    'linear-gradient(135deg, #84cc16, #65a30d)', // Lime
-  ];
-  
-  return colors[Math.abs(hash) % colors.length];
-};
-
-// Create gradient for multiple members
-const createMultiMemberGradient = (userIds: string[]): string => {
-  if (userIds.length === 1) {
-    return getMemberColor(userIds[0]);
-  }
-  
-  const colors = userIds.map(userId => {
-    const gradient = getMemberColor(userId);
-    // Extract the first color from the gradient
-    const match = gradient.match(/#[a-fA-F0-9]{6}/);
-    return match ? match[0] : '#6b7280';
-  });
-  return `linear-gradient(135deg, ${colors.join(', ')})`;
-};
-
-// Get background style for events based on assigned members
-const getEventBackgroundStyle = (assignedTo: string[]) => {
-  return {
-    background: createMultiMemberGradient(assignedTo),
-    color: 'white'
-  };
-};
-
-
 export function CalendarView() {
   const navigate = useNavigate();
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
   
-  const { places, currentTrip, isLoading } = useStore();
-  
-  // Trip period - use real trip dates or default
-  const tripStart = currentTrip?.start_date ? new Date(currentTrip.start_date) : new Date('2024-05-15');
-  const tripEnd = currentTrip?.end_date ? new Date(currentTrip.end_date) : new Date('2024-05-22');
-  
-  const formatDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
-  };
+  const { places, currentTrip, isLoading, optimizationResult } = useStore();
 
+  // カレンダーイベントのスタイルを取得する関数
+  const getEventStyle = (event: CalendarEvent): React.CSSProperties => {
+    if (event.type !== 'place' || !event.place) {
+      return {
+        backgroundColor: '#6B7280', // デフォルト色
+        color: 'white'
+      };
+    }
+    
+    // 色表示ロジックを適用
+    const colorResult = calculatePlaceColor(event.place, tripMembers);
+    const cssProperties = getCSSProperties(colorResult);
+    
+    return {
+      ...cssProperties,
+      color: 'white',
+      border: colorResult.type === 'gold' ? '2px solid #FFA500' : '1px solid rgba(255,255,255,0.2)',
+      borderRadius: '8px',
+      padding: '8px 12px',
+      minHeight: '48px',
+      display: 'flex',
+      alignItems: 'center'
+    };
+  };
+  
   // Filter places for current trip
   const tripPlaces = places.filter(place => 
     currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false
   );
+  
+  // Load trip members
+  useEffect(() => {
+    const loadTripMembers = async () => {
+      if (!currentTrip?.id) return;
+      
+      const { data, error } = await supabase
+        .from('trip_members')
+        .select('*, user:users(*)')
+        .eq('trip_id', currentTrip.id);
+        
+      if (!error && data) {
+        setTripMembers(data as TripMember[]);
+      }
+    };
+    
+    loadTripMembers();
+  }, [currentTrip?.id]);
+  
+  // Get place color info using PlaceColorCalculator
+  const getPlaceColorInfo = useCallback((place: Place) => {
+    return PlaceColorCalculator.calculatePlaceColorInfo(
+      place,
+      tripMembers,
+      tripPlaces
+    );
+  }, [tripMembers, tripPlaces]);
+  
+  // Get background style for events based on place color info
+  const getEventBackgroundStyle = useCallback((event: CalendarEvent) => {
+    if (!event.place) {
+      // Default style for non-place events
+      return {
+        backgroundColor: '#6B7280',
+        color: 'white'
+      };
+    }
+    
+    const colorInfo = getPlaceColorInfo(event.place);
+    const styles = PlaceColorCalculator.generatePlaceStyles(colorInfo);
+    
+    if (colorInfo.display_type === 'gold') {
+      return {
+        background: 'linear-gradient(135deg, #FFD700, #FFA500, #FFD700)',
+        color: 'white',
+        boxShadow: '0 2px 8px rgba(255, 215, 0, 0.4)'
+      };
+    } else if (colorInfo.display_type === 'gradient' && colorInfo.colors.length > 1) {
+      return {
+        ...styles,
+        color: 'white'
+      };
+    } else {
+      return {
+        backgroundColor: colorInfo.colors[0] || '#6B7280',
+        color: 'white'
+      };
+    }
+  }, [getPlaceColorInfo]);
+  
+  // Trip period - use real trip dates with fallback
+  const startDateStr = currentTrip?.start_date || currentTrip?.startDate;
+  const endDateStr = currentTrip?.end_date || currentTrip?.endDate;
+  const tripStart = startDateStr ? new Date(startDateStr) : new Date('2024-05-15');
+  const tripEnd = endDateStr ? new Date(endDateStr) : new Date('2024-05-22');
+  
+  const formatDate = (date: Date) => {
+    return date.toISOString().split('T')[0];
+  };
 
   // Generate trip period days
   const getTripDays = useCallback(() => {
@@ -97,7 +142,7 @@ export function CalendarView() {
     return days;
   }, [tripStart, tripEnd]);
 
-  // Generate events from real data
+  // Display events from optimization results ONLY
   const eventsByDate = useMemo(() => {
     if (!currentTrip) return {};
 
@@ -112,571 +157,322 @@ export function CalendarView() {
       endDate: currentTrip.end_date || (currentTrip as any).endDate,
       tripStart,
       tripEnd,
-      tripDaysLength: getTripDays().length
+      tripDaysLength: getTripDays().length,
+      optimizationResult: !!optimizationResult,
+      hasDailySchedules: !!optimizationResult?.optimization?.daily_schedules,
+      dailySchedulesCount: optimizationResult?.optimization?.daily_schedules?.length || 0
     });
 
     const events: EventsByDate = {};
     
-    // Get trip days for departure/arrival information
-    const tripDays = getTripDays();
-    
-    // Add departure and arrival events to first and last days
-    if (tripDays.length > 0) {
-      const firstDay = formatDate(tripDays[0]);
-      const lastDay = formatDate(tripDays[tripDays.length - 1]);
+    // ONLY display results if we have optimization results with daily schedules
+    if (optimizationResult?.optimization?.daily_schedules?.length > 0) {
+      console.log('📅 CalendarView: Displaying optimization results with', optimizationResult.optimization.daily_schedules.length, 'days');
       
-      // Get departure and destination with fallback for different field naming
-      const departureLocation = currentTrip.departureLocation || (currentTrip as any).departure_location;
-      const destination = currentTrip.destination || (currentTrip as any).destination;
-      
-      // Add departure event to first day
-      if (departureLocation) {
-        if (!events[firstDay]) events[firstDay] = [];
-        events[firstDay].push({
-          id: 'departure',
-          name: `Departure from ${departureLocation}`,
-          time: 'Start of trip',
-          type: 'trip' as const,
-          priority: 5,
-          assignedTo: [],
-          category: 'travel',
-          isSpanning: false
+      optimizationResult.optimization.daily_schedules.forEach((daySchedule, dayIndex) => {
+        const tripStartDate = currentTrip.start_date || currentTrip.startDate || new Date().toISOString();
+        const date = new Date(tripStartDate);
+        date.setDate(date.getDate() + dayIndex);
+        const dateStr = formatDate(date);
+        
+        if (!events[dateStr]) events[dateStr] = [];
+        
+        // Add departure on first day
+        if (dayIndex === 0) {
+          const departureLocation = currentTrip.departureLocation || (currentTrip as any).departure_location;
+          if (departureLocation) {
+            events[dateStr].push({
+              id: 'departure',
+              name: `Departure from ${departureLocation}`,
+              time: 'Start of trip',
+              type: 'trip' as const,
+              priority: 5,
+              assignedTo: [],
+              category: 'travel',
+              isSpanning: false
+            });
+          }
+        }
+        
+        // Add scheduled places
+        daySchedule.scheduled_places.forEach(place => {
+          events[dateStr].push({
+            id: place.id,
+            name: place.name,
+            duration: place.stay_duration_minutes || 60,
+            type: 'place' as const,
+            priority: place.wish_level || 5,
+            assignedTo: place.user_id ? [place.user_id] : [],
+            category: place.place_type === 'airport' ? 'airport' : place.category || 'Other',
+            isSpanning: false,
+            place: place
+          });
         });
-      }
+        
+        // Add destination on last day
+        if (dayIndex === optimizationResult.optimization.daily_schedules.length - 1) {
+          const destination = currentTrip.destination || (currentTrip as any).destination;
+          if (destination) {
+            events[dateStr].push({
+              id: 'arrival',
+              name: `Arrival at ${destination}`,
+              time: 'End of trip',
+              type: 'trip' as const,
+              priority: 5,
+              assignedTo: [],
+              category: 'travel',
+              isSpanning: false
+            });
+          }
+        }
+      });
       
-      // Add arrival event to last day (return to destination or departure location)
-      if (destination || departureLocation) {
-        if (!events[lastDay]) events[lastDay] = [];
-        events[lastDay].push({
-          id: 'arrival',
-          name: `Return to ${destination || departureLocation}`,
-          time: 'End of trip',
-          type: 'trip' as const,
-          priority: 5,
-          assignedTo: [],
-          category: 'travel',
-          isSpanning: false
-        });
-      }
+      // Sort events by priority and time
+      Object.keys(events).forEach(dateStr => {
+        events[dateStr].sort((a, b) => b.priority - a.priority);
+      });
+      
+      return events;
     }
     
-    // Get trip days for unscheduled places distribution
-    let unscheduledIndex = 0;
-    
-    tripPlaces.forEach(place => {
-      let date = place.visit_date || place.scheduled_date;
-      
-      // If no date assigned, distribute unscheduled places across trip days
-      if (!date && tripDays.length > 0) {
-        const dayIndex = unscheduledIndex % tripDays.length;
-        date = formatDate(tripDays[dayIndex]);
-        unscheduledIndex++;
-      }
-      
-      if (date) {
-        if (!events[date]) events[date] = [];
-        events[date].push({
-          id: place.id,
-          name: place.name,
-          time: place.scheduled_time_start && place.scheduled_time_end 
-            ? `${place.scheduled_time_start} - ${place.scheduled_time_end}`
-            : (place.is_selected_for_optimization !== undefined 
-               ? place.is_selected_for_optimization 
-               : place.scheduled) ? 'Scheduled' : 'Unscheduled',
-          duration: place.stay_duration_minutes,
-          type: 'place' as const,
-          priority: place.wish_level >= 4 ? 4 : place.wish_level >= 3 ? 3 : place.wish_level,
-          assignedTo: place.user_id ? [place.user_id] : [],
-          category: place.category || 'attraction'
-        });
-      }
-    });
-    
-    return events;
-  }, [tripPlaces, currentTrip, getTripDays]);
-
-  const getDayEvents = (date: Date) => {
-    const dateStr = formatDate(date);
-    return eventsByDate[dateStr] || [];
-  };
-
-  const isToday = (date: Date) => {
-    const today = new Date();
-    return date.toDateString() === today.toDateString();
-  };
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'temple':
-      case 'shrine':
-        return '⛩️';
-      case 'attraction':
-        return '🏛️';
-      case 'food':
-        return '🍽️';
-      case 'district':
-        return '🏙️';
-      case 'nature':
-        return '🏔️';
-      case 'trip':
-      case 'travel':
-        return '🚌';
-      default:
-        return '📍';
-    }
-  };
-
-  const handleAddPlace = () => {
-    navigate('/add-place');
-  };
+    // NO optimization results - return empty events
+    console.log('❌ CalendarView: No optimization results to display');
+    return {};
+  }, [currentTrip, optimizationResult, getTripDays]);
 
   const tripDays = getTripDays();
 
-  // Get spanning events (multi-day places)
-  const spanningEvents = useMemo(() => {
-    const spanningEvts: (CalendarEvent & { startDate: Date; endDate: Date })[] = [];
-    
-    Object.entries(eventsByDate).forEach(([dateStr, events]) => {
-      events.forEach(event => {
-        if (event.isSpanning && event.spanDays) {
-          const startDate = new Date(dateStr);
-          spanningEvts.push({
-            ...event,
-            startDate,
-            endDate: new Date(startDate.getTime() + (event.spanDays - 1) * 24 * 60 * 60 * 1000)
-          });
-        }
-      });
-    });
-    
-    return spanningEvts;
-  }, [eventsByDate]);
-
+  if (!currentTrip) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 text-center">
+        <div className="bg-white dark:bg-dark-secondary rounded-lg shadow-soft p-8">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+            トリップが選択されていません
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            トリップを作成または選択して、カレンダーを表示しましょう
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            ホームに戻る
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-primary-400/10 via-secondary-500/10 to-primary-600/10 rounded-full blur-3xl"
-          animate={{
-            x: [0, 50, 0],
-            y: [0, 30, 0],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-secondary-400/8 via-primary-500/8 to-accent-500/8 rounded-full blur-3xl"
-          animate={{
-            x: [0, -30, 0],
-            y: [0, -50, 0],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 5
-          }}
-        />
-      </div>
-
-
-      {/* Enhanced Trip Period Calendar */}
-      <div className="flex-1 overflow-auto p-6">
-        {isLoading ? (
-          /* Loading State */
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/40 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-              <CalendarIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+    <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="mb-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <CalendarIcon className="w-6 h-6 text-blue-600" />
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
+                旅行カレンダー
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {currentTrip.name} - {tripDays.length}日間
+              </p>
             </div>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
-              Loading Calendar...
-            </h3>
-            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-              Preparing your trip calendar
-            </p>
           </div>
-        ) : !currentTrip ? (
-          /* No Trip State */
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
-            </div>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
-              No Trip Selected
-            </h3>
-            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-              Please select or create a trip to view the calendar
-            </p>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {Object.values(eventsByDate).flat().filter(e => e.type === 'place').length} places scheduled
           </div>
-        ) : tripPlaces.length === 0 ? (
-          /* Empty Calendar State */
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CalendarIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
-            </div>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
-              No Places Scheduled
-            </h3>
-            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
-              Add places to your trip to see them in the calendar
-            </p>
-            <motion.button
-              onClick={handleAddPlace}
-              className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Add Your First Place
-            </motion.button>
-          </div>
-        ) : (
-          <>
-        {/* Days of week header with enhanced styling */}
-        <div className="grid grid-cols-7 gap-3 mb-4">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
-            <motion.div 
-              key={day} 
-              className="p-3 text-center font-bold text-slate-700 dark:text-slate-300 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-2xl shadow-soft border border-slate-200/50 dark:border-slate-700/50"
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              {day}
-            </motion.div>
-          ))}
         </div>
 
-        {/* Enhanced Calendar Grid */}
-        <div className="relative">
-          {/* Background grid */}
-          <div className="grid grid-cols-7 gap-3">
-            {tripDays.map((date, index) => {
-              const dayEvents = getDayEvents(date).filter(event => !event.isSpanning);
-              const todayDate = isToday(date);
-
-              return (
-                <motion.div
-                  key={index}
-                  className={`h-36 lg:h-44 border-2 rounded-3xl p-4 relative overflow-hidden transition-all duration-300 group ${
-                    todayDate 
-                      ? 'border-primary-400 bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-primary-900/30 dark:via-slate-800/80 dark:to-secondary-900/30 shadow-glow' 
-                      : 'border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-br from-white/80 via-slate-50/50 to-white/80 dark:from-slate-800/80 dark:via-slate-700/50 dark:to-slate-800/80 hover:border-primary-300/50 dark:hover:border-primary-600/50 hover:shadow-medium'
-                  }`}
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  transition={{ duration: 0.2 }}
-                  layout
-                >
-                  {/* Enhanced background effects */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  
-                  {/* Day number with enhanced styling */}
-                  <div className={`text-xl font-bold mb-2 relative z-10 ${
-                    todayDate
-                      ? 'text-primary-600 dark:text-primary-400'
-                      : 'text-slate-700 dark:text-slate-300'
-                  }`}>
-                    {date.getDate()}
-                  </div>
-
-                  {/* Day name with enhanced styling */}
-                  <div className={`text-xs font-semibold mb-3 relative z-10 ${
-                    todayDate 
-                      ? 'text-primary-500 dark:text-primary-400' 
-                      : 'text-slate-500 dark:text-slate-400'
-                  }`}>
-                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                  </div>
-
-                  {/* Add Place Button - Primary/Secondary gradient */}
-                  <motion.button
-                    onClick={handleAddPlace}
-                    className="absolute top-2 right-2 w-6 h-6 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 rounded-full flex items-center justify-center shadow-soft hover:shadow-medium transition-all duration-300 group/btn z-20"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                  >
-                    <Plus className="w-3 h-3 text-white group-hover/btn:scale-110 transition-transform" />
-                  </motion.button>
-
-                  {/* Today indicator with enhanced animation */}
-                  {todayDate && (
-                    <motion.div 
-                      className="absolute top-2 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-primary-500 rounded-full shadow-glow"
-                      animate={{
-                        scale: [1, 1.2, 1],
-                        opacity: [0.7, 1, 0.7],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                      }}
-                    />
-                  )}
-
-                  {/* Enhanced Regular Events */}
-                  <div className="space-y-2 relative z-10">
-                    {dayEvents.slice(0, 2).map((event, eventIndex) => (
-                      <motion.div
-                        key={event.id}
-                        onClick={() => setSelectedEvent(event)}
-                        className="group/event cursor-pointer"
-                        whileHover={{ scale: 1.05, y: -1 }}
-                        whileTap={{ scale: 0.95 }}
-                        layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: eventIndex * 0.1 }}
-                      >
-                        <div 
-                          className="text-xs px-3 py-2 rounded-xl border border-white/30 transition-all duration-300 hover:shadow-medium font-medium backdrop-blur-sm relative overflow-hidden"
-                          style={getEventBackgroundStyle(event.assignedTo)}
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover/event:opacity-100 transition-opacity duration-300"></div>
-                          <div className="flex items-center space-x-2 relative z-10">
-                            <span className="text-sm">{getCategoryIcon(event.category)}</span>
-                            <span className="font-semibold text-xs">{event.time}</span>
-                          </div>
-                          <div className="truncate font-semibold text-xs mt-1 relative z-10">{event.name}</div>
-                        </div>
-                      </motion.div>
-                    ))}
-                    
-                    {/* Show more indicator with enhanced styling */}
-                    {dayEvents.length > 2 && (
-                      <motion.div 
-                        className="text-xs text-primary-600 dark:text-primary-400 px-3 py-1 font-semibold bg-primary-100/60 dark:bg-primary-900/30 rounded-xl backdrop-blur-sm"
-                        whileHover={{ scale: 1.05 }}
-                      >
-                        +{dayEvents.length - 2} more
-                      </motion.div>
-                    )}
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-
-          {/* Enhanced Spanning Events Overlay */}
-          <div className="absolute inset-0 pointer-events-none">
-            {spanningEvents.map((event, eventIndex) => {
-              const startIndex = tripDays.findIndex(day => 
-                day.toDateString() === event.startDate.toDateString()
-              );
-              const endIndex = tripDays.findIndex(day => 
-                day.toDateString() === event.endDate.toDateString()
-              );
-              
-              if (startIndex === -1 || endIndex === -1) return null;
-
-              const startRow = Math.floor(startIndex / 7);
-              const endRow = Math.floor(endIndex / 7);
-              const startCol = startIndex % 7;
-              const endCol = endIndex % 7;
-
-              // Handle single row spanning
-              if (startRow === endRow) {
-                const width = ((endCol - startCol + 1) * 100) / 7;
-                const left = (startCol * 100) / 7;
-                const top = startRow * (144 + 12) + 100; // Adjusted for new height
-
-                return (
-                  <motion.div
-                    key={`spanning-${event.id}`}
-                    className="absolute pointer-events-auto cursor-pointer z-10"
-                    style={{
-                      left: `${left}%`,
-                      top: `${top}px`,
-                      width: `${width}%`,
-                      height: '28px'
-                    }}
-                    onClick={() => setSelectedEvent(event)}
-                    whileHover={{ scale: 1.02, zIndex: 20, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: eventIndex * 0.1 }}
-                  >
-                    <div 
-                      className="h-full rounded-2xl border-2 border-white/40 shadow-glow flex items-center px-4 text-white font-bold text-sm backdrop-blur-sm relative overflow-hidden"
-                      style={{ background: createMultiMemberGradient(event.assignedTo) }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
-                      <span className="mr-2 text-lg relative z-10">{getCategoryIcon(event.category)}</span>
-                      <span className="truncate relative z-10">{event.name}</span>
-                      <span className="ml-auto text-xs opacity-90 relative z-10">
-                        {event.spanDays}d
-                      </span>
-                    </div>
-                  </motion.div>
-                );
-              }
-
-              // Handle multi-row spanning with enhanced styling
-              const segments = [];
-              for (let row = startRow; row <= endRow; row++) {
-                const isFirstRow = row === startRow;
-                const isLastRow = row === endRow;
-                
-                const segmentStartCol = isFirstRow ? startCol : 0;
-                const segmentEndCol = isLastRow ? endCol : 6;
-                
-                const segmentWidth = ((segmentEndCol - segmentStartCol + 1) * 100) / 7;
-                const segmentLeft = (segmentStartCol * 100) / 7;
-                const segmentTop = row * (144 + 12) + 100;
-
-                segments.push(
-                  <motion.div
-                    key={`spanning-${event.id}-row-${row}`}
-                    className="absolute pointer-events-auto cursor-pointer z-10"
-                    style={{
-                      left: `${segmentLeft}%`,
-                      top: `${segmentTop}px`,
-                      width: `${segmentWidth}%`,
-                      height: '28px'
-                    }}
-                    onClick={() => setSelectedEvent(event)}
-                    whileHover={{ scale: 1.02, zIndex: 20, y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: eventIndex * 0.1 + row * 0.05 }}
-                  >
-                    <div 
-                      className={`h-full border-2 border-white/40 shadow-glow flex items-center px-4 text-white font-bold text-sm backdrop-blur-sm relative overflow-hidden ${
-                        isFirstRow ? 'rounded-l-2xl' : ''
-                      } ${
-                        isLastRow ? 'rounded-r-2xl' : ''
-                      } ${
-                        !isFirstRow && !isLastRow ? 'rounded-none' : ''
-                      }`}
-                      style={{ background: createMultiMemberGradient(event.assignedTo) }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
-                      {isFirstRow && (
-                        <>
-                          <span className="mr-2 text-lg relative z-10">{getCategoryIcon(event.category)}</span>
-                          <span className="truncate relative z-10">{event.name}</span>
-                        </>
-                      )}
-                      {isLastRow && !isFirstRow && (
-                        <span className="ml-auto text-xs opacity-90 relative z-10">
-                          {event.spanDays}d
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              }
-
-              return segments;
-            })}
+        {/* Trip Overview */}
+        <div className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="text-sm">
+                <span className="text-gray-500 dark:text-gray-400">From:</span>
+                <span className="ml-1 font-medium text-gray-800 dark:text-white">
+                  {tripStart.toLocaleDateString()}
+                </span>
+              </div>
+              <div className="text-sm">
+                <span className="text-gray-500 dark:text-gray-400">To:</span>
+                <span className="ml-1 font-medium text-gray-800 dark:text-white">
+                  {tripEnd.toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center space-x-1">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                <span>Places</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                <span>Meals</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
+                <span>Travel</span>
+              </div>
+            </div>
           </div>
         </div>
-          </>
-        )}
       </div>
 
-
-      {/* Enhanced Event Detail Modal */}
-      <AnimatePresence>
-        {selectedEvent && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setSelectedEvent(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full shadow-glass border border-slate-200/50 dark:border-slate-700/50 relative overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
+      {/* Calendar Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {tripDays.map((day, index) => {
+          const dateStr = formatDate(day);
+          const dayEvents = eventsByDate[dateStr] || [];
+          
+          return (
+            <div
+              key={dateStr}
+              className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft overflow-hidden"
             >
-              {/* Background gradient */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary-50/30 via-transparent to-secondary-50/30 dark:from-primary-900/20 dark:via-transparent dark:to-secondary-900/20"></div>
-              
-              <div className="relative z-10">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="text-3xl">{getCategoryIcon(selectedEvent.category)}</div>
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                        {selectedEvent.name}
-                      </h3>
-                      <div className="flex items-center space-x-3 mt-2 text-sm text-slate-600 dark:text-slate-400">
-                        <div className="flex items-center space-x-1">
-                          <Clock className="w-4 h-4" />
-                          <span className="font-medium">{selectedEvent.time}</span>
-                        </div>
-                        <span>•</span>
-                        <span className="font-medium">
-                          {selectedEvent.spanDays 
-                            ? `${selectedEvent.spanDays} days`
-                            : `${Math.floor(selectedEvent.duration / 60)}h ${selectedEvent.duration % 60}m`
-                          }
-                        </span>
-                      </div>
-                    </div>
+              {/* Day Header */}
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">Day {index + 1}</h3>
+                    <p className="text-sm opacity-90">
+                      {day.toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
+                    </p>
                   </div>
-                  <motion.button
-                    onClick={() => setSelectedEvent(null)}
-                    className="p-3 rounded-2xl hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition-all duration-300"
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                    whileTap={{ scale: 0.9 }}
-                  >
-                    <span className="text-slate-500 text-xl">✕</span>
-                  </motion.button>
-                </div>
-
-                <div className="space-y-6">
-                  {selectedEvent.assignedTo && selectedEvent.assignedTo.length > 0 && (
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3 flex items-center space-x-2">
-                        <Users className="w-4 h-4" />
-                        <span>Assigned to:</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedEvent.assignedTo.map((member: string) => (
-                          <motion.div
-                            key={member}
-                            className="flex items-center space-x-2 px-4 py-2 rounded-2xl text-white text-sm font-semibold shadow-soft"
-                            style={{ background: getMemberColor(member) }}
-                            whileHover={{ scale: 1.05 }}
-                          >
-                            <span>{member}</span>
-                          </motion.div>
-                        ))}
-                      </div>
+                  <div className="text-right">
+                    <div className="text-xs opacity-75">
+                      {dayEvents.length} events
                     </div>
-                  )}
-
-                  <div className="pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
-                    <motion.button
-                      className="w-full px-6 py-4 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 text-white rounded-2xl hover:from-primary-600 hover:via-secondary-600 hover:to-primary-700 transition-all duration-300 font-semibold shadow-glow hover:shadow-glow-lg relative overflow-hidden group"
-                      whileHover={{ scale: 1.02, y: -1 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                      <span className="relative z-10 flex items-center justify-center space-x-2">
-                        <Sparkles className="w-5 h-5" />
-                        <span>View Details</span>
-                      </span>
-                    </motion.button>
                   </div>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+
+              {/* Events List */}
+              <div className="p-3 space-y-2 min-h-[200px]">
+                  {dayEvents.length > 0 ? (
+                    dayEvents.map((event, eventIndex) => (
+                      <div
+                        key={event.id}
+                        className="group cursor-pointer"
+                        onClick={() => setSelectedEvent(event)}
+                      >
+                        <div 
+                          className="p-3 rounded-lg text-sm shadow-sm hover:shadow-md transition-all"
+                          style={getEventStyle(event)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium truncate">
+                                {event.name}
+                              </h4>
+                              {event.duration && (
+                                <div className="flex items-center mt-1 text-xs opacity-90">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  {event.duration}min
+                                </div>
+                              )}
+                              {event.time && (
+                                <div className="text-xs opacity-75 mt-1">
+                                  {event.time}
+                                </div>
+                              )}
+                            </div>
+                            {event.assignedTo && event.assignedTo.length > 0 && (
+                              <div className="flex items-center ml-2">
+                                <Users className="w-3 h-3 opacity-75" />
+                                <span className="text-xs ml-1 opacity-75">
+                                  {event.assignedTo.length}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
+                      <div className="text-center">
+                        <Plus className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No events</p>
+                      </div>
+                    </div>
+                  )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Event Detail Modal */}
+        {selectedEvent && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+            onClick={() => setSelectedEvent(null)}
+          >
+            <div
+              className="bg-white dark:bg-dark-secondary rounded-xl shadow-xl max-w-md w-full p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+                    {selectedEvent.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">
+                    {selectedEvent.category} • {selectedEvent.type}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {selectedEvent.duration && (
+                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                    <Clock className="w-4 h-4 mr-2" />
+                    Duration: {selectedEvent.duration} minutes
+                  </div>
+                )}
+
+                {selectedEvent.time && (
+                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                    <CalendarIcon className="w-4 h-4 mr-2" />
+                    Time: {selectedEvent.time}
+                  </div>
+                )}
+
+                {selectedEvent.assignedTo && selectedEvent.assignedTo.length > 0 && (
+                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                    <Users className="w-4 h-4 mr-2" />
+                    Assigned to: {selectedEvent.assignedTo.length} member(s)
+                  </div>
+                )}
+
+                <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Priority: {selectedEvent.priority}/10
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
     </div>
   );
 }
