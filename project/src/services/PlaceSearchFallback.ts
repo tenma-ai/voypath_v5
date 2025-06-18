@@ -9,33 +9,82 @@ export const searchPlacesWithFallback = async (request: PlaceSearchRequest): Pro
   const startTime = Date.now();
   let lastError: Error | null = null;
 
+  console.log('🔍 Starting place search with fallback for:', request.inputValue);
+
   try {
     // Primary: Google Maps API
-    console.log('Attempting primary search with Google Maps API');
+    console.log('🎯 Attempting primary search with Google Maps API');
     const result = await PlaceSearchService.searchPlaces(request);
-    console.log(`Primary search completed in ${Date.now() - startTime}ms`);
+    console.log(`✅ Primary search completed in ${Date.now() - startTime}ms with ${result.length} results`);
     return result;
   } catch (error) {
     lastError = error as Error;
-    console.warn('Google Maps API failed, trying fallback:', error);
+    console.error('Google Maps API failed with error:', error);
+    console.error('Error details:', {
+      message: lastError.message,
+      stack: lastError.stack,
+      name: lastError.name
+    });
     
     try {
       // Secondary: Supabase Edge Function proxy
-      console.log('Attempting secondary search via Supabase proxy');
-      const response = await fetch('/api/places/search-proxy', {
+      console.log('🔄 Attempting secondary search via Supabase proxy');
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-places-proxy`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify({
+          endpoint: 'textsearch',
+          params: {
+            query: request.inputValue,
+            language: request.language,
+            ...(request.location && {
+              location: `${request.location.lat},${request.location.lng}`,
+              radius: request.searchRadius ? Math.min(request.searchRadius * 1000, 50000) : 10000
+            })
+          }
+        }),
         signal: AbortSignal.timeout(8000) // 8 second timeout
       });
       
       if (response.ok) {
         const data = await response.json();
-        console.log(`Secondary search completed in ${Date.now() - startTime}ms`);
-        return data.places || data;
+        console.log(`✅ Secondary search completed in ${Date.now() - startTime}ms`);
+        
+        // Convert Google Places API response to our format
+        if (data.results && Array.isArray(data.results)) {
+          const convertedPlaces = data.results.map((place: any): GooglePlace => ({
+            place_id: place.place_id,
+            name: place.name,
+            formatted_address: place.formatted_address,
+            geometry: {
+              location: {
+                lat: place.geometry.location.lat,
+                lng: place.geometry.location.lng
+              }
+            },
+            rating: place.rating,
+            user_ratings_total: place.user_ratings_total,
+            price_level: place.price_level,
+            types: place.types || [],
+            photos: place.photos?.map((photo: any) => ({
+              photo_reference: photo.photo_reference,
+              height: photo.height,
+              width: photo.width
+            })),
+            opening_hours: place.opening_hours,
+            vicinity: place.vicinity
+          }));
+          console.log(`🎉 Converted ${convertedPlaces.length} places from proxy response`);
+          return convertedPlaces;
+        }
+        
+        const fallbackPlaces = data.places || data.results || [];
+        console.log(`📍 Returning ${fallbackPlaces.length} places from proxy fallback`);
+        return fallbackPlaces;
       }
       throw new Error(`Proxy search failed: ${response.status} ${response.statusText}`);
     } catch (proxyError) {
@@ -49,15 +98,8 @@ export const searchPlacesWithFallback = async (request: PlaceSearchRequest): Pro
           return cachedResults;
         }
         
-        // Quaternary: Mock data (development only)
-        if (import.meta.env.DEV) {
-          console.log('Using mock data for development');
-          const mockResults = generateMockSearchResults(request.inputValue);
-          setCachedSearchResults(request.inputValue, mockResults);
-          return mockResults;
-        }
-        
-        throw new Error('No fallback options available');
+        // Always throw error instead of using mock data to force testing real APIs
+        throw new Error('All fallback methods failed - forcing real API usage');
       } catch (fallbackError) {
         console.error('All fallback methods failed:', fallbackError);
         

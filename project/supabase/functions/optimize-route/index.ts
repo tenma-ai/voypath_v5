@@ -1,970 +1,1058 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-test-mode',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-interface OptimizeRouteRequest {
-  trip_id?: string;
-  settings?: OptimizationSettings;
-  type?: 'keep_alive' | 'optimization';
-  test_mode?: boolean;
-  _dev_user_id?: string;
-}
-
-interface OptimizationSettings {
-  fairness_weight?: number; // 0.0 to 1.0, default 0.6
-  efficiency_weight?: number; // 0.0 to 1.0, default 0.4
-  include_meals?: boolean; // default true
-  preferred_transport?: 'walking' | 'car' | 'flight';
-  use_google_maps_api?: boolean; // premium feature
-}
-
+// Comprehensive interfaces for type safety
 interface Place {
   id: string;
   name: string;
+  latitude: number;
+  longitude: number;
   category: string;
-  latitude?: number;
-  longitude?: number;
-  wish_level: number; // 1-5
+  place_type: string;
   stay_duration_minutes: number;
-  visit_date?: string;
-  scheduled_date?: string;
-  scheduled_time_start?: string;
-  scheduled_time_end?: string;
+  wish_level: number;
   user_id: string;
-  trip_id: string;
-  source?: string; // 'system', 'user'
-  created_at: string;
+  normalized_wish_level?: number;
+  fairness_contribution_score?: number;
+  is_selected_for_optimization?: boolean;
+  scheduled?: boolean;
+  visit_date?: string;
+  arrival_time?: string;
+  departure_time?: string;
+  transport_mode?: TransportMode;
+  travel_time_from_previous?: number;
+  order_in_day?: number;
+  is_airport?: boolean;
+  airport_code?: string;
 }
 
-interface TripData {
-  id: string;
-  departure_location: string;
-  destination: string;
-  start_date?: string;
-  end_date?: string;
-  optimization_preferences: OptimizationSettings;
+interface Airport {
+  iata_code: string;
+  airport_name: string;
+  city_name: string;
+  latitude: number;
+  longitude: number;
+  commercial_service: boolean;
+  international_service: boolean;
 }
 
-interface OptimizedRoute {
-  daily_schedules: DailySchedule[];
-  optimization_score: OptimizationScore;
-  execution_time_ms: number;
-  total_travel_time_minutes: number;
-  total_visit_time_minutes: number;
-  created_by: string;
+interface NormalizedUser {
+  user_id: string;
+  total_places: number;
+  avg_wish_level: number;
+  normalized_weight: number;
+  places: Place[];
+}
+
+interface OptimizationConstraints {
+  time_constraint_minutes: number;
+  distance_constraint_km: number;
+  budget_constraint_yen: number;
+  max_places: number;
 }
 
 interface DailySchedule {
+  day: number;
   date: string;
-  scheduled_places: ScheduledPlace[];
-  meal_breaks: MealBreak[];
+  places: Place[];
   total_travel_time: number;
   total_visit_time: number;
-}
-
-interface ScheduledPlace {
-  place: Place;
-  arrival_time: string;
-  departure_time: string;
-  travel_time_from_previous: number;
-  transport_mode: 'walking' | 'car' | 'flight';
-  order_in_day: number;
+  meal_breaks: MealBreak[];
 }
 
 interface MealBreak {
   type: 'breakfast' | 'lunch' | 'dinner';
   start_time: string;
-  end_time: string;
-  estimated_cost?: number;
+  duration_minutes: number;
+  estimated_cost: number;
 }
 
-interface OptimizationScore {
-  overall: number;
-  fairness: number;
-  efficiency: number;
-  details: {
-    user_adoption_balance: number;
-    wish_satisfaction_balance: number;
-    travel_efficiency: number;
-    time_constraint_compliance: number;
+interface OptimizationResult {
+  success: boolean;
+  optimization: {
+    daily_schedules: DailySchedule[];
+    optimization_score: {
+      total_score: number;
+      fairness_score: number;
+      efficiency_score: number;
+      details: {
+        user_adoption_balance: number;
+        wish_satisfaction_balance: number;
+        travel_efficiency: number;
+        time_constraint_compliance: number;
+      };
+    };
+    optimized_route: any;
+    total_duration_minutes: number;
+    places: Place[];
+    execution_time_ms: number;
+  };
+  message: string;
+}
+
+type TransportMode = 'walking' | 'public_transport' | 'car' | 'flight';
+
+// Utility functions for calculations
+function safeDistance(point1: [number, number], point2: [number, number]): number {
+  try {
+    if (!point1 || !point2 || point1.length !== 2 || point2.length !== 2) {
+      return 1000; // Default fallback distance
+    }
+    
+    const [lat1, lon1] = point1;
+    const [lat2, lon2] = point2;
+    
+    if (typeof lat1 !== 'number' || typeof lon1 !== 'number' || 
+        typeof lat2 !== 'number' || typeof lon2 !== 'number') {
+      return 1000;
+    }
+    
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  } catch (error) {
+    console.error('Error calculating distance:', error);
+    return 1000;
+  }
+}
+
+function determineTransportMode(distance: number, fromAirport = false, toAirport = false): TransportMode {
+  console.log(`🚗 Determining transport mode for distance: ${distance}km, fromAirport: ${fromAirport}, toAirport: ${toAirport}`);
+  
+  // If either end is an airport, must use flight
+  if (fromAirport || toAirport) {
+    console.log('  ✈️ Selected: flight (airport involved)');
+    return 'flight';
+  }
+  
+  // Distance-based determination
+  if (distance <= 1) {
+    console.log('  🚶 Selected: walking (short distance)');
+    return 'walking';
+  }
+  if (distance <= 50) {
+    console.log('  🚗 Selected: car (medium distance)');
+    return 'car';
+  }
+  if (distance <= 500) {
+    console.log('  🚗 Selected: car (long distance within country)');
+    return 'car';
+  }
+  
+  console.log('  ✈️ Selected: flight (international distance)');
+  return 'flight';
+}
+
+function calculateTravelTime(distance: number, mode: TransportMode): number {
+  const speeds = {
+    walking: 5, // km/h
+    public_transport: 25, // km/h
+    car: 50, // km/h
+    flight: 600 // km/h (including airport time)
+  };
+  
+  const baseTime = (distance / speeds[mode]) * 60; // minutes
+  
+  // Add overhead times
+  const overhead = {
+    walking: 5,
+    public_transport: 15,
+    car: 10,
+    flight: 120 // 2 hours for airport procedures
+  };
+  
+  const totalTime = Math.round(baseTime + overhead[mode]);
+  
+  // Cap maximum travel time to reasonable limits
+  const maxTimes = {
+    walking: 480, // 8 hours max
+    public_transport: 720, // 12 hours max
+    car: 720, // 12 hours max
+    flight: 1200 // 20 hours max (long international flights)
+  };
+  
+  const cappedTime = Math.min(totalTime, maxTimes[mode]);
+  
+  console.log(`⏱️ Travel time for ${distance}km by ${mode}: ${baseTime.toFixed(0)}min base + ${overhead[mode]}min overhead = ${totalTime}min (capped to ${cappedTime}min)`);
+  
+  return cappedTime;
+}
+
+// Step 1-2: Retrieve and validate data from database
+async function retrieveTripData(supabase: any, tripId: string, memberId: string) {
+  console.log('🔄 Step 1-2: Retrieving trip data from database');
+  console.log(`🔍 Fetching data for trip_id: ${tripId}, member_id: ${memberId}`);
+  
+  const { data: places, error: placesError } = await supabase
+    .from('places')
+    .select('*')
+    .eq('trip_id', tripId);
+    
+  if (placesError) {
+    console.error('❌ Failed to fetch places:', placesError);
+    throw new Error(`Failed to fetch places: ${placesError.message}`);
+  }
+  
+  const { data: tripMembers, error: membersError } = await supabase
+    .from('trip_members')
+    .select('user_id, assigned_color_index')
+    .eq('trip_id', tripId);
+    
+  if (membersError) {
+    console.error('❌ Failed to fetch trip members:', membersError);
+    throw new Error(`Failed to fetch trip members: ${membersError.message}`);
+  }
+  
+  console.log(`📊 Retrieved ${places?.length || 0} places and ${tripMembers?.length || 0} members`);
+  
+  // Log sample place data to debug data structure
+  if (places && places.length > 0) {
+    console.log('📍 Sample place data:', JSON.stringify(places[0], null, 2));
+  }
+  
+  return {
+    places: places || [],
+    members: tripMembers || []
   };
 }
 
-serve(async (req) => {
+// Helper function to safely convert database values to proper types
+function sanitizePlace(place: any): Place {
+  return {
+    ...place,
+    id: place.id || `place_${Date.now()}_${Math.random()}`,
+    name: place.name || 'Unknown Place',
+    latitude: parseFloat(place.latitude) || 0,
+    longitude: parseFloat(place.longitude) || 0,
+    category: place.category || 'other',
+    place_type: place.place_type || 'visit',
+    stay_duration_minutes: parseInt(place.stay_duration_minutes) || 120,
+    wish_level: parseInt(place.wish_level) || 1,
+    user_id: place.user_id || 'unknown'
+  };
+}
+
+// Step 3: Normalize user preferences
+async function normalizePreferences(places: any[]): Promise<NormalizedUser[]> {
+  console.log('🔄 Step 3: Normalizing user preferences');
+  console.log(`📊 Processing ${places?.length || 0} places for normalization`);
+  
+  if (!places || !Array.isArray(places) || places.length === 0) {
+    console.log('⚠️ No places provided for normalization');
+    return [];
+  }
+  
+  const userGroups = new Map<string, Place[]>();
+  
+  // Group places by user with proper data sanitization
+  // Include ALL places: system places (departure/destination) + user places
+  places.forEach(place => {
+    if (!place || !place.user_id) {
+      console.log('⚠️ Skipping place without user_id:', place);
+      return;
+    }
+    
+    if (!userGroups.has(place.user_id)) {
+      userGroups.set(place.user_id, []);
+    }
+    
+    const sanitizedPlace = sanitizePlace(place);
+    console.log(`📍 Sanitized place: ${sanitizedPlace.name} (${sanitizedPlace.latitude}, ${sanitizedPlace.longitude}) - Type: ${sanitizedPlace.place_type}`);
+    userGroups.get(place.user_id)!.push(sanitizedPlace);
+  });
+  
+  console.log(`📈 User groups created: ${userGroups.size} users`);
+  userGroups.forEach((places, userId) => {
+    console.log(`  - User ${userId}: ${places.length} places (${places.map(p => p.name).join(', ')})`);
+  });
+  
+  const normalizedUsers: NormalizedUser[] = [];
+  
+  // Calculate normalization for each user
+  userGroups.forEach((userPlaces, userId) => {
+    const totalPlaces = userPlaces.length;
+    const avgWishLevel = userPlaces.reduce((sum, p) => sum + p.wish_level, 0) / totalPlaces;
+    
+    // Normalize wish levels relative to user's average
+    const normalizedPlaces = userPlaces.map(place => ({
+      ...place,
+      normalized_wish_level: place.wish_level / avgWishLevel,
+      fairness_contribution_score: place.wish_level / (avgWishLevel * totalPlaces)
+    }));
+    
+    normalizedUsers.push({
+      user_id: userId,
+      total_places: totalPlaces,
+      avg_wish_level: avgWishLevel,
+      normalized_weight: 1.0 / userGroups.size, // Equal weight for each user
+      places: normalizedPlaces
+    });
+  });
+  
+  console.log(`✅ Normalized ${normalizedUsers.length} users with ${places.length} total places`);
+  return normalizedUsers;
+}
+
+// Step 4: Filter places for fairness
+async function filterPlacesForFairness(
+  normalizedUsers: NormalizedUser[], 
+  constraints: OptimizationConstraints
+): Promise<Place[]> {
+  console.log('🔄 Step 4: Filtering places for fairness');
+  
+  const allPlaces = normalizedUsers.flatMap(user => user.places);
+  
+  // Calculate total time needed for all places
+  const totalTimeNeeded = allPlaces.reduce((sum, place) => {
+    return sum + (place.stay_duration_minutes || 120); // Default 2 hours per place
+  }, 0);
+  
+  // Add estimated travel time (rough estimate: 30 min average between places)
+  const estimatedTravelTime = (allPlaces.length - 1) * 30;
+  const totalEstimatedTime = totalTimeNeeded + estimatedTravelTime;
+  
+  console.log(`📊 Total time needed: ${totalTimeNeeded} minutes visit + ${estimatedTravelTime} minutes travel = ${totalEstimatedTime} minutes`);
+  console.log(`📊 Time constraint: ${constraints.time_constraint_minutes} minutes`);
+  
+  // If all places fit within time constraint AND max places constraint, include all
+  if (allPlaces.length <= constraints.max_places && totalEstimatedTime <= constraints.time_constraint_minutes) {
+    console.log(`✅ All ${allPlaces.length} places fit within constraints (time and count)`);
+    return allPlaces.map(place => ({ ...place, is_selected_for_optimization: true }));
+  }
+  
+  // Fair selection algorithm - round-robin with wish level weighting
+  const selectedPlaces: Place[] = [];
+  const userQueues = normalizedUsers.map(user => ({
+    ...user,
+    places: [...user.places].sort((a, b) => b.normalized_wish_level! - a.normalized_wish_level!)
+  }));
+  
+  let round = 0;
+  while (selectedPlaces.length < constraints.max_places && userQueues.some(u => u.places.length > 0)) {
+    for (const user of userQueues) {
+      if (user.places.length > 0 && selectedPlaces.length < constraints.max_places) {
+        const place = user.places.shift()!;
+        place.is_selected_for_optimization = true;
+        selectedPlaces.push(place);
+      }
+    }
+    round++;
+  }
+  
+  console.log(`✅ Selected ${selectedPlaces.length} places through ${round} rounds of fair selection`);
+  return selectedPlaces;
+}
+
+// Step 5: Fix departure/destination and determine visit order
+async function fixDepartureDestination(places: Place[]): Promise<{ departure: Place | null, destination: Place | null, visitPlaces: Place[] }> {
+  console.log('🔄 Step 5: Fixing departure/destination and determining visit order');
+  console.log(`📊 Processing ${places.length} places:`);
+  places.forEach((place, index) => {
+    console.log(`  ${index + 1}. ${place.name} - Type: ${place.place_type || 'undefined'} - Source: ${place.source || 'undefined'}`);
+  });
+  
+  // Find departure and destination (handle duplicates properly)
+  const departurePlaces = places.filter(p => p.place_type === 'departure');
+  const destinationPlaces = places.filter(p => p.place_type === 'destination');
+  
+  let departure = departurePlaces.length > 0 ? departurePlaces[0] : null;
+  let destination = destinationPlaces.length > 0 ? destinationPlaces[0] : null;
+  
+  // Remove ALL departure and destination places to get visit places
+  const visitPlaces = places.filter(p => 
+    p.place_type !== 'departure' && 
+    p.place_type !== 'destination' &&
+    p.source !== 'system'
+  );
+  
+  // Log duplicates if found
+  if (departurePlaces.length > 1) {
+    console.log(`⚠️ Found ${departurePlaces.length} departure places, using first one: ${departure?.name}`);
+    console.log(`⚠️ Duplicate departure places:`, departurePlaces.map(p => p.name));
+  }
+  if (destinationPlaces.length > 1) {
+    console.log(`⚠️ Found ${destinationPlaces.length} destination places, using first one: ${destination?.name}`);
+    console.log(`⚠️ Duplicate destination places:`, destinationPlaces.map(p => p.name));
+  }
+  
+  console.log(`📋 Found departure: ${departure ? departure.name : 'None'}`);
+  console.log(`📋 Found destination: ${destination ? destination.name : 'None'}`);
+  console.log(`📋 Visit places: ${visitPlaces.length} (${visitPlaces.map(p => p.name).join(', ')})`);
+  
+  // If no system places found, try to create them from the data
+  if (!departure && !destination) {
+    console.log('⚠️ No system places found, attempting to identify from place names');
+    
+    // Find places with Departure: or Destination: in name
+    const allDepartureCandidates = places.filter(p => p.name.includes('Departure:'));
+    const allDestinationCandidates = places.filter(p => p.name.includes('Destination:'));
+    
+    if (allDepartureCandidates.length > 0) {
+      departure = allDepartureCandidates[0]; // Use first departure candidate
+      departure.place_type = 'departure';
+      console.log(`📍 Identified departure: ${departure.name}`);
+      
+      // Remove other departure candidates from consideration
+      if (allDepartureCandidates.length > 1) {
+        console.log(`⚠️ Found ${allDepartureCandidates.length} departure candidates, using first: ${departure.name}`);
+      }
+    }
+    
+    if (allDestinationCandidates.length > 0) {
+      destination = allDestinationCandidates[0]; // Use first destination candidate
+      destination.place_type = 'destination';
+      console.log(`📍 Identified destination: ${destination.name}`);
+    }
+    
+    // Re-filter visit places to exclude newly identified system places
+    const finalVisitPlaces = places.filter(p => 
+      p !== departure && 
+      p !== destination &&
+      !p.name.includes('Departure:') &&
+      !p.name.includes('Destination:')
+    );
+    
+    console.log(`📋 After identification - Visit places: ${finalVisitPlaces.length} (${finalVisitPlaces.map(p => p.name).join(', ')})`);
+    
+    return { departure, destination, visitPlaces: finalVisitPlaces };
+  }
+  
+  // For round trips (no destination), create a virtual destination same as departure
+  if (departure && !destination) {
+    console.log('🔄 Round trip detected - creating virtual destination');
+    destination = {
+      ...departure,
+      id: `${departure.id}_destination`,
+      name: departure.name.replace('Departure:', 'Return to:'),
+      place_type: 'destination'
+    };
+    console.log(`📍 Created virtual destination: ${destination.name}`);
+  }
+  
+  // Sort visit places by wish level and fairness score
+  visitPlaces.sort((a, b) => {
+    const scoreA = (a.normalized_wish_level || 1) * (a.fairness_contribution_score || 1);
+    const scoreB = (b.normalized_wish_level || 1) * (b.fairness_contribution_score || 1);
+    return scoreB - scoreA;
+  });
+  
+  console.log(`✅ Fixed route: ${departure ? 'Departure set' : 'No departure'}, ${destination ? 'Destination set' : 'No destination'}, ${visitPlaces.length} visit places`);
+  return { departure, destination, visitPlaces };
+}
+
+// Step 6: Determine transport modes
+async function determineTransportModes(places: Place[]): Promise<Place[]> {
+  console.log('🔄 Step 6: Determining transport modes');
+  
+  const updatedPlaces = [...places];
+  
+  for (let i = 1; i < updatedPlaces.length; i++) {
+    const prevPlace = updatedPlaces[i - 1];
+    const currentPlace = updatedPlaces[i];
+    
+    const distance = safeDistance(
+      [prevPlace.latitude, prevPlace.longitude],
+      [currentPlace.latitude, currentPlace.longitude]
+    );
+    
+    const transportMode = determineTransportMode(
+      distance,
+      prevPlace.is_airport,
+      currentPlace.is_airport
+    );
+    
+    currentPlace.transport_mode = transportMode;
+    currentPlace.travel_time_from_previous = calculateTravelTime(distance, transportMode);
+  }
+  
+  console.log('✅ Transport modes determined for all place transitions');
+  return updatedPlaces;
+}
+
+// Step 7: Insert airports using AirportDB API
+async function insertAirports(supabase: any, places: Place[]): Promise<Place[]> {
+  console.log('🔄 Step 7: Inserting airports using AirportDB data');
+  
+  const updatedPlaces = [...places];
+  const newAirports: Place[] = [];
+  
+  // Find long-distance transitions that need flights
+  for (let i = 1; i < updatedPlaces.length; i++) {
+    const prevPlace = updatedPlaces[i - 1];
+    const currentPlace = updatedPlaces[i];
+    
+    if (currentPlace.transport_mode === 'flight') {
+      // Find nearest airports for departure and arrival
+      const { data: departureAirports } = await supabase
+        .from('airportdb_cache')
+        .select('*')
+        .eq('commercial_service', true)
+        .order('location_point <-> point(' + prevPlace.longitude + ',' + prevPlace.latitude + ')')
+        .limit(1);
+        
+      const { data: arrivalAirports } = await supabase
+        .from('airportdb_cache')
+        .select('*')
+        .eq('commercial_service', true)
+        .order('location_point <-> point(' + currentPlace.longitude + ',' + currentPlace.latitude + ')')
+        .limit(1);
+      
+      if (departureAirports && departureAirports[0] && arrivalAirports && arrivalAirports[0]) {
+        const depAirport = departureAirports[0];
+        const arrAirport = arrivalAirports[0];
+        
+        // Insert departure airport if not same as previous place
+        if (!prevPlace.is_airport) {
+          const depAirportPlace: Place = {
+            id: `airport_${depAirport.iata_code}_dep`,
+            name: `${depAirport.airport_name} (${depAirport.iata_code})`,
+            latitude: parseFloat(depAirport.latitude),
+            longitude: parseFloat(depAirport.longitude),
+            category: 'airport',
+            place_type: 'airport',
+            stay_duration_minutes: 60,
+            wish_level: 1,
+            user_id: prevPlace.user_id,
+            is_airport: true,
+            airport_code: depAirport.iata_code,
+            transport_mode: 'car'
+          };
+          newAirports.push(depAirportPlace);
+        }
+        
+        // Insert arrival airport if not same as current place
+        if (!currentPlace.is_airport) {
+          const arrAirportPlace: Place = {
+            id: `airport_${arrAirport.iata_code}_arr`,
+            name: `${arrAirport.airport_name} (${arrAirport.iata_code})`,
+            latitude: parseFloat(arrAirport.latitude),
+            longitude: parseFloat(arrAirport.longitude),
+            category: 'airport',
+            place_type: 'airport',
+            stay_duration_minutes: 60,
+            wish_level: 1,
+            user_id: currentPlace.user_id,
+            is_airport: true,
+            airport_code: arrAirport.iata_code,
+            transport_mode: 'flight'
+          };
+          newAirports.push(arrAirportPlace);
+        }
+      }
+    }
+  }
+  
+  // Simply add all airports to the route - TSP will optimize the order
+  if (newAirports.length > 0) {
+    console.log(`✅ Adding ${newAirports.length} airports to route for TSP optimization`);
+    return [...updatedPlaces, ...newAirports];
+  }
+  
+  console.log(`✅ No airports needed for this route`);
+  return updatedPlaces;
+}
+
+// Step 8: TSP Greedy Algorithm for route optimization
+async function optimizeRouteWithTSP(places: Place[]): Promise<Place[]> {
+  console.log('🔄 Step 8: Applying TSP greedy algorithm for route optimization');
+  
+  if (places.length <= 2) return places;
+  
+  const optimizedRoute: Place[] = [];
+  const unvisited = [...places];
+  
+  // Extract departure and destination
+  const departure = unvisited.find(p => p.place_type === 'departure');
+  const destination = unvisited.find(p => p.place_type === 'destination');
+  
+  // Remove departure and destination from unvisited list
+  if (departure) {
+    optimizedRoute.push(departure);
+    unvisited.splice(unvisited.indexOf(departure), 1);
+  }
+  
+  if (destination && destination.id !== departure?.id) {
+    unvisited.splice(unvisited.indexOf(destination), 1);
+  }
+  
+  // Greedy TSP for middle places only (excluding destination)
+  while (unvisited.length > 0) {
+    const currentPlace = optimizedRoute[optimizedRoute.length - 1];
+    let nearestPlace = unvisited[0];
+    let minDistance = safeDistance(
+      [currentPlace.latitude, currentPlace.longitude],
+      [nearestPlace.latitude, nearestPlace.longitude]
+    );
+    
+    for (let i = 1; i < unvisited.length; i++) {
+      const distance = safeDistance(
+        [currentPlace.latitude, currentPlace.longitude],
+        [unvisited[i].latitude, unvisited[i].longitude]
+      );
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestPlace = unvisited[i];
+      }
+    }
+    
+    optimizedRoute.push(nearestPlace);
+    unvisited.splice(unvisited.indexOf(nearestPlace), 1);
+  }
+  
+  // Add destination at the end (only if different from departure)
+  if (destination && destination.id !== departure?.id) {
+    optimizedRoute.push(destination);
+  } else if (destination && destination.id === departure?.id) {
+    // For round trips, add a copy of departure as destination
+    const returnTrip = { ...departure, id: `${departure.id}_return`, name: departure.name.replace('Departure:', 'Return to:') };
+    optimizedRoute.push(returnTrip);
+  }
+  
+  console.log(`✅ Route optimized using TSP greedy algorithm: ${optimizedRoute.length} places`);
+  return optimizedRoute;
+}
+
+// Step 9: Calculate realistic travel times
+async function calculateRealisticTravelTimes(places: Place[]): Promise<Place[]> {
+  console.log('🔄 Step 9: Calculating realistic travel times');
+  
+  const updatedPlaces = [...places];
+  
+  for (let i = 1; i < updatedPlaces.length; i++) {
+    const prevPlace = updatedPlaces[i - 1];
+    const currentPlace = updatedPlaces[i];
+    
+    const distance = safeDistance(
+      [prevPlace.latitude, prevPlace.longitude],
+      [currentPlace.latitude, currentPlace.longitude]
+    );
+    
+    const mode = currentPlace.transport_mode || determineTransportMode(distance, prevPlace.is_airport, currentPlace.is_airport);
+    currentPlace.transport_mode = mode;
+    currentPlace.travel_time_from_previous = calculateTravelTime(distance, mode);
+  }
+  
+  console.log('✅ Realistic travel times calculated for all transitions');
+  return updatedPlaces;
+}
+
+// Step 10: Split schedule by days
+async function splitScheduleByDays(places: Place[], constraintMinutes: number): Promise<DailySchedule[]> {
+  console.log('🔄 Step 10: Splitting schedule by days');
+  
+  const dailySchedules: DailySchedule[] = [];
+  let currentDay = 1;
+  let currentDayPlaces: Place[] = [];
+  let currentDayTime = 0;
+  const maxDailyTime = Math.min(constraintMinutes, 720); // Max 12 hours per day
+  
+  for (const place of places) {
+    const placeTime = place.stay_duration_minutes + (place.travel_time_from_previous || 0);
+    
+    // Start new day if current day would exceed time limit
+    if (currentDayTime + placeTime > maxDailyTime && currentDayPlaces.length > 0) {
+      dailySchedules.push({
+        day: currentDay,
+        date: new Date(Date.now() + (currentDay - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        places: currentDayPlaces,
+        total_travel_time: currentDayPlaces.reduce((sum, p) => sum + (p.travel_time_from_previous || 0), 0),
+        total_visit_time: currentDayPlaces.reduce((sum, p) => sum + p.stay_duration_minutes, 0),
+        meal_breaks: []
+      });
+      
+      currentDay++;
+      currentDayPlaces = [];
+      currentDayTime = 0;
+    }
+    
+    currentDayPlaces.push(place);
+    currentDayTime += placeTime;
+  }
+  
+  // Add final day if there are remaining places
+  if (currentDayPlaces.length > 0) {
+    dailySchedules.push({
+      day: currentDay,
+      date: new Date(Date.now() + (currentDay - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      places: currentDayPlaces,
+      total_travel_time: currentDayPlaces.reduce((sum, p) => sum + (p.travel_time_from_previous || 0), 0),
+      total_visit_time: currentDayPlaces.reduce((sum, p) => sum + p.stay_duration_minutes, 0),
+      meal_breaks: []
+    });
+  }
+  
+  console.log(`✅ Schedule split into ${dailySchedules.length} days`);
+  return dailySchedules;
+}
+
+// Step 11: Insert meal times (MVP implementation)
+async function insertMealTimes(dailySchedules: DailySchedule[]): Promise<DailySchedule[]> {
+  console.log('🔄 Step 11: Inserting meal times (MVP implementation)');
+  
+  const updatedSchedules = dailySchedules.map(schedule => ({
+    ...schedule,
+    meal_breaks: [
+      { type: 'lunch' as const, start_time: '12:00', duration_minutes: 60, estimated_cost: 1500 },
+      { type: 'dinner' as const, start_time: '18:00', duration_minutes: 90, estimated_cost: 3000 }
+    ]
+  }));
+  
+  console.log('✅ Basic meal times inserted for all days');
+  return updatedSchedules;
+}
+
+// Step 12: Adjust for business hours (MVP implementation)
+async function adjustForBusinessHours(dailySchedules: DailySchedule[]): Promise<DailySchedule[]> {
+  console.log('🔄 Step 12: Adjusting for business hours (MVP implementation)');
+  
+  // Basic implementation - assume all places open 9:00-18:00
+  const updatedSchedules = dailySchedules.map(schedule => ({
+    ...schedule,
+    places: schedule.places.map((place, index) => ({
+      ...place,
+      arrival_time: place.arrival_time || `${9 + index * 2}:00:00`,
+      departure_time: place.departure_time || `${9 + index * 2 + Math.floor(place.stay_duration_minutes / 60)}:${(place.stay_duration_minutes % 60).toString().padStart(2, '0')}:00`
+    }))
+  }));
+  
+  console.log('✅ Basic business hours adjustment applied');
+  return updatedSchedules;
+}
+
+// Step 13: Build detailed schedule
+async function buildDetailedSchedule(dailySchedules: DailySchedule[]): Promise<DailySchedule[]> {
+  console.log('🔄 Step 13: Building detailed schedule with times and transport');
+  
+  const detailedSchedules = dailySchedules.map(schedule => {
+    let currentTime = 9 * 60; // Start at 9:00 AM (in minutes)
+    
+    const detailedPlaces = schedule.places.map((place, index) => {
+      // Add travel time to get to this place
+      if (index > 0 && place.travel_time_from_previous) {
+        currentTime += place.travel_time_from_previous;
+      }
+      
+      const arrivalHour = Math.floor(currentTime / 60);
+      const arrivalMinute = currentTime % 60;
+      const arrival_time = `${arrivalHour.toString().padStart(2, '0')}:${arrivalMinute.toString().padStart(2, '0')}:00`;
+      
+      // Add stay duration
+      currentTime += place.stay_duration_minutes;
+      
+      const departureHour = Math.floor(currentTime / 60);
+      const departureMinute = currentTime % 60;
+      const departure_time = `${departureHour.toString().padStart(2, '0')}:${departureMinute.toString().padStart(2, '0')}:00`;
+      
+      return {
+        ...place,
+        arrival_time,
+        departure_time,
+        order_in_day: index + 1
+      };
+    });
+    
+    return {
+      ...schedule,
+      places: detailedPlaces
+    };
+  });
+  
+  console.log('✅ Detailed schedule built with precise times and transport');
+  return detailedSchedules;
+}
+
+// Step 14: Store results in database
+async function storeOptimizationResults(
+  supabase: any,
+  tripId: string,
+  memberId: string,
+  dailySchedules: DailySchedule[],
+  optimizationScore: any,
+  executionTime: number
+): Promise<void> {
+  console.log('🔄 Step 14: Storing results in database');
+  
+  const { error } = await supabase
+    .from('optimization_results')
+    .insert({
+      trip_id: tripId,
+      created_by: memberId,
+      optimized_route: dailySchedules,
+      optimization_score: optimizationScore,
+      execution_time_ms: executionTime,
+      places_count: dailySchedules.reduce((sum, day) => sum + day.places.length, 0),
+      total_travel_time_minutes: dailySchedules.reduce((sum, day) => sum + day.total_travel_time, 0),
+      total_visit_time_minutes: dailySchedules.reduce((sum, day) => sum + day.total_visit_time, 0),
+      is_active: true,
+      algorithm_version: '15-step-mvp-v1'
+    });
+    
+  if (error) {
+    console.error('Failed to store optimization results:', error);
+    throw new Error(`Failed to store results: ${error.message}`);
+  }
+  
+  console.log('✅ Optimization results stored in database');
+}
+
+// Step 15: Calculate optimization scores
+function calculateOptimizationScore(
+  normalizedUsers: NormalizedUser[],
+  selectedPlaces: Place[],
+  dailySchedules: DailySchedule[],
+  constraints: OptimizationConstraints
+): any {
+  console.log('🔄 Step 15: Calculating optimization scores');
+  
+  // User adoption balance (fairness)
+  const userPlaceCounts = normalizedUsers.map(user => 
+    selectedPlaces.filter(place => place.user_id === user.user_id).length
+  );
+  const avgPlacesPerUser = userPlaceCounts.reduce((sum, count) => sum + count, 0) / userPlaceCounts.length;
+  const fairnessVariance = userPlaceCounts.reduce((sum, count) => sum + Math.pow(count - avgPlacesPerUser, 2), 0) / userPlaceCounts.length;
+  const fairnessScore = Math.max(0, 100 - fairnessVariance * 10);
+  
+  // Wish satisfaction balance
+  const totalWishValue = selectedPlaces.reduce((sum, place) => sum + (place.normalized_wish_level || 1), 0);
+  const maxPossibleWish = selectedPlaces.length * 1.5; // Assuming max normalized wish is 1.5
+  const wishSatisfactionScore = Math.min(100, (totalWishValue / maxPossibleWish) * 100);
+  
+  // Travel efficiency
+  const totalTravelTime = dailySchedules.reduce((sum, day) => sum + day.total_travel_time, 0);
+  const totalVisitTime = dailySchedules.reduce((sum, day) => sum + day.total_visit_time, 0);
+  const efficiencyRatio = totalVisitTime / (totalVisitTime + totalTravelTime);
+  const efficiencyScore = efficiencyRatio * 100;
+  
+  // Time constraint compliance
+  const totalTime = totalTravelTime + totalVisitTime;
+  const complianceScore = totalTime <= constraints.time_constraint_minutes ? 100 : 
+    Math.max(0, 100 - ((totalTime - constraints.time_constraint_minutes) / constraints.time_constraint_minutes) * 100);
+  
+  const overallScore = (fairnessScore + wishSatisfactionScore + efficiencyScore + complianceScore) / 4;
+  
+  const optimizationScore = {
+    total_score: Math.round(overallScore),
+    fairness_score: Math.round(fairnessScore),
+    efficiency_score: Math.round(efficiencyScore),
+    details: {
+      user_adoption_balance: fairnessScore / 100,
+      wish_satisfaction_balance: wishSatisfactionScore / 100,
+      travel_efficiency: efficiencyScore / 100,
+      time_constraint_compliance: complianceScore / 100
+    }
+  };
+  
+  console.log(`✅ Optimization score calculated: ${overallScore.toFixed(1)}% overall`);
+  return optimizationScore;
+}
+
+// Main optimization function implementing all 15 steps
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 405,
-      }
-    );
-  }
-
+  const startTime = Date.now();
+  
   try {
-    const requestData: OptimizeRouteRequest = await req.json();
+    console.log('🚀 Starting 15-step route optimization process');
     
-    // Handle keep-alive ping first (no auth required)
-    if (requestData.type === 'keep_alive') {
-      return new Response(
-        JSON.stringify({ message: 'pong', timestamp: new Date().toISOString() }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
+    const requestData = await req.json();
+    console.log('📥 Received request data:', JSON.stringify(requestData, null, 2));
+    
+    const { trip_id, member_id, user_places, constraints, transport_mode } = requestData;
+    
+    // Enhanced input validation
+    if (!trip_id || typeof trip_id !== 'string') {
+      throw new Error('Missing or invalid trip_id parameter');
     }
-
-    // Check for test mode first - detect test trips and test user
-    const isTestTrip = requestData.trip_id?.includes('test') ||
-                       requestData.trip_id?.includes('a1b2c3d4');
     
-    // Check for development user ID in request data
-    const isDevUser = requestData._dev_user_id === '2600c340-0ecd-4166-860f-ac4798888344';
+    if (!member_id || typeof member_id !== 'string') {
+      throw new Error('Missing or invalid member_id parameter');
+    }
     
-    const isTestMode = req.headers.get('X-Test-Mode') === 'true' || 
-                       requestData.test_mode === true ||
-                       isTestTrip ||
-                       isDevUser;
-
-    // For all other operations, require authentication
-    const supabaseClient = createClient(
+    console.log(`🔍 Processing optimization for trip: ${trip_id}, member: ${member_id}`);
+    
+    // Log user_places data structure for debugging
+    if (user_places) {
+      console.log('📊 user_places data type:', typeof user_places);
+      console.log('📊 user_places is array:', Array.isArray(user_places));
+      console.log('📊 user_places length:', user_places?.length);
+      if (user_places && user_places.length > 0) {
+        console.log('📍 First user_place sample:', JSON.stringify(user_places[0], null, 2));
+      }
+    }
+    
+    // Initialize Supabase client
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      isTestMode ? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' : Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: isTestMode ? {} : { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-
-    let user: any;
     
-    if (isTestMode) {
-      console.log('Running in test mode, bypassing authentication');
-      // Use dev user ID if provided, otherwise use test user
-      user = {
-        id: requestData._dev_user_id || '033523e2-377c-4479-a5cd-90d8905f7bd0',
-        email: isDevUser ? 'dev@voypath.com' : 'test@example.com',
-        name: isDevUser ? 'Development User' : 'Test User'
-      };
+    const optimizationConstraints: OptimizationConstraints = {
+      time_constraint_minutes: constraints?.time_constraint_minutes || 1440,
+      distance_constraint_km: constraints?.distance_constraint_km || 1000,
+      budget_constraint_yen: constraints?.budget_constraint_yen || 100000,
+      max_places: constraints?.max_places || 20
+    };
+    
+    // Execute 15-step optimization process
+    
+    // Steps 1-2: Retrieve trip data - prefer user_places if provided
+    let allPlaces = user_places;
+    
+    // If user_places not provided or empty, retrieve from database
+    if (!allPlaces || !Array.isArray(allPlaces) || allPlaces.length === 0) {
+      console.log('📥 No user_places provided, retrieving from database');
+      const tripData = await retrieveTripData(supabase, trip_id, member_id);
+      allPlaces = tripData.places;
     } else {
-      const {
-        data: { user: authUser },
-        error: userError,
-      } = await supabaseClient.auth.getUser();
-
-      if (userError || !authUser) {
-        return new Response(
-          JSON.stringify({ error: 'Unauthorized' }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 401,
-          }
-        );
-      }
-      user = authUser;
+      console.log(`📥 Using provided user_places: ${allPlaces.length} places`);
+      console.log('📊 Breakdown of provided places:');
+      allPlaces.forEach((place, index) => {
+        console.log(`  ${index + 1}. ${place.name} - Type: ${place.place_type || 'undefined'} - Source: ${place.source || 'undefined'}`);
+      });
     }
     
-    if (!requestData.trip_id) {
-      throw new Error('trip_id is required');
-    }
+    // Separate system places from user places BEFORE normalization
+    const systemPlaces = (allPlaces || []).filter(p => 
+      p.place_type === 'departure' || p.place_type === 'destination' || p.source === 'system'
+    );
+    const userPlaces = (allPlaces || []).filter(p => 
+      p.place_type !== 'departure' && p.place_type !== 'destination' && p.source !== 'system'
+    );
+    
+    console.log(`🔍 Separated places - System: ${systemPlaces.length}, User: ${userPlaces.length}`);
+    console.log('📊 System places:', systemPlaces.map(p => ({ name: p.name, type: p.place_type })));
+    console.log('📊 User places:', userPlaces.map(p => ({ name: p.name, category: p.category })));
 
-    // Check user permissions and rate limits (skip in test mode)
-    if (!isTestMode) {
-      await validateUserPermissions(supabaseClient, user.id, requestData.trip_id);
-      await checkOptimizationRateLimit(supabaseClient, user.id);
-    }
-
-    // Gather trip data
-    const { trip, places, members } = await gatherTripData(supabaseClient, requestData.trip_id);
-
-    // Check for cached results
-    const cachedResult = await getCachedOptimization(supabaseClient, requestData.trip_id, places);
-    if (cachedResult) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          optimization_result: cachedResult,
-          cached: true,
-          message: 'Using cached optimization result'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    }
-
-    // Execute optimization
-    const startTime = Date.now();
-    const optimizedRoute = await optimizeRoute(trip, places, members, requestData.settings);
+    // Step 3: Normalize preferences for USER places only (system places are fixed)
+    console.log('📊 Processing USER places for normalization (excluding system places):', JSON.stringify(userPlaces, null, 2));
+    const normalizedUsers = await normalizePreferences(userPlaces);
+    
+    // Step 4: Filter USER places for fairness (system places always included)
+    const selectedVisitPlaces = await filterPlacesForFairness(normalizedUsers, optimizationConstraints);
+    
+    // Step 5: Combine system places (always included) with selected user places
+    const allSelectedPlaces = [...systemPlaces, ...selectedVisitPlaces];
+    console.log(`🔗 Combined places: ${allSelectedPlaces.length} total (${systemPlaces.length} system + ${selectedVisitPlaces.length} user)`);
+    console.log(`🔗 Combined place names: ${allSelectedPlaces.map(p => p.name)}`);
+    const { departure, destination, visitPlaces } = await fixDepartureDestination(allSelectedPlaces);
+    
+    console.log(`📋 After fixDepartureDestination:`);
+    console.log(`  - Departure: ${departure ? departure.name : 'None'}`);
+    console.log(`  - Destination: ${destination ? destination.name : 'None'}`);
+    console.log(`  - Visit places: ${visitPlaces.length} (${visitPlaces.map(p => p.name).join(', ')})`);
+    console.log(`  - Total places being processed: ${[departure, ...visitPlaces, destination].filter(Boolean).length}`);
+    
+    // Step 6: Determine transport modes
+    const placesWithTransport = await determineTransportModes([
+      ...(departure ? [departure] : []),
+      ...visitPlaces,
+      ...(destination ? [destination] : [])
+    ]);
+    
+    // Step 7: Insert airports
+    const placesWithAirports = await insertAirports(supabase, placesWithTransport);
+    
+    // Step 8: TSP optimization
+    console.log(`🔄 Input to TSP: ${placesWithAirports.length} places`);
+    const optimizedRoute = await optimizeRouteWithTSP(placesWithAirports);
+    console.log(`✅ TSP output: ${optimizedRoute.length} places`);
+    
+    // Step 9: Calculate realistic travel times
+    const routeWithTravelTimes = await calculateRealisticTravelTimes(optimizedRoute);
+    console.log(`✅ Route with travel times: ${routeWithTravelTimes.length} places`);
+    
+    // Step 10: Split by days
+    const dailySchedules = await splitScheduleByDays(routeWithTravelTimes, optimizationConstraints.time_constraint_minutes);
+    console.log(`📅 After splitScheduleByDays: ${dailySchedules.length} days`);
+    dailySchedules.forEach((day, index) => {
+      console.log(`  Day ${index + 1}: ${day.places.length} places (${day.places.map(p => p.name).join(', ')})`);
+    });
+    
+    // Step 11: Insert meal times
+    const schedulesWithMeals = await insertMealTimes(dailySchedules);
+    
+    // Step 12: Adjust business hours
+    const schedulesWithBusinessHours = await adjustForBusinessHours(schedulesWithMeals);
+    
+    // Step 13: Build detailed schedule
+    const detailedSchedules = await buildDetailedSchedule(schedulesWithBusinessHours);
+    
+    // Step 15: Calculate optimization score
+    const optimizationScore = calculateOptimizationScore(
+      normalizedUsers,
+      allSelectedPlaces,
+      detailedSchedules,
+      optimizationConstraints
+    );
+    
     const executionTime = Date.now() - startTime;
-
-    // Save and broadcast results
-    const resultId = await saveOptimizationResult(
-      supabaseClient,
-      requestData.trip_id,
-      user.id,
-      optimizedRoute,
+    
+    // Step 14: Store results
+    await storeOptimizationResults(
+      supabase,
+      trip_id,
+      member_id,
+      detailedSchedules,
+      optimizationScore,
       executionTime
     );
-
-    // Cache the result
-    await setCachedOptimization(supabaseClient, requestData.trip_id, places, optimizedRoute);
-
-    // Record usage event
-    await recordOptimizationEvent(supabaseClient, user.id, requestData.trip_id, {
-      execution_time_ms: executionTime,
-      places_count: places.length,
-      optimization_score: optimizedRoute.optimization_score.overall
-    });
-
+    
+    console.log(`🎉 15-step optimization completed successfully in ${executionTime}ms`);
+    
+    // Return comprehensive result
+    const result: OptimizationResult = {
+      success: true,
+      optimization: {
+        daily_schedules: detailedSchedules,
+        optimization_score: optimizationScore,
+        optimized_route: { daily_schedules: detailedSchedules },
+        total_duration_minutes: detailedSchedules.reduce((sum, day) => 
+          sum + day.total_travel_time + day.total_visit_time, 0),
+        places: routeWithTravelTimes,
+        execution_time_ms: executionTime
+      },
+      message: `Route optimized successfully using 15-step algorithm. Processed ${normalizedUsers.length} users, selected ${allSelectedPlaces.length} places (${systemPlaces.length} system + ${selectedVisitPlaces.length} user), organized into ${detailedSchedules.length} days with ${optimizationScore.total_score}% optimization score.`
+    };
+    
     return new Response(
-      JSON.stringify({
-        success: true,
-        optimization_result: optimizedRoute,
-        result_id: resultId,
-        execution_time_ms: executionTime,
-        cached: false,
-        message: 'Route optimized successfully'
-      }),
+      JSON.stringify(result),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
-      }
+      },
     );
-
+    
   } catch (error) {
-    console.error('Optimization Error:', error);
+    const executionTime = Date.now() - startTime;
+    console.error('❌ Optimization failed:', error);
+    console.error('Error stack:', error.stack);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        execution_time_ms: executionTime,
+        timestamp: new Date().toISOString()
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
+        status: 500,
+      },
     );
   }
 });
-
-async function validateUserPermissions(supabase: any, userId: string, tripId: string) {
-  const { data: membership, error } = await supabase
-    .from('trip_members')
-    .select('can_optimize')
-    .eq('trip_id', tripId)
-    .eq('user_id', userId)
-    .single();
-
-  if (error || !membership) {
-    throw new Error('You are not a member of this trip');
-  }
-
-  if (!membership.can_optimize) {
-    throw new Error('You do not have permission to optimize this trip');
-  }
-}
-
-async function checkOptimizationRateLimit(supabase: any, userId: string) {
-  const windowStart = new Date();
-  windowStart.setHours(windowStart.getHours() - 1);
-
-  const { data: user } = await supabase
-    .from('users')
-    .select('is_premium')
-    .eq('id', userId)
-    .single();
-
-  const limit = user?.is_premium ? 20 : 3;
-
-  const { data: recentOptimizations } = await supabase
-    .from('optimization_results')
-    .select('created_at')
-    .eq('created_by', userId)
-    .gte('created_at', windowStart.toISOString());
-
-  if (recentOptimizations && recentOptimizations.length >= limit) {
-    throw new Error(
-      `Rate limit exceeded. ${user?.is_premium ? 'Premium' : 'Free'} users can perform ${limit} optimizations per hour.`
-    );
-  }
-}
-
-async function gatherTripData(supabase: any, tripId: string) {
-  // Get trip information
-  const { data: trip, error: tripError } = await supabase
-    .from('trips')
-    .select('*')
-    .eq('id', tripId)
-    .single();
-
-  if (tripError) throw new Error(`Trip not found: ${tripError.message}`);
-
-  if (!trip.departure_location) {
-    throw new Error('Departure location is required for optimization');
-  }
-
-  // Get all places for the trip
-  const { data: places, error: placesError } = await supabase
-    .from('places')
-    .select(`
-      *,
-      user:users(id, name, is_premium)
-    `)
-    .eq('trip_id', tripId)
-    .order('created_at');
-
-  if (placesError) throw new Error(`Failed to fetch places: ${placesError.message}`);
-
-  // Get trip members
-  const { data: members, error: membersError } = await supabase
-    .from('trip_members')
-    .select(`
-      *,
-      user:users(id, name, is_premium)
-    `)
-    .eq('trip_id', tripId);
-
-  if (membersError) throw new Error(`Failed to fetch members: ${membersError.message}`);
-
-  return { trip, places: places || [], members: members || [] };
-}
-
-async function optimizeRoute(
-  trip: TripData,
-  places: Place[],
-  members: any[],
-  settings?: OptimizationSettings
-): Promise<OptimizedRoute> {
-  // Merge settings with trip preferences
-  const finalSettings: OptimizationSettings = {
-    fairness_weight: 0.6,
-    efficiency_weight: 0.4,
-    include_meals: true,
-    ...trip.optimization_preferences,
-    ...settings
-  };
-
-  // Use pre-selected places from place selection Edge Function
-  let selectedPlaces: Place[];
-  
-  try {
-    // Call place selection Edge Function to get optimally selected places
-    const selectionResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/select-optimal-places`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`
-      },
-      body: JSON.stringify({
-        trip_id: trip.id,
-        max_places: finalSettings.max_places_per_day || 20,
-        fairness_weight: finalSettings.fairness_weight || 0.6,
-        _dev_user_id: user.id === '2600c340-0ecd-4166-860f-ac4798888344' ? user.id : undefined
-      })
-    });
-
-    if (selectionResponse.ok) {
-      const selectionResult = await selectionResponse.json();
-      selectedPlaces = selectionResult.result.selectedPlaces.map((sp: any) => sp.place);
-      console.log(`Using ${selectedPlaces.length} pre-selected places from selection service`);
-    } else {
-      // Fallback to original logic if selection service fails
-      console.warn('Place selection service failed, using fallback selection');
-      selectedPlaces = places;
-    }
-  } catch (error) {
-    console.warn('Error calling place selection service:', error);
-    selectedPlaces = places;
-  }
-
-  // Separate system-generated places (departure/destination) from user places
-  const systemPlaces = selectedPlaces.filter(p => p.source === 'system');
-  const userPlaces = selectedPlaces.filter(p => p.source !== 'system');
-
-  // Find departure and destination places
-  const departurePlace = systemPlaces.find(p => 
-    p.category === 'departure_point' || p.name.includes('(Departure)')
-  );
-  const destinationPlace = systemPlaces.find(p => 
-    p.category === 'destination_point' || p.category === 'return_point' ||
-    p.name.includes('(Final Destination)') || p.name.includes('(Return)')
-  );
-
-  if (!departurePlace) {
-    throw new Error('Departure location not found in places');
-  }
-
-  // Group places by day if dates are available
-  const dailySchedules = trip.start_date && trip.end_date
-    ? optimizeScheduledTrip(trip, departurePlace, destinationPlace, userPlaces, finalSettings)
-    : optimizeUnscheduledTrip(trip, departurePlace, destinationPlace, userPlaces, finalSettings);
-
-  // Calculate optimization score
-  const optimizationScore = calculateOptimizationScore(dailySchedules, finalSettings);
-
-  // Calculate totals
-  const totalTravelTime = dailySchedules.reduce((sum, day) => sum + day.total_travel_time, 0);
-  const totalVisitTime = dailySchedules.reduce((sum, day) => sum + day.total_visit_time, 0);
-
-  return {
-    daily_schedules: dailySchedules,
-    optimization_score: optimizationScore,
-    execution_time_ms: 0, // Will be set by caller
-    total_travel_time_minutes: totalTravelTime,
-    total_visit_time_minutes: totalVisitTime,
-    created_by: ''  // Will be set by caller
-  };
-}
-
-function normalizeUserWeights(places: Place[], members: any[]): Place[] {
-  // Calculate places per user
-  const userPlaceCounts = places.reduce((acc, place) => {
-    acc[place.user_id] = (acc[place.user_id] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  return places.map(place => {
-    const userCount = userPlaceCounts[place.user_id] || 1;
-    const fairnessFactor = Math.sqrt(1 / userCount); // Reduce weight for users with many places
-    
-    return {
-      ...place,
-      normalized_weight: (place.wish_level / 5) * fairnessFactor
-    } as any;
-  });
-}
-
-function optimizeScheduledTrip(
-  trip: TripData,
-  departure: Place,
-  destination: Place | undefined,
-  places: Place[],
-  settings: OptimizationSettings
-): DailySchedule[] {
-  const tripDays = generateTripDays(trip.start_date!, trip.end_date!);
-  const dailySchedules: DailySchedule[] = [];
-
-  // Assign places to days based on visit_date or distribute evenly
-  const dailyPlaceGroups = groupPlacesByDay(places, tripDays);
-
-  tripDays.forEach((date, dayIndex) => {
-    const dayPlaces = dailyPlaceGroups[date] || [];
-    
-    // Add departure place on first day
-    const placesForDay = dayIndex === 0 ? [departure, ...dayPlaces] : dayPlaces;
-    
-    // Add destination place on last day
-    if (dayIndex === tripDays.length - 1 && destination) {
-      placesForDay.push(destination);
-    }
-
-    // Optimize the order for this day using TSP with constraints
-    const optimizedOrder = optimizeSingleDay(placesForDay, departure, 
-      dayIndex === tripDays.length - 1 ? destination : undefined);
-
-    // Create detailed schedule with times
-    const dailySchedule = createDailySchedule(date, optimizedOrder, settings);
-    dailySchedules.push(dailySchedule);
-  });
-
-  return dailySchedules;
-}
-
-function optimizeUnscheduledTrip(
-  trip: TripData,
-  departure: Place,
-  destination: Place | undefined,
-  places: Place[],
-  settings: OptimizationSettings
-): DailySchedule[] {
-  // For unscheduled trips, create a single day schedule or distribute across reasonable days
-  const maxPlacesPerDay = 8;
-  const dayCount = Math.ceil((places.length + 2) / maxPlacesPerDay); // +2 for departure/destination
-
-  const dailySchedules: DailySchedule[] = [];
-  
-  for (let dayIndex = 0; dayIndex < dayCount; dayIndex++) {
-    const startIndex = dayIndex * maxPlacesPerDay;
-    const endIndex = Math.min(startIndex + maxPlacesPerDay, places.length);
-    const dayPlaces = places.slice(startIndex, endIndex);
-
-    // Add departure on first day
-    const placesForDay = dayIndex === 0 ? [departure, ...dayPlaces] : dayPlaces;
-    
-    // Add destination on last day
-    if (dayIndex === dayCount - 1 && destination) {
-      placesForDay.push(destination);
-    }
-
-    const optimizedOrder = optimizeSingleDay(placesForDay, departure,
-      dayIndex === dayCount - 1 ? destination : undefined);
-
-    const date = `day-${dayIndex + 1}`;
-    const dailySchedule = createDailySchedule(date, optimizedOrder, settings);
-    dailySchedules.push(dailySchedule);
-  }
-
-  return dailySchedules;
-}
-
-function optimizeSingleDay(
-  places: Place[],
-  departure: Place,
-  destination?: Place
-): Place[] {
-  if (places.length <= 2) {
-    return places;
-  }
-
-  // Separate fixed points (departure/destination) from optimizable places
-  const optimizablePlaces = places.filter(p => 
-    p.id !== departure.id && (!destination || p.id !== destination.id)
-  );
-
-  if (optimizablePlaces.length === 0) {
-    return destination ? [departure, destination] : [departure];
-  }
-
-  // Use nearest neighbor heuristic with 2-opt improvement
-  const currentRoute = [departure];
-  const unvisited = [...optimizablePlaces];
-  let currentPlace = departure;
-
-  // Build initial route using nearest neighbor
-  while (unvisited.length > 0) {
-    const nearest = findNearestPlace(currentPlace, unvisited);
-    currentRoute.push(nearest);
-    unvisited.splice(unvisited.indexOf(nearest), 1);
-    currentPlace = nearest;
-  }
-
-  // Add destination at the end
-  if (destination) {
-    currentRoute.push(destination);
-  }
-
-  // Improve with 2-opt (keeping departure and destination fixed)
-  return improve2OptWithFixedEnds(currentRoute);
-}
-
-function findNearestPlace(current: Place, candidates: Place[]): Place {
-  let nearest = candidates[0];
-  let minScore = calculatePlaceScore(current, nearest);
-
-  for (const candidate of candidates.slice(1)) {
-    const score = calculatePlaceScore(current, candidate);
-    if (score < minScore) {
-      minScore = score;
-      nearest = candidate;
-    }
-  }
-
-  return nearest;
-}
-
-function calculatePlaceScore(from: Place, to: Place): number {
-  // Combine distance and wish level for scoring
-  const distance = calculateDistance(from, to);
-  const wishBonus = (to as any).normalized_weight || (to.wish_level / 5);
-  
-  // Higher wish level reduces effective distance
-  return distance * (2 - wishBonus);
-}
-
-function calculateDistance(place1: Place, place2: Place): number {
-  // Use Haversine formula if coordinates available, otherwise estimate
-  if (place1.latitude && place1.longitude && place2.latitude && place2.longitude) {
-    return calculateHaversineDistance(
-      place1.latitude, place1.longitude,
-      place2.latitude, place2.longitude
-    );
-  }
-  
-  // Fallback: estimate distance based on place names (for demonstration)
-  const distanceMap: Record<string, Record<string, number>> = {
-    'London': { 'Sydney': 17000, 'New York': 5500, 'Tokyo': 9600, 'PARI': 9600 },
-    'Sydney': { 'London': 17000, 'New York': 15900, 'Tokyo': 7800, 'PARI': 7800 },
-    'New York': { 'London': 5500, 'Sydney': 15900, 'Tokyo': 10900, 'PARI': 10900 },
-    'Tokyo': { 'London': 9600, 'Sydney': 7800, 'New York': 10900, 'PARI': 0 },
-    'PARI': { 'London': 9600, 'Sydney': 7800, 'New York': 10900, 'Tokyo': 0 }
-  };
-  
-  const place1Key = Object.keys(distanceMap).find(key => place1.name.includes(key));
-  const place2Key = Object.keys(distanceMap).find(key => place2.name.includes(key));
-  
-  if (place1Key && place2Key && distanceMap[place1Key]?.[place2Key]) {
-    return distanceMap[place1Key][place2Key];
-  }
-  
-  // Ultimate fallback: assume medium distance for unknown places
-  return 100; // 100km default distance
-}
-
-function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth's radius in kilometers
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
-
-function improve2OptWithFixedEnds(route: Place[]): Place[] {
-  if (route.length <= 3) return route;
-
-  let improved = true;
-  let currentRoute = [...route];
-
-  while (improved) {
-    improved = false;
-    
-    // Only optimize between fixed endpoints
-    for (let i = 1; i < currentRoute.length - 2; i++) {
-      for (let j = i + 1; j < currentRoute.length - 1; j++) {
-        const newRoute = [...currentRoute];
-        
-        // Reverse the segment between i and j
-        const segment = newRoute.slice(i, j + 1).reverse();
-        newRoute.splice(i, j - i + 1, ...segment);
-        
-        if (calculateTotalDistance(newRoute) < calculateTotalDistance(currentRoute)) {
-          currentRoute = newRoute;
-          improved = true;
-        }
-      }
-    }
-  }
-
-  return currentRoute;
-}
-
-function calculateTotalDistance(route: Place[]): number {
-  let total = 0;
-  for (let i = 0; i < route.length - 1; i++) {
-    total += calculateDistance(route[i], route[i + 1]);
-  }
-  return total;
-}
-
-function createDailySchedule(date: string, places: Place[], settings: OptimizationSettings): DailySchedule {
-  const scheduledPlaces: ScheduledPlace[] = [];
-  const mealBreaks: MealBreak[] = [];
-  
-  let currentTime = new Date(`${date}T09:00:00`); // Start at 9 AM
-  let totalTravelTime = 0;
-  let totalVisitTime = 0;
-
-  for (let i = 0; i < places.length; i++) {
-    const place = places[i];
-    const previousPlace = i > 0 ? places[i - 1] : null;
-    
-    // Calculate travel time from previous place
-    const travelTime = previousPlace ? calculateTravelTime(previousPlace, place) : 0;
-    totalTravelTime += travelTime;
-    
-    // Add travel time to current time
-    currentTime = new Date(currentTime.getTime() + travelTime * 60000);
-    
-    // Check for meal breaks
-    const mealBreak = checkForMealBreak(currentTime, mealBreaks);
-    if (mealBreak) {
-      mealBreaks.push(mealBreak);
-      currentTime = new Date(mealBreak.end_time);
-    }
-    
-    const arrivalTime = new Date(currentTime);
-    const departureTime = new Date(currentTime.getTime() + place.stay_duration_minutes * 60000);
-    totalVisitTime += place.stay_duration_minutes;
-    
-    scheduledPlaces.push({
-      place,
-      arrival_time: arrivalTime.toISOString(),
-      departure_time: departureTime.toISOString(),
-      travel_time_from_previous: travelTime,
-      transport_mode: selectTransportMode(previousPlace, place),
-      order_in_day: i + 1
-    });
-    
-    currentTime = departureTime;
-  }
-
-  return {
-    date,
-    scheduled_places: scheduledPlaces,
-    meal_breaks: mealBreaks,
-    total_travel_time: totalTravelTime,
-    total_visit_time: totalVisitTime
-  };
-}
-
-function calculateTravelTime(from: Place, to: Place): number {
-  const distance = calculateDistance(from, to);
-  const transportMode = selectTransportMode(from, to);
-  
-  // Realistic travel time calculation based on transport mode
-  switch (transportMode) {
-    case 'walking':
-      return Math.max(5, distance * 12); // Walking: ~5km/h
-    case 'car':
-      return Math.max(30, distance * 1.5); // Car: ~40km/h average + traffic
-    case 'flight':
-      // Flight time calculation: airport procedures + flight time
-      const flightTime = distance / 800 * 60; // ~800km/h cruising speed
-      const airportTime = 180; // 3 hours for check-in, security, boarding, deplaning
-      return Math.max(240, flightTime + airportTime); // Minimum 4 hours for any flight
-    default:
-      return Math.max(30, distance * 1.5); // Default to car
-  }
-}
-
-function selectTransportMode(from: Place | null, to: Place): 'walking' | 'car' | 'flight' {
-  if (!from) return 'walking';
-  
-  const distance = calculateDistance(from, to);
-  
-  // International/long distance flights (500km+)
-  if (distance >= 500) return 'flight';
-  
-  // Domestic flights for very long distances (200km+)
-  if (distance >= 200) return 'flight';
-  
-  // Car for medium distances (1km+)
-  if (distance >= 1) return 'car';
-  
-  // Walking for very short distances
-  return 'walking';
-}
-
-function checkForMealBreak(currentTime: Date, existingBreaks: MealBreak[]): MealBreak | null {
-  const hour = currentTime.getHours();
-  
-  const mealTimes = [
-    { type: 'breakfast' as const, start: 7, end: 9, duration: 45 },
-    { type: 'lunch' as const, start: 12, end: 14, duration: 60 },
-    { type: 'dinner' as const, start: 18, end: 20, duration: 90 }
-  ];
-
-  for (const meal of mealTimes) {
-    if (hour >= meal.start && hour <= meal.end) {
-      const hasExisting = existingBreaks.some(b => b.type === meal.type);
-      if (!hasExisting) {
-        const startTime = new Date(currentTime);
-        const endTime = new Date(currentTime.getTime() + meal.duration * 60000);
-        
-        return {
-          type: meal.type,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          estimated_cost: meal.type === 'breakfast' ? 800 : meal.type === 'lunch' ? 1200 : 2000
-        };
-      }
-    }
-  }
-  
-  return null;
-}
-
-function generateTripDays(startDate: string, endDate: string): string[] {
-  const days: string[] = [];
-  const current = new Date(startDate);
-  const end = new Date(endDate);
-  
-  while (current <= end) {
-    days.push(current.toISOString().split('T')[0]);
-    current.setDate(current.getDate() + 1);
-  }
-  
-  return days;
-}
-
-function groupPlacesByDay(places: Place[], tripDays: string[]): Record<string, Place[]> {
-  const groups: Record<string, Place[]> = {};
-  
-  // Initialize all days
-  tripDays.forEach(day => {
-    groups[day] = [];
-  });
-  
-  // Assign places with specific visit dates
-  const scheduledPlaces = places.filter(p => p.visit_date);
-  const unscheduledPlaces = places.filter(p => !p.visit_date);
-  
-  scheduledPlaces.forEach(place => {
-    const date = place.visit_date!.split('T')[0];
-    if (groups[date]) {
-      groups[date].push(place);
-    }
-  });
-  
-  // Distribute unscheduled places evenly
-  unscheduledPlaces.forEach((place, index) => {
-    const dayIndex = index % tripDays.length;
-    groups[tripDays[dayIndex]].push(place);
-  });
-  
-  return groups;
-}
-
-function calculateOptimizationScore(dailySchedules: DailySchedule[], settings: OptimizationSettings): OptimizationScore {
-  // Calculate fairness score
-  const fairnessScore = calculateFairnessScore(dailySchedules);
-  
-  // Calculate efficiency score  
-  const efficiencyScore = calculateEfficiencyScore(dailySchedules);
-  
-  // Calculate overall score
-  const overall = (settings.fairness_weight || 0.6) * fairnessScore + 
-                  (settings.efficiency_weight || 0.4) * efficiencyScore;
-
-  return {
-    overall,
-    fairness: fairnessScore,
-    efficiency: efficiencyScore,
-    details: {
-      user_adoption_balance: fairnessScore,
-      wish_satisfaction_balance: fairnessScore,
-      travel_efficiency: efficiencyScore,
-      time_constraint_compliance: efficiencyScore
-    }
-  };
-}
-
-function calculateFairnessScore(dailySchedules: DailySchedule[]): number {
-  const allPlaces = dailySchedules.flatMap(day => day.scheduled_places.map(sp => sp.place));
-  const userPlaces = allPlaces.filter(p => p.source !== 'system');
-  
-  if (userPlaces.length === 0) return 1.0;
-  
-  // Calculate user adoption rates
-  const userCounts = userPlaces.reduce((acc, place) => {
-    acc[place.user_id] = (acc[place.user_id] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  
-  const rates = Object.values(userCounts).map(count => count / userPlaces.length);
-  const mean = rates.reduce((sum, rate) => sum + rate, 0) / rates.length;
-  const variance = rates.reduce((sum, rate) => sum + Math.pow(rate - mean, 2), 0) / rates.length;
-  
-  // Lower variance = higher fairness
-  return Math.exp(-variance * 10);
-}
-
-function calculateEfficiencyScore(dailySchedules: DailySchedule[]): number {
-  const totalDistance = dailySchedules.reduce((sum, day) => {
-    return sum + day.scheduled_places.reduce((daySum, sp, index) => {
-      return daySum + (sp.travel_time_from_previous || 0);
-    }, 0);
-  }, 0);
-  
-  const totalPlaces = dailySchedules.reduce((sum, day) => sum + day.scheduled_places.length, 0);
-  
-  if (totalPlaces <= 1) return 1.0;
-  
-  // Normalize efficiency score (lower average travel time = higher efficiency)
-  const avgTravelTime = totalDistance / (totalPlaces - 1);
-  return Math.max(0, 1 - (avgTravelTime / 60)); // Assume 60 minutes as poor efficiency threshold
-}
-
-async function getCachedOptimization(supabase: any, tripId: string, places: Place[]): Promise<OptimizedRoute | null> {
-  const placesHash = generatePlacesHash(places);
-  
-  const { data, error } = await supabase
-    .from('optimization_cache')
-    .select('result')
-    .eq('trip_id', tripId)
-    .eq('places_hash', placesHash)
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (error || !data) return null;
-  
-  return data.result as OptimizedRoute;
-}
-
-async function setCachedOptimization(supabase: any, tripId: string, places: Place[], result: OptimizedRoute) {
-  const placesHash = generatePlacesHash(places);
-  const expiresAt = new Date();
-  expiresAt.setMinutes(expiresAt.getMinutes() + 30); // 30 minute cache
-
-  await supabase
-    .from('optimization_cache')
-    .upsert({
-      trip_id: tripId,
-      places_hash: placesHash,
-      settings_hash: 'default',
-      result,
-      expires_at: expiresAt.toISOString(),
-    });
-}
-
-function generatePlacesHash(places: Place[]): string {
-  const hashInput = places
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .map(p => `${p.id}:${p.wish_level}:${p.stay_duration_minutes}:${p.visit_date || ''}`)
-    .join('|');
-  
-  return btoa(hashInput).slice(0, 32);
-}
-
-async function saveOptimizationResult(
-  supabase: any,
-  tripId: string,
-  userId: string,
-  result: OptimizedRoute,
-  executionTime: number
-): Promise<string> {
-  // Mark previous results as inactive
-  await supabase
-    .from('optimization_results')
-    .update({ is_active: false })
-    .eq('trip_id', tripId);
-
-  // Save new result
-  const { data, error } = await supabase
-    .from('optimization_results')
-    .insert({
-      trip_id: tripId,
-      created_by: userId,
-      optimized_route: result.daily_schedules,
-      optimization_score: result.optimization_score,
-      execution_time_ms: executionTime,
-      places_count: result.daily_schedules.reduce((sum, day) => sum + day.scheduled_places.length, 0),
-      algorithm_version: '2.0',
-      total_travel_time_minutes: result.total_travel_time_minutes,
-      total_visit_time_minutes: result.total_visit_time_minutes,
-      is_active: true
-    })
-    .select('id')
-    .single();
-
-  if (error) {
-    throw new Error(`Failed to save optimization result: ${error.message}`);
-  }
-
-  return data.id;
-}
-
-async function recordOptimizationEvent(supabase: any, userId: string, tripId: string, metadata: any) {
-  await supabase
-    .from('usage_events')
-    .insert({
-      user_id: userId,
-      event_type: 'optimization_completed',
-      event_category: 'optimization',
-      trip_id: tripId,
-      metadata
-    });
-}

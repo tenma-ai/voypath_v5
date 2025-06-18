@@ -153,6 +153,21 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
     setShowProgress(true);
     setError(null);
     setProgress({ stage: 'collecting', progress: 0, message: 'Starting optimization...' });
+    
+    // Clear any cached optimization results first
+    console.log('🗑️ Clearing cached optimization results before new optimization');
+    setOptimizationResult(null);
+    
+    // Also clear from database (best effort)
+    try {
+      await supabase
+        .from('optimization_results')
+        .delete()
+        .eq('trip_id', tripId);
+      console.log('✅ Cleared database optimization cache');
+    } catch (error) {
+      console.warn('⚠️ Could not clear database cache (continuing anyway):', error);
+    }
 
     try {
       // Execute real optimization

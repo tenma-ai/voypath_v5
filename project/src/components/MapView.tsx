@@ -189,13 +189,16 @@ export function MapView() {
       }
       
       // Geocode destination location
-      if (destination) {
+      if (destination && destination !== 'same as departure location') {
         geocodeAddress(destination)
           .then(coords => setDestinationCoords(coords))
           .catch(error => console.error('Failed to geocode destination location:', error));
+      } else if (destination === 'same as departure location' && departureCoords) {
+        // Use departure coordinates for destination if they are the same
+        setDestinationCoords(departureCoords);
       }
     }
-  }, [isLoaded, currentTrip]);
+  }, [isLoaded, currentTrip, departureCoords]);
 
   // Update route segments when optimization result changes
   useEffect(() => {

@@ -55,8 +55,19 @@ export function MyPlacesPage() {
     currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false
   );
 
-  // Use only real database data
-  const displayPlaces = tripPlaces;
+  // Exclude departure and destination places from MyPlaces view
+  const displayPlaces = tripPlaces.filter(place => {
+    // Filter out system transportation places
+    const isSystemTransport = 
+      place.place_type === 'departure' || 
+      place.place_type === 'destination' ||
+      place.category === 'departure_point' ||
+      place.category === 'destination_point' ||
+      place.category === 'transportation' ||
+      place.source === 'system';
+    
+    return !isSystemTransport;
+  });
 
   const filteredPlaces = displayPlaces.filter(place => {
     // Use database field is_selected_for_optimization for scheduled status
@@ -236,9 +247,7 @@ export function MyPlacesPage() {
                 />
                 <div className="absolute top-2 right-2">
                   {(() => {
-                    const isScheduled = place.is_selected_for_optimization !== undefined 
-                      ? place.is_selected_for_optimization 
-                      : place.scheduled;
+                    const isScheduled = place.is_selected_for_optimization || place.scheduled;
                     return (
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         isScheduled

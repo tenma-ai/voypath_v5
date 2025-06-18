@@ -105,6 +105,7 @@ interface StoreState {
   // UI State
   isOptimizing: boolean;
   setIsOptimizing: (optimizing: boolean) => void;
+  isCreatingSystemPlaces: boolean;
 
   // Optimization Results
   optimizationResult: OptimizedRoute | null;
@@ -306,6 +307,7 @@ export const useStore = create<StoreState>()((set, get) => ({
       // UI State
       isOptimizing: false,
       setIsOptimizing: (optimizing) => set({ isOptimizing: optimizing }),
+      isCreatingSystemPlaces: false,
 
       // Optimization Results
       optimizationResult: null,
@@ -441,7 +443,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           const { data: placesData, error } = await supabase
             .from('places')
             .select(`
-              id, name, category, place_type, wish_level, stay_duration_minutes,
+              id, name, category, place_type, source, wish_level, stay_duration_minutes,
               latitude, longitude, is_selected_for_optimization, 
               normalized_wish_level, selection_round, trip_id, user_id, created_at,
               scheduled, scheduled_date, scheduled_time_start, scheduled_time_end
@@ -467,11 +469,14 @@ export const useStore = create<StoreState>()((set, get) => ({
               stayDuration: (place.stay_duration_minutes || 120) / 60,
               priceLevel: 2,
               scheduled: place.is_selected_for_optimization || false,
-              scheduledDate: place.is_selected_for_optimization ? '7/1' : undefined,
+              scheduledDate: place.scheduled_date ? new Date(place.scheduled_date).toLocaleDateString() : undefined,
               tripId: place.trip_id,
               trip_id: place.trip_id,
               userId: place.user_id,
               user_id: place.user_id,
+              // CRITICAL: Include place_type and source
+              place_type: place.place_type,
+              source: place.source,
               is_selected_for_optimization: place.is_selected_for_optimization,
               normalized_wish_level: place.normalized_wish_level,
               selection_round: place.selection_round,
@@ -486,6 +491,12 @@ export const useStore = create<StoreState>()((set, get) => ({
             if (targetTripId) {
               const tripPlaces = dbPlaces.filter(p => p.trip_id === targetTripId);
               console.log(`📍 Places for current trip (${targetTripId}):`, tripPlaces.length);
+            }
+            
+            // Create system places if they don't exist (only once per trip load)
+            if (targetTripId && !get().isCreatingSystemPlaces) {
+              const { createSystemPlaces } = get();
+              await createSystemPlaces(targetTripId);
             }
           }
         } catch (error) {
@@ -520,6 +531,18 @@ export const useStore = create<StoreState>()((set, get) => ({
 
         try {
           console.log('Creating trip in Supabase database');
+          console.log('Current user from store:', user);
+          
+          // Check current authentication status
+          const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+          console.log('Current authenticated user:', currentUser);
+          if (authError) {
+            console.error('Auth error:', authError);
+            throw new Error('Authentication required');
+          }
+          if (!currentUser) {
+            throw new Error('User not authenticated');
+          }
           
           // Generate UUID with timestamp to avoid conflicts
           const generateUUID = () => {
@@ -571,7 +594,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             destination: tripData.destination,
             start_date: tripData.start_date,
             end_date: tripData.end_date,
-            owner_id: user.id,
+            owner_id: currentUser.id, // Use authenticated user ID
           };
 
           // Save to Supabase database with retry on conflict
@@ -731,6 +754,9 @@ export const useStore = create<StoreState>()((set, get) => ({
             notes: place.notes,
             tripId: place.trip_id,
             userId: place.user_id,
+            // CRITICAL: Include place_type and source for system places identification
+            place_type: place.place_type,
+            source: place.source,
             // Database schema compatibility
             trip_id: place.trip_id,
             user_id: place.user_id,
@@ -764,6 +790,10 @@ export const useStore = create<StoreState>()((set, get) => ({
 
       loadOptimizationResult: async (tripId: string): Promise<void> => {
         try {
+          // Clear any cached optimization results and always start fresh
+          console.log('🗑️ Clearing cached optimization results for trip:', tripId);
+          set({ optimizationResult: null });
+          
           // Check if table exists before querying
           const { data: result, error } = await supabase
             .from('optimization_results')
@@ -780,9 +810,13 @@ export const useStore = create<StoreState>()((set, get) => ({
           }
 
           if (result) {
+            console.log('🔍 [useStore] Raw database result:', result);
+            console.log('🔍 [useStore] optimized_route:', result.optimized_route);
+            console.log('🔍 [useStore] daily_schedules:', result.optimized_route?.daily_schedules);
+            
             // Convert database result to OptimizedRoute format
             const optimizedRoute: OptimizedRoute = {
-              daily_schedules: result.optimized_route || [],
+              daily_schedules: result.optimized_route?.daily_schedules || [],
               optimization_score: result.optimization_score || { overall: 0, fairness: 0, efficiency: 0 },
               execution_time_ms: result.execution_time_ms || 0,
               total_travel_time_minutes: result.total_travel_time_minutes || 0,
@@ -790,8 +824,11 @@ export const useStore = create<StoreState>()((set, get) => ({
               created_by: result.created_by || ''
             };
 
+            console.log('🔍 [useStore] Converted optimizedRoute:', optimizedRoute);
+            console.log('🔍 [useStore] Converted daily_schedules:', optimizedRoute.daily_schedules);
+
             set({ optimizationResult: optimizedRoute });
-            console.log(`Loaded optimization result for trip ${tripId}`);
+            console.log(`✅ Loaded optimization result for trip ${tripId}`);
           } else {
             set({ optimizationResult: null });
           }
@@ -804,6 +841,13 @@ export const useStore = create<StoreState>()((set, get) => ({
 
       createSystemPlaces: async (tripId: string): Promise<void> => {
         try {
+          const { isCreatingSystemPlaces } = get();
+          if (isCreatingSystemPlaces) {
+            console.log('⚠️ System places creation already in progress for trip', tripId);
+            return;
+          }
+          
+          set({ isCreatingSystemPlaces: true });
           
           const { user, currentTrip } = get();
           if (!user || !currentTrip) return;
@@ -820,17 +864,36 @@ export const useStore = create<StoreState>()((set, get) => ({
             return;
           }
 
-          // Check if system places already exist
-          const { data: existingSystemPlaces } = await supabase
+          // Check if system places already exist with comprehensive checks
+          const { data: existingSystemPlaces, error: systemPlacesError } = await supabase
             .from('places')
-            .select('id, place_type')
+            .select('id, place_type, category, source')
             .eq('trip_id', tripId)
-            .in('place_type', ['departure', 'destination']);
+            .or('place_type.in.(departure,destination),category.in.(transportation,departure_point,destination_point),source.eq.system');
 
+          console.log('🗑️ Checking existing system places for trip:', tripId);
+          console.log('🗑️ Existing system places:', existingSystemPlaces);
+          console.log('🗑️ System places error:', systemPlacesError);
+          console.log('🗑️ Trip departure_location:', trip.departure_location);
+          console.log('🗑️ Trip destination:', trip.destination);
+
+          // Always recreate system places to ensure they exist correctly
           if (existingSystemPlaces && existingSystemPlaces.length > 0) {
-            console.log('System places already exist for trip', tripId);
-            return;
+            console.log('🗑️ Deleting existing system places for trip', tripId);
+            const { error: deleteError } = await supabase
+              .from('places')
+              .delete()
+              .eq('trip_id', tripId)
+              .or('place_type.in.(departure,destination),source.eq.system');
+            
+            if (deleteError) {
+              console.error('❌ Failed to delete existing system places:', deleteError);
+            } else {
+              console.log('✅ Existing system places deleted successfully');
+            }
           }
+          
+          console.log('✅ No existing system places found - creating new ones');
 
           const systemPlaces = [];
 
@@ -854,16 +917,20 @@ export const useStore = create<StoreState>()((set, get) => ({
               trip_id: tripId,
               user_id: user.id,
               place_type: 'departure',
-              source: 'system_generated'
+              source: 'system'
             });
           }
 
-          // Create destination place if different from departure
-          if (trip.destination && trip.destination !== trip.departure_location) {
+          // Create destination place only if different from departure
+          if (trip.destination && trip.destination !== 'same as departure location') {
             systemPlaces.push({
-              name: `Destination: ${trip.destination}`,
+              name: trip.destination === 'same as departure location' || trip.destination === trip.departure_location 
+                ? `Destination: ${trip.departure_location}` 
+                : `Destination: ${trip.destination}`,
               category: 'transportation',
-              address: trip.destination,
+              address: trip.destination === 'same as departure location' 
+                ? trip.departure_location 
+                : trip.destination,
               latitude: 35.6812, // Default coordinates
               longitude: 139.7671,
               rating: 0,
@@ -878,7 +945,7 @@ export const useStore = create<StoreState>()((set, get) => ({
               trip_id: tripId,
               user_id: user.id,
               place_type: 'destination',
-              source: 'system_generated'
+              source: 'system'
             });
           }
 
@@ -899,6 +966,8 @@ export const useStore = create<StoreState>()((set, get) => ({
           
         } catch (error) {
           console.error('Failed to create system places:', error);
+        } finally {
+          set({ isCreatingSystemPlaces: false });
         }
       },
     }));

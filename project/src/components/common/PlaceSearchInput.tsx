@@ -5,8 +5,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Search, MapPin, Star, Plus, Loader2 } from 'lucide-react';
-import { GooglePlace, PlaceSearchRequest } from '../../services/PlaceSearchService';
-import { searchPlacesWithFallback } from '../../services/PlaceSearchFallback';
+import { GooglePlace, PlaceSearchRequest, PlaceSearchService } from '../../services/PlaceSearchService';
 
 export interface PlaceSearchInputProps {
   value: string;
@@ -60,12 +59,17 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
           maxResults: 8
         };
 
-        const places = await searchPlacesWithFallback(searchRequest);
+        const places = await PlaceSearchService.searchPlaces(searchRequest);
         setSuggestions(places);
         setShowSuggestions(places.length > 0);
       } catch (err) {
         console.error('Place search error:', err);
-        setError('Search failed. Please try again.');
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        if (errorMessage.includes('API request denied') || errorMessage.includes('BillingNotEnabledMapError')) {
+          setError('Google Maps API billing not enabled. Please enable billing or contact administrator.');
+        } else {
+          setError(`Search failed: ${errorMessage}`);
+        }
         setSuggestions([]);
         setShowSuggestions(false);
       } finally {

@@ -15,6 +15,7 @@ export function TripDetailPage() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [tripIcon, setTripIcon] = useState<string | null>(null);
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
+  const [optimizationProgress, setOptimizationProgress] = useState(0);
   
   // Auto-clear error after 5 seconds
   useEffect(() => {
@@ -25,7 +26,6 @@ export function TripDetailPage() {
       return () => clearTimeout(timer);
     }
   }, [optimizationError]);
-  const [optimizationProgress, setOptimizationProgress] = useState(0);
   const { currentTrip, places, trips, isOptimizing, optimizationResult, setOptimizationResult, setIsOptimizing, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase } = useStore();
 
   // Load fresh data from database when page loads or trip changes
@@ -43,6 +43,35 @@ export function TripDetailPage() {
 
     loadData();
   }, [currentTrip?.id, loadPlacesFromDatabase]);
+
+  const trip = currentTrip;
+
+  // Load places and optimization result on component mount
+  useEffect(() => {
+    if (currentTrip?.id) { // Load for all real trips
+      createSystemPlaces?.(currentTrip.id); // Creates system places if they don't exist
+      loadPlacesFromAPI?.(currentTrip.id);
+      loadOptimizationResult?.(currentTrip.id);
+    }
+  }, [currentTrip?.id, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces]);
+
+  // Get places for current trip
+  const tripPlaces = places.filter(place => 
+    currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false
+  );
+  const hasPlaces = tripPlaces.length > 0;
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('TripDetailPage Debug:', {
+      tripId: currentTrip?.id,
+      totalPlaces: places.length,
+      tripPlacesCount: tripPlaces.length,
+      hasPlaces,
+      isOptimizing,
+      user: !!user
+    });
+  }, [currentTrip?.id, places.length, tripPlaces.length, hasPlaces, isOptimizing, user]);
 
   // Use current trip - redirect to home if none selected
   if (!currentTrip) {
@@ -62,35 +91,6 @@ export function TripDetailPage() {
       </div>
     );
   }
-
-  const trip = currentTrip;
-
-  // Load places and optimization result on component mount
-  useEffect(() => {
-    if (trip.id) { // Load for all real trips
-      createSystemPlaces?.(trip.id); // Creates system places if they don't exist
-      loadPlacesFromAPI?.(trip.id);
-      loadOptimizationResult?.(trip.id);
-    }
-  }, [trip.id, currentTrip, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces]);
-
-  // Get places for current trip
-  const tripPlaces = places.filter(place => 
-    trip ? (place.trip_id === trip.id || place.tripId === trip.id) : false
-  );
-  const hasPlaces = tripPlaces.length > 0;
-  
-  // Debug logging
-  useEffect(() => {
-    console.log('TripDetailPage Debug:', {
-      tripId: trip?.id,
-      totalPlaces: places.length,
-      tripPlacesCount: tripPlaces.length,
-      hasPlaces,
-      isOptimizing,
-      user: !!user
-    });
-  }, [trip?.id, places.length, tripPlaces.length, hasPlaces, isOptimizing, user]);
 
   // Handle optimization
   const handleOptimization = async () => {

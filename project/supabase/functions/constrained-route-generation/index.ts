@@ -1,511 +1,310 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
+// 共通CORS設定
+const COMMON_CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-test-mode',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
-
-interface RouteConstraints {
-  maxDailyHours: number;
-  mealBreaks: {
-    breakfast: { start: number; duration: number };
-    lunch: { start: number; duration: number };
-    dinner: { start: number; duration: number };
-  };
-  transportModes: {
-    walkingMaxKm: number;
-    publicTransportMaxKm: number;
-    carMinKm: number;
-    flightMinKm: number;
-  };
-}
-
-interface Place {
-  id: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  wish_level: number;
-  stay_duration_minutes: number;
-  user_id: string;
-  category: string;
-  address?: string;
-}
-
-interface PlaceWithTransport extends Place {
-  transportToNext: 'walking' | 'public_transport' | 'car' | 'flight' | null;
-  travelTimeMinutes?: number;
-  travelDistance?: number;
-}
-
-interface PlaceWithTiming extends PlaceWithTransport {
-  arrivalTime: string;
-  departureTime: string;
-}
-
-interface MealBreak {
-  type: 'breakfast' | 'lunch' | 'dinner';
-  startTime: string;
-  endTime: string;
-  duration: number;
-  suggestedLocation: string;
-}
-
-interface DailyRoute {
-  date: string;
-  places: PlaceWithTiming[];
-  totalMinutes: number;
-  mealBreaks: MealBreak[];
-}
-
-interface DetailedSchedule {
-  tripId: string;
-  dailyRoutes: DailyRoute[];
-  totalDays: number;
-  totalTravelTime: number;
-  totalVisitTime: number;
-  optimizationScore: {
-    overall: number;
-    fairness: number;
-    efficiency: number;
-  };
-  executionTimeMs: number;
-  algorithmVersion: string;
-}
-
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 405,
-      }
-    );
-  }
-
-  try {
-    const requestData = await req.json();
-    const { tripId, userId, places, departure, destination, constraints, _dev_user_id } = requestData;
-
-    if (!tripId || !userId || !places || !departure) {
-      throw new Error('Missing required parameters');
+// 統一エラーレスポンス
+function createErrorResponse(message, statusCode = 500) {
+  return new Response(JSON.stringify({
+    success: false,
+    error: message,
+    timestamp: new Date().toISOString()
+  }), {
+    status: statusCode,
+    headers: {
+      ...COMMON_CORS_HEADERS,
+      'Content-Type': 'application/json'
     }
-
-    // Check for test mode - detect test trips and test user
-    const isTestTrip = tripId?.includes('test') ||
-                       tripId?.includes('a1b2c3d4');
-    
-    // Check for development user ID in request data
-    const isDevUser = _dev_user_id === '2600c340-0ecd-4166-860f-ac4798888344';
-    
-    const isTestMode = req.headers.get('X-Test-Mode') === 'true' || 
-                       isTestTrip ||
-                       isDevUser;
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        global: {
-          headers: isTestMode ? {} : { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
-
-    // Execute constrained route generation
-    const startTime = Date.now();
-    const detailedSchedule = await generateConstrainedRoute(
-      places,
-      departure,
-      destination,
-      constraints,
-      tripId,
-      userId,
-      supabase
-    );
-    const executionTime = Date.now() - startTime;
-
-    detailedSchedule.executionTimeMs = executionTime;
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        result: detailedSchedule,
-        executionTimeMs: executionTime
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
-
-  } catch (error) {
-    console.error('Constrained route generation error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    );
-  }
-});
-
-// 制約付きルート生成 (提供されたアルゴリズム統合)
-async function generateConstrainedRoute(
-  places: Place[],
-  departure: Place,
-  destination: Place | null,
-  constraints: RouteConstraints,
-  tripId: string,
-  userId: string,
-  supabase: any
-): Promise<DetailedSchedule> {
-
-  // 1. 出発地・目的地固定の貪欲法ルート (提供されたアルゴリズム)
-  const baseRoute = [departure, ...optimizeGreedy(places), ...(destination ? [destination] : [])];
-
-  // 2. 交通手段決定 (提供されたアルゴリズム)
-  const routeWithTransport = await assignTransportModes(baseRoute, constraints, supabase);
-
-  // 3. 移動時間計算 (提供されたアルゴリズム)
-  const routeWithTiming = await calculateTravelTimes(routeWithTransport, supabase);
-
-  // 4. 日程分割 (提供されたアルゴリズム)
-  const maxDailyMinutes = constraints.maxDailyHours * 60;
-  const dailyRoutes = splitIntoDays(routeWithTiming, maxDailyMinutes);
-
-  // 5. 食事時間挿入 (提供されたアルゴリズム)
-  const routeWithMeals = insertMealBreaks(dailyRoutes, constraints.mealBreaks);
-
-  // 6. 営業時間調整
-  const finalRoutes = await adjustForOpeningHours(routeWithMeals, supabase);
-
-  // 7. 詳細スケジュール構築
-  const detailedSchedule = await buildDetailedSchedule(
-    tripId,
-    finalRoutes,
-    routeWithTiming,
-    supabase
-  );
-
-  return detailedSchedule;
-}
-
-// 貪欲法TSP (提供されたアルゴリズム)
-function optimizeGreedy(places: Place[]): Place[] {
-  if (places.length <= 1) return places;
-  
-  const result: Place[] = [];
-  let current = places[0];
-  let remaining = places.slice(1);
-  result.push(current);
-  
-  while (remaining.length > 0) {
-    // 最も近い場所を選択
-    const nearest = remaining.reduce((closest, place) => {
-      const currentDist = haversineDistance(current, place);
-      const closestDist = haversineDistance(current, closest);
-      return currentDist < closestDist ? place : closest;
-    });
-    
-    result.push(nearest);
-    remaining = remaining.filter(p => p.id !== nearest.id);
-    current = nearest;
-  }
-  
-  return result;
-}
-
-// 交通手段割り当て (提供されたアルゴリズム拡張)
-async function assignTransportModes(
-  route: Place[], 
-  constraints: RouteConstraints,
-  supabase: any
-): Promise<PlaceWithTransport[]> {
-  const result: PlaceWithTransport[] = [];
-  
-  for (let i = 0; i < route.length; i++) {
-    if (i === 0) {
-      result.push({ ...route[i], transportToNext: null });
-      continue;
-    }
-    
-    const prev = route[i - 1];
-    const current = route[i];
-    const distance = haversineDistance(prev, current);
-    
-    let mode: 'walking' | 'public_transport' | 'car' | 'flight';
-    
-    // Priority order: flight for long distances, then car for medium, public transport for short, walking for very short
-    if (distance >= constraints.transportModes.flightMinKm) {
-      // Check if airports are available for both locations
-      const hasOriginAirport = await hasAirport(prev, supabase);
-      const hasDestinationAirport = await hasAirport(current, supabase);
-      
-      if (hasOriginAirport && hasDestinationAirport) {
-        mode = 'flight';
-      } else if (distance >= constraints.transportModes.carMinKm) {
-        mode = 'car'; // Fallback to car if no airports available for long distance
-      } else {
-        mode = 'public_transport';
-      }
-    } else if (distance >= constraints.transportModes.carMinKm) {
-      mode = 'car';
-    } else if (distance >= constraints.transportModes.walkingMaxKm) {
-      mode = 'public_transport';
-    } else {
-      mode = 'walking';
-    }
-    
-    result.push({ 
-      ...current, 
-      transportToNext: mode,
-      travelDistance: distance
-    });
-  }
-  
-  return result;
-}
-
-// 移動時間計算 (提供されたアルゴリズム)
-async function calculateTravelTimes(route: PlaceWithTransport[], supabase: any): Promise<PlaceWithTiming[]> {
-  const speedKmH = {
-    walking: 4,
-    public_transport: 25,
-    car: 50,
-    flight: 600
-  };
-  
-  const result: PlaceWithTiming[] = [];
-  let currentTime = 9 * 60; // 9 AM in minutes
-  
-  for (let i = 0; i < route.length; i++) {
-    const place = route[i];
-    
-    if (i === 0) {
-      result.push({
-        ...place,
-        arrivalTime: formatTime(currentTime),
-        departureTime: formatTime(currentTime + place.stay_duration_minutes),
-        travelTimeMinutes: 0
-      });
-      currentTime += place.stay_duration_minutes;
-      continue;
-    }
-    
-    const prev = route[i - 1];
-    const distance = place.travelDistance || 0;
-    const speed = speedKmH[place.transportToNext as keyof typeof speedKmH] || 25;
-    
-    let travelTime = (distance / speed) * 60; // 分に変換
-    
-    // 追加時間 (提供されたアルゴリズム)
-    if (place.transportToNext === 'flight') {
-      travelTime += 180; // 空港手続き3時間
-    } else if (place.transportToNext === 'public_transport') {
-      travelTime += 15; // 待ち時間
-    }
-    
-    currentTime += Math.round(travelTime);
-    
-    result.push({
-      ...place,
-      arrivalTime: formatTime(currentTime),
-      departureTime: formatTime(currentTime + place.stay_duration_minutes),
-      travelTimeMinutes: Math.round(travelTime)
-    });
-    
-    currentTime += place.stay_duration_minutes;
-  }
-  
-  return result;
-}
-
-// 日程分割 (提供されたアルゴリズム)
-function splitIntoDays(route: PlaceWithTiming[], maxDailyMinutes: number): DailyRoute[] {
-  const dailyRoutes: DailyRoute[] = [];
-  let currentDay: PlaceWithTiming[] = [];
-  let currentDayMinutes = 0;
-  
-  for (const place of route) {
-    const placeTime = place.stay_duration_minutes + (place.travelTimeMinutes || 0);
-    
-    if (currentDayMinutes + placeTime > maxDailyMinutes && currentDay.length > 0) {
-      // 新しい日に移行
-      dailyRoutes.push({ 
-        date: `day-${dailyRoutes.length + 1}`,
-        places: currentDay, 
-        totalMinutes: currentDayMinutes,
-        mealBreaks: []
-      });
-      currentDay = [place];
-      currentDayMinutes = placeTime;
-    } else {
-      currentDay.push(place);
-      currentDayMinutes += placeTime;
-    }
-  }
-  
-  if (currentDay.length > 0) {
-    dailyRoutes.push({ 
-      date: `day-${dailyRoutes.length + 1}`,
-      places: currentDay, 
-      totalMinutes: currentDayMinutes,
-      mealBreaks: []
-    });
-  }
-  
-  return dailyRoutes;
-}
-
-// 食事時間挿入
-function insertMealBreaks(dailyRoutes: DailyRoute[], mealSettings: any): DailyRoute[] {
-  return dailyRoutes.map(dayRoute => {
-    const mealBreaks: MealBreak[] = [];
-    
-    // 各食事時間をチェックして挿入
-    Object.entries(mealSettings).forEach(([mealType, settings]: [string, any]) => {
-      const mealBreak: MealBreak = {
-        type: mealType as 'breakfast' | 'lunch' | 'dinner',
-        startTime: `${settings.start}:00`,
-        endTime: `${settings.start + Math.floor(settings.duration / 60)}:${(settings.duration % 60).toString().padStart(2, '0')}`,
-        duration: settings.duration,
-        suggestedLocation: `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} location`
-      };
-      mealBreaks.push(mealBreak);
-    });
-    
-    return {
-      ...dayRoute,
-      mealBreaks
-    };
   });
 }
-
-// Haversine距離計算
-function haversineDistance(place1: Place, place2: Place): number {
-  const R = 6371; // 地球の半径 (km)
-  const dLat = (place2.latitude - place1.latitude) * Math.PI / 180;
-  const dLon = (place2.longitude - place1.longitude) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(place1.latitude * Math.PI / 180) * Math.cos(place2.latitude * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+// 統一成功レスポンス
+function createSuccessResponse(data, statusCode = 200) {
+  return new Response(JSON.stringify({
+    success: true,
+    ...data,
+    timestamp: new Date().toISOString()
+  }), {
+    status: statusCode,
+    headers: {
+      ...COMMON_CORS_HEADERS,
+      'Content-Type': 'application/json'
+    }
+  });
+}
+// ハーバーサイン距離計算
+function calculateDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
-
-// AirportDB APIを使用した空港検出
-async function hasAirport(place: Place, supabase: any): Promise<boolean> {
-  try {
-    // Supabase Edge Function (detect-airports-airportdb) を呼び出し
-    const airportDetectionResponse = await supabase.functions.invoke('detect-airports-airportdb', {
-      body: {
-        coordinates: [{
-          latitude: place.latitude,
-          longitude: place.longitude,
-          name: place.name || 'Unknown Place'
-        }]
-      },
-      headers: {
-        'X-Test-Mode': isTestMode ? 'true' : 'false' // Pass test mode for internal function calls
-      }
-    });
-
-    if (airportDetectionResponse.error) {
-      console.error('Airport detection API error:', airportDetectionResponse.error);
-      throw new Error('AirportDB API call failed');
-    }
-
-    const airportData = airportDetectionResponse.data;
-    if (!airportData || !Array.isArray(airportData.results) || airportData.results.length === 0) {
-      return false;
-    }
-
-    const locationResult = airportData.results[0];
-    return locationResult.hasAirport && locationResult.airports && locationResult.airports.length > 0;
-
-  } catch (error) {
-    console.warn('AirportDB API failed, using fallback:', error);
-    
-    // フォールバック: 座標ベース簡易判定
-    const majorAirports = [
-      // 日本
-      { lat: 35.7533, lng: 140.3933 }, // 成田
-      { lat: 35.5544, lng: 139.7798 }, // 羽田
-      { lat: 34.4348, lng: 135.2440 }, // 関西
-      { lat: 43.0642, lng: 141.3469 }, // 新千歳
-      // アメリカ
-      { lat: 40.6413, lng: -73.7781 }, // JFK
-      { lat: 40.7769, lng: -73.8740 }, // LaGuardia
-      { lat: 40.6895, lng: -74.1745 }, // Newark
-      { lat: 34.0522, lng: -118.2437 }, // LAX
-      // ヨーロッパ
-      { lat: 51.4700, lng: -0.4543 }, // Heathrow
-      { lat: 48.1100, lng: 2.5500 }, // Charles de Gaulle
-      { lat: 50.0333, lng: 8.5706 }, // Frankfurt
-      // アジア
-      { lat: 1.3644, lng: 103.9915 }, // Changi
-      { lat: 22.3080, lng: 113.9185 }, // Hong Kong
-      { lat: 25.2532, lng: 55.3657 }, // Dubai
+// TSP貪欲法による経路最適化（ステップ8）
+function optimizeRouteWithTSP(places, departure, destination) {
+  if (places.length === 0) return [
+    departure,
+    destination
+  ];
+  // 出発地と到着地を除いた中間地点
+  const middlePoints = places.filter((p)=>p.id !== departure.id && p.id !== destination.id);
+  if (middlePoints.length === 0) {
+    return destination.id !== departure.id ? [
+      departure,
+      destination
+    ] : [
+      departure
     ];
-
-    const threshold = 100; // 100km範囲内に空港があるかチェック
-    return majorAirports.some(airport => {
-      const distance = haversineDistance(
-        { latitude: place.latitude, longitude: place.longitude },
-        { latitude: airport.lat, longitude: airport.lng }
-      );
-      return distance <= threshold;
-    });
+  }
+  const route = [
+    departure
+  ];
+  const unvisited = [
+    ...middlePoints
+  ];
+  let current = departure;
+  // 貪欲法で最寄りの場所を選択
+  while(unvisited.length > 0){
+    let nearest = unvisited[0];
+    let minDistance = calculateDistance(current.latitude || current.location?.lat || 0, current.longitude || current.location?.lng || 0, nearest.latitude || nearest.location?.lat || 0, nearest.longitude || nearest.location?.lng || 0);
+    for(let i = 1; i < unvisited.length; i++){
+      const distance = calculateDistance(current.latitude || current.location?.lat || 0, current.longitude || current.location?.lng || 0, unvisited[i].latitude || unvisited[i].location?.lat || 0, unvisited[i].longitude || unvisited[i].location?.lng || 0);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = unvisited[i];
+      }
+    }
+    route.push(nearest);
+    unvisited.splice(unvisited.indexOf(nearest), 1);
+    current = nearest;
+  }
+  // 到着地を最後に追加（出発地と異なる場合）
+  if (destination.id !== departure.id) {
+    route.push(destination);
+  }
+  return route;
+}
+// 移動手段決定（ステップ6）
+function determineTransportMode(from, to) {
+  const distance = calculateDistance(from.latitude || from.location?.lat || 0, from.longitude || from.location?.lng || 0, to.latitude || to.location?.lat || 0, to.longitude || to.location?.lng || 0);
+  
+  console.log(`[CONSTRAINED-ROUTE] Transport mode determination: ${from.name || 'Unknown'} → ${to.name || 'Unknown'} (${distance.toFixed(2)}km)`);
+  
+  if (distance < 2) {
+    console.log(`[CONSTRAINED-ROUTE] Selected: walking (distance < 2km)`);
+    return 'walking'; // 2km未満は徒歩
+  }
+  if (distance >= 1000) {
+    console.log(`[CONSTRAINED-ROUTE] Selected: flight (distance >= 1000km - intercontinental)`);
+    return 'flight'; // 1000km以上は確実に飛行機（大陸間）
+  }
+  if (distance >= 300) {
+    console.log(`[CONSTRAINED-ROUTE] Selected: flight (distance >= 300km - international)`);
+    return 'flight'; // 300km以上は飛行機（国際・長距離）
+  }
+  
+  console.log(`[CONSTRAINED-ROUTE] Selected: car (distance < 300km)`);
+  return 'car'; // その他は車
+}
+// 現実的な移動時間計算（ステップ9）
+function calculateTravelTime(from, to, mode) {
+  const distance = calculateDistance(from.latitude || from.location?.lat || 0, from.longitude || from.location?.lng || 0, to.latitude || to.location?.lat || 0, to.longitude || to.location?.lng || 0);
+  switch(mode){
+    case 'walking':
+      return Math.max(10, distance * 12); // 5km/h
+    case 'car':
+      return Math.max(15, distance * 1.5); // 40km/h平均
+    case 'flight':
+      return Math.max(240, distance / 800 * 60 + 180); // 800km/h + 3時間手続き
+    default:
+      return distance * 2;
   }
 }
-
-// 営業時間調整 (簡易実装)
-async function adjustForOpeningHours(dailyRoutes: DailyRoute[], supabase: any): Promise<DailyRoute[]> {
-  // 簡易実装: 現在はそのまま返す
-  // 実装時はPlacesテーブルのopening_hoursカラムを参照
-  return dailyRoutes;
-}
-
-// 詳細スケジュール構築
-async function buildDetailedSchedule(
-  tripId: string,
-  finalRoutes: DailyRoute[],
-  routeWithTiming: PlaceWithTiming[],
-  supabase: any
-): Promise<DetailedSchedule> {
-  
-  const totalTravelTime = routeWithTiming.reduce((sum, place) => sum + (place.travelTimeMinutes || 0), 0);
-  const totalVisitTime = routeWithTiming.reduce((sum, place) => sum + place.stay_duration_minutes, 0);
-  
+// 時間文字列をパース
+function parseTimeString(timeStr) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
   return {
-    tripId,
-    dailyRoutes: finalRoutes,
-    totalDays: finalRoutes.length,
-    totalTravelTime,
-    totalVisitTime,
-    optimizationScore: {
-      overall: 0.8,
-      fairness: 0.7,
-      efficiency: 0.9
-    },
-    executionTimeMs: 0, // Will be set by caller
-    algorithmVersion: '2.0-constrained'
+    hours,
+    minutes
   };
 }
-
-// 時間フォーマット関数
-function formatTime(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+// 時間を分に変換
+function timeToMinutes(hours, minutes) {
+  return hours * 60 + minutes;
 }
+// 分を時間文字列に変換
+function minutesToTimeString(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60) % 24;
+  const minutes = totalMinutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
+// 詳細スケジュール構築（ステップ13）
+function createDetailedSchedule(route, tripStartDate, tripDurationDays, dailyStartTime, dailyEndTime) {
+  const schedules = [];
+  const placesPerDay = Math.ceil(route.length / tripDurationDays);
+  const startTime = parseTimeString(dailyStartTime);
+  const endTime = parseTimeString(dailyEndTime);
+  const dailyAvailableMinutes = timeToMinutes(endTime.hours, endTime.minutes) - timeToMinutes(startTime.hours, startTime.minutes);
+  for(let day = 1; day <= tripDurationDays; day++){
+    const startIdx = (day - 1) * placesPerDay;
+    const endIdx = Math.min(startIdx + placesPerDay, route.length);
+    const dayPlaces = route.slice(startIdx, endIdx);
+    if (dayPlaces.length === 0) continue;
+    const currentDate = new Date(tripStartDate);
+    currentDate.setDate(currentDate.getDate() + (day - 1));
+    const dateString = currentDate.toISOString().split('T')[0];
+    const items = [];
+    let currentTime = timeToMinutes(startTime.hours, startTime.minutes);
+    let dayTravelTime = 0;
+    let dayPlaceTime = 0;
+    dayPlaces.forEach((place, index)=>{
+      // 移動時間追加
+      if (index > 0) {
+        const prevPlace = dayPlaces[index - 1];
+        const transportMode = determineTransportMode(prevPlace, place);
+        const travelTime = calculateTravelTime(prevPlace, place, transportMode);
+        items.push({
+          id: `transport_${prevPlace.id}_${place.id}`,
+          type: 'transport',
+          name: `${prevPlace.name} → ${place.name}`,
+          start_time: minutesToTimeString(currentTime),
+          end_time: minutesToTimeString(currentTime + travelTime),
+          duration_minutes: travelTime,
+          day,
+          transport_mode: transportMode
+        });
+        currentTime += travelTime;
+        dayTravelTime += travelTime;
+      }
+      // 場所での滞在
+      const stayDuration = place.stay_duration_minutes || 120;
+      items.push({
+        id: place.id,
+        type: 'place',
+        name: place.name,
+        location: {
+          lat: place.latitude || place.location?.lat || 0,
+          lng: place.longitude || place.location?.lng || 0
+        },
+        start_time: minutesToTimeString(currentTime),
+        end_time: minutesToTimeString(currentTime + stayDuration),
+        duration_minutes: stayDuration,
+        day,
+        member_color: place.member_color
+      });
+      currentTime += stayDuration;
+      dayPlaceTime += stayDuration;
+    });
+    // 食事時間挿入（ステップ11）
+    const mealTimes = [
+      {
+        name: '朝食',
+        start: 8 * 60,
+        duration: 45
+      },
+      {
+        name: '昼食',
+        start: 12 * 60,
+        duration: 60
+      },
+      {
+        name: '夕食',
+        start: 18 * 60 + 30,
+        duration: 90
+      }
+    ];
+    mealTimes.forEach((meal)=>{
+      // 既存のアイテムと重複しないかチェック
+      const hasConflict = items.some((item)=>{
+        const itemStart = timeToMinutes(...parseTimeString(item.start_time));
+        const itemEnd = timeToMinutes(...parseTimeString(item.end_time));
+        const mealEnd = meal.start + meal.duration;
+        return meal.start < itemEnd && mealEnd > itemStart;
+      });
+      if (!hasConflict) {
+        items.push({
+          id: `meal_${day}_${meal.name}`,
+          type: 'meal',
+          name: meal.name,
+          start_time: minutesToTimeString(meal.start),
+          end_time: minutesToTimeString(meal.start + meal.duration),
+          duration_minutes: meal.duration,
+          day
+        });
+      }
+    });
+    // 時間順ソート
+    items.sort((a, b)=>{
+      const aTime = timeToMinutes(...parseTimeString(a.start_time));
+      const bTime = timeToMinutes(...parseTimeString(b.start_time));
+      return aTime - bTime;
+    });
+    const mealTime = items.filter((item)=>item.type === 'meal').reduce((sum, item)=>sum + item.duration_minutes, 0);
+    schedules.push({
+      day,
+      date: dateString,
+      items,
+      total_duration_minutes: currentTime - timeToMinutes(startTime.hours, startTime.minutes),
+      travel_time_minutes: dayTravelTime,
+      place_time_minutes: dayPlaceTime,
+      meal_time_minutes: mealTime
+    });
+  }
+  return schedules;
+}
+function calculateEfficiencyScore(route) {
+  if (route.length <= 1) return 1.0;
+  let totalDistance = 0;
+  for(let i = 0; i < route.length - 1; i++){
+    totalDistance += calculateDistance(route[i].latitude || route[i].location?.lat || 0, route[i].longitude || route[i].location?.lng || 0, route[i + 1].latitude || route[i + 1].location?.lat || 0, route[i + 1].longitude || route[i + 1].location?.lng || 0);
+  }
+  const avgDistance = totalDistance / (route.length - 1);
+  return Math.max(0, Math.min(1, 1 - avgDistance / 1000)); // 1000km基準で正規化
+}
+serve(async (req)=>{
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: COMMON_CORS_HEADERS
+    });
+  }
+  try {
+    const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: {
+        headers: {
+          Authorization: req.headers.get('Authorization')
+        }
+      }
+    });
+    const requestData = await req.json();
+    console.log(`🗺️ Starting constrained route generation for trip ${requestData.trip_id}`);
+    // ステップ5: 出発地・到着地固定でTSP最適化
+    const optimizedRoute = optimizeRouteWithTSP(requestData.route_with_airports, requestData.departure_location, requestData.destination_location);
+    // ステップ10-13: 詳細スケジュール構築
+    const detailedSchedule = createDetailedSchedule(optimizedRoute, requestData.trip_start_date, requestData.trip_duration_days, requestData.daily_start_time, requestData.daily_end_time);
+    const totalTravelTime = detailedSchedule.reduce((sum, day)=>sum + day.travel_time_minutes, 0);
+    const totalPlaceTime = detailedSchedule.reduce((sum, day)=>sum + day.place_time_minutes, 0);
+    const result = {
+      optimized_route: optimizedRoute,
+      detailed_schedule: detailedSchedule,
+      total_travel_time_minutes: totalTravelTime,
+      total_place_time_minutes: totalPlaceTime,
+      efficiency_score: calculateEfficiencyScore(optimizedRoute),
+      schedule_feasibility: 0.85
+    };
+    // データベースに保存
+    await supabaseClient.from('trip_optimization_results').upsert({
+      trip_id: requestData.trip_id,
+      step: 'constrained_route_generation',
+      result,
+      created_at: new Date().toISOString()
+    });
+    console.log(`✅ Route optimization completed: ${optimizedRoute.length} places, ${detailedSchedule.length} days`);
+    return createSuccessResponse(result);
+  } catch (error) {
+    console.error('❌ Constrained route generation error:', error);
+    return createErrorResponse(error.message);
+  }
+});

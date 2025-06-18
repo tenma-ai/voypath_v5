@@ -90,16 +90,32 @@ export function ListView() {
   const tripPlaces = places.filter(place => 
     currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false
   );
+  
+  // Separate departure/destination places (always included) from user places
+  const systemPlaces = tripPlaces.filter(place => 
+    place.place_type === 'departure' || place.place_type === 'destination'
+  );
+  const userPlaces = tripPlaces.filter(place => 
+    place.place_type !== 'departure' && place.place_type !== 'destination'
+  );
+  
+  console.log('ListView Debug:', {
+    totalPlaces: tripPlaces.length,
+    systemPlaces: systemPlaces.length,
+    userPlaces: userPlaces.length,
+    systemPlaceTypes: systemPlaces.map(p => ({ name: p.name, type: p.place_type })),
+    placesWithOptimization: tripPlaces.filter(place => place.is_selected_for_optimization).length
+  });
 
   // Generate schedule from real data
   const schedule = useMemo(() => {
     if (!currentTrip) return [];
     
-    // Check if we have optimization results with detailed schedule
-    if (optimizationResult?.detailedSchedule) {
+    // Check if we have optimization results with daily schedules
+    if (optimizationResult?.daily_schedules) {
       const scheduleDays: DaySchedule[] = [];
       
-      optimizationResult.detailedSchedule.forEach((daySchedule, dayIndex) => {
+      optimizationResult.daily_schedules.forEach((daySchedule, dayIndex) => {
         const events: ScheduleEvent[] = [];
         
         // Get departure and destination with fallback for different field naming
@@ -163,7 +179,7 @@ export function ListView() {
         });
         
         // Add return for last day
-        if (dayIndex === optimizationResult.detailedSchedule.length - 1 && (destination || departureLocation)) {
+        if (dayIndex === optimizationResult.daily_schedules.length - 1 && (destination || departureLocation)) {
           const lastPlace = daySchedule.places[daySchedule.places.length - 1];
           events.push({
             id: 'return',
@@ -188,8 +204,32 @@ export function ListView() {
     }
     
     // Fallback: Group places by scheduled status and date availability
-    const scheduledPlaces = tripPlaces.filter(place => place.is_selected_for_optimization);
-    const placesWithDates = scheduledPlaces.filter(place => 
+    // Include both user places and system places that are marked as scheduled
+    const scheduledPlaces = tripPlaces.filter(place => 
+      place.is_selected_for_optimization || 
+      place.scheduled ||
+      ((place.place_type === 'departure' || place.place_type === 'destination') && place.scheduled)
+    );
+    
+    // Sort places to ensure proper order: departure first, destination last, others in between
+    const sortedScheduledPlaces = scheduledPlaces.sort((a, b) => {
+      // Departure places (place_type === 'departure') come first
+      if (a.place_type === 'departure' && b.place_type !== 'departure') return -1;
+      if (b.place_type === 'departure' && a.place_type !== 'departure') return 1;
+      
+      // Destination places (place_type === 'destination') come last
+      if (a.place_type === 'destination' && b.place_type !== 'destination') return 1;
+      if (b.place_type === 'destination' && a.place_type !== 'destination') return -1;
+      
+      // For places with the same type, maintain original order or sort by creation time
+      if (a.created_at && b.created_at) {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+      
+      return 0;
+    });
+    
+    const placesWithDates = sortedScheduledPlaces.filter(place => 
       place.visit_date || place.scheduled_date
     );
     
@@ -217,21 +257,23 @@ export function ListView() {
       const departureLocation = currentTrip.departureLocation || (currentTrip as any).departure_location;
       const destination = currentTrip.destination || (currentTrip as any).destination;
       
-      // Add departure information to first day
-      if (index === 0 && departureLocation) {
-        daySchedule.events.push({
-          id: 'departure',
-          type: 'travel',
-          name: `Departure from ${departureLocation}`,
-          time: 'Trip Start',
-          mode: 'travel',
-          from: departureLocation,
-          to: places.length > 0 ? places[0].name : 'First destination'
-        });
-      }
+      // Sort all places within the day including system places, by order or creation
+      const sortedDayPlaces = places.sort((a, b) => {
+        // If optimization order exists, use it
+        if (a.order && b.order) {
+          return a.order - b.order;
+        }
+        // Otherwise maintain creation order
+        if (a.created_at && b.created_at) {
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+        return 0;
+      });
+      
+      // Skip manual departure/destination creation since they're already in the database
       
       // Add place events with interspersed travel events
-      places.forEach((place, placeIndex) => {
+      sortedDayPlaces.forEach((place, placeIndex) => {
         // Add place event
         daySchedule.events.push({
           id: place.id,
@@ -252,8 +294,8 @@ export function ListView() {
         });
 
         // Add travel event to next place (except for last place)
-        if (placeIndex < places.length - 1) {
-          const nextPlace = places[placeIndex + 1];
+        if (placeIndex < sortedDayPlaces.length - 1) {
+          const nextPlace = sortedDayPlaces[placeIndex + 1];
           daySchedule.events.push({
             id: `travel-${place.id}-to-${nextPlace.id}`,
             type: 'travel',
@@ -268,25 +310,13 @@ export function ListView() {
         }
       });
       
-      // Add return information to last day
-      const isLastDay = index === Object.keys(dateGroups).length - 1;
-      if (isLastDay && (destination || departureLocation)) {
-        daySchedule.events.push({
-          id: 'return',
-          type: 'travel',
-          name: `Return to ${destination || departureLocation}`,
-          time: 'Trip End',
-          mode: 'travel',
-          from: places.length > 0 ? places[places.length - 1].name : 'Last destination',
-          to: destination || departureLocation
-        });
-      }
+      // Skip manual return creation since destination is already in the database
       
       scheduleDays.push(daySchedule);
     });
     
     // Add scheduled places without specific dates to the first available day
-    const scheduledWithoutDates = scheduledPlaces.filter(place => 
+    const scheduledWithoutDates = sortedScheduledPlaces.filter(place => 
       !place.visit_date && !place.scheduled_date
     );
     

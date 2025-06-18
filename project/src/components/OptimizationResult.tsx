@@ -12,9 +12,18 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
   // const [activeView, setActiveView] = useState<'summary'>('summary');
   // Format optimization result for display
   const formatOptimizationResult = (result: OptimizedRoute) => {
+    // Handle nested result structure - extract daily_schedules from the correct location
+    const dailySchedules = result?.daily_schedules || (result as any)?.optimization_result?.daily_schedules;
+    
+    // Debug logging
+    console.log('🔍 [OptimizationResult] Formatting result:', result);
+    console.log('🔍 [OptimizationResult] Daily schedules:', dailySchedules);
+    console.log('🔍 [OptimizationResult] Daily schedules type:', typeof dailySchedules);
+    console.log('🔍 [OptimizationResult] Is array:', Array.isArray(dailySchedules));
+    
     // Safety check for required properties
-    if (!result || !result.daily_schedules || !Array.isArray(result.daily_schedules)) {
-      console.error('Invalid optimization result structure:', result);
+    if (!result || !dailySchedules || !Array.isArray(dailySchedules)) {
+      console.error('❌ [OptimizationResult] Invalid optimization result structure:', result);
       return {
         schedulesByDay: {},
         totalStats: { places: 0, travelTime: 0, visitTime: 0, score: 0 },
@@ -22,27 +31,51 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
       };
     }
 
-    const schedulesByDay = result.daily_schedules.reduce((acc, schedule) => {
-      const dayKey = schedule.day_number ? `day-${schedule.day_number}` : schedule.date || `day-${Object.keys(acc).length + 1}`;
+    const schedulesByDay = dailySchedules.reduce((acc, schedule) => {
+      console.log('🔍 [OptimizationResult] Processing schedule:', schedule);
+      console.log('🔍 [OptimizationResult] Schedule places:', schedule.places);
+      console.log('🔍 [OptimizationResult] Schedule scheduled_places:', schedule.scheduled_places);
+      console.log('🔍 [OptimizationResult] Schedule places length:', schedule.places?.length);
+      console.log('🔍 [OptimizationResult] Schedule scheduled_places length:', schedule.scheduled_places?.length);
+      
+      const dayKey = schedule.day ? `day-${schedule.day}` : schedule.date || `day-${Object.keys(acc).length + 1}`;
       if (!acc[dayKey]) acc[dayKey] = [];
-      acc[dayKey] = (schedule.scheduled_places || []).sort((a, b) => (a.order_in_day || 0) - (b.order_in_day || 0));
+      
+      // Handle both 'places' and 'scheduled_places' formats
+      const schedulePlaces = schedule.places || schedule.scheduled_places || [];
+      acc[dayKey] = schedulePlaces.sort((a, b) => (a.order || 0) - (b.order || 0));
+      
+      console.log('🔍 [OptimizationResult] Assigned to day', dayKey, ':', acc[dayKey].length, 'places');
       return acc;
     }, {} as Record<string, any[]>);
 
     const totalStats = {
-      places: result.daily_schedules.reduce((sum, day) => sum + (day.scheduled_places?.length || 0), 0),
-      travelTime: result.daily_schedules.reduce((sum, day) => 
-        sum + (day.scheduled_places || []).reduce((daySum, place) => daySum + (place.travel_time_from_previous || 0), 0), 0),
-      visitTime: result.daily_schedules.reduce((sum, day) => 
-        sum + (day.scheduled_places || []).reduce((daySum, place) => daySum + (place.visit_duration || 0), 0), 0),
+      places: dailySchedules.reduce((sum, day) => {
+        const dayPlaces = day.places || day.scheduled_places || [];
+        return sum + dayPlaces.length;
+      }, 0),
+      travelTime: result.total_travel_time_minutes || dailySchedules.reduce((sum, day) => {
+        const dayPlaces = day.places || day.scheduled_places || [];
+        const dayTravelTime = dayPlaces.reduce((daySum, place) => 
+          daySum + (place.travel_time_from_previous || place.travel_time_minutes || 0), 0);
+        const scheduleTravelTime = day.travel_time_minutes || day.total_travel_time || 0;
+        return sum + Math.max(dayTravelTime, scheduleTravelTime);
+      }, 0),
+      visitTime: result.total_visit_time_minutes || dailySchedules.reduce((sum, day) => {
+        const dayPlaces = day.places || day.scheduled_places || [];
+        return sum + dayPlaces.reduce((daySum, place) => daySum + (place.stay_duration_minutes || 0), 0);
+      }, 0),
       score: result.optimization_score ? 
-        ((result.optimization_score.fairness || 0) + (result.optimization_score.efficiency || 0)) / 2 : 0
+        (result.optimization_score.overall || 
+         result.optimization_score.total_score / 100 ||
+         ((result.optimization_score.fairness || result.optimization_score.fairness_score / 100 || 0) + 
+          (result.optimization_score.efficiency || result.optimization_score.efficiency_score / 100 || 0)) / 2) : 0
     };
 
     return {
       schedulesByDay,
       totalStats,
-      summary: `Optimized ${totalStats.places} places across ${result.daily_schedules.length} days`
+      summary: `Optimized ${totalStats.places} places across ${dailySchedules.length} days`
     };
   };
 
@@ -67,6 +100,45 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
         return '✈️';
       default:
         return '🚗'; // デフォルトは車
+    }
+  };
+
+  const formatTime = (timeString: string): string => {
+    if (!timeString) return 'Invalid Date';
+    
+    try {
+      let date: Date;
+      
+      if (timeString.includes('T')) {
+        // ISO string format
+        date = new Date(timeString);
+      } else if (timeString.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) {
+        // Time only format (H:mm, HH:mm, H:mm:ss, or HH:mm:ss)
+        const today = new Date().toISOString().split('T')[0];
+        // Ensure leading zero for single digit hours and add seconds if missing
+        let normalizedTime = timeString;
+        if (timeString.split(':').length === 2) {
+          normalizedTime = timeString + ':00';
+        }
+        if (normalizedTime.length === 7) { // H:mm:ss format
+          normalizedTime = '0' + normalizedTime;
+        }
+        date = new Date(`${today}T${normalizedTime}`);
+      } else {
+        // Try to parse as is
+        date = new Date(timeString);
+      }
+      
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    } catch (error) {
+      return 'Invalid Date';
     }
   };
 
@@ -150,13 +222,13 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
             <div className="flex justify-between text-sm">
               <span className="text-slate-600 dark:text-slate-400">Fairness</span>
               <span className="font-medium text-slate-900 dark:text-slate-100">
-                {Math.round((result.optimization_score?.fairness || 0) * 100)}%
+                {Math.round((result.optimization_score?.fairness || result.optimization_score?.fairness_score || 0) * (result.optimization_score?.fairness_score > 10 ? 1 : 100))}%
               </span>
             </div>
             <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2 mt-1">
               <div 
                 className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(result.optimization_score?.fairness || 0) * 100}%` }}
+                style={{ width: `${(result.optimization_score?.fairness || result.optimization_score?.fairness_score || 0) * (result.optimization_score?.fairness_score > 10 ? 1 : 100)}%` }}
               />
             </div>
           </div>
@@ -165,13 +237,13 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
             <div className="flex justify-between text-sm">
               <span className="text-slate-600 dark:text-slate-400">Efficiency</span>
               <span className="font-medium text-slate-900 dark:text-slate-100">
-                {Math.round((result.optimization_score?.efficiency || 0) * 100)}%
+                {Math.round((result.optimization_score?.efficiency || result.optimization_score?.efficiency_score || 0) * (result.optimization_score?.efficiency_score > 10 ? 1 : 100))}%
               </span>
             </div>
             <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2 mt-1">
               <div 
                 className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(result.optimization_score?.efficiency || 0) * 100}%` }}
+                style={{ width: `${(result.optimization_score?.efficiency || result.optimization_score?.efficiency_score || 0) * (result.optimization_score?.efficiency_score > 10 ? 1 : 100)}%` }}
               />
             </div>
           </div>
@@ -260,29 +332,23 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
                   {places.map((scheduledPlace, index) => (
                     <div key={index} className="flex items-center space-x-3 text-sm">
                       <div className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded-full flex items-center justify-center text-xs font-medium">
-                        {scheduledPlace.order_in_day}
+                        {scheduledPlace.order || index + 1}
                       </div>
                       <div className="flex-1">
                         <span className="font-medium text-slate-900 dark:text-slate-100">
-                          {scheduledPlace.place.name}
+                          {scheduledPlace?.name || scheduledPlace?.place?.name || 'Unknown Place'}
                         </span>
                         <div className="text-slate-500 dark:text-slate-400 text-xs">
-                          {new Date(scheduledPlace.arrival_time).toLocaleTimeString([], { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })} - {new Date(scheduledPlace.departure_time).toLocaleTimeString([], { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
+                          {formatTime(scheduledPlace?.arrival_time)} - {formatTime(scheduledPlace?.departure_time)}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 text-slate-500 dark:text-slate-400">
                         <span className="text-xs">
-                          {getTransportIcon(scheduledPlace.transport_mode)}
+                          {getTransportIcon(scheduledPlace?.transport_mode)}
                         </span>
-                        {(scheduledPlace.travel_time_from_previous || 0) > 0 && (
+                        {(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0) > 0 && (
                           <span className="text-xs">
-                            {formatMinutes(scheduledPlace.travel_time_from_previous || 0)}
+                            {formatMinutes(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0)}
                           </span>
                         )}
                       </div>
@@ -296,7 +362,7 @@ export function OptimizationResult({ result, onClose }: OptimizationResultProps)
 
       {/* Execution Info */}
       <div className="text-xs text-slate-500 dark:text-slate-400 text-center pt-4 border-t border-slate-200 dark:border-slate-600">
-        Optimization completed in {result.execution_time_ms || 'N/A'}ms • {result.daily_schedules.length} day{result.daily_schedules.length !== 1 ? 's' : ''} planned
+        Optimization completed in {(result as any)?.execution_time_ms || 'N/A'}ms • {Object.keys(formattedResult.schedulesByDay).length} day{Object.keys(formattedResult.schedulesByDay).length !== 1 ? 's' : ''} planned
       </div>
     </motion.div>
   );

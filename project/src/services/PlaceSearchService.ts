@@ -82,10 +82,14 @@ export class PlaceSearchService {
         );
 
         // Prepare search request with proper location handling
+        console.log('🔍 Preparing search request for:', request.inputValue.trim());
         const searchRequest: any = {
           query: request.inputValue.trim(),
-          language: request.language
+          language: request.language,
+          // Add fields to improve search accuracy
+          fields: ['place_id', 'name', 'formatted_address', 'geometry', 'rating', 'user_ratings_total', 'types', 'photos']
         };
+        console.log('📝 Search request object:', searchRequest);
 
         // Add location and radius if provided
         if (request.location) {
