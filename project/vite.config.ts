@@ -34,6 +34,16 @@ export default defineConfig({
     fs: {
       strict: false,
     },
+    hmr: {
+      port: 5174,
+      overlay: false,
+      timeout: 60000,
+      protocol: 'ws',
+    },
+    watch: {
+      usePolling: false,
+      interval: 100,
+    },
   },
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' },

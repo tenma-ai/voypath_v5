@@ -1,1058 +1,901 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
-
-// Comprehensive interfaces for type safety
-interface Place {
-  id: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  category: string;
-  place_type: string;
-  stay_duration_minutes: number;
-  wish_level: number;
-  user_id: string;
-  normalized_wish_level?: number;
-  fairness_contribution_score?: number;
-  is_selected_for_optimization?: boolean;
-  scheduled?: boolean;
-  visit_date?: string;
-  arrival_time?: string;
-  departure_time?: string;
-  transport_mode?: TransportMode;
-  travel_time_from_previous?: number;
-  order_in_day?: number;
-  is_airport?: boolean;
-  airport_code?: string;
+// 距離計算（ハバーサイン公式）
+function calculateDistance(point1, point2) {
+  const R = 6371; // 地球の半径(km)
+  const [lat1, lon1] = point1;
+  const [lat2, lon2] = point2;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
-
-interface Airport {
-  iata_code: string;
-  airport_name: string;
-  city_name: string;
-  latitude: number;
-  longitude: number;
-  commercial_service: boolean;
-  international_service: boolean;
-}
-
-interface NormalizedUser {
-  user_id: string;
-  total_places: number;
-  avg_wish_level: number;
-  normalized_weight: number;
-  places: Place[];
-}
-
-interface OptimizationConstraints {
-  time_constraint_minutes: number;
-  distance_constraint_km: number;
-  budget_constraint_yen: number;
-  max_places: number;
-}
-
-interface DailySchedule {
-  day: number;
-  date: string;
-  places: Place[];
-  total_travel_time: number;
-  total_visit_time: number;
-  meal_breaks: MealBreak[];
-}
-
-interface MealBreak {
-  type: 'breakfast' | 'lunch' | 'dinner';
-  start_time: string;
-  duration_minutes: number;
-  estimated_cost: number;
-}
-
-interface OptimizationResult {
-  success: boolean;
-  optimization: {
-    daily_schedules: DailySchedule[];
-    optimization_score: {
-      total_score: number;
-      fairness_score: number;
-      efficiency_score: number;
-      details: {
-        user_adoption_balance: number;
-        wish_satisfaction_balance: number;
-        travel_efficiency: number;
-        time_constraint_compliance: number;
-      };
-    };
-    optimized_route: any;
-    total_duration_minutes: number;
-    places: Place[];
-    execution_time_ms: number;
-  };
-  message: string;
-}
-
-type TransportMode = 'walking' | 'public_transport' | 'car' | 'flight';
-
-// Utility functions for calculations
-function safeDistance(point1: [number, number], point2: [number, number]): number {
-  try {
-    if (!point1 || !point2 || point1.length !== 2 || point2.length !== 2) {
-      return 1000; // Default fallback distance
-    }
-    
-    const [lat1, lon1] = point1;
-    const [lat2, lon2] = point2;
-    
-    if (typeof lat1 !== 'number' || typeof lon1 !== 'number' || 
-        typeof lat2 !== 'number' || typeof lon2 !== 'number') {
-      return 1000;
-    }
-    
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  } catch (error) {
-    console.error('Error calculating distance:', error);
-    return 1000;
-  }
-}
-
-function determineTransportMode(distance: number, fromAirport = false, toAirport = false): TransportMode {
-  console.log(`🚗 Determining transport mode for distance: ${distance}km, fromAirport: ${fromAirport}, toAirport: ${toAirport}`);
-  
-  // If either end is an airport, must use flight
-  if (fromAirport || toAirport) {
-    console.log('  ✈️ Selected: flight (airport involved)');
-    return 'flight';
-  }
-  
-  // Distance-based determination
-  if (distance <= 1) {
-    console.log('  🚶 Selected: walking (short distance)');
+// 移動手段の判定（改善版）
+function determineTransportMode(distance, fromAirport = false, toAirport = false) {
+  console.log(`🚗 Distance: ${distance.toFixed(1)}km, fromAirport: ${fromAirport}, toAirport: ${toAirport}`);
+  // 距離ベースの判定を優先（空港であっても近距離は車を使用）
+  if (distance <= 2) {
+    console.log('  🚶 Walking (short distance)');
     return 'walking';
   }
-  if (distance <= 50) {
-    console.log('  🚗 Selected: car (medium distance)');
-    return 'car';
-  }
   if (distance <= 500) {
-    console.log('  🚗 Selected: car (long distance within country)');
+    console.log('  🚗 Car (medium distance)');
     return 'car';
   }
-  
-  console.log('  ✈️ Selected: flight (international distance)');
+  // 長距離の場合のみ飛行機を使用
+  console.log('  ✈️ Flight (long distance)');
   return 'flight';
 }
-
-function calculateTravelTime(distance: number, mode: TransportMode): number {
+// 移動時間の計算（改善版）
+function calculateTravelTime(distance, mode) {
+  if (mode === 'flight') {
+    // 飛行機の現実的な時間計算（空港での手続き時間を含む）
+    if (distance > 8000) {
+      // 超長距離国際線（例：東京→ニューヨーク）
+      return 660; // 11時間（飛行時間8時間 + 空港手続き3時間）
+    } else if (distance > 3000) {
+      // 長距離国際線（例：東京→ヨーロッパ）
+      return 480; // 8時間（飛行時間6時間 + 空港手続き2時間）
+    } else if (distance > 1000) {
+      // 中距離国際線（例：東京→アジア）
+      return 300; // 5時間（飛行時間3時間 + 空港手続き2時間）
+    } else {
+      // 国内線・短距離
+      return 120; // 2時間（飛行時間1時間 + 空港手続き1時間）
+    }
+  }
   const speeds = {
-    walking: 5, // km/h
-    public_transport: 25, // km/h
-    car: 50, // km/h
-    flight: 600 // km/h (including airport time)
+    walking: 5,
+    car: 80,
+    flight: 800 // この値は上記で個別処理するため使用されない
   };
-  
-  const baseTime = (distance / speeds[mode]) * 60; // minutes
-  
-  // Add overhead times
+  const baseTime = distance / speeds[mode] * 60; // 分単位
+  // オーバーヘッド時間（休憩、乗車準備等）
   const overhead = {
     walking: 5,
-    public_transport: 15,
-    car: 10,
-    flight: 120 // 2 hours for airport procedures
+    car: 20,
+    flight: 0 // 上記で個別処理
   };
-  
-  const totalTime = Math.round(baseTime + overhead[mode]);
-  
-  // Cap maximum travel time to reasonable limits
-  const maxTimes = {
-    walking: 480, // 8 hours max
-    public_transport: 720, // 12 hours max
-    car: 720, // 12 hours max
-    flight: 1200 // 20 hours max (long international flights)
-  };
-  
-  const cappedTime = Math.min(totalTime, maxTimes[mode]);
-  
-  console.log(`⏱️ Travel time for ${distance}km by ${mode}: ${baseTime.toFixed(0)}min base + ${overhead[mode]}min overhead = ${totalTime}min (capped to ${cappedTime}min)`);
-  
-  return cappedTime;
+  return Math.round(baseTime + overhead[mode]);
 }
-
-// Step 1-2: Retrieve and validate data from database
-async function retrieveTripData(supabase: any, tripId: string, memberId: string) {
-  console.log('🔄 Step 1-2: Retrieving trip data from database');
-  console.log(`🔍 Fetching data for trip_id: ${tripId}, member_id: ${memberId}`);
-  
-  const { data: places, error: placesError } = await supabase
-    .from('places')
-    .select('*')
-    .eq('trip_id', tripId);
-    
-  if (placesError) {
-    console.error('❌ Failed to fetch places:', placesError);
-    throw new Error(`Failed to fetch places: ${placesError.message}`);
-  }
-  
-  const { data: tripMembers, error: membersError } = await supabase
-    .from('trip_members')
-    .select('user_id, assigned_color_index')
-    .eq('trip_id', tripId);
-    
-  if (membersError) {
-    console.error('❌ Failed to fetch trip members:', membersError);
-    throw new Error(`Failed to fetch trip members: ${membersError.message}`);
-  }
-  
-  console.log(`📊 Retrieved ${places?.length || 0} places and ${tripMembers?.length || 0} members`);
-  
-  // Log sample place data to debug data structure
-  if (places && places.length > 0) {
-    console.log('📍 Sample place data:', JSON.stringify(places[0], null, 2));
-  }
-  
-  return {
-    places: places || [],
-    members: tripMembers || []
-  };
-}
-
-// Helper function to safely convert database values to proper types
-function sanitizePlace(place: any): Place {
-  return {
-    ...place,
-    id: place.id || `place_${Date.now()}_${Math.random()}`,
-    name: place.name || 'Unknown Place',
-    latitude: parseFloat(place.latitude) || 0,
-    longitude: parseFloat(place.longitude) || 0,
-    category: place.category || 'other',
-    place_type: place.place_type || 'visit',
-    stay_duration_minutes: parseInt(place.stay_duration_minutes) || 120,
-    wish_level: parseInt(place.wish_level) || 1,
-    user_id: place.user_id || 'unknown'
-  };
-}
-
-// Step 3: Normalize user preferences
-async function normalizePreferences(places: any[]): Promise<NormalizedUser[]> {
-  console.log('🔄 Step 3: Normalizing user preferences');
-  console.log(`📊 Processing ${places?.length || 0} places for normalization`);
-  
-  if (!places || !Array.isArray(places) || places.length === 0) {
-    console.log('⚠️ No places provided for normalization');
-    return [];
-  }
-  
-  const userGroups = new Map<string, Place[]>();
-  
-  // Group places by user with proper data sanitization
-  // Include ALL places: system places (departure/destination) + user places
-  places.forEach(place => {
-    if (!place || !place.user_id) {
-      console.log('⚠️ Skipping place without user_id:', place);
-      return;
+// 希望度の正規化（必須機能）
+function normalizePreferences(places) {
+  console.log('🔄 Normalizing preferences');
+  // ユーザーごとにグループ化
+  const userGroups = new Map();
+  places.forEach((place)=>{
+    if (place.place_type === 'visit') {
+      if (!userGroups.has(place.user_id)) {
+        userGroups.set(place.user_id, []);
+      }
+      userGroups.get(place.user_id).push(place);
     }
-    
+  });
+  // 各ユーザーの希望度を正規化
+  userGroups.forEach((userPlaces, userId)=>{
+    const avgWish = userPlaces.reduce((sum, p)=>sum + p.wish_level, 0) / userPlaces.length;
+    userPlaces.forEach((place)=>{
+      place.normalized_wish_level = place.wish_level / avgWish;
+    });
+    console.log(`User ${userId}: ${userPlaces.length} places, avg wish: ${avgWish.toFixed(2)}`);
+  });
+  return places;
+}
+// 場所の絞り込み（公平性考慮）
+function filterPlacesByFairness(places, maxPlaces) {
+  console.log('🔄 Filtering places by fairness');
+  const systemPlaces = places.filter((p)=>p.place_type === 'departure' || p.place_type === 'destination');
+  const visitPlaces = places.filter((p)=>p.place_type === 'visit');
+  if (visitPlaces.length <= maxPlaces - systemPlaces.length) {
+    console.log('✅ All places fit within limit');
+    return places;
+  }
+  // ラウンドロビン方式で公平に選択
+  const userGroups = new Map();
+  visitPlaces.forEach((place)=>{
     if (!userGroups.has(place.user_id)) {
       userGroups.set(place.user_id, []);
     }
-    
-    const sanitizedPlace = sanitizePlace(place);
-    console.log(`📍 Sanitized place: ${sanitizedPlace.name} (${sanitizedPlace.latitude}, ${sanitizedPlace.longitude}) - Type: ${sanitizedPlace.place_type}`);
-    userGroups.get(place.user_id)!.push(sanitizedPlace);
+    userGroups.get(place.user_id).push(place);
   });
-  
-  console.log(`📈 User groups created: ${userGroups.size} users`);
-  userGroups.forEach((places, userId) => {
-    console.log(`  - User ${userId}: ${places.length} places (${places.map(p => p.name).join(', ')})`);
+  // 各ユーザーの場所を希望度順にソート
+  userGroups.forEach((places)=>{
+    places.sort((a, b)=>(b.normalized_wish_level || 1) - (a.normalized_wish_level || 1));
   });
-  
-  const normalizedUsers: NormalizedUser[] = [];
-  
-  // Calculate normalization for each user
-  userGroups.forEach((userPlaces, userId) => {
-    const totalPlaces = userPlaces.length;
-    const avgWishLevel = userPlaces.reduce((sum, p) => sum + p.wish_level, 0) / totalPlaces;
-    
-    // Normalize wish levels relative to user's average
-    const normalizedPlaces = userPlaces.map(place => ({
-      ...place,
-      normalized_wish_level: place.wish_level / avgWishLevel,
-      fairness_contribution_score: place.wish_level / (avgWishLevel * totalPlaces)
-    }));
-    
-    normalizedUsers.push({
-      user_id: userId,
-      total_places: totalPlaces,
-      avg_wish_level: avgWishLevel,
-      normalized_weight: 1.0 / userGroups.size, // Equal weight for each user
-      places: normalizedPlaces
-    });
-  });
-  
-  console.log(`✅ Normalized ${normalizedUsers.length} users with ${places.length} total places`);
-  return normalizedUsers;
-}
-
-// Step 4: Filter places for fairness
-async function filterPlacesForFairness(
-  normalizedUsers: NormalizedUser[], 
-  constraints: OptimizationConstraints
-): Promise<Place[]> {
-  console.log('🔄 Step 4: Filtering places for fairness');
-  
-  const allPlaces = normalizedUsers.flatMap(user => user.places);
-  
-  // Calculate total time needed for all places
-  const totalTimeNeeded = allPlaces.reduce((sum, place) => {
-    return sum + (place.stay_duration_minutes || 120); // Default 2 hours per place
-  }, 0);
-  
-  // Add estimated travel time (rough estimate: 30 min average between places)
-  const estimatedTravelTime = (allPlaces.length - 1) * 30;
-  const totalEstimatedTime = totalTimeNeeded + estimatedTravelTime;
-  
-  console.log(`📊 Total time needed: ${totalTimeNeeded} minutes visit + ${estimatedTravelTime} minutes travel = ${totalEstimatedTime} minutes`);
-  console.log(`📊 Time constraint: ${constraints.time_constraint_minutes} minutes`);
-  
-  // If all places fit within time constraint AND max places constraint, include all
-  if (allPlaces.length <= constraints.max_places && totalEstimatedTime <= constraints.time_constraint_minutes) {
-    console.log(`✅ All ${allPlaces.length} places fit within constraints (time and count)`);
-    return allPlaces.map(place => ({ ...place, is_selected_for_optimization: true }));
-  }
-  
-  // Fair selection algorithm - round-robin with wish level weighting
-  const selectedPlaces: Place[] = [];
-  const userQueues = normalizedUsers.map(user => ({
-    ...user,
-    places: [...user.places].sort((a, b) => b.normalized_wish_level! - a.normalized_wish_level!)
-  }));
-  
+  const selectedVisitPlaces = [];
+  const maxVisitPlaces = maxPlaces - systemPlaces.length;
+  // ラウンドロビンで選択
   let round = 0;
-  while (selectedPlaces.length < constraints.max_places && userQueues.some(u => u.places.length > 0)) {
-    for (const user of userQueues) {
-      if (user.places.length > 0 && selectedPlaces.length < constraints.max_places) {
-        const place = user.places.shift()!;
-        place.is_selected_for_optimization = true;
-        selectedPlaces.push(place);
+  while(selectedVisitPlaces.length < maxVisitPlaces && Array.from(userGroups.values()).some((arr)=>arr.length > 0)){
+    for (const [userId, userPlaces] of userGroups){
+      if (userPlaces.length > 0 && selectedVisitPlaces.length < maxVisitPlaces) {
+        selectedVisitPlaces.push(userPlaces.shift());
       }
     }
     round++;
   }
-  
-  console.log(`✅ Selected ${selectedPlaces.length} places through ${round} rounds of fair selection`);
-  return selectedPlaces;
+  console.log(`✅ Selected ${selectedVisitPlaces.length} visit places in ${round} rounds`);
+  return [
+    ...systemPlaces,
+    ...selectedVisitPlaces
+  ];
 }
-
-// Step 5: Fix departure/destination and determine visit order
-async function fixDepartureDestination(places: Place[]): Promise<{ departure: Place | null, destination: Place | null, visitPlaces: Place[] }> {
-  console.log('🔄 Step 5: Fixing departure/destination and determining visit order');
-  console.log(`📊 Processing ${places.length} places:`);
-  places.forEach((place, index) => {
-    console.log(`  ${index + 1}. ${place.name} - Type: ${place.place_type || 'undefined'} - Source: ${place.source || 'undefined'}`);
-  });
-  
-  // Find departure and destination (handle duplicates properly)
-  const departurePlaces = places.filter(p => p.place_type === 'departure');
-  const destinationPlaces = places.filter(p => p.place_type === 'destination');
-  
-  let departure = departurePlaces.length > 0 ? departurePlaces[0] : null;
-  let destination = destinationPlaces.length > 0 ? destinationPlaces[0] : null;
-  
-  // Remove ALL departure and destination places to get visit places
-  const visitPlaces = places.filter(p => 
-    p.place_type !== 'departure' && 
-    p.place_type !== 'destination' &&
-    p.source !== 'system'
-  );
-  
-  // Log duplicates if found
-  if (departurePlaces.length > 1) {
-    console.log(`⚠️ Found ${departurePlaces.length} departure places, using first one: ${departure?.name}`);
-    console.log(`⚠️ Duplicate departure places:`, departurePlaces.map(p => p.name));
-  }
-  if (destinationPlaces.length > 1) {
-    console.log(`⚠️ Found ${destinationPlaces.length} destination places, using first one: ${destination?.name}`);
-    console.log(`⚠️ Duplicate destination places:`, destinationPlaces.map(p => p.name));
-  }
-  
-  console.log(`📋 Found departure: ${departure ? departure.name : 'None'}`);
-  console.log(`📋 Found destination: ${destination ? destination.name : 'None'}`);
-  console.log(`📋 Visit places: ${visitPlaces.length} (${visitPlaces.map(p => p.name).join(', ')})`);
-  
-  // If no system places found, try to create them from the data
-  if (!departure && !destination) {
-    console.log('⚠️ No system places found, attempting to identify from place names');
-    
-    // Find places with Departure: or Destination: in name
-    const allDepartureCandidates = places.filter(p => p.name.includes('Departure:'));
-    const allDestinationCandidates = places.filter(p => p.name.includes('Destination:'));
-    
-    if (allDepartureCandidates.length > 0) {
-      departure = allDepartureCandidates[0]; // Use first departure candidate
-      departure.place_type = 'departure';
-      console.log(`📍 Identified departure: ${departure.name}`);
-      
-      // Remove other departure candidates from consideration
-      if (allDepartureCandidates.length > 1) {
-        console.log(`⚠️ Found ${allDepartureCandidates.length} departure candidates, using first: ${departure.name}`);
-      }
+// 重複除去のためのヘルパー関数
+function removeDuplicatePlaces(places) {
+  const uniquePlaces = [];
+  const seenPlaces = new Set();
+  for (const place of places){
+    // 重複判定のキー: 緯度経度と名前で判定
+    const placeKey = `${place.latitude.toFixed(4)}-${place.longitude.toFixed(4)}-${place.name}`;
+    if (!seenPlaces.has(placeKey)) {
+      seenPlaces.add(placeKey);
+      uniquePlaces.push(place);
+    } else {
+      console.log(`⏭️ Removed duplicate place: ${place.name}`);
     }
-    
-    if (allDestinationCandidates.length > 0) {
-      destination = allDestinationCandidates[0]; // Use first destination candidate
-      destination.place_type = 'destination';
-      console.log(`📍 Identified destination: ${destination.name}`);
-    }
-    
-    // Re-filter visit places to exclude newly identified system places
-    const finalVisitPlaces = places.filter(p => 
-      p !== departure && 
-      p !== destination &&
-      !p.name.includes('Departure:') &&
-      !p.name.includes('Destination:')
-    );
-    
-    console.log(`📋 After identification - Visit places: ${finalVisitPlaces.length} (${finalVisitPlaces.map(p => p.name).join(', ')})`);
-    
-    return { departure, destination, visitPlaces: finalVisitPlaces };
   }
-  
-  // For round trips (no destination), create a virtual destination same as departure
-  if (departure && !destination) {
-    console.log('🔄 Round trip detected - creating virtual destination');
-    destination = {
-      ...departure,
-      id: `${departure.id}_destination`,
-      name: departure.name.replace('Departure:', 'Return to:'),
-      place_type: 'destination'
-    };
-    console.log(`📍 Created virtual destination: ${destination.name}`);
-  }
-  
-  // Sort visit places by wish level and fairness score
-  visitPlaces.sort((a, b) => {
-    const scoreA = (a.normalized_wish_level || 1) * (a.fairness_contribution_score || 1);
-    const scoreB = (b.normalized_wish_level || 1) * (b.fairness_contribution_score || 1);
-    return scoreB - scoreA;
-  });
-  
-  console.log(`✅ Fixed route: ${departure ? 'Departure set' : 'No departure'}, ${destination ? 'Destination set' : 'No destination'}, ${visitPlaces.length} visit places`);
-  return { departure, destination, visitPlaces };
+  return uniquePlaces;
 }
-
-// Step 6: Determine transport modes
-async function determineTransportModes(places: Place[]): Promise<Place[]> {
-  console.log('🔄 Step 6: Determining transport modes');
-  
-  const updatedPlaces = [...places];
-  
-  for (let i = 1; i < updatedPlaces.length; i++) {
-    const prevPlace = updatedPlaces[i - 1];
-    const currentPlace = updatedPlaces[i];
-    
-    const distance = safeDistance(
-      [prevPlace.latitude, prevPlace.longitude],
-      [currentPlace.latitude, currentPlace.longitude]
-    );
-    
-    const transportMode = determineTransportMode(
-      distance,
-      prevPlace.is_airport,
-      currentPlace.is_airport
-    );
-    
-    currentPlace.transport_mode = transportMode;
-    currentPlace.travel_time_from_previous = calculateTravelTime(distance, transportMode);
-  }
-  
-  console.log('✅ Transport modes determined for all place transitions');
-  return updatedPlaces;
-}
-
-// Step 7: Insert airports using AirportDB API
-async function insertAirports(supabase: any, places: Place[]): Promise<Place[]> {
-  console.log('🔄 Step 7: Inserting airports using AirportDB data');
-  
-  const updatedPlaces = [...places];
-  const newAirports: Place[] = [];
-  
-  // Find long-distance transitions that need flights
-  for (let i = 1; i < updatedPlaces.length; i++) {
-    const prevPlace = updatedPlaces[i - 1];
-    const currentPlace = updatedPlaces[i];
-    
-    if (currentPlace.transport_mode === 'flight') {
-      // Find nearest airports for departure and arrival
-      const { data: departureAirports } = await supabase
-        .from('airportdb_cache')
-        .select('*')
-        .eq('commercial_service', true)
-        .order('location_point <-> point(' + prevPlace.longitude + ',' + prevPlace.latitude + ')')
-        .limit(1);
-        
-      const { data: arrivalAirports } = await supabase
-        .from('airportdb_cache')
-        .select('*')
-        .eq('commercial_service', true)
-        .order('location_point <-> point(' + currentPlace.longitude + ',' + currentPlace.latitude + ')')
-        .limit(1);
-      
-      if (departureAirports && departureAirports[0] && arrivalAirports && arrivalAirports[0]) {
-        const depAirport = departureAirports[0];
-        const arrAirport = arrivalAirports[0];
-        
-        // Insert departure airport if not same as previous place
-        if (!prevPlace.is_airport) {
-          const depAirportPlace: Place = {
-            id: `airport_${depAirport.iata_code}_dep`,
-            name: `${depAirport.airport_name} (${depAirport.iata_code})`,
-            latitude: parseFloat(depAirport.latitude),
-            longitude: parseFloat(depAirport.longitude),
-            category: 'airport',
-            place_type: 'airport',
-            stay_duration_minutes: 60,
-            wish_level: 1,
-            user_id: prevPlace.user_id,
-            is_airport: true,
-            airport_code: depAirport.iata_code,
-            transport_mode: 'car'
-          };
-          newAirports.push(depAirportPlace);
-        }
-        
-        // Insert arrival airport if not same as current place
+// 空港検出・挿入（シンプル版）
+async function insertAirportsIfNeeded(supabase, places) {
+  console.log('🔄 Checking for airport insertions needed');
+  const newRoute = [];
+  for(let i = 0; i < places.length; i++){
+    const currentPlace = places[i];
+    newRoute.push(currentPlace);
+    // 次の場所があるかチェック
+    if (i < places.length - 1) {
+      const nextPlace = places[i + 1];
+      const distance = calculateDistance([
+        currentPlace.latitude,
+        currentPlace.longitude
+      ], [
+        nextPlace.latitude,
+        nextPlace.longitude
+      ]);
+      const transportMode = determineTransportMode(distance, currentPlace.is_airport, nextPlace.is_airport);
+      if (transportMode === 'flight') {
+        console.log(`✈️ Flight needed: ${currentPlace.name} → ${nextPlace.name} (${distance.toFixed(1)}km)`);
+        // 出発空港を追加（現在地が空港でない場合）
         if (!currentPlace.is_airport) {
-          const arrAirportPlace: Place = {
-            id: `airport_${arrAirport.iata_code}_arr`,
-            name: `${arrAirport.airport_name} (${arrAirport.iata_code})`,
-            latitude: parseFloat(arrAirport.latitude),
-            longitude: parseFloat(arrAirport.longitude),
-            category: 'airport',
-            place_type: 'airport',
-            stay_duration_minutes: 60,
-            wish_level: 1,
-            user_id: currentPlace.user_id,
-            is_airport: true,
-            airport_code: arrAirport.iata_code,
-            transport_mode: 'flight'
-          };
-          newAirports.push(arrAirportPlace);
+          const depAirport = await findNearestAirport(supabase, currentPlace.latitude, currentPlace.longitude);
+          if (depAirport) {
+            const depAirportPlace = {
+              id: `airport_${depAirport.iata_code}_dep_${Date.now()}`,
+              name: `${depAirport.airport_name} (${depAirport.iata_code})`,
+              latitude: depAirport.latitude,
+              longitude: depAirport.longitude,
+              category: 'airport',
+              place_type: 'airport',
+              stay_duration_minutes: 120, // 空港は2時間で固定
+              wish_level: 1,
+              user_id: currentPlace.user_id,
+              is_airport: true,
+              airport_code: depAirport.iata_code
+            };
+            newRoute.push(depAirportPlace);
+            console.log(`🛫 Inserted departure airport: ${depAirportPlace.name}`);
+          }
+        }
+        // 到着空港を追加（次の場所が空港でない場合）
+        if (!nextPlace.is_airport) {
+          const arrAirport = await findNearestAirport(supabase, nextPlace.latitude, nextPlace.longitude);
+          if (arrAirport) {
+            const arrAirportPlace = {
+              id: `airport_${arrAirport.iata_code}_arr_${Date.now()}`,
+              name: `${arrAirport.airport_name} (${arrAirport.iata_code})`,
+              latitude: arrAirport.latitude,
+              longitude: arrAirport.longitude,
+              category: 'airport',
+              place_type: 'airport',
+              stay_duration_minutes: 120, // 空港は2時間で固定
+              wish_level: 1,
+              user_id: nextPlace.user_id,
+              is_airport: true,
+              airport_code: arrAirport.iata_code
+            };
+            newRoute.push(arrAirportPlace);
+            console.log(`🛬 Inserted arrival airport: ${arrAirportPlace.name}`);
+          }
         }
       }
     }
   }
-  
-  // Simply add all airports to the route - TSP will optimize the order
-  if (newAirports.length > 0) {
-    console.log(`✅ Adding ${newAirports.length} airports to route for TSP optimization`);
-    return [...updatedPlaces, ...newAirports];
-  }
-  
-  console.log(`✅ No airports needed for this route`);
-  return updatedPlaces;
+  console.log(`✅ Route with airports: ${newRoute.map((p)=>p.name).join(' → ')}`);
+  return newRoute;
 }
-
-// Step 8: TSP Greedy Algorithm for route optimization
-async function optimizeRouteWithTSP(places: Place[]): Promise<Place[]> {
-  console.log('🔄 Step 8: Applying TSP greedy algorithm for route optimization');
-  
-  if (places.length <= 2) return places;
-  
-  const optimizedRoute: Place[] = [];
-  const unvisited = [...places];
-  
-  // Extract departure and destination
-  const departure = unvisited.find(p => p.place_type === 'departure');
-  const destination = unvisited.find(p => p.place_type === 'destination');
-  
-  // Remove departure and destination from unvisited list
-  if (departure) {
-    optimizedRoute.push(departure);
-    unvisited.splice(unvisited.indexOf(departure), 1);
+// 国際空港判定関数
+function isInternationalAirport(airport) {
+  const name = airport.name?.toLowerCase() || '';
+  const type = airport.type?.toLowerCase() || '';
+  // 除外すべき空港タイプ
+  const excludeKeywords = [
+    'heliport',
+    'helipad',
+    'helicopter',
+    'naval',
+    'air force',
+    'military',
+    'army',
+    'navy',
+    'base',
+    'station',
+    'field',
+    'private',
+    'restricted',
+    'closed',
+    'abandoned',
+    'seaplane',
+    'balloonport'
+  ];
+  // 名前に除外キーワードが含まれている場合は除外
+  for (const keyword of excludeKeywords){
+    if (name.includes(keyword)) {
+      return false;
+    }
   }
-  
-  if (destination && destination.id !== departure?.id) {
-    unvisited.splice(unvisited.indexOf(destination), 1);
+  // タイプが明確に空港以外の場合は除外
+  if (type && !type.includes('airport')) {
+    return false;
   }
-  
-  // Greedy TSP for middle places only (excluding destination)
-  while (unvisited.length > 0) {
-    const currentPlace = optimizedRoute[optimizedRoute.length - 1];
-    let nearestPlace = unvisited[0];
-    let minDistance = safeDistance(
-      [currentPlace.latitude, currentPlace.longitude],
-      [nearestPlace.latitude, nearestPlace.longitude]
-    );
-    
-    for (let i = 1; i < unvisited.length; i++) {
-      const distance = safeDistance(
-        [currentPlace.latitude, currentPlace.longitude],
-        [unvisited[i].latitude, unvisited[i].longitude]
-      );
-      
+  // 国際空港を示すキーワード
+  const internationalKeywords = [
+    'international',
+    'intl',
+    'airport'
+  ];
+  // 主要な国際空港のIATAコード（確実に含めたいもの）
+  const majorInternationalAirports = [
+    'NRT',
+    'HND',
+    'KIX',
+    'CTS',
+    'FUK',
+    'OKA',
+    'JFK',
+    'LAX',
+    'ORD',
+    'DFW',
+    'DEN',
+    'SFO',
+    'SEA',
+    'LAS',
+    'PHX',
+    'IAH',
+    'CLT',
+    'MIA',
+    'BOS',
+    'MSP',
+    'DTW',
+    'LHR',
+    'CDG',
+    'AMS',
+    'FRA',
+    'MAD',
+    'FCO',
+    'MUC',
+    'ZUR',
+    'VIE',
+    'CPH',
+    'ARN',
+    'OSL',
+    'HEL',
+    'ICN',
+    'PVG',
+    'PEK',
+    'CAN',
+    'HKG',
+    'TPE',
+    'NRT',
+    'SIN',
+    'BKK',
+    'KUL',
+    'CGK',
+    'MNL',
+    'DEL',
+    'BOM',
+    'SYD',
+    'MEL',
+    'BNE',
+    'PER',
+    'AKL',
+    'CHC',
+    'DXB',
+    'DOH',
+    'AUH',
+    'KWI',
+    'JNB',
+    'CAI',
+    'ADD',
+    'LOS',
+    'GRU',
+    'GIG',
+    'EZE',
+    'SCL',
+    'LIM',
+    'BOG',
+    'UIO',
+    'YYZ',
+    'YVR',
+    'YUL',
+    'YYC' // カナダ
+  ];
+  // 主要国際空港リストに含まれている場合は確実に含める
+  if (majorInternationalAirports.includes(airport.iata)) {
+    return true;
+  }
+  // 名前に"International"が含まれている場合
+  if (name.includes('international') || name.includes('intl')) {
+    return true;
+  }
+  // その他の大規模空港の条件（名前に"Airport"が含まれ、3文字のIATAコードがある）
+  if (name.includes('airport') && airport.iata && airport.iata.length === 3) {
+    return true;
+  }
+  return false;
+}
+// OpenFlights データを使用した最寄り空港検索
+async function findNearestAirport(supabase, lat, lng) {
+  try {
+    console.log(`🔍 Searching nearest airport for coordinates: ${lat}, ${lng}`);
+    // OpenFlights データベースから空港データを取得
+    const airportsData = await fetchOpenFlightsData();
+    if (!airportsData || airportsData.length === 0) {
+      console.log('⚠️ Failed to fetch OpenFlights data, using fallback airports');
+      return await findNearestAirportFallback(lat, lng);
+    }
+    // 商用国際空港のみをフィルタ（厳格な条件）
+    const commercialAirports = airportsData.filter((airport)=>airport.iata && airport.iata !== '\\N' && airport.iata.length === 3 && Math.abs(airport.latitude) > 0 && Math.abs(airport.longitude) > 0 && // 国際空港のフィルタリング条件
+      isInternationalAirport(airport));
+    if (commercialAirports.length === 0) {
+      console.log('⚠️ No commercial airports found, using fallback');
+      return await findNearestAirportFallback(lat, lng);
+    }
+    // 最寄りの空港を検索
+    let nearest = commercialAirports[0];
+    let minDistance = calculateDistance([
+      lat,
+      lng
+    ], [
+      nearest.latitude,
+      nearest.longitude
+    ]);
+    for (const airport of commercialAirports){
+      const distance = calculateDistance([
+        lat,
+        lng
+      ], [
+        airport.latitude,
+        airport.longitude
+      ]);
       if (distance < minDistance) {
         minDistance = distance;
-        nearestPlace = unvisited[i];
+        nearest = airport;
       }
     }
-    
-    optimizedRoute.push(nearestPlace);
-    unvisited.splice(unvisited.indexOf(nearestPlace), 1);
-  }
-  
-  // Add destination at the end (only if different from departure)
-  if (destination && destination.id !== departure?.id) {
-    optimizedRoute.push(destination);
-  } else if (destination && destination.id === departure?.id) {
-    // For round trips, add a copy of departure as destination
-    const returnTrip = { ...departure, id: `${departure.id}_return`, name: departure.name.replace('Departure:', 'Return to:') };
-    optimizedRoute.push(returnTrip);
-  }
-  
-  console.log(`✅ Route optimized using TSP greedy algorithm: ${optimizedRoute.length} places`);
-  return optimizedRoute;
-}
-
-// Step 9: Calculate realistic travel times
-async function calculateRealisticTravelTimes(places: Place[]): Promise<Place[]> {
-  console.log('🔄 Step 9: Calculating realistic travel times');
-  
-  const updatedPlaces = [...places];
-  
-  for (let i = 1; i < updatedPlaces.length; i++) {
-    const prevPlace = updatedPlaces[i - 1];
-    const currentPlace = updatedPlaces[i];
-    
-    const distance = safeDistance(
-      [prevPlace.latitude, prevPlace.longitude],
-      [currentPlace.latitude, currentPlace.longitude]
-    );
-    
-    const mode = currentPlace.transport_mode || determineTransportMode(distance, prevPlace.is_airport, currentPlace.is_airport);
-    currentPlace.transport_mode = mode;
-    currentPlace.travel_time_from_previous = calculateTravelTime(distance, mode);
-  }
-  
-  console.log('✅ Realistic travel times calculated for all transitions');
-  return updatedPlaces;
-}
-
-// Step 10: Split schedule by days
-async function splitScheduleByDays(places: Place[], constraintMinutes: number): Promise<DailySchedule[]> {
-  console.log('🔄 Step 10: Splitting schedule by days');
-  
-  const dailySchedules: DailySchedule[] = [];
-  let currentDay = 1;
-  let currentDayPlaces: Place[] = [];
-  let currentDayTime = 0;
-  const maxDailyTime = Math.min(constraintMinutes, 720); // Max 12 hours per day
-  
-  for (const place of places) {
-    const placeTime = place.stay_duration_minutes + (place.travel_time_from_previous || 0);
-    
-    // Start new day if current day would exceed time limit
-    if (currentDayTime + placeTime > maxDailyTime && currentDayPlaces.length > 0) {
-      dailySchedules.push({
-        day: currentDay,
-        date: new Date(Date.now() + (currentDay - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        places: currentDayPlaces,
-        total_travel_time: currentDayPlaces.reduce((sum, p) => sum + (p.travel_time_from_previous || 0), 0),
-        total_visit_time: currentDayPlaces.reduce((sum, p) => sum + p.stay_duration_minutes, 0),
-        meal_breaks: []
-      });
-      
-      currentDay++;
-      currentDayPlaces = [];
-      currentDayTime = 0;
-    }
-    
-    currentDayPlaces.push(place);
-    currentDayTime += placeTime;
-  }
-  
-  // Add final day if there are remaining places
-  if (currentDayPlaces.length > 0) {
-    dailySchedules.push({
-      day: currentDay,
-      date: new Date(Date.now() + (currentDay - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      places: currentDayPlaces,
-      total_travel_time: currentDayPlaces.reduce((sum, p) => sum + (p.travel_time_from_previous || 0), 0),
-      total_visit_time: currentDayPlaces.reduce((sum, p) => sum + p.stay_duration_minutes, 0),
-      meal_breaks: []
-    });
-  }
-  
-  console.log(`✅ Schedule split into ${dailySchedules.length} days`);
-  return dailySchedules;
-}
-
-// Step 11: Insert meal times (MVP implementation)
-async function insertMealTimes(dailySchedules: DailySchedule[]): Promise<DailySchedule[]> {
-  console.log('🔄 Step 11: Inserting meal times (MVP implementation)');
-  
-  const updatedSchedules = dailySchedules.map(schedule => ({
-    ...schedule,
-    meal_breaks: [
-      { type: 'lunch' as const, start_time: '12:00', duration_minutes: 60, estimated_cost: 1500 },
-      { type: 'dinner' as const, start_time: '18:00', duration_minutes: 90, estimated_cost: 3000 }
-    ]
-  }));
-  
-  console.log('✅ Basic meal times inserted for all days');
-  return updatedSchedules;
-}
-
-// Step 12: Adjust for business hours (MVP implementation)
-async function adjustForBusinessHours(dailySchedules: DailySchedule[]): Promise<DailySchedule[]> {
-  console.log('🔄 Step 12: Adjusting for business hours (MVP implementation)');
-  
-  // Basic implementation - assume all places open 9:00-18:00
-  const updatedSchedules = dailySchedules.map(schedule => ({
-    ...schedule,
-    places: schedule.places.map((place, index) => ({
-      ...place,
-      arrival_time: place.arrival_time || `${9 + index * 2}:00:00`,
-      departure_time: place.departure_time || `${9 + index * 2 + Math.floor(place.stay_duration_minutes / 60)}:${(place.stay_duration_minutes % 60).toString().padStart(2, '0')}:00`
-    }))
-  }));
-  
-  console.log('✅ Basic business hours adjustment applied');
-  return updatedSchedules;
-}
-
-// Step 13: Build detailed schedule
-async function buildDetailedSchedule(dailySchedules: DailySchedule[]): Promise<DailySchedule[]> {
-  console.log('🔄 Step 13: Building detailed schedule with times and transport');
-  
-  const detailedSchedules = dailySchedules.map(schedule => {
-    let currentTime = 9 * 60; // Start at 9:00 AM (in minutes)
-    
-    const detailedPlaces = schedule.places.map((place, index) => {
-      // Add travel time to get to this place
-      if (index > 0 && place.travel_time_from_previous) {
-        currentTime += place.travel_time_from_previous;
-      }
-      
-      const arrivalHour = Math.floor(currentTime / 60);
-      const arrivalMinute = currentTime % 60;
-      const arrival_time = `${arrivalHour.toString().padStart(2, '0')}:${arrivalMinute.toString().padStart(2, '0')}:00`;
-      
-      // Add stay duration
-      currentTime += place.stay_duration_minutes;
-      
-      const departureHour = Math.floor(currentTime / 60);
-      const departureMinute = currentTime % 60;
-      const departure_time = `${departureHour.toString().padStart(2, '0')}:${departureMinute.toString().padStart(2, '0')}:00`;
-      
-      return {
-        ...place,
-        arrival_time,
-        departure_time,
-        order_in_day: index + 1
-      };
-    });
-    
+    console.log(`🛫 Found nearest airport: ${nearest.name} (${nearest.iata}) - Distance: ${minDistance.toFixed(1)}km`);
     return {
-      ...schedule,
-      places: detailedPlaces
+      iata_code: nearest.iata,
+      airport_name: nearest.name,
+      city_name: nearest.city,
+      latitude: nearest.latitude,
+      longitude: nearest.longitude,
+      commercial_service: true
     };
-  });
-  
-  console.log('✅ Detailed schedule built with precise times and transport');
-  return detailedSchedules;
+  } catch (error) {
+    console.error('❌ Airport search error:', error);
+    return await findNearestAirportFallback(lat, lng);
+  }
 }
-
-// Step 14: Store results in database
-async function storeOptimizationResults(
-  supabase: any,
-  tripId: string,
-  memberId: string,
-  dailySchedules: DailySchedule[],
-  optimizationScore: any,
-  executionTime: number
-): Promise<void> {
-  console.log('🔄 Step 14: Storing results in database');
-  
-  const { error } = await supabase
-    .from('optimization_results')
-    .insert({
-      trip_id: tripId,
-      created_by: memberId,
+// OpenFlights データの取得
+async function fetchOpenFlightsData() {
+  try {
+    console.log('📥 Fetching OpenFlights airport data...');
+    const response = await fetch('https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const csvData = await response.text();
+    const lines = csvData.split('\n').filter((line)=>line.trim());
+    const airports = [];
+    for (const line of lines){
+      if (line.trim()) {
+        const parts = line.split(',').map((part)=>part.replace(/"/g, '').trim());
+        if (parts.length >= 8) {
+          airports.push({
+            id: parts[0],
+            name: parts[1],
+            city: parts[2],
+            country: parts[3],
+            iata: parts[4] || null,
+            icao: parts[5] || null,
+            latitude: parseFloat(parts[6]) || 0,
+            longitude: parseFloat(parts[7]) || 0,
+            altitude: parseInt(parts[8]) || 0,
+            type: parts[12] || null
+          });
+        }
+      }
+    }
+    console.log(`✅ Loaded ${airports.length} airports from OpenFlights`);
+    return airports;
+  } catch (error) {
+    console.error('❌ Failed to fetch OpenFlights data:', error);
+    return [];
+  }
+}
+// フォールバック用の主要空港検索
+async function findNearestAirportFallback(lat, lng) {
+  console.log('🔄 Using fallback airport database');
+  const majorAirports = [
+    {
+      iata_code: 'NRT',
+      airport_name: 'Narita International Airport',
+      city_name: 'Tokyo',
+      latitude: 35.7647,
+      longitude: 140.3864
+    },
+    {
+      iata_code: 'HND',
+      airport_name: 'Tokyo Haneda International Airport',
+      city_name: 'Tokyo',
+      latitude: 35.5523,
+      longitude: 139.7800
+    },
+    {
+      iata_code: 'KIX',
+      airport_name: 'Kansai International Airport',
+      city_name: 'Osaka',
+      latitude: 34.4273,
+      longitude: 135.2444
+    },
+    {
+      iata_code: 'JFK',
+      airport_name: 'John F Kennedy International Airport',
+      city_name: 'New York',
+      latitude: 40.6398,
+      longitude: -73.7789
+    },
+    {
+      iata_code: 'LAX',
+      airport_name: 'Los Angeles International Airport',
+      city_name: 'Los Angeles',
+      latitude: 33.9425,
+      longitude: -118.4081
+    },
+    {
+      iata_code: 'LHR',
+      airport_name: 'London Heathrow Airport',
+      city_name: 'London',
+      latitude: 51.4706,
+      longitude: -0.461941
+    },
+    {
+      iata_code: 'CDG',
+      airport_name: 'Charles de Gaulle International Airport',
+      city_name: 'Paris',
+      latitude: 49.0128,
+      longitude: 2.55
+    },
+    {
+      iata_code: 'ICN',
+      airport_name: 'Incheon International Airport',
+      city_name: 'Seoul',
+      latitude: 37.4691,
+      longitude: 126.451
+    }
+  ];
+  let nearest = majorAirports[0];
+  let minDistance = calculateDistance([
+    lat,
+    lng
+  ], [
+    nearest.latitude,
+    nearest.longitude
+  ]);
+  for (const airport of majorAirports){
+    const distance = calculateDistance([
+      lat,
+      lng
+    ], [
+      airport.latitude,
+      airport.longitude
+    ]);
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearest = airport;
+    }
+  }
+  console.log(`🛫 Fallback: Selected ${nearest.airport_name} (${nearest.iata_code}) - Distance: ${minDistance.toFixed(1)}km`);
+  return {
+    ...nearest,
+    commercial_service: true
+  };
+}
+// シンプルなTSP（最短距離貪欲法）
+function optimizeRouteOrder(places) {
+  console.log('🔄 Optimizing route order with simple TSP');
+  console.log(`  Input places: ${places.map((p)=>`${p.name}(${p.place_type})`).join(', ')}`);
+  if (places.length <= 2) return places;
+  const departure = places.find((p)=>p.place_type === 'departure');
+  const destination = places.find((p)=>p.place_type === 'destination');
+  const others = places.filter((p)=>p.place_type !== 'departure' && p.place_type !== 'destination');
+  console.log(`  Departure: ${departure?.name || 'NONE'}`);
+  console.log(`  Destination: ${destination?.name || 'NONE'}`);
+  console.log(`  Others: ${others.map((p)=>p.name).join(', ')}`);
+  const route = [];
+  // 出発地を最初に
+  if (departure) {
+    route.push(departure);
+    console.log(`  Added departure: ${departure.name}`);
+  }
+  // 貪欲法で中間地点を最適化
+  const remaining = [
+    ...others
+  ];
+  let current = departure || others[0];
+  while(remaining.length > 0){
+    let nearest = remaining[0];
+    let minDistance = calculateDistance([
+      current.latitude,
+      current.longitude
+    ], [
+      nearest.latitude,
+      nearest.longitude
+    ]);
+    for(let i = 1; i < remaining.length; i++){
+      const distance = calculateDistance([
+        current.latitude,
+        current.longitude
+      ], [
+        remaining[i].latitude,
+        remaining[i].longitude
+      ]);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = remaining[i];
+      }
+    }
+    route.push(nearest);
+    remaining.splice(remaining.indexOf(nearest), 1);
+    current = nearest;
+  }
+  // 目的地を最後に（同じ場所への往復の場合のみ出発地と同じ場所を追加）
+  if (destination) {
+    const depName = departure?.name || '';
+    const destName = destination.name || '';
+    console.log(`  Processing destination: ${destName}`);
+    console.log(`  Departure name: ${depName}`);
+    
+    // 往復判定：名前に明確に「same as departure」が含まれる場合のみ往復として扱う
+    const isExplicitRoundTrip = destName.toLowerCase().includes('same as departure');
+    
+    if (isExplicitRoundTrip && departure) {
+      // 復路として出発地のコピーを作成
+      const returnPlace = {
+        ...departure,
+        id: `return_${departure.id}`,
+        name: `Return to ${depName}`,
+        place_type: 'destination'
+      };
+      route.push(returnPlace);
+      console.log(`  Added return destination: ${returnPlace.name}`);
+    } else {
+      // 通常の目的地として追加
+      route.push(destination);
+      console.log(`  Added destination: ${destination.name}`);
+    }
+  } else {
+    console.log(`  No destination found!`);
+  }
+  console.log(`✅ Route optimized: ${route.map((p)=>p.name).join(' → ')}`);
+  return route;
+}
+// 移動時間・移動手段の計算
+function calculateRouteDetails(places) {
+  console.log('🔄 Calculating route details');
+  const route = [
+    ...places
+  ];
+  for(let i = 1; i < route.length; i++){
+    const prev = route[i - 1];
+    const curr = route[i];
+    const distance = calculateDistance([
+      prev.latitude,
+      prev.longitude
+    ], [
+      curr.latitude,
+      curr.longitude
+    ]);
+    const transportMode = determineTransportMode(distance, prev.is_airport, curr.is_airport);
+    const travelTime = calculateTravelTime(distance, transportMode);
+    curr.transport_mode = transportMode;
+    curr.travel_time_from_previous = travelTime;
+    console.log(`${prev.name} → ${curr.name}: ${distance.toFixed(1)}km, ${transportMode}, ${travelTime}min`);
+  }
+  return route;
+}
+// 日別スケジュール分割
+function createDailySchedule(places) {
+  console.log('🔄 Creating daily schedule');
+  const maxDailyHours = 12; // 1日最大12時間
+  const maxDailyMinutes = maxDailyHours * 60;
+  const schedules = [];
+  let currentDay = 1;
+  let currentPlaces = [];
+  let currentTime = 0;
+  let timeCounter = 9 * 60; // 9:00 AMから開始
+  for(let i = 0; i < places.length; i++){
+    const place = places[i];
+    const placeTime = place.stay_duration_minutes + (place.travel_time_from_previous || 0);
+    // フライトの場合は到着が翌日になるので新しい日を作成
+    if (place.transport_mode === 'flight' && currentPlaces.length > 0) {
+      // 現在の日を完了
+      schedules.push(createDaySchedule(currentDay, currentPlaces, timeCounter));
+      currentDay++;
+      currentPlaces = [];
+      currentTime = 0;
+      timeCounter = 9 * 60; // 翌日の9:00 AMから開始
+    }
+    // 通常の時間超過チェック（フライト以外）
+    else if (currentTime + placeTime > maxDailyMinutes && currentPlaces.length > 0) {
+      schedules.push(createDaySchedule(currentDay, currentPlaces, timeCounter));
+      currentDay++;
+      currentPlaces = [];
+      currentTime = 0;
+      timeCounter = 9 * 60; // リセット
+    }
+    // 時間設定
+    if (place.travel_time_from_previous) {
+      timeCounter += place.travel_time_from_previous;
+    }
+    place.arrival_time = formatTime(timeCounter);
+    timeCounter += place.stay_duration_minutes;
+    place.departure_time = formatTime(timeCounter);
+    place.order_in_day = currentPlaces.length + 1;
+    currentPlaces.push(place);
+    currentTime += placeTime;
+  }
+  // 最後の日を追加
+  if (currentPlaces.length > 0) {
+    schedules.push(createDaySchedule(currentDay, currentPlaces, timeCounter));
+  }
+  console.log(`✅ Created ${schedules.length} daily schedules`);
+  return schedules;
+}
+function createDaySchedule(day, places, timeCounter) {
+  const date = new Date();
+  date.setDate(date.getDate() + day - 1);
+  return {
+    day,
+    date: date.toISOString().split('T')[0],
+    scheduled_places: places,
+    total_travel_time: places.reduce((sum, p)=>sum + (p.travel_time_from_previous || 0), 0),
+    total_visit_time: places.reduce((sum, p)=>sum + p.stay_duration_minutes, 0),
+    meal_breaks: []
+  };
+}
+function formatTime(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:00`;
+}
+// 最適化結果の検証
+function validateOptimizationResult(places, schedules) {
+  console.log('🔍 Validating optimization result');
+  const issues = [];
+  // 1. 重複チェック
+  const placeNames = places.map((p)=>p.name);
+  const uniqueNames = new Set(placeNames);
+  if (placeNames.length !== uniqueNames.size) {
+    issues.push('Duplicate places found in route');
+  }
+  // 2. 移動時間の合理性チェック
+  let unrealisticMoves = 0;
+  for(let i = 1; i < places.length; i++){
+    const place = places[i];
+    if (place.travel_time_from_previous && place.travel_time_from_previous > 720) {
+      unrealisticMoves++;
+    }
+  }
+  if (unrealisticMoves > 0) {
+    issues.push(`${unrealisticMoves} unrealistic travel times (>12h) found`);
+  }
+  // 3. 日程の合理性チェック
+  schedules.forEach((schedule, index)=>{
+    if (schedule.total_travel_time > 720) {
+      issues.push(`Day ${index + 1} has excessive travel time (${Math.round(schedule.total_travel_time / 60)}h)`);
+    }
+    if (schedule.scheduled_places.length === 0) {
+      issues.push(`Day ${index + 1} has no scheduled places`);
+    }
+  });
+  // 4. フライト数チェック
+  const flightDays = schedules.filter((schedule)=>schedule.scheduled_places.some((place)=>place.transport_mode === 'flight')).length;
+  if (flightDays > schedules.length * 0.5) {
+    issues.push('Too many flight days - schedule may be unrealistic');
+  }
+  const isValid = issues.length === 0;
+  console.log(`✅ Validation result: ${isValid ? 'VALID' : 'ISSUES FOUND'}`);
+  if (!isValid) {
+    issues.forEach((issue)=>console.log(`  ⚠️ ${issue}`));
+  }
+  return {
+    isValid,
+    issues
+  };
+}
+// 改善された最適化スコア計算
+function calculateOptimizationScore(places, schedules) {
+  const totalTravel = schedules.reduce((sum, day)=>sum + day.total_travel_time, 0);
+  const totalVisit = schedules.reduce((sum, day)=>sum + day.total_visit_time, 0);
+  // 効率性（訪問時間 / 総時間）
+  const efficiency = totalVisit > 0 && totalTravel > 0 ? totalVisit / (totalVisit + totalTravel) : 0.5;
+  // 希望度満足度
+  const visitPlaces = places.filter((p)=>p.place_type === 'visit');
+  const avgNormalizedWish = visitPlaces.length > 0 ? visitPlaces.reduce((sum, p)=>sum + (p.normalized_wish_level || 0.8), 0) / visitPlaces.length : 0.8;
+  // 公平性（ユーザー間のバランス）
+  let fairness = 1.0;
+  if (visitPlaces.length > 0) {
+    const userCounts = new Map();
+    visitPlaces.forEach((p)=>{
+      userCounts.set(p.user_id, (userCounts.get(p.user_id) || 0) + 1);
+    });
+    const counts = Array.from(userCounts.values());
+    if (counts.length > 1) {
+      const avgCount = counts.reduce((sum, c)=>sum + c, 0) / counts.length;
+      const variance = counts.reduce((sum, c)=>sum + Math.pow(c - avgCount, 2), 0) / counts.length;
+      fairness = avgCount > 0 ? Math.max(0, 1 - variance / avgCount) : 1.0;
+    }
+  }
+  // 実現可能性（新しい指標）
+  const validation = validateOptimizationResult(places, schedules);
+  const feasibility = validation.isValid ? 1.0 : Math.max(0.1, 1.0 - validation.issues.length * 0.2);
+  // スコア計算（実現可能性を重視）
+  const totalScore = (efficiency * 0.3 + avgNormalizedWish * 0.2 + fairness * 0.2 + feasibility * 0.3) * 100;
+  console.log(`📊 Score calculation: efficiency=${efficiency.toFixed(2)}, wish=${avgNormalizedWish.toFixed(2)}, fairness=${fairness.toFixed(2)}, feasibility=${feasibility.toFixed(2)}, total=${totalScore.toFixed(1)}%`);
+  return {
+    total_score: Math.round(Math.max(0, Math.min(100, totalScore))),
+    fairness_score: Math.round(Math.max(0, Math.min(100, fairness * 100))),
+    efficiency_score: Math.round(Math.max(0, Math.min(100, efficiency * 100))),
+    feasibility_score: Math.round(Math.max(0, Math.min(100, feasibility * 100))),
+    validation_issues: validation.issues,
+    details: {
+      user_adoption_balance: fairness,
+      wish_satisfaction_balance: avgNormalizedWish,
+      travel_efficiency: efficiency,
+      time_constraint_compliance: feasibility,
+      is_feasible: validation.isValid
+    }
+  };
+}
+// メイン処理
+Deno.serve(async (req)=>{
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: corsHeaders
+    });
+  }
+  const startTime = Date.now();
+  try {
+    console.log('🚀 Starting simplified route optimization');
+    const { trip_id, member_id, user_places, constraints } = await req.json();
+    if (!trip_id || !member_id) {
+      throw new Error('Missing trip_id or member_id');
+    }
+    console.log(`📍 Processing ${user_places?.length || 0} places for trip ${trip_id}`);
+    const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    // データベースから場所を取得（user_placesが提供されていない場合）
+    let places = user_places;
+    if (!places || places.length === 0) {
+      const { data, error } = await supabase.from('places').select('*').eq('trip_id', trip_id);
+      if (error) throw new Error(`Database error: ${error.message}`);
+      places = data || [];
+    }
+    if (places.length === 0) {
+      throw new Error('No places found for optimization');
+    }
+    console.log(`📊 Input: ${places.length} places`);
+    // デバッグ: 入力データの詳細をログ出力
+    places.forEach((place, index)=>{
+      console.log(`  Place ${index + 1}: ${place.name} (type: ${place.place_type}, stay: ${place.stay_duration_minutes}min, lat: ${place.latitude}, lng: ${place.longitude})`);
+    });
+    // 1. 滞在時間の正規化と確認（stay_duration_minutesが適切に設定されているか）
+    console.log('🔄 Ensuring proper stay durations for all places');
+    places.forEach((place, index) => {
+      // 空港の場合は120分に固定、それ以外はユーザー設定値を使用
+      if (place.place_type === 'airport' || place.category === 'airport') {
+        place.stay_duration_minutes = 120;
+        console.log(`  Airport ${place.name}: Set to 120 minutes`);
+      } else if (!place.stay_duration_minutes || place.stay_duration_minutes <= 0) {
+        // stay_duration_minutesが設定されていない場合のデフォルト値
+        place.stay_duration_minutes = 60; // 1時間デフォルト
+        console.log(`  ${place.name}: No duration set, defaulting to 60 minutes`);
+      } else {
+        console.log(`  ${place.name}: Using configured duration of ${place.stay_duration_minutes} minutes`);
+      }
+    });
+    
+    // 2. 希望度の正規化（必須機能）
+    const normalizedPlaces = normalizePreferences(places);
+    // 3. 場所の絞り込み（公平性考慮）
+    const maxPlaces = constraints?.max_places || 20;
+    const filteredPlaces = filterPlacesByFairness(normalizedPlaces, maxPlaces);
+    // 4. 出発地・目的地の固定（必須機能）
+    const departure = filteredPlaces.find((p)=>p.place_type === 'departure');
+    const destination = filteredPlaces.find((p)=>p.place_type === 'destination');
+    console.log(`🏁 Departure: ${departure?.name || 'None'}, Destination: ${destination?.name || 'None'}`);
+    // 5. ルート最適化（TSP）- 基本的な場所のみで実行
+    const optimizedRoute = optimizeRouteOrder(filteredPlaces);
+    // 6. 最適化されたルートに長距離移動用の空港を挿入
+    const routeWithAirports = await insertAirportsIfNeeded(supabase, optimizedRoute);
+    // 7. 移動時間・移動手段計算
+    const routeWithDetails = calculateRouteDetails(routeWithAirports);
+    // 8. 日別スケジュール作成
+    const dailySchedules = createDailySchedule(routeWithDetails);
+    // 9. 最適化スコア計算
+    const optimizationScore = calculateOptimizationScore(routeWithDetails, dailySchedules);
+    const executionTime = Date.now() - startTime;
+    // 10. 結果保存
+    console.log('💾 Saving optimization result to database...');
+    const { data: savedResult, error: saveError } = await supabase.from('optimization_results').insert({
+      trip_id,
+      created_by: member_id,
       optimized_route: dailySchedules,
       optimization_score: optimizationScore,
       execution_time_ms: executionTime,
-      places_count: dailySchedules.reduce((sum, day) => sum + day.places.length, 0),
-      total_travel_time_minutes: dailySchedules.reduce((sum, day) => sum + day.total_travel_time, 0),
-      total_visit_time_minutes: dailySchedules.reduce((sum, day) => sum + day.total_visit_time, 0),
+      places_count: routeWithDetails.length,
+      total_travel_time_minutes: dailySchedules.reduce((sum, day)=>sum + day.total_travel_time, 0),
+      total_visit_time_minutes: dailySchedules.reduce((sum, day)=>sum + day.total_visit_time, 0),
       is_active: true,
-      algorithm_version: '15-step-mvp-v1'
-    });
+      algorithm_version: 'simplified-v1'
+    }).select();
     
-  if (error) {
-    console.error('Failed to store optimization results:', error);
-    throw new Error(`Failed to store results: ${error.message}`);
-  }
-  
-  console.log('✅ Optimization results stored in database');
-}
-
-// Step 15: Calculate optimization scores
-function calculateOptimizationScore(
-  normalizedUsers: NormalizedUser[],
-  selectedPlaces: Place[],
-  dailySchedules: DailySchedule[],
-  constraints: OptimizationConstraints
-): any {
-  console.log('🔄 Step 15: Calculating optimization scores');
-  
-  // User adoption balance (fairness)
-  const userPlaceCounts = normalizedUsers.map(user => 
-    selectedPlaces.filter(place => place.user_id === user.user_id).length
-  );
-  const avgPlacesPerUser = userPlaceCounts.reduce((sum, count) => sum + count, 0) / userPlaceCounts.length;
-  const fairnessVariance = userPlaceCounts.reduce((sum, count) => sum + Math.pow(count - avgPlacesPerUser, 2), 0) / userPlaceCounts.length;
-  const fairnessScore = Math.max(0, 100 - fairnessVariance * 10);
-  
-  // Wish satisfaction balance
-  const totalWishValue = selectedPlaces.reduce((sum, place) => sum + (place.normalized_wish_level || 1), 0);
-  const maxPossibleWish = selectedPlaces.length * 1.5; // Assuming max normalized wish is 1.5
-  const wishSatisfactionScore = Math.min(100, (totalWishValue / maxPossibleWish) * 100);
-  
-  // Travel efficiency
-  const totalTravelTime = dailySchedules.reduce((sum, day) => sum + day.total_travel_time, 0);
-  const totalVisitTime = dailySchedules.reduce((sum, day) => sum + day.total_visit_time, 0);
-  const efficiencyRatio = totalVisitTime / (totalVisitTime + totalTravelTime);
-  const efficiencyScore = efficiencyRatio * 100;
-  
-  // Time constraint compliance
-  const totalTime = totalTravelTime + totalVisitTime;
-  const complianceScore = totalTime <= constraints.time_constraint_minutes ? 100 : 
-    Math.max(0, 100 - ((totalTime - constraints.time_constraint_minutes) / constraints.time_constraint_minutes) * 100);
-  
-  const overallScore = (fairnessScore + wishSatisfactionScore + efficiencyScore + complianceScore) / 4;
-  
-  const optimizationScore = {
-    total_score: Math.round(overallScore),
-    fairness_score: Math.round(fairnessScore),
-    efficiency_score: Math.round(efficiencyScore),
-    details: {
-      user_adoption_balance: fairnessScore / 100,
-      wish_satisfaction_balance: wishSatisfactionScore / 100,
-      travel_efficiency: efficiencyScore / 100,
-      time_constraint_compliance: complianceScore / 100
-    }
-  };
-  
-  console.log(`✅ Optimization score calculated: ${overallScore.toFixed(1)}% overall`);
-  return optimizationScore;
-}
-
-// Main optimization function implementing all 15 steps
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  const startTime = Date.now();
-  
-  try {
-    console.log('🚀 Starting 15-step route optimization process');
-    
-    const requestData = await req.json();
-    console.log('📥 Received request data:', JSON.stringify(requestData, null, 2));
-    
-    const { trip_id, member_id, user_places, constraints, transport_mode } = requestData;
-    
-    // Enhanced input validation
-    if (!trip_id || typeof trip_id !== 'string') {
-      throw new Error('Missing or invalid trip_id parameter');
-    }
-    
-    if (!member_id || typeof member_id !== 'string') {
-      throw new Error('Missing or invalid member_id parameter');
-    }
-    
-    console.log(`🔍 Processing optimization for trip: ${trip_id}, member: ${member_id}`);
-    
-    // Log user_places data structure for debugging
-    if (user_places) {
-      console.log('📊 user_places data type:', typeof user_places);
-      console.log('📊 user_places is array:', Array.isArray(user_places));
-      console.log('📊 user_places length:', user_places?.length);
-      if (user_places && user_places.length > 0) {
-        console.log('📍 First user_place sample:', JSON.stringify(user_places[0], null, 2));
-      }
-    }
-    
-    // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-    
-    const optimizationConstraints: OptimizationConstraints = {
-      time_constraint_minutes: constraints?.time_constraint_minutes || 1440,
-      distance_constraint_km: constraints?.distance_constraint_km || 1000,
-      budget_constraint_yen: constraints?.budget_constraint_yen || 100000,
-      max_places: constraints?.max_places || 20
-    };
-    
-    // Execute 15-step optimization process
-    
-    // Steps 1-2: Retrieve trip data - prefer user_places if provided
-    let allPlaces = user_places;
-    
-    // If user_places not provided or empty, retrieve from database
-    if (!allPlaces || !Array.isArray(allPlaces) || allPlaces.length === 0) {
-      console.log('📥 No user_places provided, retrieving from database');
-      const tripData = await retrieveTripData(supabase, trip_id, member_id);
-      allPlaces = tripData.places;
+    if (saveError) {
+      console.error('❌ Failed to save optimization result:', saveError);
+      // 保存に失敗してもレスポンスは返す（一時的なメモリ結果として）
     } else {
-      console.log(`📥 Using provided user_places: ${allPlaces.length} places`);
-      console.log('📊 Breakdown of provided places:');
-      allPlaces.forEach((place, index) => {
-        console.log(`  ${index + 1}. ${place.name} - Type: ${place.place_type || 'undefined'} - Source: ${place.source || 'undefined'}`);
-      });
+      console.log('✅ Optimization result saved successfully:', savedResult?.[0]?.id);
     }
-    
-    // Separate system places from user places BEFORE normalization
-    const systemPlaces = (allPlaces || []).filter(p => 
-      p.place_type === 'departure' || p.place_type === 'destination' || p.source === 'system'
-    );
-    const userPlaces = (allPlaces || []).filter(p => 
-      p.place_type !== 'departure' && p.place_type !== 'destination' && p.source !== 'system'
-    );
-    
-    console.log(`🔍 Separated places - System: ${systemPlaces.length}, User: ${userPlaces.length}`);
-    console.log('📊 System places:', systemPlaces.map(p => ({ name: p.name, type: p.place_type })));
-    console.log('📊 User places:', userPlaces.map(p => ({ name: p.name, category: p.category })));
-
-    // Step 3: Normalize preferences for USER places only (system places are fixed)
-    console.log('📊 Processing USER places for normalization (excluding system places):', JSON.stringify(userPlaces, null, 2));
-    const normalizedUsers = await normalizePreferences(userPlaces);
-    
-    // Step 4: Filter USER places for fairness (system places always included)
-    const selectedVisitPlaces = await filterPlacesForFairness(normalizedUsers, optimizationConstraints);
-    
-    // Step 5: Combine system places (always included) with selected user places
-    const allSelectedPlaces = [...systemPlaces, ...selectedVisitPlaces];
-    console.log(`🔗 Combined places: ${allSelectedPlaces.length} total (${systemPlaces.length} system + ${selectedVisitPlaces.length} user)`);
-    console.log(`🔗 Combined place names: ${allSelectedPlaces.map(p => p.name)}`);
-    const { departure, destination, visitPlaces } = await fixDepartureDestination(allSelectedPlaces);
-    
-    console.log(`📋 After fixDepartureDestination:`);
-    console.log(`  - Departure: ${departure ? departure.name : 'None'}`);
-    console.log(`  - Destination: ${destination ? destination.name : 'None'}`);
-    console.log(`  - Visit places: ${visitPlaces.length} (${visitPlaces.map(p => p.name).join(', ')})`);
-    console.log(`  - Total places being processed: ${[departure, ...visitPlaces, destination].filter(Boolean).length}`);
-    
-    // Step 6: Determine transport modes
-    const placesWithTransport = await determineTransportModes([
-      ...(departure ? [departure] : []),
-      ...visitPlaces,
-      ...(destination ? [destination] : [])
-    ]);
-    
-    // Step 7: Insert airports
-    const placesWithAirports = await insertAirports(supabase, placesWithTransport);
-    
-    // Step 8: TSP optimization
-    console.log(`🔄 Input to TSP: ${placesWithAirports.length} places`);
-    const optimizedRoute = await optimizeRouteWithTSP(placesWithAirports);
-    console.log(`✅ TSP output: ${optimizedRoute.length} places`);
-    
-    // Step 9: Calculate realistic travel times
-    const routeWithTravelTimes = await calculateRealisticTravelTimes(optimizedRoute);
-    console.log(`✅ Route with travel times: ${routeWithTravelTimes.length} places`);
-    
-    // Step 10: Split by days
-    const dailySchedules = await splitScheduleByDays(routeWithTravelTimes, optimizationConstraints.time_constraint_minutes);
-    console.log(`📅 After splitScheduleByDays: ${dailySchedules.length} days`);
-    dailySchedules.forEach((day, index) => {
-      console.log(`  Day ${index + 1}: ${day.places.length} places (${day.places.map(p => p.name).join(', ')})`);
-    });
-    
-    // Step 11: Insert meal times
-    const schedulesWithMeals = await insertMealTimes(dailySchedules);
-    
-    // Step 12: Adjust business hours
-    const schedulesWithBusinessHours = await adjustForBusinessHours(schedulesWithMeals);
-    
-    // Step 13: Build detailed schedule
-    const detailedSchedules = await buildDetailedSchedule(schedulesWithBusinessHours);
-    
-    // Step 15: Calculate optimization score
-    const optimizationScore = calculateOptimizationScore(
-      normalizedUsers,
-      allSelectedPlaces,
-      detailedSchedules,
-      optimizationConstraints
-    );
-    
-    const executionTime = Date.now() - startTime;
-    
-    // Step 14: Store results
-    await storeOptimizationResults(
-      supabase,
-      trip_id,
-      member_id,
-      detailedSchedules,
-      optimizationScore,
-      executionTime
-    );
-    
-    console.log(`🎉 15-step optimization completed successfully in ${executionTime}ms`);
-    
-    // Return comprehensive result
-    const result: OptimizationResult = {
+    console.log(`✅ Optimization completed in ${executionTime}ms`);
+    return new Response(JSON.stringify({
       success: true,
       optimization: {
-        daily_schedules: detailedSchedules,
+        daily_schedules: dailySchedules,
         optimization_score: optimizationScore,
-        optimized_route: { daily_schedules: detailedSchedules },
-        total_duration_minutes: detailedSchedules.reduce((sum, day) => 
-          sum + day.total_travel_time + day.total_visit_time, 0),
-        places: routeWithTravelTimes,
+        optimized_route: {
+          daily_schedules: dailySchedules
+        },
+        total_duration_minutes: dailySchedules.reduce((sum, day)=>sum + day.total_travel_time + day.total_visit_time, 0),
+        places: routeWithDetails,
         execution_time_ms: executionTime
       },
-      message: `Route optimized successfully using 15-step algorithm. Processed ${normalizedUsers.length} users, selected ${allSelectedPlaces.length} places (${systemPlaces.length} system + ${selectedVisitPlaces.length} user), organized into ${detailedSchedules.length} days with ${optimizationScore.total_score}% optimization score.`
-    };
-    
-    return new Response(
-      JSON.stringify(result),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+      message: `Route optimized with ${routeWithDetails.length} places in ${dailySchedules.length} days. Score: ${optimizationScore.total_score}%`
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
       },
-    );
-    
+      status: 200
+    });
   } catch (error) {
-    const executionTime = Date.now() - startTime;
     console.error('❌ Optimization failed:', error);
-    console.error('Error stack:', error.stack);
-    
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        execution_time_ms: executionTime,
-        timestamp: new Date().toISOString()
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message,
+      execution_time_ms: Date.now() - startTime
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
       },
-    );
+      status: 500
+    });
   }
 });

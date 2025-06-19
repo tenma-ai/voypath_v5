@@ -52,15 +52,18 @@ function App() {
 
     checkAuth();
 
-    // Listen for auth state changes
+    // Listen for auth state changes (only for actual sign in/out events)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 Auth state changed:', event, session?.user?.id);
-      
-      if (event === 'SIGNED_IN' && session?.user) {
-        await handleAuthenticated(session.user);
-      } else if (event === 'SIGNED_OUT') {
-        setIsAuthenticated(false);
-        setUser(null);
+      // Only handle explicit sign in/out events, ignore token refreshes
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        console.log('🔄 Auth state changed:', event, session?.user?.id);
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          await handleAuthenticated(session.user);
+        } else if (event === 'SIGNED_OUT') {
+          setIsAuthenticated(false);
+          setUser(null);
+        }
       }
     });
 

@@ -6,6 +6,7 @@ import { PremiumBadge } from './PremiumBadge';
 import { PremiumModal } from './PremiumModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { MemberColorService } from '../services/MemberColorService';
 
 const routeTitles: Record<string, { title: string; subtitle?: string; icon?: any; gradient?: string }> = {
   '/': { 
@@ -60,6 +61,7 @@ function TopAppBar() {
   const [showVoypathMenu, setShowVoypathMenu] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [userColor, setUserColor] = useState<string | null>(null);
   
   const routeInfo = routeTitles[location.pathname] || { title: 'Voypath', gradient: 'from-primary-500 to-secondary-600' };
   const showBackButton = location.pathname !== '/';
@@ -74,6 +76,34 @@ function TopAppBar() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Load user's member color
+  useEffect(() => {
+    const loadUserColor = async () => {
+      if (!user?.id || !currentTrip?.id) {
+        setUserColor(null);
+        return;
+      }
+
+      try {
+        const color = await MemberColorService.getMemberColor(currentTrip.id, user.id);
+        if (color) {
+          setUserColor(color.hex);
+        } else {
+          // Try to assign a color if not already assigned
+          const assignedColor = await MemberColorService.assignColorToMember(currentTrip.id, user.id);
+          setUserColor(assignedColor.hex);
+        }
+      } catch (error) {
+        console.error('Failed to load user color:', error);
+        // Fallback to deterministic color
+        const fallbackColor = MemberColorService.getColorForOptimization(user.id, {});
+        setUserColor(fallbackColor);
+      }
+    };
+
+    loadUserColor();
+  }, [user?.id, currentTrip?.id]);
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -592,14 +622,16 @@ function TopAppBar() {
                     whileTap={{ scale: 0.95 }}
                   >
                     <div 
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-medium hover:shadow-glow transition-all duration-300 relative overflow-hidden border ${
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-medium hover:shadow-glow transition-all duration-300 relative overflow-hidden border-2 ${
                         isPremium 
                           ? 'border-yellow-400/30' 
-                          : 'border-slate-200/50 dark:border-slate-700/50'
+                          : 'border-white dark:border-slate-800'
                       }`}
                       style={isPremium ? {
                         background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #000000 100%)',
                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      } : userColor ? {
+                        backgroundColor: userColor,
                       } : {
                         background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)',
                       }}
@@ -637,14 +669,16 @@ function TopAppBar() {
                             <div className="flex items-center space-x-3">
                               <div className="relative">
                                 <div 
-                                  className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-medium border ${
+                                  className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-medium border-2 ${
                                     isPremium 
                                       ? 'border-yellow-400/30' 
-                                      : 'border-slate-200/50 dark:border-slate-700/50'
+                                      : 'border-white dark:border-slate-800'
                                   }`}
                                   style={isPremium ? {
                                     background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #000000 100%)',
                                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                                  } : userColor ? {
+                                    backgroundColor: userColor,
                                   } : {
                                     background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)',
                                   }}

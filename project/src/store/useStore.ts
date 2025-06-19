@@ -530,6 +530,7 @@ export const useStore = create<StoreState>()((set, get) => ({
         
         // Preserve existing optimization results during initialization
         const existingOptimizationResult = optimizationResult;
+        console.log('🔒 Preserving optimization result during initialization:', !!existingOptimizationResult);
         
         try {
           await loadTripsFromDatabase();
@@ -542,16 +543,15 @@ export const useStore = create<StoreState>()((set, get) => ({
             // Load places data
             await get().loadPlacesFromDatabase(currentTrip.id);
             
-            // Only load optimization results if we don't already have them
-            if (!existingOptimizationResult?.optimization?.daily_schedules?.length) {
-              console.log('📊 Loading optimization results from database');
-              await get().loadOptimizationResult(currentTrip.id);
-            } else {
-              console.log('✅ Preserving existing optimization results');
-              set({ optimizationResult: existingOptimizationResult });
-            }
+            // Load optimization results from database
+            // The loadOptimizationResult function will preserve existing results if no new ones are found
+            console.log('📊 Checking for optimization results in database');
+            await get().loadOptimizationResult(currentTrip.id);
             
+            // Check if optimization result was preserved
+            const { optimizationResult: finalResult } = get();
             console.log(`✅ Initialized app with data for trip: ${currentTrip.name}`);
+            console.log('📊 Final optimization result status:', !!finalResult);
           } else {
             console.log('🔄 Initialized app with trips data (no current trip selected)');
           }
@@ -559,6 +559,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           console.error('Failed to initialize from database:', error);
           // Restore optimization results even if initialization fails
           if (existingOptimizationResult) {
+            console.log('🔄 Restoring optimization result after initialization error');
             set({ optimizationResult: existingOptimizationResult });
           }
         }
@@ -830,14 +831,10 @@ export const useStore = create<StoreState>()((set, get) => ({
 
       loadOptimizationResult: async (tripId: string): Promise<void> => {
         try {
-          // Check if we already have optimization results for this trip
-          const currentResult = get().optimizationResult;
-          if (currentResult && currentResult.optimization?.daily_schedules?.length > 0) {
-            console.log('✅ Optimization results already loaded, skipping reload');
-            return;
-          }
-          
           console.log('🔍 Loading optimization results for trip:', tripId);
+          
+          // Get current optimization result to preserve if needed
+          const { optimizationResult: currentOptimizationResult } = get();
           
           // Check if table exists before querying
           const { data: results, error } = await supabase
@@ -851,9 +848,13 @@ export const useStore = create<StoreState>()((set, get) => ({
           const result = results?.[0] || null;
 
           if (error) {
-            // If table doesn't exist or query fails, just set null result
+            // If table doesn't exist or query fails, preserve existing result
             console.warn('Optimization results table not found or query failed:', error.message);
-            set({ optimizationResult: null });
+            console.log('Preserving existing optimization result:', currentOptimizationResult);
+            // Don't overwrite with null if we have existing results
+            if (!currentOptimizationResult) {
+              set({ optimizationResult: null });
+            }
             return;
           }
 
@@ -863,14 +864,20 @@ export const useStore = create<StoreState>()((set, get) => ({
             console.log('🔍 [useStore] daily_schedules:', result.optimized_route?.daily_schedules);
             
             // Convert database result to OptimizationResult format
+            // optimized_route is an array of daily schedules directly
+            const dailySchedules = Array.isArray(result.optimized_route) ? result.optimized_route : [];
+            
+            // Extract all places from all daily schedules
+            const allPlaces = dailySchedules.flatMap(day => day.scheduled_places || []);
+            
             const optimizationResult: OptimizationResult = {
               success: true,
               optimization: {
-                daily_schedules: result.optimized_route?.daily_schedules || [],
+                daily_schedules: dailySchedules,
                 optimization_score: result.optimization_score || { total_score: 0, fairness_score: 0, efficiency_score: 0, details: { user_adoption_balance: 0, wish_satisfaction_balance: 0, travel_efficiency: 0, time_constraint_compliance: 0 } },
-                optimized_route: { daily_schedules: result.optimized_route?.daily_schedules || [] },
+                optimized_route: { daily_schedules: dailySchedules },
                 total_duration_minutes: result.total_travel_time_minutes + result.total_visit_time_minutes || 0,
-                places: [],
+                places: allPlaces,
                 execution_time_ms: result.execution_time_ms || 0
               },
               message: 'Optimization loaded from database'
@@ -882,12 +889,24 @@ export const useStore = create<StoreState>()((set, get) => ({
             set({ optimizationResult: optimizationResult });
             console.log(`✅ Loaded optimization result for trip ${tripId}`);
           } else {
-            set({ optimizationResult: null });
+            // No results found in database, preserve existing if available
+            console.log('No optimization results found in database');
+            if (!currentOptimizationResult) {
+              set({ optimizationResult: null });
+            } else {
+              console.log('Preserving existing optimization result');
+            }
           }
           
         } catch (error) {
           console.error('Failed to load optimization result:', error);
-          set({ optimizationResult: null });
+          // Preserve existing result on error
+          const { optimizationResult: currentResult } = get();
+          if (!currentResult) {
+            set({ optimizationResult: null });
+          } else {
+            console.log('Preserving existing optimization result after error');
+          }
         }
       },
 

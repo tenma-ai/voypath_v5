@@ -19,6 +19,56 @@ import {
   Minimize
 } from 'lucide-react';
 import type { OptimizedTrip, OptimizedPlace } from '../types/optimization';
+
+// Edge Function response structure
+interface EdgeFunctionOptimizationResult {
+  success: boolean;
+  optimization: {
+    daily_schedules: DailySchedule[];
+    optimization_score: {
+      total_score: number;
+      fairness_score: number;
+      efficiency_score: number;
+      feasibility_score: number;
+      details: {
+        user_adoption_balance: number;
+        wish_satisfaction_balance: number;
+        travel_efficiency: number;
+        time_constraint_compliance: number;
+      };
+    };
+    optimized_route: {
+      daily_schedules: DailySchedule[];
+    };
+    total_duration_minutes: number;
+    places: any[];
+    execution_time_ms: number;
+  };
+  message: string;
+}
+
+interface DailySchedule {
+  day: number;
+  date: string;
+  scheduled_places: ScheduledPlace[];
+  total_travel_time: number;
+  total_visit_time: number;
+  meal_breaks: any[];
+}
+
+interface ScheduledPlace {
+  id: string;
+  name: string;
+  arrival_time: string;
+  departure_time: string;
+  stay_duration_minutes: number;
+  transport_mode: string;
+  travel_time_from_previous: number;
+  order_in_day: number;
+  category?: string;
+  place_type?: string;
+  user_id?: string;
+}
 import { MemberColorService } from '../services/MemberColorService';
 import OptimizationProgressVisualization from './OptimizationProgressVisualization';
 import DetailedScheduleTimelineView from './DetailedScheduleTimelineView';
@@ -26,7 +76,8 @@ import { OptimizedMapView } from './OptimizedMapView';
 import PlaceDetailCard from './PlaceDetailCard';
 
 interface OptimizationResultsVisualizationProps {
-  optimizedTrip: OptimizedTrip;
+  optimizedTrip?: OptimizedTrip;
+  optimizationResult?: EdgeFunctionOptimizationResult;
   isLoading?: boolean;
   onExport?: (format: 'pdf' | 'json' | 'ical') => void;
   onShare?: () => void;
@@ -38,6 +89,7 @@ type LayoutMode = 'split' | 'fullscreen' | 'compact';
 
 export default function OptimizationResultsVisualization({
   optimizedTrip,
+  optimizationResult,
   isLoading = false,
   onExport,
   onShare,
@@ -52,28 +104,46 @@ export default function OptimizationResultsVisualization({
 
   useEffect(() => {
     initializeMemberColors();
-  }, [optimizedTrip, initializeMemberColors]);
+  }, [optimizedTrip, optimizationResult, initializeMemberColors]);
 
   const initializeMemberColors = async () => {
-    if (!optimizedTrip.tripId) return;
+    // Use optimizationResult if available, fallback to optimizedTrip
+    const dataSource = optimizationResult || optimizedTrip;
+    if (!dataSource) return;
 
     try {
+      // Try to get trip ID from either source
+      const tripId = optimizedTrip?.tripId || 'fallback-trip';
+      
       // Get existing color mapping or create fallback
-      const colorMapping = await MemberColorService.getSimpleColorMapping(optimizedTrip.tripId);
+      const colorMapping = tripId !== 'fallback-trip' 
+        ? await MemberColorService.getSimpleColorMapping(tripId)
+        : {};
       
       // If no colors assigned, create fallback mapping
       if (Object.keys(colorMapping).length === 0) {
         const fallbackColors: Record<string, string> = {};
         
-        // Extract unique member IDs from preferences
+        // Extract unique member IDs from optimization result or optimized trip
         const memberIds = new Set<string>();
-        optimizedTrip.detailedSchedule?.forEach(day => {
-          day.places.forEach(place => {
-            place.member_preferences?.forEach(pref => {
-              memberIds.add(pref.member_id);
+        
+        if (optimizationResult?.optimization?.places) {
+          // Extract from Edge Function response
+          optimizationResult.optimization.places.forEach(place => {
+            if (place.user_id) {
+              memberIds.add(place.user_id);
+            }
+          });
+        } else if (optimizedTrip?.detailedSchedule) {
+          // Extract from legacy optimized trip
+          optimizedTrip.detailedSchedule.forEach(day => {
+            day.places.forEach(place => {
+              place.member_preferences?.forEach(pref => {
+                memberIds.add(pref.member_id);
+              });
             });
           });
-        });
+        }
 
         // Assign colors to members
         Array.from(memberIds).forEach((memberId, index) => {
@@ -106,7 +176,25 @@ export default function OptimizationResultsVisualization({
   };
 
   const getDayPlaces = (dayIndex: number): OptimizedPlace[] => {
-    return optimizedTrip.detailedSchedule?.[dayIndex]?.places || [];
+    if (optimizationResult?.optimization?.daily_schedules) {
+      // Use Edge Function response structure
+      const schedule = optimizationResult.optimization.daily_schedules[dayIndex];
+      return schedule?.scheduled_places?.map(sp => ({
+        id: sp.id,
+        name: sp.name,
+        arrival_time: sp.arrival_time,
+        departure_time: sp.departure_time,
+        visit_duration: sp.stay_duration_minutes,
+        transport_mode: sp.transport_mode,
+        travel_time_from_previous: sp.travel_time_from_previous,
+        order_in_day: sp.order_in_day,
+        category: sp.category,
+        place_type: sp.place_type,
+        user_id: sp.user_id
+      })) || [];
+    }
+    // Fallback to legacy structure
+    return optimizedTrip?.detailedSchedule?.[dayIndex]?.places || [];
   };
 
   const renderViewModeSelector = () => (
@@ -229,10 +317,10 @@ export default function OptimizationResultsVisualization({
             <h3 className="text-lg font-semibold text-gray-900">Trip Duration</h3>
           </div>
           <p className="text-2xl font-bold text-blue-600">
-            {optimizedTrip.detailedSchedule?.length || 0} Days
+            {optimizationResult?.optimization?.daily_schedules?.length || optimizedTrip?.detailedSchedule?.length || 0} Days
           </p>
           <p className="text-sm text-gray-600">
-            {optimizedTrip.detailedSchedule?.reduce((total, day) => total + day.places.length, 0)} Places Total
+            {optimizationResult?.optimization?.places?.length || optimizedTrip?.detailedSchedule?.reduce((total, day) => total + day.places.length, 0) || 0} Places Total
           </p>
         </div>
 
@@ -266,7 +354,7 @@ export default function OptimizationResultsVisualization({
             <h3 className="text-lg font-semibold text-gray-900">Optimization Score</h3>
           </div>
           <p className="text-2xl font-bold text-purple-600">
-            {optimizedTrip.optimizationScore ? Math.round(optimizedTrip.optimizationScore * 100) : 'N/A'}%
+            {optimizationResult?.optimization?.optimization_score?.total_score || (optimizedTrip?.optimizationScore ? Math.round(optimizedTrip.optimizationScore * 100) : 'N/A')}%
           </p>
           <p className="text-sm text-gray-600">
             Efficiency Rating
@@ -278,14 +366,42 @@ export default function OptimizationResultsVisualization({
       <div className={`grid ${layoutMode === 'fullscreen' ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-6`}>
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">Day Schedule</h3>
-          <DetailedScheduleTimelineView
-            optimizedTrip={optimizedTrip}
-            memberColors={memberColors}
-            onPlaceSelect={handlePlaceSelect}
-          />
+          {optimizationResult ? (
+            <div className="space-y-4">
+              {optimizationResult.optimization.daily_schedules.map((schedule, dayIndex) => (
+                <div key={dayIndex} className="border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 mb-3">Day {schedule.day}</h4>
+                  <div className="space-y-2">
+                    {schedule.scheduled_places.map((place, index) => (
+                      <div key={index} className="flex items-center space-x-3 text-sm">
+                        <div className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
+                          {place.order_in_day || index + 1}
+                        </div>
+                        <div className="flex-1">
+                          <span className="font-medium text-gray-900">{place.name}</span>
+                          <div className="text-gray-500 text-xs">
+                            {place.arrival_time} - {place.departure_time}
+                          </div>
+                        </div>
+                        <div className="text-gray-500 text-xs">
+                          {place.transport_mode === 'flight' ? '✈️' : place.transport_mode === 'walking' ? '🚶' : '🚗'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <DetailedScheduleTimelineView
+              optimizedTrip={optimizedTrip!}
+              memberColors={memberColors}
+              onPlaceSelect={handlePlaceSelect}
+            />
+          )}
         </div>
         
-        {layoutMode !== 'fullscreen' && (
+        {layoutMode !== 'fullscreen' && optimizedTrip && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900">Route Map</h3>
             <div className="h-96 rounded-lg overflow-hidden">
@@ -303,25 +419,66 @@ export default function OptimizationResultsVisualization({
     </div>
   );
 
-  const renderTimelineMode = () => (
-    <DetailedScheduleTimelineView
-      optimizedTrip={optimizedTrip}
-      memberColors={memberColors}
-      onPlaceSelect={handlePlaceSelect}
-    />
-  );
-
-  const renderMapMode = () => (
-    <div className="h-[600px] rounded-lg overflow-hidden">
-      <OptimizedMapView
+  const renderTimelineMode = () => {
+    if (optimizationResult) {
+      return (
+        <div className="space-y-4">
+          {optimizationResult.optimization.daily_schedules.map((schedule, dayIndex) => (
+            <div key={dayIndex} className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Day {schedule.day} - {schedule.date}</h3>
+              <div className="space-y-3">
+                {schedule.scheduled_places.map((place, index) => (
+                  <div key={index} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                      {place.order_in_day || index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">{place.name}</h4>
+                      <div className="text-sm text-gray-600">
+                        {place.arrival_time} - {place.departure_time} ({place.stay_duration_minutes}min)
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Transport: {place.transport_mode} • Travel time: {place.travel_time_from_previous}min
+                      </div>
+                    </div>
+                    <div className="text-2xl">
+                      {place.transport_mode === 'flight' ? '✈️' : place.transport_mode === 'walking' ? '🚶' : '🚗'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
+    return optimizedTrip ? (
+      <DetailedScheduleTimelineView
         optimizedTrip={optimizedTrip}
         memberColors={memberColors}
-        selectedDay={selectedDay}
         onPlaceSelect={handlePlaceSelect}
-        className="h-full"
       />
-    </div>
-  );
+    ) : <div>No timeline data available</div>;
+  };
+
+  const renderMapMode = () => {
+    if (!optimizedTrip) {
+      return <div className="h-[600px] rounded-lg bg-gray-100 flex items-center justify-center text-gray-500">Map view not available for Edge Function results</div>;
+    }
+    
+    return (
+      <div className="h-[600px] rounded-lg overflow-hidden">
+        <OptimizedMapView
+          optimizedTrip={optimizedTrip}
+          memberColors={memberColors}
+          selectedDay={selectedDay}
+          onPlaceSelect={handlePlaceSelect}
+          className="h-full"
+        />
+      </div>
+    );
+  };
 
   const renderDetailsMode = () => {
     const dayPlaces = getDayPlaces(selectedDay);
@@ -336,7 +493,7 @@ export default function OptimizationResultsVisualization({
             onChange={(e) => setSelectedDay(Number(e.target.value))}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            {optimizedTrip.detailedSchedule?.map((_, index) => (
+            {(optimizationResult?.optimization?.daily_schedules || optimizedTrip?.detailedSchedule || []).map((_, index) => (
               <option key={index} value={index}>
                 Day {index + 1}
               </option>
@@ -388,7 +545,7 @@ export default function OptimizationResultsVisualization({
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Optimization Results</h1>
             <p className="text-gray-600">
-              Optimized trip with {optimizedTrip.detailedSchedule?.reduce((total, day) => total + day.places.length, 0)} places across {optimizedTrip.detailedSchedule?.length} days
+              Optimized trip with {optimizationResult?.optimization?.places?.length || optimizedTrip?.detailedSchedule?.reduce((total, day) => total + day.places.length, 0) || 0} places across {optimizationResult?.optimization?.daily_schedules?.length || optimizedTrip?.detailedSchedule?.length || 0} days
             </p>
           </div>
           

@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Calendar, Users, Settings, Wand2, Clock, AlertCircle, List, Sparkles, Camera } from 'lucide-react';
+import ReactDOM from 'react-dom';
+import { MapPin, Calendar, Users, Settings, Wand2, Clock, AlertCircle, Sparkles, Camera, BarChart3, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { MapView } from '../components/MapView';
-import { ListView } from '../components/ListView';
-import { CalendarView } from '../components/CalendarView';
+import MapView from '../components/MapView';
+import CalendarView from '../components/CalendarView';
 import { OptimizationModal } from '../components/OptimizationModal';
 import { OptimizationResult } from '../components/OptimizationResult';
 import { TripSettingsModal } from '../components/TripSettingsModal';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function TripDetailPage() {
-  const [activeView, setActiveView] = useState<'map' | 'list' | 'calendar'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'calendar'>('map');
   const [showOptimizationModal, setShowOptimizationModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showScorePopup, setShowScorePopup] = useState(false);
   const [tripIcon, setTripIcon] = useState<string | null>(null);
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
   const [optimizationProgress, setOptimizationProgress] = useState(0);
@@ -26,7 +27,22 @@ export function TripDetailPage() {
       return () => clearTimeout(timer);
     }
   }, [optimizationError]);
-  const { currentTrip, places, trips, isOptimizing, optimizationResult, setOptimizationResult, setIsOptimizing, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase } = useStore();
+
+  // Close score popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showScorePopup) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('[data-score-popup]')) {
+          setShowScorePopup(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showScorePopup]);
+  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase } = useStore();
 
   // Load fresh data from database when page loads or trip changes
   useEffect(() => {
@@ -65,13 +81,23 @@ export function TripDetailPage() {
   useEffect(() => {
     console.log('TripDetailPage Debug:', {
       tripId: currentTrip?.id,
+      tripName: currentTrip?.name,
       totalPlaces: places.length,
       tripPlacesCount: tripPlaces.length,
       hasPlaces,
       isOptimizing,
-      user: !!user
+      user: !!user,
+      hasOptimizationResult: !!optimizationResult,
+      optimizationResultStructure: optimizationResult ? {
+        success: optimizationResult.success,
+        hasOptimization: !!optimizationResult.optimization,
+        hasDailySchedules: !!optimizationResult.optimization?.daily_schedules,
+        dailySchedulesCount: Array.isArray(optimizationResult.optimization?.daily_schedules) 
+          ? optimizationResult.optimization.daily_schedules.length 
+          : 0
+      } : null
     });
-  }, [currentTrip?.id, places.length, tripPlaces.length, hasPlaces, isOptimizing, user]);
+  }, [currentTrip?.id, places.length, tripPlaces.length, hasPlaces, isOptimizing, user, optimizationResult]);
 
   // Use current trip - redirect to home if none selected
   if (!currentTrip) {
@@ -212,13 +238,6 @@ export function TripDetailPage() {
       bgColor: 'from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20'
     },
     { 
-      key: 'list', 
-      label: 'Timeline', 
-      icon: List, 
-      gradient: 'from-purple-500 to-violet-600',
-      bgColor: 'from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20'
-    },
-    { 
       key: 'calendar', 
       label: 'Calendar', 
       icon: Calendar, 
@@ -229,6 +248,22 @@ export function TripDetailPage() {
 
   const deadline = trip.addPlaceDeadline ? formatDeadline(trip.addPlaceDeadline) : null;
   const deadlineCompact = trip.addPlaceDeadline ? formatDeadlineCompact(trip.addPlaceDeadline) : null;
+
+  // Score indicator component
+  const ScoreIndicator = ({ label, value, color }: { label: string; value: number; color: string }) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
+        <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{Math.round(value)}%</span>
+      </div>
+      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+        <div 
+          className={`h-2 rounded-full transition-all duration-500 ${color}`}
+          style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+        ></div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
@@ -293,9 +328,35 @@ export function TripDetailPage() {
 
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                      {trip.name}
-                    </h1>
+                    <div className="flex items-center space-x-3">
+                      <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+                        {trip.name}
+                      </h1>
+                      
+                      {/* Compact Score Display */}
+                      {optimizationResult && (
+                        <div className="relative flex items-center space-x-2" data-score-popup>
+                          {/* Simple score badge */}
+                          <div className="px-3 py-1 bg-green-100 dark:bg-green-900/20 rounded-full">
+                            <span className="text-sm font-semibold text-green-700 dark:text-green-300">
+                              {Math.round((optimizationResult.optimization?.optimization_score?.total_score || 0))}%
+                            </span>
+                          </div>
+                          
+                          {/* Score details button */}
+                          <motion.button
+                            onClick={() => setShowScorePopup(!showScorePopup)}
+                            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            <BarChart3 className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                          </motion.button>
+                          
+                        </div>
+                      )}
+                    </div>
+                    
                     {/* Settings Button */}
                     <motion.button
                       onClick={() => setShowSettingsModal(true)}
@@ -404,7 +465,9 @@ export function TripDetailPage() {
             {viewOptions.map(({ key, label, icon: Icon, gradient }) => (
               <motion.button
                 key={key}
-                onClick={() => setActiveView(key as any)}
+                onClick={() => {
+                  setActiveView(key as any);
+                }}
                 className={`relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center space-x-2 ${
                   activeView === key
                     ? 'text-white shadow-soft'
@@ -432,20 +495,30 @@ export function TripDetailPage() {
 
       {/* Main Content with Enhanced Transitions */}
       <div className="flex-1 overflow-hidden relative">
-        <AnimatePresence mode="wait">
+        {/* MapView - Always rendered but conditionally visible */}
+        <div 
+          className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
+            activeView === 'map' ? 'opacity-100 z-20 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
+          }`}
+        >
+          {console.log('🔍 [TripDetailPage] Rendering MapView for trip:', currentTrip?.name, 'with optimization result:', !!optimizationResult)}
+          <MapView optimizationResult={optimizationResult} />
+        </div>
+        
+        {/* Other views - Rendered only when active */}
+        
+        {activeView === 'calendar' && (
           <motion.div
-            key={activeView}
-            initial={{ opacity: 0, x: 20, scale: 0.98 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: -20, scale: 0.98 }}
-            transition={{ duration: 0.4, ease: "easeInOut" }}
-            className="h-full"
+            key="calendar"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="absolute inset-0 h-full w-full z-10"
           >
-            {activeView === 'map' && <MapView />}
-            {activeView === 'list' && <ListView />}
-            {activeView === 'calendar' && <CalendarView />}
+            <CalendarView optimizationResult={optimizationResult} />
           </motion.div>
-        </AnimatePresence>
+        )}
       </div>
 
       {/* Route Optimization Button - FIXED POSITION: Exactly same as My Places Add Button */}
@@ -567,31 +640,100 @@ export function TripDetailPage() {
         )}
       </AnimatePresence>
 
-      {/* Optimization Result Display */}
-      <AnimatePresence>
-        {optimizationResult && (
+      {/* Removed Optimization Result Modal - Now displayed directly in ListView/CalendarView/MapView */}
+
+      {/* Score Popup Portal - Rendered at document root for maximum z-index */}
+      {showScorePopup && optimizationResult && ReactDOM.createPortal(
+        <AnimatePresence>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setOptimizationResult(null)}
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[99999] flex items-start justify-center pt-20"
+            style={{ zIndex: 99999 }}
+            onClick={() => setShowScorePopup(false)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              initial={{ opacity: 0, scale: 0.9, y: -20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-96 max-w-[90vw]"
               onClick={(e) => e.stopPropagation()}
-              className="max-w-4xl max-h-[90vh] w-full overflow-y-auto"
             >
-              <OptimizationResult
-                result={optimizationResult}
-                onClose={() => setOptimizationResult(null)}
-              />
+              {/* Popup header */}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Optimization Scores</h3>
+                <button
+                  onClick={() => setShowScorePopup(false)}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+              
+              {/* Score indicators */}
+              <div className="space-y-4">
+                <ScoreIndicator 
+                  label="Overall Score" 
+                  value={optimizationResult.optimization?.optimization_score?.total_score || 0}
+                  color="bg-green-500"
+                />
+                <ScoreIndicator 
+                  label="Fairness" 
+                  value={optimizationResult.optimization?.optimization_score?.fairness_score || 0}
+                  color="bg-blue-500"
+                />
+                <ScoreIndicator 
+                  label="Efficiency" 
+                  value={optimizationResult.optimization?.optimization_score?.efficiency_score || 0}
+                  color="bg-purple-500"
+                />
+                
+                {/* User satisfaction details */}
+                {optimizationResult.optimization?.optimization_score?.details?.user_adoption_balance && (
+                  <ScoreIndicator 
+                    label="User Adoption" 
+                    value={(optimizationResult.optimization.optimization_score.details.user_adoption_balance || 0) * 100}
+                    color="bg-orange-500"
+                  />
+                )}
+                
+                {optimizationResult.optimization?.optimization_score?.details?.wish_satisfaction_balance && (
+                  <ScoreIndicator 
+                    label="Wish Satisfaction" 
+                    value={(optimizationResult.optimization.optimization_score.details.wish_satisfaction_balance || 0) * 100}
+                    color="bg-pink-500"
+                  />
+                )}
+                
+                {/* Individual user satisfactions */}
+                {optimizationResult.optimization?.user_satisfactions && (
+                  <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Individual User Satisfaction</h4>
+                    <div className="space-y-3">
+                      {Object.entries(optimizationResult.optimization.user_satisfactions).map(([userId, satisfaction]: [string, any], index) => (
+                        <div key={userId} className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/20 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-bold text-teal-700 dark:text-teal-300">{index + 1}</span>
+                          </div>
+                          <div className="flex-1">
+                            <ScoreIndicator 
+                              label={`User ${index + 1}`}
+                              value={(satisfaction || 0) * 100}
+                              color="bg-teal-500"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body
+      )}
 
     </div>
   );

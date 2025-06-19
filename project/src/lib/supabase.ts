@@ -318,11 +318,22 @@ export const addPlaceToDatabase = async (placeData: any) => {
 // Realtime subscription management
 const realtimeChannels = new Map<string, RealtimeChannel>()
 
+// Tables that should have realtime updates enabled
+const REALTIME_ENABLED_TABLES = ['subscriptions', 'users', 'subscription_items']
+
 export const subscribeToRealtime = (
   table: string,
   tripId?: string,
   callback?: (payload: any) => void
 ) => {
+  // Only allow realtime for specific tables
+  if (!REALTIME_ENABLED_TABLES.includes(table)) {
+    console.log(`🚫 Realtime updates disabled for table: ${table}`);
+    return null as any;
+  }
+  
+  console.log(`✅ Realtime updates enabled for table: ${table}`);
+  
   const channelKey = `${table}_${tripId || 'all'}`
   
   if (realtimeChannels.has(channelKey)) {
