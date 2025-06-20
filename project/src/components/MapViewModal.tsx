@@ -67,17 +67,17 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
         className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-          <div className="flex items-center space-x-3">
-            <MapPin className="w-6 h-6 text-blue-500" />
-            <h2 className="text-xl font-semibold text-gray-900">マップビュー</h2>
+        <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-white">
+          <div className="flex items-center space-x-2">
+            <MapPin className="w-5 h-5 text-blue-500" />
+            <h2 className="text-base font-semibold text-gray-900">マップビュー</h2>
           </div>
           
           {/* View Toggle Buttons */}
           <div className="flex items-center space-x-2">
             <div className="bg-gray-100 rounded-lg p-1 flex">
               <button
-                className="px-3 py-1.5 rounded text-sm font-medium bg-blue-500 text-white"
+                className="px-2 py-1 rounded text-xs font-medium bg-blue-500 text-white"
                 disabled
               >
                 Map
@@ -85,7 +85,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
               {onSwitchToList && (
                 <button
                   onClick={onSwitchToList}
-                  className="px-3 py-1.5 rounded text-sm font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+                  className="px-2 py-1 rounded text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
                 >
                   Timeline
                 </button>
@@ -93,7 +93,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
               {onSwitchToCalendar && (
                 <button
                   onClick={onSwitchToCalendar}
-                  className="px-3 py-1.5 rounded text-sm font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+                  className="px-2 py-1 rounded text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
                 >
                   Calendar
                 </button>
@@ -101,9 +101,9 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -137,11 +137,12 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
               onLoad={onLoad}
               onUnmount={onUnmount}
               options={{
-                zoomControl: true,
+                zoomControl: false,
                 streetViewControl: false,
-                mapTypeControl: true,
+                mapTypeControl: false,
                 fullscreenControl: true,
                 gestureHandling: 'auto',
+                disableDefaultUI: true,
               }}
             >
               {console.log('🔍 [MapViewModal] Rendering map with', places.length, 'places')}
@@ -149,7 +150,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
               {/* Test marker */}
               <Marker 
                 position={{ lat: 35.6812, lng: 139.7671 }} 
-                title="東京テストマーカー"
+                title="Tokyo Test Marker"
                 onClick={() => console.log('Test marker clicked')}
               />
               
@@ -185,8 +186,8 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
         </div>
 
         {/* Footer with stats */}
-        <div className="p-4 bg-gray-50 border-t border-gray-200">
-          <div className="text-center text-sm text-gray-600">
+        <div className="p-2 bg-gray-50 border-t border-gray-200">
+          <div className="text-center text-xs text-gray-600">
             {places.length} スポット • 最適化されたルート
           </div>
         </div>

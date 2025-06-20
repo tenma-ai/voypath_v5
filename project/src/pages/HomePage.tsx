@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, MapPin, Calendar, Users, Edit, Trash2, Globe, Sparkles, TrendingUp, Clock, AlertCircle, Crown, Star, Zap, Gift } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { GuestProfilePrompt } from '../components/GuestProfilePrompt';
@@ -10,11 +10,19 @@ import { PremiumBadge } from '../components/PremiumBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function HomePage() {
-  const { user, trips, deleteTrip, canCreateTrip, setCurrentTrip, loadPlacesFromAPI } = useStore();
+  const navigate = useNavigate();
+  const { user, trips, currentTrip, deleteTrip, canCreateTrip, setCurrentTrip, loadPlacesFromAPI } = useStore();
+  
+  // Debug: Log all trips data
+  React.useEffect(() => {
+    console.log('🏠 HomePage: All trips loaded:', trips.map(t => ({ id: t.id, name: t.name })));
+    console.log('🏠 HomePage: Current trip:', currentTrip ? { id: currentTrip.id, name: currentTrip.name } : 'none');
+  }, [trips, currentTrip]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [premiumFeature, setPremiumFeature] = useState<'trips' | 'members' | 'places' | undefined>();
+  const [selectingTripId, setSelectingTripId] = useState<string | null>(null);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -65,12 +73,12 @@ export function HomePage() {
   };
 
   const handleStripePayment = () => {
-    // Stripe決済処理をここに実装
+    // Implement Stripe payment processing here
     console.log('Redirecting to Stripe payment...');
-    // 実際の実装では、Stripeのチェックアウトセッションを作成してリダイレクト
+    // In actual implementation, create Stripe checkout session and redirect
     // window.location.href = 'https://checkout.stripe.com/...';
     
-    // デモ用に一時的にプレミアムモーダルを開く
+    // Temporarily open premium modal for demo
     setShowPremiumModal(true);
   };
 
@@ -124,7 +132,7 @@ export function HomePage() {
       <motion.div variants={itemVariants} className="text-center space-y-4">
         <div className="relative inline-block">
           <div className="flex items-center justify-center space-x-4">
-            <h1 className="text-4xl lg:text-6xl font-bold bg-gradient-to-r from-primary-600 via-secondary-600 to-primary-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-primary-600 via-secondary-600 to-primary-600 bg-clip-text text-transparent">
               Welcome to Voypath
             </h1>
             {isPremium && <PremiumBadge size="lg" />}
@@ -142,7 +150,7 @@ export function HomePage() {
             }}
           />
         </div>
-        <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+        <p className="text-base text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
           Plan your perfect journey with intelligent route optimization and collaborative trip planning
         </p>
       </motion.div>
@@ -167,8 +175,8 @@ export function HomePage() {
                   <stat.icon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stat.value}</div>
-                  <div className="text-sm text-slate-600 dark:text-slate-400">{stat.label}</div>
+                  <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{stat.value}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400">{stat.label}</div>
                 </div>
               </div>
             </div>
@@ -189,7 +197,7 @@ export function HomePage() {
             <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600 rounded-2xl flex items-center justify-center group-hover:from-primary-100 group-hover:to-primary-200 dark:group-hover:from-primary-900/50 dark:group-hover:to-primary-800/50 transition-all duration-300">
               <Globe className="w-6 h-6" />
             </div>
-            <span className="font-semibold text-lg">Join Trip</span>
+            <span className="font-semibold text-base">Join Trip</span>
           </div>
         </motion.button>
 
@@ -204,7 +212,7 @@ export function HomePage() {
             <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm group-hover:bg-white/30 transition-all duration-300">
               <Plus className="w-6 h-6" />
             </div>
-            <span className="font-semibold text-lg">Create Trip</span>
+            <span className="font-semibold text-base">Create Trip</span>
             {!canCreateTrip() && <Crown className="w-5 h-5 text-yellow-300 fill-current" />}
           </div>
         </motion.button>
@@ -213,7 +221,7 @@ export function HomePage() {
       {/* Trips Section */}
       <motion.div variants={itemVariants} className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Your Trips</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your Trips</h2>
           <div className="flex items-center space-x-3">
             {!isPremium && (
               <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
@@ -289,11 +297,48 @@ export function HomePage() {
                     <Link 
                       to="/my-trip" 
                       className="block"
-                      onClick={() => setCurrentTrip(trip)}
+                      onClick={async (e) => {
+                        // Prevent navigation until trip data is loaded
+                        e.preventDefault();
+                        setSelectingTripId(trip.id);
+                        try {
+                          console.log('🔄 HomePage: User clicked to select trip:', {
+                            tripId: trip.id,
+                            tripName: trip.name,
+                            previousTrip: currentTrip?.id,
+                            clickedTripData: trip,
+                            allTripsCount: trips.length
+                          });
+                          
+                          // Use setCurrentTrip which now handles complete data clearing and reloading
+                          await setCurrentTrip(trip);
+                          
+                          console.log('✅ HomePage: Trip selection completed, navigating to /my-trip');
+                          // Navigate after successful trip selection using React Router
+                          navigate('/my-trip');
+                        } catch (error) {
+                          console.error('❌ HomePage: Failed to select trip:', error);
+                          alert('Failed to load trip data. Please try again.');
+                        } finally {
+                          setSelectingTripId(null);
+                        }
+                      }}
                     >
-                      <div className="relative bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-6 border border-slate-200/50 dark:border-slate-700/50 hover:border-primary-300/50 dark:hover:border-primary-600/50 transition-all duration-300 shadow-soft hover:shadow-medium overflow-hidden">
+                      <div className={`relative bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-6 border border-slate-200/50 dark:border-slate-700/50 hover:border-primary-300/50 dark:hover:border-primary-600/50 transition-all duration-300 shadow-soft hover:shadow-medium overflow-hidden ${
+                        selectingTripId === trip.id ? 'opacity-70 pointer-events-none' : ''
+                      }`}>
                         {/* Background Gradient */}
                         <div className="absolute inset-0 bg-gradient-to-br from-primary-50/30 via-transparent to-secondary-50/30 dark:from-primary-900/10 dark:via-transparent dark:to-secondary-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        
+                        {/* Loading Overlay */}
+                        {selectingTripId === trip.id && (
+                          <div className="absolute inset-0 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm flex items-center justify-center z-20">
+                            <div className="flex items-center space-x-2 text-primary-600 dark:text-primary-400">
+                              <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                              <span className="font-medium">Loading...</span>
+                            </div>
+                          </div>
+                        )}
                         
                         {/* Deadline Badge */}
                         {deadline && (
@@ -471,7 +516,7 @@ export function HomePage() {
                 </motion.div>
                 <div>
                   <motion.h3 
-                    className="text-2xl font-bold text-yellow-400 drop-shadow-lg mb-2"
+                    className="text-lg font-bold text-yellow-400 drop-shadow-lg mb-2"
                     animate={{
                       scale: [1, 1.02, 1],
                     }}
@@ -482,13 +527,13 @@ export function HomePage() {
                   >
                     🚀 Unlock Premium Power!
                   </motion.h3>
-                  <p className="text-slate-300 text-lg drop-shadow-sm mb-2">
+                  <p className="text-slate-300 text-sm drop-shadow-sm mb-2">
                     Unlimited trips, members, and places
                   </p>
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-1">
                       <motion.span 
-                        className="text-yellow-400 font-bold text-xl"
+                        className="text-yellow-400 font-bold text-base"
                         animate={{
                           scale: [1, 1.1, 1],
                         }}
@@ -504,7 +549,7 @@ export function HomePage() {
                 </div>
               </div>
               <motion.div
-                className="px-8 py-4 text-black rounded-2xl font-bold text-lg shadow-glow hover:shadow-glow-lg relative overflow-hidden group border-2 border-yellow-400"
+                className="px-6 py-3 text-black rounded-2xl font-bold text-sm shadow-glow hover:shadow-glow-lg relative overflow-hidden group border-2 border-yellow-400"
                 style={{
                   background: 'linear-gradient(135deg, #fbbf24, #f59e0b, #d97706)',
                 }}
@@ -516,9 +561,9 @@ export function HomePage() {
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-white/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <span className="relative z-10 flex items-center space-x-2">
-                  <Zap className="w-5 h-5" />
+                  <Zap className="w-4 h-4" />
                   <span>UPGRADE NOW!</span>
-                  <Gift className="w-5 h-5" />
+                  <Gift className="w-4 h-4" />
                 </span>
               </motion.div>
             </div>

@@ -22,11 +22,11 @@ export const STRIPE_PRICES = {
     displayInterval: 'year',
     taxInclusive: false, // 自動税計算対応
     features: [
-      '無制限旅行作成',
-      '高度な共有機能',
-      'パスワード保護',
-      'アクセス解析',
-      '優先サポート'
+      'Unlimited trip creation',
+      'Advanced sharing features',
+      'Password protection',
+      'Access analytics',
+      'Priority support'
     ]
   }
 } as const;

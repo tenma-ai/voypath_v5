@@ -267,18 +267,18 @@ export function TripDetailPage() {
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {/* Fixed Trip Header - Proper spacing from top */}
-      <div className="relative mt-16 p-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
+      {/* Fixed Trip Header - Compact */}
+      <div className="relative pt-16 p-2 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
         {/* Subtle Background Elements */}
         <div className="absolute inset-0 overflow-hidden">
           <motion.div
-            className="absolute -top-5 -right-5 w-16 h-16 bg-gradient-to-br from-primary-400/10 to-secondary-500/10 rounded-full blur-xl"
+            className="absolute -top-2 -right-2 w-4 h-4 bg-gradient-to-br from-primary-400/8 to-secondary-500/8 rounded-full blur-lg"
             animate={{
-              scale: [1, 1.1, 1],
-              opacity: [0.3, 0.5, 0.3],
+              scale: [1, 1.05, 1],
+              opacity: [0.2, 0.3, 0.2],
             }}
             transition={{
-              duration: 4,
+              duration: 6,
               repeat: Infinity,
               ease: "easeInOut"
             }}
@@ -286,167 +286,71 @@ export function TripDetailPage() {
         </div>
 
         <div className="relative z-10">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex-1">
-              <div className="flex items-center space-x-3 mb-2">
-                {/* Trip Icon with Upload */}
-                <div className="relative group">
-                  <motion.div
-                    className="w-12 h-12 bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-soft overflow-hidden relative"
-                    whileHover={{ scale: 1.05 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    {trip.icon ? (
-                      <img 
-                        src={trip.icon} 
-                        alt="Trip Icon" 
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Sparkles className="w-6 h-6 text-white" />
-                    )}
-                    
-                    {/* Upload Overlay */}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                      <Camera className="w-4 h-4 text-white" />
-                    </div>
-                  </motion.div>
-                  
-                  {/* Hidden File Input */}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleIconUpload}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  
-                  {/* Upload Tooltip */}
-                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-slate-900 dark:bg-slate-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap pointer-events-none">
-                    Upload Icon
-                  </div>
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                        {trip.name}
-                      </h1>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <h1 className="text-base font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+                {trip.name}
+              </h1>
                       
-                      {/* Compact Score Display */}
-                      {optimizationResult && (
-                        <div className="relative flex items-center space-x-2" data-score-popup>
-                          {/* Simple score badge */}
-                          <div className="px-3 py-1 bg-green-100 dark:bg-green-900/20 rounded-full">
-                            <span className="text-sm font-semibold text-green-700 dark:text-green-300">
-                              {Math.round((optimizationResult.optimization?.optimization_score?.total_score || 0))}%
-                            </span>
-                          </div>
-                          
-                          {/* Score details button */}
-                          <motion.button
-                            onClick={() => setShowScorePopup(!showScorePopup)}
-                            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                          >
-                            <BarChart3 className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
-                          </motion.button>
-                          
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Settings Button */}
-                    <motion.button
-                      onClick={() => setShowSettingsModal(true)}
-                      className="p-2 rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition-all duration-300 group"
-                      whileHover={{ scale: 1.1, rotate: 90 }}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <Settings className="w-5 h-5 text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors" />
-                    </motion.button>
+              {/* Compact Score Display */}
+              {optimizationResult && (
+                <div className="relative flex items-center space-x-1" data-score-popup>
+                  <div className="px-2 py-0.5 bg-green-100 dark:bg-green-900/20 rounded-full">
+                    <span className="text-xs font-semibold text-green-700 dark:text-green-300">
+                      {Math.round((optimizationResult.optimization?.optimization_score?.total_score || 0))}%
+                    </span>
                   </div>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    {trip.description}
-                  </p>
+                  <motion.button
+                    onClick={() => setShowScorePopup(!showScorePopup)}
+                    className="p-0.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <BarChart3 className="w-3 h-3 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                  </motion.button>
                 </div>
+              )}
+                    
+              {/* Trip dates and members info */}
+              {trip.startDate && trip.endDate && (
+                <div className="flex items-center space-x-1 text-xs text-slate-600 dark:text-slate-400">
+                  <Calendar className="w-3 h-3" />
+                  <span>{formatDateRange(trip.startDate, trip.endDate)}</span>
+                </div>
+              )}
+              <div className="flex items-center space-x-1 text-xs text-slate-600 dark:text-slate-400">
+                <Users className="w-3 h-3" />
+                <span>{trip.memberCount}</span>
               </div>
             </div>
+            
+            {/* Settings Button */}
+            <motion.button
+              onClick={() => setShowSettingsModal(true)}
+              className="p-1.5 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition-all duration-300 group"
+              whileHover={{ scale: 1.1, rotate: 90 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <Settings className="w-4 h-4 text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors" />
+            </motion.button>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3 text-sm text-slate-600 dark:text-slate-400">
-              <motion.div 
-                className="flex items-center space-x-1 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50"
-                whileHover={{ scale: 1.02 }}
-              >
-                <MapPin className="w-4 h-4 text-primary-500" />
-                <span className="font-medium">From: {trip.departureLocation}</span>
-              </motion.div>
-              {trip.destination && (
-                <motion.div 
-                  className="flex items-center space-x-1 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50"
-                  whileHover={{ scale: 1.02 }}
-                >
-                  <MapPin className="w-4 h-4 text-secondary-500" />
-                  <span className="font-medium">To: {trip.destination}</span>
-                </motion.div>
-              )}
-              {trip.startDate && trip.endDate && (
-                <motion.div 
-                  className="flex items-center space-x-1 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50"
-                  whileHover={{ scale: 1.02 }}
-                >
-                  <Calendar className="w-4 h-4 text-accent-500" />
-                  <span className="font-medium">{formatDateRange(trip.startDate, trip.endDate)}</span>
-                </motion.div>
-              )}
-              <motion.div 
-                className="flex items-center space-x-1 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50"
-                whileHover={{ scale: 1.02 }}
-              >
-                <Users className="w-4 h-4 text-green-500" />
-                <span className="font-medium">{trip.memberCount}</span>
-              </motion.div>
-            </div>
-
-            {/* Compact Deadline Display */}
-            {deadlineCompact && (
-              <motion.div 
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-sm border ${
-                  deadlineCompact.isExpired
-                    ? 'bg-red-50/80 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/50'
-                    : 'bg-amber-50/80 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200/50 dark:border-amber-800/50'
-                }`}
-                whileHover={{ scale: 1.02 }}
-              >
-                <Clock className="w-3 h-3" />
-                <span>{deadlineCompact.isExpired ? 'Expired' : deadlineCompact.text}</span>
-              </motion.div>
-            )}
-          </div>
-
-          {/* Full Deadline Warning - Compact */}
+          {/* Deadline warning - compact */}
           {deadline && (deadline.isExpired || new Date(trip.addPlaceDeadline!).getTime() - new Date().getTime() < 24 * 60 * 60 * 1000) && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`mt-3 p-3 rounded-xl border backdrop-blur-sm ${
+              className={`mt-2 p-2 rounded-lg border backdrop-blur-sm text-xs ${
                 deadline.isExpired
-                  ? 'bg-red-50/80 dark:bg-red-900/20 border-red-200/50 dark:border-red-800/50'
-                  : 'bg-amber-50/80 dark:bg-amber-900/20 border-amber-200/50 dark:border-amber-800/50'
+                  ? 'bg-red-50/80 dark:bg-red-900/20 border-red-200/50 dark:border-red-800/50 text-red-700 dark:text-red-300'
+                  : 'bg-amber-50/80 dark:bg-amber-900/20 border-amber-200/50 dark:border-amber-800/50 text-amber-700 dark:text-amber-300'
               }`}
             >
-              <div className="flex items-center space-x-2">
-                <AlertCircle className={`w-4 h-4 ${
+              <div className="flex items-center space-x-1">
+                <AlertCircle className={`w-3 h-3 ${
                   deadline.isExpired ? 'text-red-500' : 'text-amber-500'
                 }`} />
-                <span className={`text-sm font-semibold ${
-                  deadline.isExpired 
-                    ? 'text-red-700 dark:text-red-300' 
-                    : 'text-amber-700 dark:text-amber-300'
-                }`}>
+                <span>
                   {deadline.isExpired 
                     ? `Deadline expired: ${deadline.text}`
                     : `Deadline: ${deadline.text}`
@@ -458,17 +362,17 @@ export function TripDetailPage() {
         </div>
       </div>
 
-      {/* View Toggle */}
-      <div className="relative p-3 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50">
+      {/* View Toggle - Minimal */}
+      <div className="relative py-1 px-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50">
         <div className="flex justify-center">
-          <div className="bg-slate-100/80 dark:bg-slate-700/80 rounded-2xl p-1 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50">
+          <div className="bg-slate-100/80 dark:bg-slate-700/80 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50">
             {viewOptions.map(({ key, label, icon: Icon, gradient }) => (
               <motion.button
                 key={key}
                 onClick={() => {
                   setActiveView(key as any);
                 }}
-                className={`relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center space-x-2 ${
+                className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
                   activeView === key
                     ? 'text-white shadow-soft'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -479,13 +383,13 @@ export function TripDetailPage() {
                 {/* Active Background */}
                 {activeView === key && (
                   <motion.div
-                    className={`absolute inset-0 bg-gradient-to-r ${gradient} rounded-xl`}
+                    className={`absolute inset-0 bg-gradient-to-r ${gradient} rounded-md`}
                     layoutId="activeViewBg"
                     transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                   />
                 )}
                 
-                <Icon className="w-4 h-4 relative z-10" />
+                <Icon className="w-3 h-3 relative z-10" />
                 <span className="relative z-10">{label}</span>
               </motion.button>
             ))}
@@ -521,94 +425,6 @@ export function TripDetailPage() {
         )}
       </div>
 
-      {/* Route Optimization Button - FIXED POSITION: Exactly same as My Places Add Button */}
-      <div className="fixed bottom-20 right-4 z-40">
-        <motion.button
-          whileHover={{ scale: 1.05, y: -2 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={hasPlaces ? handleOptimization : () => setOptimizationError('Please add places to your trip before optimizing')}
-          className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
-            isOptimizing
-              ? 'bg-gradient-to-br from-green-500 to-emerald-600'
-              : 'bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600'
-          }`}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          
-          {/* Sparkle effects */}
-          <div className="absolute inset-0">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-0.5 h-0.5 bg-white rounded-full"
-                style={{
-                  left: `${25 + i * 25}%`,
-                  top: `${25 + i * 20}%`,
-                }}
-                animate={{
-                  scale: [0, 1, 0],
-                  opacity: [0, 1, 0],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  delay: i * 0.7,
-                }}
-              />
-            ))}
-          </div>
-
-          {isOptimizing ? (
-            <div className="relative w-8 h-8 flex items-center justify-center">
-              {/* Circular Progress Ring */}
-              <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 32 32">
-                {/* Background Circle */}
-                <circle
-                  cx="16"
-                  cy="16"
-                  r="12"
-                  fill="none"
-                  stroke="rgba(255, 255, 255, 0.2)"
-                  strokeWidth="2"
-                />
-                {/* Progress Circle */}
-                <motion.circle
-                  cx="16"
-                  cy="16"
-                  r="12"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 12}`}
-                  initial={{ strokeDashoffset: 2 * Math.PI * 12 }}
-                  animate={{ 
-                    strokeDashoffset: 2 * Math.PI * 12 * (1 - optimizationProgress / 100)
-                  }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                />
-              </svg>
-              {/* Center Icon */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Wand2 className="w-4 h-4 text-white" />
-              </div>
-            </div>
-          ) : (
-            <Wand2 className="w-6 h-6 text-white relative z-10" />
-          )}
-
-          {/* Enhanced Tooltip */}
-          <div className="absolute right-full mr-3 px-3 py-2 bg-slate-900/90 dark:bg-slate-700/90 backdrop-blur-sm text-white text-sm rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300 whitespace-nowrap pointer-events-none shadow-glow border border-slate-700/50">
-            <div className="flex items-center space-x-2">
-              <Sparkles className="w-4 h-4" />
-              <span className="font-semibold">
-                {isOptimizing ? `Optimizing ${optimizationProgress}%` : 'Optimize Route'}
-              </span>
-            </div>
-            <div className="absolute left-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-l-slate-900/90 dark:border-l-slate-700/90"></div>
-          </div>
-        </motion.button>
-      </div>
 
       {/* Modals */}
       <OptimizationModal

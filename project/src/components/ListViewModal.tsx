@@ -118,9 +118,10 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
 
   const formatTime = (timeString: string) => {
     if (!timeString) return '';
-    return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('ja-JP', {
+    return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('en-US', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: false
     });
   };
 
@@ -128,9 +129,9 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     if (hours > 0) {
-      return `${hours}時間${mins > 0 ? `${mins}分` : ''}`;
+      return `${hours}h${mins > 0 ? ` ${mins}m` : ''}`;
     }
-    return `${mins}分`;
+    return `${mins}m`;
   };
 
   const formatDistance = (distance: number) => {
@@ -258,21 +259,21 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
                                   <h4 className="font-semibold text-gray-900 mb-1">{place.place_name || place.name}</h4>
                                   <div className="flex items-center text-gray-600 text-sm mb-2">
                                     <MapPin className="w-4 h-4 mr-1" />
-                                    <span>{place.address || 'アドレス不明'}</span>
+                                    <span>{place.address || 'Address unknown'}</span>
                                   </div>
                                   
                                   {/* Time info */}
                                   <div className="flex items-center space-x-4 text-sm">
                                     <div className="flex items-center text-green-600">
                                       <Clock className="w-4 h-4 mr-1" />
-                                      <span>到着: {formatTime(place.arrival_time)}</span>
+                                      <span>Arrival: {formatTime(place.arrival_time)}</span>
                                     </div>
                                     <div className="flex items-center text-blue-600">
                                       <Clock className="w-4 h-4 mr-1" />
-                                      <span>出発: {formatTime(place.departure_time)}</span>
+                                      <span>Departure: {formatTime(place.departure_time)}</span>
                                     </div>
                                     <div className="text-gray-600">
-                                      滞在: {formatDuration(place.stay_duration_minutes || 60)}
+                                      Stay: {formatDuration(place.stay_duration_minutes || 60)}
                                     </div>
                                   </div>
                                   

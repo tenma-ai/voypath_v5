@@ -154,23 +154,23 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
 
       {/* Search results dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute top-full mt-2 w-full bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden z-50 max-h-96 overflow-y-auto">
+        <div className="absolute top-full mt-2 left-0 w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden z-50 max-h-96 overflow-y-auto">
           {suggestions.map((place) => (
             <button
               key={place.place_id}
               onClick={() => handleSuggestionClick(place)}
-              className="w-full p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border-b border-slate-200/30 dark:border-slate-700/30 last:border-b-0 focus:outline-none focus:bg-slate-50 dark:focus:bg-slate-700/50"
+              className="w-full p-3 sm:p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border-b border-slate-200/30 dark:border-slate-700/30 last:border-b-0 focus:outline-none focus:bg-slate-50 dark:focus:bg-slate-700/50"
             >
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 text-white" />
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary-500 to-secondary-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                  <h4 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100 truncate">
                     {place.name}
                   </h4>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 truncate">
                     {place.formatted_address}
                   </p>
                   
@@ -193,7 +193,7 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
 
       {/* No results case */}
       {showSuggestions && suggestions.length === 0 && !isLoading && value.length >= 2 && (
-        <div className="absolute top-full mt-2 w-full bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 p-4 z-50">
+        <div className="absolute top-full mt-2 left-0 w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 p-3 sm:p-4 z-50">
           <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
             No places found for "{value}"
           </p>

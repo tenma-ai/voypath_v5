@@ -135,8 +135,7 @@ export class TripOptimizationService {
     try {
       const optimizationSettings = { ...this.DEFAULT_SETTINGS, ...settings }
       
-      console.log('Starting full optimization pipeline for trip:', tripId)
-      console.log('Settings:', optimizationSettings)
+      console.log('🚀 Starting optimization for trip:', tripId)
 
       // Always use production Edge Functions (no demo mode)
 
@@ -160,7 +159,7 @@ export class TripOptimizationService {
         message: 'Including all places for optimization...' 
       })
       
-      console.log('Skipping place selection - using all available places')
+      // Using all available places
 
       // Stage 3: Optimize route using constrained generation
       onProgress?.({ 
@@ -170,7 +169,7 @@ export class TripOptimizationService {
       })
 
       const result = await this.optimizeRouteWithConstraints(tripId, optimizationSettings)
-      console.log('Route optimization result:', result)
+      // Route optimization complete
       
       // Stage 4: Update places with schedule information
       if (result.success && result.optimization) {
@@ -190,7 +189,7 @@ export class TripOptimizationService {
         executionTimeMs: result.execution_time_ms
       })
       
-      console.log('Full optimization completed:', result)
+      console.log('✅ Optimization pipeline completed')
       
       return result
     } catch (error) {
@@ -210,7 +209,7 @@ export class TripOptimizationService {
    */
   static async normalizePreferences(tripId: string): Promise<NormalizationResult> {
     try {
-      console.log('Normalizing preferences for trip:', tripId)
+      // Normalizing preferences
 
       // Get places and members data for the trip
       const { data: places, error: placesError } = await supabase
@@ -289,7 +288,7 @@ export class TripOptimizationService {
     } = {}
   ): Promise<PlaceSelectionResult> {
     try {
-      console.log('Selecting optimal places for trip:', tripId)
+      // Selecting optimal places
 
       // Get normalized places from database (from step 1)
       const { data: places, error: placesError } = await supabase
@@ -393,7 +392,7 @@ export class TripOptimizationService {
     tripId: string, 
     settings: OptimizationSettings = {}
   ): Promise<OptimizationResult> {
-    console.log('Optimizing route with constrained generation for trip:', tripId)
+    // Starting route optimization
     
     // Import supabase
     const { supabase } = await import('../lib/supabase');
@@ -473,31 +472,7 @@ export class TripOptimizationService {
     
     const allTripPlaces = freshPlaces || [];
     
-    console.log('[OPTIMIZE-ROUTE] Sending data to optimize-route function:');
-    console.log('  - trip_id:', tripId);
-    console.log('  - member_id:', user.id);
-    console.log('  - ALL places count:', allTripPlaces?.length || 0);
-    console.log('  - System places:', allTripPlaces?.filter(p => p.source === 'system').map(p => ({ name: p.name, place_type: p.place_type })));
-    console.log('  - User places:', allTripPlaces?.filter(p => p.source !== 'system').map(p => ({ name: p.name, category: p.category })));
-    console.log('  - ALL places detailed:', allTripPlaces?.map(p => ({ 
-      name: p.name, 
-      lat: p.latitude, 
-      lng: p.longitude,
-      category: p.category,
-      place_type: p.place_type,
-      source: p.source,
-      user_id: p.user_id,
-      id: p.id
-    })));
-    
-    // Check for trip places breakdown
-    const debugSystemPlaces = allTripPlaces?.filter(p => p.source === 'system') || [];
-    const debugUserPlaces = allTripPlaces?.filter(p => p.source !== 'system') || [];
-    console.log('📊 Trip places breakdown:');
-    console.log('  - Total places:', allTripPlaces?.length || 0);
-    console.log('  - System places:', debugSystemPlaces.length);
-    console.log('  - User places:', debugUserPlaces.length);
-    console.log('📍 All place names:', allTripPlaces?.map(p => p.name));
+    console.log('📡 Calling route optimization API for trip:', tripId, '(' + (allTripPlaces?.length || 0) + ' places)');
     
     // Verify we have at least departure + user places
     if (allTripPlaces?.length < 3) {
@@ -517,7 +492,7 @@ export class TripOptimizationService {
       transport_mode: settings.preferred_transport || 'mixed'
     })
     
-    console.log('optimize-route function response:', result)
+    // Route optimization response received
     
     if (!result.success) {
       throw new Error(result.error || 'Route optimization failed')
@@ -529,7 +504,7 @@ export class TripOptimizationService {
       throw new Error('No optimization data returned from edge function');
     }
 
-    console.log('🔍 [TripOptimizationService] Full optimization data structure:', JSON.stringify(optimizationData, null, 2));
+    // Removed verbose data structure logging
 
     // Extract ALL places from daily schedules across ALL days
     let allOptimizedPlaces = [];
@@ -539,23 +514,23 @@ export class TripOptimizationService {
       for (const daySchedule of optimizationData.daily_schedules) {
         if (daySchedule.places && Array.isArray(daySchedule.places)) {
           allOptimizedPlaces.push(...daySchedule.places);
-          console.log(`🔍 [TripOptimizationService] Found ${daySchedule.places.length} places in day ${daySchedule.day || 'unknown'}`);
+          // Found places in day
         }
       }
-      console.log('🔍 [TripOptimizationService] Total places from all daily schedules:', allOptimizedPlaces.length);
+      // Total places from daily schedules
     } else if (optimizationData.optimized_route?.daily_schedules && Array.isArray(optimizationData.optimized_route.daily_schedules)) {
       // Fallback: check optimized_route structure
       for (const daySchedule of optimizationData.optimized_route.daily_schedules) {
         if (daySchedule.places && Array.isArray(daySchedule.places)) {
           allOptimizedPlaces.push(...daySchedule.places);
-          console.log(`🔍 [TripOptimizationService] Found ${daySchedule.places.length} places in day ${daySchedule.day || 'unknown'} (from optimized_route)`);
+          // Found places in day from optimized_route
         }
       }
-      console.log('🔍 [TripOptimizationService] Total places from optimized_route daily schedules:', allOptimizedPlaces.length);
+      // Total places from optimized_route
     } else if (optimizationData.places && Array.isArray(optimizationData.places)) {
       // Final fallback: direct places array
       allOptimizedPlaces = optimizationData.places;
-      console.log('🔍 [TripOptimizationService] Found places in direct places array:', allOptimizedPlaces.length);
+      // Found places in direct array
     } else {
       console.warn('❌ [TripOptimizationService] No places found in response. Available keys:', Object.keys(optimizationData));
       console.warn('❌ [TripOptimizationService] Full response structure:');
@@ -564,8 +539,8 @@ export class TripOptimizationService {
       console.warn('  - places:', optimizationData.places);
     }
     
-    console.log('🔍 [TripOptimizationService] Final extracted optimized places:', allOptimizedPlaces.length);
-    console.log('🔍 [TripOptimizationService] All place names:', allOptimizedPlaces.map((p: any) => p.name));
+    console.log('✅ Optimization completed:', allOptimizedPlaces.length, 'places');
+    // Place names list removed for brevity
 
     // Remove duplicates by ID while preserving order
     const uniquePlaces = [];
@@ -577,7 +552,7 @@ export class TripOptimizationService {
       }
     }
     
-    console.log('🔍 [TripOptimizationService] Unique places after deduplication:', uniquePlaces.length);
+    // Deduplication complete
     const optimizedPlaces = uniquePlaces;
 
     return {
@@ -853,11 +828,7 @@ export class TripOptimizationService {
    */
   static async updatePlacesWithSchedule(tripId: string, optimizedRoute: OptimizedRoute): Promise<void> {
     try {
-      console.log('Updating places with schedule for trip:', tripId)
-      console.log('Optimized route structure:', optimizedRoute)
-      console.log('Daily schedules:', optimizedRoute.daily_schedules)
-      console.log('Daily schedules type:', typeof optimizedRoute.daily_schedules)
-      console.log('Is array:', Array.isArray(optimizedRoute.daily_schedules))
+      // Updating places with optimization schedule
       
       // First, reset all places to unscheduled
       await supabase
@@ -875,8 +846,7 @@ export class TripOptimizationService {
 
       // Then update scheduled places from optimization result
       if (!optimizedRoute.daily_schedules || !Array.isArray(optimizedRoute.daily_schedules)) {
-        console.warn('No valid daily_schedules found in optimization result, skipping schedule updates')
-        console.warn('Available properties in optimizedRoute:', Object.keys(optimizedRoute))
+        console.warn('⚠️ No valid daily schedules found, skipping updates')
         return
       }
       
@@ -894,18 +864,18 @@ export class TripOptimizationService {
           const placeId = placeData.id || scheduledPlace.id;
           const placeName = placeData.name || scheduledPlace.name;
           
-          console.log(`🔍 Processing scheduled place: ${placeName} (ID: ${placeId})`);
+          // Processing scheduled place
           
-          // Skip temporary airport places generated by optimization
+          // Skip temporary/virtual places generated by optimization
           // These are computational artifacts for route calculation, not real user places
-          if (placeId && placeId.startsWith('airport_')) {
-            console.log(`⏭️ Skipping temporary airport place: ${placeName} (${placeId}) - Used only for route calculation`);
+          if (placeId && (placeId.startsWith('airport_') || placeId.startsWith('return_') || placeId.startsWith('departure_'))) {
+            // Skipping virtual place
             continue;
           }
           
           // Skip places that are clearly airports by category but don't have real IDs
           if (placeData.category === 'airport' && placeData.place_type === 'airport' && !placeId.match(/^[a-f0-9-]{36}$/)) {
-            console.log(`⏭️ Skipping generated airport place: ${placeName} (${placeId}) - Not a user place`);
+            // Skipping generated airport place
             continue;
           }
           
@@ -964,7 +934,7 @@ export class TripOptimizationService {
         }
       }
       
-      console.log('Places updated with schedule successfully')
+      console.log('✅ Schedule update completed')
     } catch (error) {
       console.error('Error updating places with schedule:', error)
       throw error

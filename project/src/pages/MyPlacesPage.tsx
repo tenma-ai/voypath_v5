@@ -3,6 +3,7 @@ import { Grid3X3, List, Star, Clock, AlertCircle, Plus } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { PlaceImage } from '../components/PlaceImage';
 
 export function MyPlacesPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -240,8 +241,9 @@ export function MyPlacesPage() {
               className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-lg transition-shadow"
             >
               <div className="relative">
-                <img
-                  src={place.image_url || place.image || '/api/placeholder/400/300'}
+                <PlaceImage
+                  placeName={place.name}
+                  fallbackUrl={place.image_url || place.image || '/api/placeholder/400/300'}
                   alt={place.name}
                   className="w-full h-32 object-cover"
                 />
@@ -296,10 +298,12 @@ export function MyPlacesPage() {
               className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 hover:shadow-lg transition-shadow"
             >
               <div className="flex items-start space-x-3">
-                <img
-                  src={place.image_url || place.image || '/api/placeholder/400/300'}
+                <PlaceImage
+                  placeName={place.name}
+                  fallbackUrl={place.image_url || place.image || '/api/placeholder/400/300'}
                   alt={place.name}
                   className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                  size="small"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
@@ -369,31 +373,6 @@ export function MyPlacesPage() {
         </div>
       )}
 
-      {/* Floating Add Place Button - only show if deadline hasn't passed */}
-      {!isDeadlinePassed() && (
-        <Link
-          to="/add-place"
-          className="fixed bottom-32 right-4 z-40"
-        >
-          <motion.div
-            className="w-14 h-14 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center group relative overflow-hidden"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.5 }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <Plus className="w-6 h-6 text-white relative z-10" />
-            
-            {/* Tooltip */}
-            <div className="absolute right-full mr-3 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-sm rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap pointer-events-none">
-              Add Place
-              <div className="absolute left-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-l-slate-900 dark:border-l-slate-700"></div>
-            </div>
-          </motion.div>
-        </Link>
-      )}
     </div>
   );
 }

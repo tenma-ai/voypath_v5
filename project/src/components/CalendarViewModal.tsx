@@ -141,9 +141,9 @@ const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
         className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center">
-            <Calendar className="w-5 h-5 mr-2" />
+        <div className="flex items-center justify-between p-2 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-900 flex items-center">
+            <Calendar className="w-4 h-4 mr-2" />
             カレンダービュー
           </h2>
           
@@ -153,7 +153,7 @@ const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
               {onSwitchToMap && (
                 <button
                   onClick={onSwitchToMap}
-                  className="px-3 py-1.5 rounded text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors"
+                  className="px-2 py-1 rounded text-xs font-medium text-slate-600 hover:bg-slate-200 transition-colors"
                 >
                   Map
                 </button>
@@ -161,13 +161,13 @@ const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
               {onSwitchToList && (
                 <button
                   onClick={onSwitchToList}
-                  className="px-3 py-1.5 rounded text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors"
+                  className="px-2 py-1 rounded text-xs font-medium text-slate-600 hover:bg-slate-200 transition-colors"
                 >
                   Timeline
                 </button>
               )}
               <button
-                className="px-3 py-1.5 rounded text-sm font-medium bg-primary-500 text-white"
+                className="px-2 py-1 rounded text-xs font-medium bg-primary-500 text-white"
                 disabled
               >
                 Calendar
@@ -175,31 +175,31 @@ const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Summary */}
-        <div className="p-4 bg-gray-50 border-b border-gray-200">
-          <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="p-2 bg-gray-50 border-b border-gray-200">
+          <div className="grid grid-cols-3 gap-2 text-center">
             <div>
-              <div className="text-lg font-bold text-blue-600">{formattedResult.totalStats.places}</div>
-              <div className="text-sm text-gray-600">スポット</div>
+              <div className="text-sm font-bold text-blue-600">{formattedResult.totalStats.places}</div>
+              <div className="text-xs text-gray-600">スポット</div>
             </div>
             <div>
-              <div className="text-lg font-bold text-green-600">
+              <div className="text-sm font-bold text-green-600">
                 {formatDuration(formattedResult.totalStats.travelTime)}
               </div>
-              <div className="text-sm text-gray-600">移動時間</div>
+              <div className="text-xs text-gray-600">移動時間</div>
             </div>
             <div>
-              <div className="text-lg font-bold text-purple-600">
+              <div className="text-sm font-bold text-purple-600">
                 {formatDuration(formattedResult.totalStats.visitTime)}
               </div>
-              <div className="text-sm text-gray-600">滞在時間</div>
+              <div className="text-xs text-gray-600">滞在時間</div>
             </div>
           </div>
         </div>
@@ -216,8 +216,8 @@ const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
                 {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData]) => (
                   <div key={dayKey} className="border border-gray-200 rounded-lg overflow-hidden">
                     {/* Day Header */}
-                    <div className="bg-blue-50 px-4 py-3 border-b border-gray-200">
-                      <h3 className="font-semibold text-blue-900">
+                    <div className="bg-blue-50 px-3 py-2 border-b border-gray-200">
+                      <h3 className="text-sm font-semibold text-blue-900">
                         Day {dayData.day} - {new Date(dayData.date).toLocaleDateString('ja-JP', {
                           year: 'numeric',
                           month: 'long',
@@ -241,21 +241,17 @@ const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
                                 isHourMark ? 'border-t border-gray-200 pt-2' : ''
                               }`}
                             >
-                              <div className={`w-16 text-sm ${isHourMark ? 'font-semibold' : 'text-gray-500'}`}>
+                              <div className={`w-12 text-xs ${isHourMark ? 'font-semibold' : 'text-gray-500'}`}>
                                 {time}
                               </div>
                               
                               <div className="flex-1">
                                 {place ? (
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
                                     <div className="flex items-start justify-between">
                                       <div className="flex-1">
-                                        <h4 className="font-semibold text-blue-900 mb-1">{place.place_name || place.name}</h4>
-                                        <div className="flex items-center text-blue-700 text-sm mb-1">
-                                          <MapPin className="w-3 h-3 mr-1" />
-                                          <span>{place.address || 'アドレス不明'}</span>
-                                        </div>
-                                        <div className="flex items-center text-blue-600 text-sm">
+                                        <h4 className="text-sm font-semibold text-blue-900">{place.place_name || place.name}</h4>
+                                        <div className="flex items-center text-blue-600 text-xs mt-1">
                                           <Clock className="w-3 h-3 mr-1" />
                                           <span>
                                             {formatTime(place.arrival_time)} - {formatTime(place.departure_time)}

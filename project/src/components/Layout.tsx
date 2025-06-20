@@ -1,10 +1,16 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Navigation } from './Navigation';
 import { TopAppBar } from './TopAppBar';
+import { FloatingActionButtons } from './FloatingActionButtons';
 import { motion } from 'framer-motion';
 
 export function Layout() {
+  const location = useLocation();
+  
+  // Show floating action buttons only on plan and places pages
+  const showFloatingButtons = location.pathname === '/my-trip' || location.pathname === '/my-trip/my-places';
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative overflow-hidden">
       {/* Animated Background Elements */}
@@ -78,6 +84,7 @@ export function Layout() {
       </motion.main>
       
       <Navigation />
+      {showFloatingButtons && <FloatingActionButtons />}
     </div>
   );
 }

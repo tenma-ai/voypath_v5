@@ -4,11 +4,11 @@ import { Home, Map, MapPin, MessageCircle, Share2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const navItems = [
-  { to: '/', icon: Home, label: 'Home', gradient: 'from-blue-500 to-purple-600' },
-  { to: '/my-trip', icon: Map, label: 'Plan', gradient: 'from-emerald-500 to-teal-600' },
-  { to: '/my-trip/my-places', icon: MapPin, label: 'Places', gradient: 'from-orange-500 to-red-600' },
-  { to: '/my-trip/chat', icon: MessageCircle, label: 'Chat', gradient: 'from-pink-500 to-rose-600' },
-  { to: '/my-trip/share', icon: Share2, label: 'Share', gradient: 'from-indigo-500 to-blue-600' },
+  { to: '/', icon: Home, label: 'Home', gradient: 'from-primary-500 to-secondary-600' },
+  { to: '/my-trip', icon: Map, label: 'Plan', gradient: 'from-secondary-500 to-accent-600' },
+  { to: '/my-trip/my-places', icon: MapPin, label: 'Places', gradient: 'from-accent-500 to-primary-600' },
+  { to: '/my-trip/chat', icon: MessageCircle, label: 'Chat', gradient: 'from-green-500 to-blue-600' },
+  { to: '/my-trip/share', icon: Share2, label: 'Share', gradient: 'from-purple-500 to-pink-600' },
 ];
 
 export function Navigation() {
@@ -71,27 +71,19 @@ export function Navigation() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: index * 0.1 }}
               >
-                {/* Active Background with Matching Gradient */}
-                {isActive && (
-                  <motion.div
-                    className={`absolute -inset-3 bg-gradient-to-br ${gradient} rounded-2xl shadow-glow`}
-                    layoutId="activeTab"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
                 
                 {/* Hover Background */}
-                <motion.div 
-                  className="absolute -inset-3 bg-slate-100/60 dark:bg-slate-800/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                  whileHover={{ scale: 1.05 }}
-                />
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className={`absolute w-0.5 h-0.5 bg-gradient-to-r ${gradient} rounded-full`} style={{left: '25%', top: '25%'}}></div>
+                  <div className={`absolute w-0.5 h-0.5 bg-gradient-to-r ${gradient} rounded-full`} style={{left: '50%', top: '45%'}}></div>
+                </div>
                 
                 {/* Icon Container - Compact */}
                 <div className="relative z-10 mb-0.5">
                   <motion.div 
                     className={`p-2 rounded-xl transition-all duration-300 relative overflow-hidden ${
                       isActive 
-                        ? 'bg-white/20 backdrop-blur-sm shadow-soft' 
+                        ? `bg-gradient-to-r ${gradient} shadow-soft` 
                         : 'bg-transparent group-hover:bg-slate-200/60 dark:group-hover:bg-slate-700/60'
                     }`}
                     whileHover={{ scale: 1.1, rotate: isActive ? 0 : 5 }}
@@ -103,7 +95,7 @@ export function Navigation() {
                         {Array.from({ length: 2 }).map((_, i) => (
                           <motion.div
                             key={i}
-                            className="absolute w-0.5 h-0.5 bg-white rounded-full"
+                            className={`absolute w-0.5 h-0.5 bg-gradient-to-r ${gradient} rounded-full`}
                             style={{
                               left: `${25 + i * 25}%`,
                               top: `${25 + i * 20}%`,
@@ -124,7 +116,7 @@ export function Navigation() {
                     
                     <Icon className={`w-4 h-4 transition-all duration-300 relative z-10 ${
                       isActive 
-                        ? 'text-white drop-shadow-sm' 
+                        ? 'text-white drop-shadow-md' 
                         : 'text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200'
                     }`} />
                   </motion.div>
@@ -134,7 +126,7 @@ export function Navigation() {
                 <motion.span 
                   className={`text-xs font-semibold transition-all duration-300 relative z-10 ${
                     isActive 
-                      ? 'text-white drop-shadow-sm' 
+                      ? 'text-slate-900 dark:text-slate-100 drop-shadow-sm' 
                       : 'text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200'
                   }`}
                   animate={isActive ? { scale: [1, 1.02, 1] } : {}}
@@ -146,7 +138,7 @@ export function Navigation() {
                 {/* Active indicator dot - Compact */}
                 {isActive && (
                   <motion.div
-                    className="absolute -bottom-0.5 w-0.5 h-0.5 bg-white rounded-full"
+                    className={`absolute -bottom-0.5 w-0.5 h-0.5 bg-gradient-to-r ${gradient} rounded-full`}
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.2 }}

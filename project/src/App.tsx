@@ -25,21 +25,16 @@ function App() {
   const [isHandlingAuth, setIsHandlingAuth] = useState(false);
 
   useEffect(() => {
+    let isInitialCheck = true;
+    
     // Check if user is already authenticated
     const checkAuth = async () => {
       try {
-        // Log local storage for debugging
-        console.log('🔍 Checking localStorage for session...');
-        const storageKeys = Object.keys(localStorage).filter(key => key.includes('supabase'));
-        console.log('📦 Supabase storage keys:', storageKeys);
-        
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session && session.user) {
-          console.log('✅ Found existing session:', session.user.id);
           await handleAuthenticated(session.user);
         } else {
-          console.log('❌ No existing session found');
           setIsAuthenticated(false);
         }
       } catch (error) {
@@ -47,23 +42,24 @@ function App() {
         setIsAuthenticated(false);
       } finally {
         setIsCheckingAuth(false);
+        isInitialCheck = false;
       }
     };
 
     checkAuth();
 
-    // Listen for auth state changes (only for actual sign in/out events)
+    // Listen for auth state changes (avoid duplicate handling on initial load)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only handle explicit sign in/out events, ignore token refreshes
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-        console.log('🔄 Auth state changed:', event, session?.user?.id);
-        
-        if (event === 'SIGNED_IN' && session?.user) {
-          await handleAuthenticated(session.user);
-        } else if (event === 'SIGNED_OUT') {
-          setIsAuthenticated(false);
-          setUser(null);
-        }
+      // Skip the initial SIGNED_IN event that fires immediately after getSession
+      if (isInitialCheck && event === 'SIGNED_IN') {
+        return;
+      }
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        await handleAuthenticated(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        setUser(null);
       }
     });
 

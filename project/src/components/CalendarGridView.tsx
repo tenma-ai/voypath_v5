@@ -135,7 +135,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
     
     // Check if departure/arrival place
     const placeName = place.name.toLowerCase();
-    if (placeName.includes('departure') || placeName.includes('return') || placeName.includes('出発') || placeName.includes('到着')) {
+    if (placeName.includes('departure') || placeName.includes('return')) {
       console.log(`🔍 [CalendarGridView] ${place.name} is departure/arrival - using black`);
       return '#000000';
     }
@@ -184,54 +184,54 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
   });
 
   return (
-    <div className="h-full bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-6">
+    <div className="h-full bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-4 overflow-y-auto">
       {/* Calendar Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center">
-            <Calendar className="w-5 h-5 text-white" />
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg flex items-center justify-center">
+            <Calendar className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
               {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
               {Object.keys(monthSchedule).length} scheduled days
             </p>
           </div>
         </div>
         
         {/* Month Navigation */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1">
           <button
             onClick={() => navigateMonth('prev')}
-            className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
           >
-            <ChevronLeft className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            <ChevronLeft className="w-4 h-4 text-slate-600 dark:text-slate-400" />
           </button>
           <button
             onClick={() => setCurrentDate(new Date())}
-            className="px-3 py-1 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+            className="px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
           >
             Today
           </button>
           <button
             onClick={() => navigateMonth('next')}
-            className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
           >
-            <ChevronRight className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            <ChevronRight className="w-4 h-4 text-slate-600 dark:text-slate-400" />
           </button>
         </div>
       </div>
 
       {/* Calendar Grid */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-soft border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
         {/* Day Headers */}
         <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-700">
           {dayNames.map((dayName) => (
             <div
               key={dayName}
-              className="p-4 text-center text-sm font-semibold text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800"
+              className="p-2 text-center text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800"
             >
               {dayName}
             </div>
@@ -245,7 +245,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
               return (
                 <div
                   key={`empty-${index}`}
-                  className="h-32 border-r border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50"
+                  className="h-20 border-r border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50"
                 />
               );
             }
@@ -262,12 +262,12 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
             return (
               <div
                 key={day.toISOString()}
-                className={`h-32 border-r border-b border-slate-200 dark:border-slate-700 p-2 overflow-y-auto ${
+                className={`h-20 border-r border-b border-slate-200 dark:border-slate-700 p-1 overflow-y-auto ${
                   isToday ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-white dark:bg-slate-800'
                 }`}
               >
                 {/* Date Number */}
-                <div className={`text-sm font-medium mb-1 ${
+                <div className={`text-xs font-medium mb-0.5 ${
                   isToday 
                     ? 'text-blue-600 dark:text-blue-400' 
                     : 'text-slate-900 dark:text-slate-100'
@@ -276,30 +276,24 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
                 </div>
 
                 {/* Places for this day */}
-                <div className="space-y-1">
-                  {dayPlaces.slice(0, 3).map((place, placeIndex) => (
+                <div className="space-y-0.5">
+                  {dayPlaces.slice(0, 2).map((place, placeIndex) => (
                     <div
                       key={place.id}
-                      className="text-xs p-1 rounded border-l-2 bg-slate-50 dark:bg-slate-700"
+                      className="text-xs p-0.5 rounded border-l-2 bg-slate-50 dark:bg-slate-700"
                       style={{ borderLeftColor: getPlaceColor(place) }}
                       title={`${place.name}${place.time ? ` at ${place.time}` : ''}`}
                     >
-                      <div className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                      <div className="font-medium text-slate-900 dark:text-slate-100 truncate" style={{ fontSize: '10px' }}>
                         {place.name}
                       </div>
-                      {place.time && (
-                        <div className="text-slate-600 dark:text-slate-400 flex items-center space-x-1">
-                          <Clock className="w-2.5 h-2.5" />
-                          <span>{place.time}</span>
-                        </div>
-                      )}
                     </div>
                   ))}
                   
-                  {/* Show "more" indicator if there are more than 3 places */}
-                  {dayPlaces.length > 3 && (
-                    <div className="text-xs text-slate-500 dark:text-slate-400 px-1">
-                      +{dayPlaces.length - 3} more
+                  {/* Show "more" indicator if there are more than 2 places */}
+                  {dayPlaces.length > 2 && (
+                    <div className="text-slate-500 dark:text-slate-400 px-0.5" style={{ fontSize: '10px' }}>
+                      +{dayPlaces.length - 2} more
                     </div>
                   )}
                 </div>
@@ -309,28 +303,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="mt-6 bg-white dark:bg-slate-800 rounded-xl shadow-soft border border-slate-200/50 dark:border-slate-700/50 p-4">
-        <h4 className="text-sm font-semibold mb-3 text-slate-900 dark:text-slate-100">Color Legend</h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded bg-black"></div>
-            <span className="text-slate-600 dark:text-slate-300">Departure/Arrival</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded bg-blue-500"></div>
-            <span className="text-slate-600 dark:text-slate-300">Single Member</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded bg-gradient-to-r from-blue-500 to-green-500"></div>
-            <span className="text-slate-600 dark:text-slate-300">Multiple Members</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded bg-yellow-500"></div>
-            <span className="text-slate-600 dark:text-slate-300">5+ Members</span>
-          </div>
-        </div>
-      </div>
+      {/* Legend - Removed to save space */}
     </div>
   );
 };

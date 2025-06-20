@@ -15,7 +15,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose }) =
 
   const handleUpgrade = async () => {
     if (!user) {
-      setError('ログインが必要です');
+      setError('Login required');
       return;
     }
 
@@ -40,7 +40,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose }) =
       });
 
       if (!response.ok) {
-        throw new Error('決済セッションの作成に失敗しました');
+        throw new Error('Failed to create payment session');
       }
 
       const { sessionId } = await response.json();
@@ -48,7 +48,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose }) =
       // Stripeチェックアウトにリダイレクト
       const stripe = await stripePromise;
       if (!stripe) {
-        throw new Error('Stripeの初期化に失敗しました');
+        throw new Error('Failed to initialize Stripe');
       }
 
       const { error: stripeError } = await stripe.redirectToCheckout({
@@ -60,7 +60,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose }) =
       }
     } catch (err) {
       console.error('Premium upgrade error:', err);
-      setError(err instanceof Error ? err.message : '決済処理中にエラーが発生しました');
+      setError(err instanceof Error ? err.message : 'An error occurred during payment processing');
     } finally {
       setLoading(false);
     }
@@ -82,12 +82,12 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose }) =
               <span className="text-lg text-gray-500">/{STRIPE_PRICES.PREMIUM_YEARLY.displayInterval}</span>
             </div>
             <p className="text-sm text-gray-500">
-              {TAX_CONFIG.automaticTax && '※税金は地域に応じて自動計算されます'}
+              {TAX_CONFIG.automaticTax && '※Taxes are automatically calculated by region'}
             </p>
           </div>
 
           <div className="text-left mb-6">
-            <h3 className="font-semibold text-gray-900 mb-3">Premium機能:</h3>
+            <h3 className="font-semibold text-gray-900 mb-3">Premium Features:</h3>
             <ul className="space-y-2">
               {STRIPE_PRICES.PREMIUM_YEARLY.features.map((feature, index) => (
                 <li key={index} className="flex items-center text-sm text-gray-700">
@@ -112,19 +112,19 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose }) =
               className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
               disabled={loading}
             >
-              キャンセル
+              Cancel
             </button>
             <button
               onClick={handleUpgrade}
               disabled={loading}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
             >
-              {loading ? '処理中...' : 'Premiumにアップグレード'}
+              {loading ? 'Processing...' : 'Upgrade to Premium'}
             </button>
           </div>
 
           <p className="text-xs text-gray-500 mt-4">
-            安全な決済はStripeによって処理されます
+            Secure payments are processed by Stripe
           </p>
         </div>
       </div>

@@ -11,6 +11,9 @@ console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
 console.log('VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Not set');
 console.log('DEV mode:', import.meta.env.DEV);
 
+// Set default dark mode
+document.documentElement.classList.add('dark');
+
 // Start optimization keep-alive service for better performance
 OptimizationKeepAliveService.startKeepAlive();
 
@@ -20,12 +23,10 @@ window.addEventListener('beforeunload', () => {
 });
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter future={{
-      v7_startTransition: true,
-      v7_relativeSplatPath: true
-    }}>
-      <App />
-    </BrowserRouter>
-  </StrictMode>
+  <BrowserRouter future={{
+    v7_startTransition: true,
+    v7_relativeSplatPath: true
+  }}>
+    <App />
+  </BrowserRouter>
 );

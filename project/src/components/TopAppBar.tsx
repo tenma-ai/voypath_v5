@@ -356,7 +356,7 @@ function TopAppBar() {
                         <div className="fixed inset-0 z-40" onClick={() => setShowVoypathMenu(false)} />
                         
                         <motion.div 
-                          className="absolute left-0 top-full mt-2 w-80 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 py-2 z-50 overflow-hidden"
+                          className="absolute left-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 py-2 z-50 overflow-hidden"
                           variants={menuVariants}
                           initial="hidden"
                           animate="visible"
@@ -377,7 +377,7 @@ function TopAppBar() {
                                 />
                               </div>
                               <div>
-                                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-lg">
+                                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">
                                   Voypath
                                 </h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -515,7 +515,7 @@ function TopAppBar() {
                     </div>
                   )}
                   <div className="min-w-0">
-                    <h1 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">
+                    <h1 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate">
                       {routeInfo.title}
                     </h1>
                     {routeInfo.subtitle && (
@@ -530,33 +530,13 @@ function TopAppBar() {
 
             {/* Right Section */}
             <div className="flex items-center space-x-1.5 ml-auto flex-shrink-0">
-              {/* Temporary Logout Button for Debug */}
-              <button
-                onClick={handleLogout}
-                className="px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600 transition-colors"
-              >
-                Logout
-              </button>
               {/* Theme Toggle */}
               <motion.button
                 onClick={toggleTheme}
-                className="relative p-2 rounded-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 hover:border-primary-300/50 dark:hover:border-primary-600/50 transition-all duration-300 shadow-soft hover:shadow-medium group overflow-hidden"
+                className="relative p-2 hover:bg-slate-100/50 dark:hover:bg-slate-700/50 rounded-xl transition-all duration-300 group"
                 whileHover={{ scale: 1.05, y: -1 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                  animate={{
-                    background: theme === 'dark' 
-                      ? ['linear-gradient(45deg, rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.1))', 'linear-gradient(45deg, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.2))']
-                      : ['linear-gradient(45deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1))', 'linear-gradient(45deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.2))']
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    repeatType: "reverse"
-                  }}
-                />
 
                 <AnimatePresence mode="wait">
                   {theme === 'light' ? (
@@ -568,7 +548,7 @@ function TopAppBar() {
                       transition={{ duration: 0.3 }}
                       className="relative z-10"
                     >
-                      <Sun className="w-4 h-4 text-yellow-500 group-hover:text-yellow-400 transition-colors" />
+                      <Sun className="w-4 h-4 text-yellow-600 group-hover:text-yellow-500 transition-colors" />
                     </motion.div>
                   ) : (
                     <motion.div
@@ -579,7 +559,7 @@ function TopAppBar() {
                       transition={{ duration: 0.3 }}
                       className="relative z-10"
                     >
-                      <Moon className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors" />
+                      <Moon className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors" />
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -589,26 +569,11 @@ function TopAppBar() {
               {!isPremium && (
                 <motion.button
                   onClick={() => setShowPremiumModal(true)}
-                  className="relative p-2 rounded-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 hover:border-yellow-300/50 dark:hover:border-yellow-600/50 transition-all duration-300 shadow-soft hover:shadow-medium group overflow-hidden"
+                  className="relative p-2 hover:bg-slate-100/50 dark:hover:bg-slate-700/50 rounded-xl transition-all duration-300 group"
                   whileHover={{ scale: 1.05, y: -1 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                  />
-
-                  <Crown className="w-4 h-4 text-yellow-600 dark:text-yellow-400 fill-current relative z-10" />
-                  
-                  <motion.div
-                    className="absolute -inset-0.5 bg-yellow-400/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    animate={{
-                      scale: [1, 1.1, 1],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                    }}
-                  />
+                  <Crown className="w-4 h-4 text-yellow-600 dark:text-yellow-400 fill-current" />
                 </motion.button>
               )}
 
@@ -654,7 +619,7 @@ function TopAppBar() {
                         <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
                         
                         <motion.div 
-                          className="absolute right-0 top-full mt-2 w-72 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 py-2 z-50 overflow-hidden"
+                          className="absolute right-0 top-full mt-2 w-64 sm:w-72 max-w-[calc(100vw-2rem)] bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 py-2 z-50 overflow-hidden"
                           variants={menuVariants}
                           initial="hidden"
                           animate="visible"
@@ -693,7 +658,7 @@ function TopAppBar() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center space-x-1.5">
-                                  <p className="font-semibold text-slate-900 dark:text-slate-100 truncate text-sm">
+                                  <p className="font-medium text-slate-900 dark:text-slate-100 truncate text-sm">
                                     {user.name || 'Guest User'}
                                   </p>
                                   {isPremium && <PremiumBadge size="sm" />}
@@ -838,37 +803,6 @@ function TopAppBar() {
           </div>
         </div>
 
-        {/* Trip Info Bar */}
-        {currentTrip && (location.pathname.startsWith('/my-trip') || location.pathname === '/add-place') && (
-          <motion.div 
-            className="border-t border-slate-200/30 dark:border-slate-700/30 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-          >
-            <div className="px-3 lg:px-4 py-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center space-x-3 text-slate-600 dark:text-slate-400">
-                  <div className="flex items-center space-x-1">
-                    <MapPin className="w-2.5 h-2.5" />
-                    <span className="font-medium">{currentTrip.destination}</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Calendar className="w-2.5 h-2.5" />
-                    <span>{new Date(currentTrip.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(currentTrip.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <Users className="w-2.5 h-2.5" />
-                    <span>{currentTrip.memberCount}</span>
-                  </div>
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-500 bg-slate-100/60 dark:bg-slate-800/60 px-2 py-0.5 rounded-lg">
-                  {currentTrip.name}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
       </motion.header>
 
       {/* Premium Modal */}

@@ -37,7 +37,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
   const [showProgress, setShowProgress] = useState(false);
   const [connectivity, setConnectivity] = useState({ normalize: false, select: false, route: false });
   
-  const { user: currentUser, places, setOptimizationResult, setUser } = useStore();
+  const { user: currentUser, places, setOptimizationResult, setUser, loadPlacesFromAPI } = useStore();
 
   // Create a guest user if none exists (for testing)
   React.useEffect(() => {
@@ -153,6 +153,15 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
     setShowProgress(true);
     setError(null);
     setProgress({ stage: 'collecting', progress: 0, message: 'Starting optimization...' });
+    
+    // Force reload places from database before optimization
+    console.log('🔄 Reloading places from database before optimization');
+    try {
+      await loadPlacesFromAPI(tripId);
+      console.log('✅ Places reloaded from database');
+    } catch (error) {
+      console.warn('⚠️ Could not reload places (continuing anyway):', error);
+    }
     
     // Clear any cached optimization results first
     console.log('🗑️ Clearing cached optimization results before new optimization');

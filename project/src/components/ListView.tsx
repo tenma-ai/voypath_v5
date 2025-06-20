@@ -427,10 +427,10 @@ export function ListView() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <Calendar className="w-5 h-5 text-blue-600" />
-            <h3 className="font-semibold text-gray-800 dark:text-white">旅程表</h3>
+            <h3 className="font-semibold text-gray-800 dark:text-white">Itinerary</h3>
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            {optimizationResult ? '最適化済み' : '未最適化'}
+            {optimizationResult ? 'Optimized' : 'Not optimized'}
           </div>
         </div>
         

@@ -17,7 +17,7 @@ function calculateDistance(point1, point2) {
   return R * c;
 }
 // 移動手段の判定（改善版）
-function determineTransportMode(distance, fromAirport = false, toAirport = false) {
+function determineTransportMode(distance, fromAirport = faではlse, toAirport = false) {
   console.log(`🚗 Distance: ${distance.toFixed(1)}km, fromAirport: ${fromAirport}, toAirport: ${toAirport}`);
   // 距離ベースの判定を優先（空港であっても近距離は車を使用）
   if (distance <= 2) {

@@ -43,9 +43,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     
     // Check various patterns for departure/arrival
     const isDeparture = placeName.includes('Departure:') || 
+                       placeName.includes('出発') ||
                        placeNameLower.includes('departure');
                        
     const isArrival = placeName.includes('Return to Departure:') || 
+                     placeName.includes('到着') ||
                      placeNameLower.includes('return') ||
                      placeNameLower.includes('arrival');
     
@@ -115,6 +117,81 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     }
   };
 
+  // Get place color based on member contributions
+  const getPlaceColor = (place: any) => {
+    // 出発・到着地点: 黒色固定
+    if (place.place_name?.includes('Departure:') || place.place_name?.includes('Return to Departure:')) {
+      return '#000000';
+    }
+
+    // Get actual contributors for this place
+    let contributors: any[] = [];
+    
+    console.log(`🔍 [CalendarView] Place raw data:`, {
+      name: place.place_name || place.name,
+      memberContribution: place.member_contribution,
+      addedBy: place.added_by,
+      userId: place.user_id,
+      createdBy: place.created_by
+    });
+
+    // First, try to get contributors from member_contribution field
+    if (place.member_contribution) {
+      if (Array.isArray(place.member_contribution)) {
+        // Direct array format
+        contributors = place.member_contribution;
+      } else if (place.member_contribution.contributors) {
+        // Object with contributors property
+        contributors = place.member_contribution.contributors;
+      } else if (typeof place.member_contribution === 'object') {
+        // Check if it's a single contributor object
+        if (place.member_contribution.user_id || place.member_contribution.userId) {
+          contributors = [place.member_contribution];
+        }
+      }
+    }
+
+    // If no contributors found, try to get from added_by/user_id fields
+    if (contributors.length === 0) {
+      const addedByUserId = place.added_by || place.addedBy || place.created_by || place.user_id;
+      if (addedByUserId) {
+        contributors = [{
+          user_id: addedByUserId,
+          userId: addedByUserId,
+          weight: 1.0
+        }];
+      }
+    }
+
+    // Ensure all contributors have actual colors
+    contributors = contributors.map(contributor => {
+      const userId = contributor.user_id || contributor.userId;
+      const userColor = memberColors[userId] || MemberColorService.getColorForOptimization(userId, memberColors);
+      return {
+        ...contributor,
+        user_id: userId,
+        color_hex: userColor
+      };
+    });
+
+    console.log(`🔍 [CalendarView] Final contributors:`, contributors);
+
+    const contributorCount = contributors.length;
+    
+    if (contributorCount === 0) {
+      return '#9CA3AF'; // Gray for no contributors
+    } else if (contributorCount === 1) {
+      // 1人の追加者: その人のメンバーカラー
+      return contributors[0].color_hex;
+    } else if (contributorCount >= 5) {
+      // 5人以上の追加者: 金色
+      return '#FFD700';
+    } else {
+      // 2-4人の追加者: 主要貢献者の色（グラデーション将来実装）
+      return contributors[0].color_hex;
+    }
+  };
+
   // Extract places from optimization result
   const formatOptimizationResult = (result: any) => {
     if (!result?.optimization?.daily_schedules) {
@@ -139,17 +216,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
 
   const formatTime = (timeString: string) => {
     if (!timeString) return '';
-    return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('en-US', {
+    return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('ja-JP', {
       hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
+      minute: '2-digit'
     });
   };
 
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
+    return hours > 0 ? `${hours}時間${mins > 0 ? `${mins}分` : ''}` : `${mins}分`;
   };
 
   const generateTimeSlots = () => {
@@ -166,7 +242,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   const timeSlots = generateTimeSlots();
 
   const getPlaceForTimeSlot = (time: string, targetDate: string) => {
-    // Find the schedule for the target date
     const daySchedule = Object.values(formattedResult.schedulesByDay).find((schedule: any) => 
       schedule.date === targetDate
     );
@@ -177,41 +252,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       if (!place.arrival_time || !place.departure_time) return false;
       return time >= place.arrival_time && time < place.departure_time;
     });
-  };
-
-  // Get transport icon and color
-  const getTransportIcon = (mode: string) => {
-    const modeLower = mode.toLowerCase();
-    if (modeLower.includes('flight') || modeLower.includes('plane') || modeLower.includes('air')) {
-      return { 
-        color: '#2563EB', 
-        svg: (
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2v0A1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-          </svg>
-        )
-      };
-    } else if (modeLower.includes('car') || modeLower.includes('drive') || modeLower.includes('taxi')) {
-      return { 
-        color: '#92400E', 
-        svg: (
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M5 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 0h12a2 2 0 0 1 0 4h-5m-7 0h12M5 9V7a1 1 0 0 1 1-1h9l3 4m-3 0h3a1 1 0 0 1 1 1v6h-2"/>
-          </svg>
-        )
-      };
-    } else {
-      return { 
-        color: '#6B7280', 
-        svg: (
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="9" cy="21" r="1"/>
-            <circle cx="20" cy="21" r="1"/>
-            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-          </svg>
-        )
-      };
-    }
   };
 
   // If grid mode, use the grid calendar component
@@ -295,9 +335,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
           {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData]) => (
             <div key={dayKey} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
               {/* Day Header */}
-              <div className="bg-blue-50 px-3 py-2 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-blue-900">
-                  Day {dayData.day} - {new Date(dayData.date).toLocaleDateString('en-US', {
+              <div className="bg-blue-50 px-4 py-3 border-b border-gray-200">
+                <h3 className="font-semibold text-blue-900">
+                  Day {dayData.day} - {new Date(dayData.date).toLocaleDateString('ja-JP', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
@@ -320,7 +360,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                           isHourMark ? 'border-t border-gray-200 pt-2' : ''
                         }`}
                       >
-                        <div className={`w-12 text-xs ${isHourMark ? 'font-semibold' : 'text-gray-500'}`}>
+                        <div className={`w-16 text-sm ${isHourMark ? 'font-semibold' : 'text-gray-500'}`}>
                           {time}
                         </div>
                         

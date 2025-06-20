@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Polyline } from '@react-google-maps/api';
-import { MapPin } from 'lucide-react';
+import { MapPin, Car, UserRound } from 'lucide-react';
 import { PlaceColorCalculator } from '../utils/PlaceColorCalculator';
 import { MemberColorService } from '../services/MemberColorService';
 import { useStore } from '../store/useStore';
@@ -72,18 +72,15 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     
     // Check various patterns for departure/arrival
     const isDeparture = placeName.includes('Departure:') || 
-                       placeName.includes('出発') ||
                        placeNameLower.includes('departure') ||
                        index === 0;
                        
     const isArrival = placeName.includes('Return to Departure:') || 
-                     placeName.includes('到着') ||
                      placeNameLower.includes('return') ||
                      placeNameLower.includes('arrival') ||
                      index === allPlaces.length - 1;
                      
     const isAirport = placeNameLower.includes('airport') || 
-                     placeNameLower.includes('空港') ||
                      placeName.includes('(HND)') ||
                      placeName.includes('(NRT)') ||
                      placeName.includes('(LGA)') ||
@@ -359,20 +356,20 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   }
 
   return (
-    <div className="h-full w-full relative" style={{ minHeight: '400px' }}>
+    <div className="h-full w-full relative">
       <GoogleMap
-        mapContainerStyle={{ width: '100%', height: '100%', minHeight: '400px' }}
+        mapContainerStyle={{ width: '100%', height: '100%' }}
         center={{ lat: 35.6812, lng: 139.7671 }}
         zoom={6}
         onLoad={onLoad}
         onUnmount={onUnmount}
         options={{
-          zoomControl: true,
+          zoomControl: false,
           streetViewControl: false,
-          mapTypeControl: true,
+          mapTypeControl: false,
           fullscreenControl: true,
           gestureHandling: 'auto',
-          disableDefaultUI: false,
+          disableDefaultUI: true,
         }}
       >
         {/* Route lines */}
@@ -420,43 +417,22 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         })}
       </GoogleMap>
       
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-4 max-w-xs z-20">
-        <h4 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">凡例</h4>
-        
-        {/* Place markers legend */}
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded-full bg-black border-2 border-white"></div>
-            <span className="text-xs text-gray-700 dark:text-gray-300">出発・到着地点</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white"></div>
-            <span className="text-xs text-gray-700 dark:text-gray-300">1人の追加者</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded-full bg-gradient-to-r from-blue-500 via-green-500 to-purple-500 border-2 border-white"></div>
-            <span className="text-xs text-gray-700 dark:text-gray-300">2-4人の追加者</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded-full border-2 border-white" style={{ background: '#FFD700' }}></div>
-            <span className="text-xs text-gray-700 dark:text-gray-300">5人以上の追加者</span>
-          </div>
-        </div>
-        
-        {/* Route lines legend */}
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2">
+      {/* Legend - Transport icons only */}
+      <div className="absolute bottom-4 left-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-3 z-20">
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2v0A1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+            </svg>
             <div className="w-4 h-0.5" style={{ backgroundColor: '#2563EB' }}></div>
-            <span className="text-xs text-gray-700 dark:text-gray-300">飛行機</span>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1">
+            <Car className="w-4 h-4 text-amber-700" />
             <div className="w-4 h-0.5" style={{ backgroundColor: '#92400E' }}></div>
-            <span className="text-xs text-gray-700 dark:text-gray-300">車</span>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1">
+            <UserRound className="w-4 h-4 text-gray-600" />
             <div className="w-4 h-0.5" style={{ backgroundColor: '#6B7280' }}></div>
-            <span className="text-xs text-gray-700 dark:text-gray-300">徒歩・その他</span>
           </div>
         </div>
       </div>
