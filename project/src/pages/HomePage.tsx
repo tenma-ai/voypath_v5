@@ -481,7 +481,7 @@ export function HomePage() {
             <div className="absolute -bottom-10 -left-10 w-24 h-24 bg-yellow-600/15 rounded-full blur-2xl"></div>
 
             <div className="relative flex items-center justify-between">
-              <div className="flex items-center space-x-3 sm:space-x-6"
+              <div className="flex items-center space-x-3 sm:space-x-6">
                 <motion.div 
                   className="relative"
                   animate={{
