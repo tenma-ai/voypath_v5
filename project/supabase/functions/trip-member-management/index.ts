@@ -35,26 +35,49 @@ serve(async (req) => {
   }
 
   try {
+    // 認証ヘッダー取得（大文字小文字両方対応）
+    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+    console.log('🔐 Auth header received:', authHeader ? 'Present' : 'Missing');
+    
+    if (!authHeader) {
+      console.log('❌ No authorization header found');
+      return new Response(
+        JSON.stringify({ error: 'Authorization header is required' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
+    }
+
     // Supabase クライアント初期化
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     );
 
     // 認証確認
+    console.log('🔍 Attempting to get user from auth header...');
     const {
       data: { user },
       error: userError,
     } = await supabaseClient.auth.getUser();
 
+    console.log('👤 User data:', user ? `Found user: ${user.id}` : 'No user found');
+    console.log('❌ User error:', userError ? userError.message : 'No error');
+
     if (userError || !user) {
+      console.log('❌ Authentication failed:', userError?.message || 'No user');
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ 
+          error: 'Unauthorized',
+          details: userError?.message || 'No user found'
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
