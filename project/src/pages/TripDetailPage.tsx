@@ -267,8 +267,8 @@ export function TripDetailPage() {
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {/* Fixed Trip Header - Compact */}
-      <div className="fixed top-16 left-0 right-0 z-30 p-2 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
+      {/* Combined Fixed Header - Trip Info + View Toggle */}
+      <div className="fixed top-12 left-0 right-0 z-[9996] bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
         {/* Subtle Background Elements */}
         <div className="absolute inset-0 overflow-hidden">
           <motion.div
@@ -285,114 +285,117 @@ export function TripDetailPage() {
           />
         </div>
 
-        <div className="relative z-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <h1 className="text-base font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                {trip.name}
-              </h1>
-                      
-              {/* Compact Score Display */}
-              {optimizationResult && (
-                <div className="relative flex items-center space-x-1" data-score-popup>
-                  <div className="px-2 py-0.5 bg-green-100 dark:bg-green-900/20 rounded-full">
-                    <span className="text-xs font-semibold text-green-700 dark:text-green-300">
-                      {Math.round((optimizationResult.optimization?.optimization_score?.total_score || 0))}%
-                    </span>
+        {/* Trip Info Section */}
+        <div className="p-2 border-b border-slate-200/30 dark:border-slate-700/30">
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <h1 className="text-base font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+                  {trip.name}
+                </h1>
+                        
+                {/* Compact Score Display */}
+                {optimizationResult && (
+                  <div className="relative flex items-center space-x-1" data-score-popup>
+                    <div className="px-2 py-0.5 bg-green-100 dark:bg-green-900/20 rounded-full">
+                      <span className="text-xs font-semibold text-green-700 dark:text-green-300">
+                        {Math.round((optimizationResult.optimization?.optimization_score?.total_score || 0))}%
+                      </span>
+                    </div>
+                    <motion.button
+                      onClick={() => setShowScorePopup(!showScorePopup)}
+                      className="p-0.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <BarChart3 className="w-3 h-3 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                    </motion.button>
                   </div>
-                  <motion.button
-                    onClick={() => setShowScorePopup(!showScorePopup)}
-                    className="p-0.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                  >
-                    <BarChart3 className="w-3 h-3 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
-                  </motion.button>
-                </div>
-              )}
-                    
-              {/* Trip dates and members info */}
-              {trip.startDate && trip.endDate && (
-                <div className="flex items-center space-x-1 text-xs text-slate-600 dark:text-slate-400">
-                  <Calendar className="w-3 h-3" />
-                  <span>{formatDateRange(trip.startDate, trip.endDate)}</span>
-                </div>
-              )}
-              <div className="flex items-center space-x-1 text-xs text-slate-600 dark:text-slate-400">
-                <Users className="w-3 h-3" />
-                <span>{trip.memberCount}</span>
-              </div>
-            </div>
-            
-            {/* Settings Button */}
-            <motion.button
-              onClick={() => setShowSettingsModal(true)}
-              className="p-1.5 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition-all duration-300 group"
-              whileHover={{ scale: 1.1, rotate: 90 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Settings className="w-4 h-4 text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors" />
-            </motion.button>
-          </div>
-
-          {/* Deadline warning - compact */}
-          {deadline && (deadline.isExpired || new Date(trip.addPlaceDeadline!).getTime() - new Date().getTime() < 24 * 60 * 60 * 1000) && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`mt-2 p-2 rounded-lg border backdrop-blur-sm text-xs ${
-                deadline.isExpired
-                  ? 'bg-red-50/80 dark:bg-red-900/20 border-red-200/50 dark:border-red-800/50 text-red-700 dark:text-red-300'
-                  : 'bg-amber-50/80 dark:bg-amber-900/20 border-amber-200/50 dark:border-amber-800/50 text-amber-700 dark:text-amber-300'
-              }`}
-            >
-              <div className="flex items-center space-x-1">
-                <AlertCircle className={`w-3 h-3 ${
-                  deadline.isExpired ? 'text-red-500' : 'text-amber-500'
-                }`} />
-                <span>
-                  {deadline.isExpired 
-                    ? `Deadline expired: ${deadline.text}`
-                    : `Deadline: ${deadline.text}`
-                  }
-                </span>
-              </div>
-            </motion.div>
-          )}
-        </div>
-      </div>
-
-      {/* View Toggle - Minimal */}
-      <div className="fixed top-24 left-0 right-0 z-30 py-1 px-2 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50">
-        <div className="flex justify-center">
-          <div className="bg-slate-100/80 dark:bg-slate-700/80 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50">
-            {viewOptions.map(({ key, label, icon: Icon, gradient }) => (
-              <motion.button
-                key={key}
-                onClick={() => {
-                  setActiveView(key as any);
-                }}
-                className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
-                  activeView === key
-                    ? 'text-white shadow-soft'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {/* Active Background */}
-                {activeView === key && (
-                  <motion.div
-                    className={`absolute inset-0 bg-gradient-to-r ${gradient} rounded-md`}
-                    layoutId="activeViewBg"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
                 )}
-                
-                <Icon className="w-3 h-3 relative z-10" />
-                <span className="relative z-10">{label}</span>
+                      
+                {/* Trip dates and members info */}
+                {trip.startDate && trip.endDate && (
+                  <div className="flex items-center space-x-1 text-xs text-slate-600 dark:text-slate-400">
+                    <Calendar className="w-3 h-3" />
+                    <span>{formatDateRange(trip.startDate, trip.endDate)}</span>
+                  </div>
+                )}
+                <div className="flex items-center space-x-1 text-xs text-slate-600 dark:text-slate-400">
+                  <Users className="w-3 h-3" />
+                  <span>{trip.memberCount}</span>
+                </div>
+              </div>
+              
+              {/* Settings Button */}
+              <motion.button
+                onClick={() => setShowSettingsModal(true)}
+                className="p-1.5 rounded-lg hover:bg-slate-100/80 dark:hover:bg-slate-700/80 transition-all duration-300 group"
+                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                <Settings className="w-4 h-4 text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors" />
               </motion.button>
-            ))}
+            </div>
+
+            {/* Deadline warning - compact */}
+            {deadline && (deadline.isExpired || new Date(trip.addPlaceDeadline!).getTime() - new Date().getTime() < 24 * 60 * 60 * 1000) && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`mt-2 p-2 rounded-lg border backdrop-blur-sm text-xs ${
+                  deadline.isExpired
+                    ? 'bg-red-50/80 dark:bg-red-900/20 border-red-200/50 dark:border-red-800/50 text-red-700 dark:text-red-300'
+                    : 'bg-amber-50/80 dark:bg-amber-900/20 border-amber-200/50 dark:border-amber-800/50 text-amber-700 dark:text-amber-300'
+                }`}
+              >
+                <div className="flex items-center space-x-1">
+                  <AlertCircle className={`w-3 h-3 ${
+                    deadline.isExpired ? 'text-red-500' : 'text-amber-500'
+                  }`} />
+                  <span>
+                    {deadline.isExpired 
+                      ? `Deadline expired: ${deadline.text}`
+                      : `Deadline: ${deadline.text}`
+                    }
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </div>
+
+        {/* View Toggle Section */}
+        <div className="py-1 px-2">
+          <div className="flex justify-center">
+            <div className="bg-slate-100/80 dark:bg-slate-700/80 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50">
+              {viewOptions.map(({ key, label, icon: Icon, gradient }) => (
+                <motion.button
+                  key={key}
+                  onClick={() => {
+                    setActiveView(key as any);
+                  }}
+                  className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
+                    activeView === key
+                      ? 'text-white shadow-soft'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {/* Active Background */}
+                  {activeView === key && (
+                    <motion.div
+                      className={`absolute inset-0 bg-gradient-to-r ${gradient} rounded-md`}
+                      layoutId="activeViewBg"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  
+                  <Icon className="w-3 h-3 relative z-10" />
+                  <span className="relative z-10">{label}</span>
+                </motion.button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

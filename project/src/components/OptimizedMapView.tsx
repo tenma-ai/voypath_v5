@@ -365,7 +365,9 @@ export function OptimizedMapView({
   }
 
   return (
-    <div className={`relative h-full ${className}`}>
+    <div className={`relative h-full ${className}`} style={{
+      background: 'linear-gradient(180deg, #6BB6FF 0%, #FFFFFF 100%)'
+    }}>
       {/* Loading Overlay */}
       <AnimatePresence>
         {isLoading && (

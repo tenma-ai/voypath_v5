@@ -109,7 +109,9 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
         </div>
 
         {/* Map Content */}
-        <div className="flex-1 relative bg-gray-100">
+        <div className="flex-1 relative" style={{
+          background: 'linear-gradient(180deg, #6BB6FF 0%, #FFFFFF 100%)'
+        }}>
           {loadError ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">

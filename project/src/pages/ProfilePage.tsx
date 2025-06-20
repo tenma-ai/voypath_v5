@@ -51,10 +51,10 @@ export function ProfilePage() {
         </p>
       </div>
 
-      {/* Basic Information */}
+      {/* Profile Settings */}
       <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
         <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-          Basic Information
+          Profile Settings
         </h3>
         
         <div className="space-y-4">

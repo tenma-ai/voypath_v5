@@ -219,28 +219,30 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     return (
       <div className="h-full relative">
         {/* View Toggle */}
-        <div className="fixed top-32 right-4 z-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1 flex">
+        <div className="fixed top-[5.5rem] right-4 z-[9995] bg-slate-100/80 dark:bg-slate-700/80 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50">
           <button
             onClick={() => setViewMode('timeline')}
-            className={`p-2 rounded-md transition-colors ${
+            className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
               viewMode === 'timeline' 
-                ? 'bg-orange-500 text-white' 
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'text-white shadow-soft bg-orange-500' 
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
             title="Timeline View"
           >
-            <List className="w-4 h-4" />
+            <List className="w-3 h-3" />
+            <span>Timeline</span>
           </button>
           <button
             onClick={() => setViewMode('grid')}
-            className={`p-2 rounded-md transition-colors ${
+            className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
               viewMode === 'grid' 
-                ? 'bg-orange-500 text-white' 
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'text-white shadow-soft bg-orange-500' 
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
             title="Grid View"
           >
-            <Grid3X3 className="w-4 h-4" />
+            <Grid3X3 className="w-3 h-3" />
+            <span>Grid</span>
           </button>
         </div>
         <div className="mt-12">
@@ -267,28 +269,30 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   return (
     <div className="h-full overflow-y-auto bg-gray-50 relative">
       {/* View Toggle */}
-      <div className="fixed top-32 right-4 z-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1 flex">
+      <div className="fixed top-[5.5rem] right-4 z-[9995] bg-slate-100/80 dark:bg-slate-700/80 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50">
         <button
           onClick={() => setViewMode('timeline')}
-          className={`p-2 rounded-md transition-colors ${
+          className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
             viewMode === 'timeline' 
-              ? 'bg-orange-500 text-white' 
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              ? 'text-white shadow-soft bg-orange-500' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
           title="Timeline View"
         >
-          <List className="w-4 h-4" />
+          <List className="w-3 h-3" />
+          <span>Timeline</span>
         </button>
         <button
           onClick={() => setViewMode('grid')}
-          className={`p-2 rounded-md transition-colors ${
+          className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
             viewMode === 'grid' 
-              ? 'bg-orange-500 text-white' 
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              ? 'text-white shadow-soft bg-orange-500' 
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
           title="Grid View"
         >
-          <Grid3X3 className="w-4 h-4" />
+          <Grid3X3 className="w-3 h-3" />
+          <span>Grid</span>
         </button>
       </div>
       

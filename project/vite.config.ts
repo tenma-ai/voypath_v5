@@ -35,7 +35,7 @@ export default defineConfig({
       strict: false,
     },
     hmr: {
-      port: 5174,
+      port: 5173,
       overlay: false,
       timeout: 60000,
       protocol: 'ws',

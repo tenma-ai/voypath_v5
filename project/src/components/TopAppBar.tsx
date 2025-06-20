@@ -119,14 +119,13 @@ function TopAppBar() {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, [showProfileMenu, showVoypathMenu]);
 
   const handleProfileMenuToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('🔄 Profile menu clicked, current state:', showProfileMenu);
     setShowProfileMenu(!showProfileMenu);
     setShowVoypathMenu(false);
   };
@@ -134,7 +133,6 @@ function TopAppBar() {
   const handleVoypathMenuToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('🔄 Voypath menu clicked, current state:', showVoypathMenu);
     setShowVoypathMenu(!showVoypathMenu);
     setShowProfileMenu(false);
   };
@@ -211,17 +209,17 @@ function TopAppBar() {
       case 'about':
         console.log('Opening About Us...');
         break;
-      case 'support':
-        console.log('Opening Customer Support...');
-        break;
       case 'features':
         console.log('Opening Features...');
         break;
       case 'pricing':
         setShowPremiumModal(true);
         break;
-      case 'contact':
-        console.log('Opening Contact...');
+      case 'help':
+        console.log('Opening Help Center with FAQs and contact options (email/phone)...');
+        break;
+      case 'feedback':
+        console.log('Opening feedback form...');
         break;
       case 'privacy':
         console.log('Opening Privacy Policy...');
@@ -237,10 +235,10 @@ function TopAppBar() {
   const menuVariants = {
     hidden: {
       opacity: 0,
-      scale: 0.95,
-      y: -10,
+      scale: 0.9,
+      y: -20,
       transition: {
-        duration: 0.2,
+        duration: 0.15,
         ease: "easeOut"
       }
     },
@@ -249,7 +247,7 @@ function TopAppBar() {
       scale: 1,
       y: 0,
       transition: {
-        duration: 0.3,
+        duration: 0.2,
         ease: "easeOut"
       }
     }
@@ -271,7 +269,7 @@ function TopAppBar() {
   return (
     <>
       <motion.header 
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+        className={`fixed top-0 left-0 right-0 z-[9997] transition-all duration-500 ${
           isScrolled 
             ? 'bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 shadow-soft' 
             : 'bg-white/95 dark:bg-slate-900/95 backdrop-blur-md'
@@ -311,7 +309,7 @@ function TopAppBar() {
                   <ArrowLeft className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors relative z-10" />
                 </motion.button>
               ) : (
-                <div className="relative voypath-menu-container">
+                <div className="relative voypath-menu-container" style={{ zIndex: 10000 }}>
                   <motion.button
                     onClick={handleVoypathMenuToggle}
                     className="flex items-center space-x-2 group"
@@ -332,6 +330,19 @@ function TopAppBar() {
                           src="/voypathlogo_nameunder.png" 
                           alt="Voypath" 
                           className="w-5 h-5 object-contain filter drop-shadow-sm relative z-10"
+                          onError={(e) => {
+                            console.error('Logo failed to load, trying fallback');
+                            // Fallback: show a text logo
+                            e.currentTarget.style.display = 'none';
+                            const parent = e.currentTarget.parentElement;
+                            if (parent && !parent.querySelector('.fallback-logo')) {
+                              const fallback = document.createElement('div');
+                              fallback.className = 'fallback-logo text-white font-bold text-xs';
+                              fallback.textContent = 'VP';
+                              parent.appendChild(fallback);
+                            }
+                          }}
+                          onLoad={() => console.log('Logo loaded successfully')}
                         />
                       </motion.div>
                       <motion.div
@@ -353,10 +364,11 @@ function TopAppBar() {
                     {showVoypathMenu && (
                       <>
                         {/* Backdrop */}
-                        <div className="fixed inset-0 z-40" onClick={() => setShowVoypathMenu(false)} />
+                        <div className="fixed inset-0 bg-black/10" onClick={() => setShowVoypathMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="absolute left-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 py-2 z-50 overflow-hidden"
+                          className="fixed left-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden opacity-100"
+                          style={{ zIndex: 10001 }}
                           variants={menuVariants}
                           initial="hidden"
                           animate="visible"
@@ -374,6 +386,11 @@ function TopAppBar() {
                                   src="/voypathlogo_nameunder.png" 
                                   alt="Voypath" 
                                   className="w-7 h-7 object-contain filter drop-shadow-sm"
+                                  onError={(e) => {
+                                    console.error('Menu logo failed to load:', e);
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                  onLoad={() => console.log('Menu logo loaded successfully')}
                                 />
                               </div>
                               <div>
@@ -421,32 +438,44 @@ function TopAppBar() {
                           {/* Support Section */}
                           <div className="px-2 py-2 border-t border-slate-200/50 dark:border-slate-700/50">
                             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-2 mb-2">Support</div>
-                            {[
-                              { key: 'support', icon: Phone, label: 'Customer Service', description: '24/7 support available' },
-                              { key: 'help', icon: HelpCircle, label: 'Help Center', description: 'FAQs and guides' },
-                              { key: 'contact', icon: MessageCircle, label: 'Contact Us', description: 'Get in touch' },
-                            ].map((item, index) => (
-                              <motion.button
-                                key={item.key}
-                                onClick={() => handleVoypathAction(item.key)}
-                                className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden rounded-xl"
-                                variants={itemVariants}
-                                custom={index + 4}
-                                whileHover={{ x: 4 }}
-                              >
-                                <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-green-100 dark:group-hover:bg-green-900/30 transition-colors duration-300 relative z-10">
-                                  <item.icon className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors duration-300" />
+                            <motion.button
+                              onClick={() => handleVoypathAction('help')}
+                              className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden rounded-xl"
+                              variants={itemVariants}
+                              custom={4}
+                              whileHover={{ x: 4 }}
+                            >
+                              <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-green-100 dark:group-hover:bg-green-900/30 transition-colors duration-300 relative z-10">
+                                <HelpCircle className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors duration-300" />
+                              </div>
+                              <div className="flex-1 relative z-10">
+                                <span className="text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 font-medium transition-colors duration-300 text-sm">
+                                  Help Center
+                                </span>
+                                <div className="text-xs text-slate-500 dark:text-slate-400">
+                                  FAQs, contact us (email/phone)
                                 </div>
-                                <div className="flex-1 relative z-10">
-                                  <span className="text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 font-medium transition-colors duration-300 text-sm">
-                                    {item.label}
-                                  </span>
-                                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                                    {item.description}
-                                  </div>
+                              </div>
+                            </motion.button>
+                            <motion.button
+                              onClick={() => handleVoypathAction('feedback')}
+                              className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden rounded-xl"
+                              variants={itemVariants}
+                              custom={5}
+                              whileHover={{ x: 4 }}
+                            >
+                              <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors duration-300 relative z-10">
+                                <MessageCircle className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300" />
+                              </div>
+                              <div className="flex-1 relative z-10">
+                                <span className="text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 font-medium transition-colors duration-300 text-sm">
+                                  Send Feedback
+                                </span>
+                                <div className="text-xs text-slate-500 dark:text-slate-400">
+                                  Help us improve
                                 </div>
-                              </motion.button>
-                            ))}
+                              </div>
+                            </motion.button>
                           </div>
 
                           {/* Legal Section */}
@@ -579,7 +608,7 @@ function TopAppBar() {
 
               {/* Profile Menu */}
               {user && (
-                <div className="relative profile-menu-container">
+                <div className="relative profile-menu-container" style={{ zIndex: 10000 }}>
                   <motion.button
                     onClick={handleProfileMenuToggle}
                     className="relative group"
@@ -587,11 +616,7 @@ function TopAppBar() {
                     whileTap={{ scale: 0.95 }}
                   >
                     <div 
-                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shadow-medium hover:shadow-glow transition-all duration-300 relative overflow-hidden border-2 ${
-                        isPremium 
-                          ? 'border-yellow-400/30' 
-                          : 'border-white dark:border-slate-800'
-                      }`}
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shadow-medium hover:shadow-glow transition-all duration-300 relative overflow-hidden"
                       style={isPremium ? {
                         background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #000000 100%)',
                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
@@ -616,10 +641,11 @@ function TopAppBar() {
                     {showProfileMenu && (
                       <>
                         {/* Backdrop */}
-                        <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                        <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="absolute right-0 top-full mt-2 w-64 sm:w-72 max-w-[calc(100vw-2rem)] bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 py-2 z-50 overflow-hidden"
+                          className="fixed right-4 top-16 w-64 sm:w-72 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden opacity-100"
+                          style={{ zIndex: 10001 }}
                           variants={menuVariants}
                           initial="hidden"
                           animate="visible"
@@ -634,11 +660,7 @@ function TopAppBar() {
                             <div className="flex items-center space-x-3">
                               <div className="relative">
                                 <div 
-                                  className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-medium border-2 ${
-                                    isPremium 
-                                      ? 'border-yellow-400/30' 
-                                      : 'border-white dark:border-slate-800'
-                                  }`}
+                                  className="w-12 h-12 rounded-xl flex items-center justify-center shadow-medium"
                                   style={isPremium ? {
                                     background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #000000 100%)',
                                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
@@ -674,43 +696,12 @@ function TopAppBar() {
                             </div>
                           </motion.div>
 
-                          {/* Quick Actions Section */}
-                          <div className="px-2 py-2">
-                            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-2 mb-2">Quick Actions</div>
-                            <div className="grid grid-cols-2 gap-2">
-                              {[
-                                { key: 'my-trips', icon: MapPin, label: 'My Trips', color: 'text-blue-500' },
-                                { key: 'current-trip', icon: Calendar, label: 'Current Trip', color: 'text-green-500' },
-                                { key: 'notifications', icon: Bell, label: 'Notifications', color: 'text-orange-500' },
-                                { key: 'help', icon: HelpCircle, label: 'Help', color: 'text-purple-500' },
-                              ].map((item, index) => (
-                                <motion.button
-                                  key={item.key}
-                                  onClick={() => handleMenuAction(item.key)}
-                                  className="flex flex-col items-center space-y-1 p-3 rounded-xl hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group"
-                                  variants={itemVariants}
-                                  custom={index + 1}
-                                  whileHover={{ scale: 1.02, y: -1 }}
-                                  whileTap={{ scale: 0.98 }}
-                                >
-                                  <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-slate-200 dark:group-hover:bg-slate-600 transition-colors duration-300">
-                                    <item.icon className={`w-4 h-4 ${item.color} transition-colors duration-300`} />
-                                  </div>
-                                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors duration-300">
-                                    {item.label}
-                                  </span>
-                                </motion.button>
-                              ))}
-                            </div>
-                          </div>
 
                           {/* Menu Items Section */}
-                          <div className="relative py-1 border-t border-slate-200/50 dark:border-slate-700/50">
+                          <div className="relative py-1">
                             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-2">Account</div>
                             {[
                               { key: 'profile', icon: User, label: 'Profile Settings' },
-                              { key: 'edit-profile', icon: Edit, label: 'Edit Profile' },
-                              { key: 'settings', icon: Settings, label: 'Preferences' },
                             ].map((item, index) => (
                               <motion.button
                                 key={item.key}
@@ -756,22 +747,6 @@ function TopAppBar() {
                               </>
                             )}
 
-                            {/* Additional Actions */}
-                            <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-1" />
-                            <motion.button
-                              onClick={() => handleMenuAction('feedback')}
-                              className="w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden"
-                              variants={itemVariants}
-                              custom={9}
-                              whileHover={{ x: 4 }}
-                            >
-                              <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors duration-300 relative z-10">
-                                <MessageCircle className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300" />
-                              </div>
-                              <span className="text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 font-medium transition-colors duration-300 relative z-10 text-sm">
-                                Send Feedback
-                              </span>
-                            </motion.button>
 
                             {!user.isGuest && (
                               <>

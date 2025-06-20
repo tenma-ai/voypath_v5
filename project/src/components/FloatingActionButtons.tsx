@@ -81,9 +81,9 @@ export function FloatingActionButtons() {
 
   return (
     <>
-      {/* Optimize Route Button - Top position */}
+      {/* Optimize Route Button - Bottom position */}
       <motion.button
-        className="fixed bottom-36 right-4 z-40"
+        className="fixed bottom-20 right-4 z-40"
         whileHover={{ scale: 1.05, y: -2 }}
         whileTap={{ scale: 0.95 }}
         onClick={hasPlaces ? handleOptimization : () => setOptimizationError('Please add places to your trip before optimizing')}
@@ -143,11 +143,11 @@ export function FloatingActionButtons() {
         </div>
       </motion.button>
 
-      {/* Add Place Button - Bottom position, only show if deadline hasn't passed */}
+      {/* Add Place Button - Top position, only show if deadline hasn't passed */}
       {!isDeadlinePassed() && (
         <Link
           to="/add-place"
-          className="fixed bottom-20 right-4 z-40"
+          className="fixed bottom-36 right-4 z-40"
         >
           <motion.div
             className="w-14 h-14 bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center group relative overflow-hidden"

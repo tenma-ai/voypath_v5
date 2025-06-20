@@ -151,7 +151,7 @@ export function HomePage() {
           />
         </div>
         <p className="text-base text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-          Plan your perfect journey with intelligent route optimization and collaborative trip planning
+          Plan your perfect journey
         </p>
       </motion.div>
 
@@ -328,7 +328,7 @@ export function HomePage() {
                         selectingTripId === trip.id ? 'opacity-70 pointer-events-none' : ''
                       }`}>
                         {/* Background Gradient */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary-50/30 via-transparent to-secondary-50/30 dark:from-primary-900/10 dark:via-transparent dark:to-secondary-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary-50/30 via-transparent to-secondary-50/30 dark:from-primary-900/10 dark:via-transparent dark:to-secondary-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 w-full max-w-full"></div>
                         
                         {/* Loading Overlay */}
                         {selectingTripId === trip.id && (

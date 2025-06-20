@@ -356,7 +356,9 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   }
 
   return (
-    <div className="h-full w-full relative">
+    <div className="h-full w-full relative" style={{
+      background: 'linear-gradient(180deg, #6BB6FF 0%, #FFFFFF 100%)'
+    }}>
       <GoogleMap
         mapContainerStyle={{ width: '100%', height: '100%' }}
         center={{ lat: 35.6812, lng: 139.7671 }}
