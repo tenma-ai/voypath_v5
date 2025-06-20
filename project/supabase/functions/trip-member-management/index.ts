@@ -257,9 +257,13 @@ async function handleCreateInvitation(req: Request, supabase: any, userId: strin
 }
 
 async function handleJoinTrip(req: Request, supabase: any, userId: string) {
+  console.log('🎯 handleJoinTrip called for user:', userId);
+  
   const requestData: InvitationJoinRequest = await req.json();
+  console.log('📝 Request data:', JSON.stringify(requestData));
   
   if (!requestData.invitation_code) {
+    console.log('❌ No invitation code provided');
     throw new Error('Invitation code is required');
   }
 
