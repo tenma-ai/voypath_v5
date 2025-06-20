@@ -64,17 +64,39 @@ export function SharedTripView() {
       };
       
       console.log('📤 Request body:', requestBody);
+      console.log('🔑 ANON_KEY present:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      };
+      
+      console.log('📤 Request headers:', Object.keys(headers));
       
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
+        headers,
         body: JSON.stringify(requestBody),
       });
       
       console.log('📥 Response status:', response.status);
+      
+      if (!response.ok) {
+        try {
+          const errorText = await response.text();
+          console.log('❌ Error response text:', errorText);
+          
+          // Try to parse as JSON for more details
+          try {
+            const errorJson = JSON.parse(errorText);
+            console.log('❌ Error response JSON:', errorJson);
+          } catch (parseError) {
+            console.log('❌ Could not parse error as JSON');
+          }
+        } catch (readError) {
+          console.log('❌ Could not read error response:', readError);
+        }
+      }
 
       if (response.ok) {
         const data = await response.json();
