@@ -219,7 +219,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     return (
       <div className="h-full relative">
         {/* View Toggle */}
-        <div className="fixed top-36 right-4 z-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1 flex">
+        <div className="fixed top-32 right-4 z-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1 flex">
           <button
             onClick={() => setViewMode('timeline')}
             className={`p-2 rounded-md transition-colors ${
@@ -243,7 +243,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
             <Grid3X3 className="w-4 h-4" />
           </button>
         </div>
-        <div className="mt-16">
+        <div className="mt-12">
           <CalendarGridView optimizationResult={optimizationResult} />
         </div>
       </div>
@@ -267,7 +267,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   return (
     <div className="h-full overflow-y-auto bg-gray-50 relative">
       {/* View Toggle */}
-      <div className="fixed top-36 right-4 z-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1 flex">
+      <div className="fixed top-32 right-4 z-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1 flex">
         <button
           onClick={() => setViewMode('timeline')}
           className={`p-2 rounded-md transition-colors ${
@@ -292,7 +292,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
         </button>
       </div>
       
-      <div className="p-6 pt-20">
+      <div className="p-6 pt-16">
         <div className="space-y-8">
           {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData]) => (
             <div key={dayKey} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">

@@ -324,7 +324,7 @@ export function HomePage() {
                         }
                       }}
                     >
-                      <div className={`relative bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-6 border border-slate-200/50 dark:border-slate-700/50 hover:border-primary-300/50 dark:hover:border-primary-600/50 transition-all duration-300 shadow-soft hover:shadow-medium overflow-hidden ${
+                      <div className={`relative bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-3 sm:p-4 border border-slate-200/50 dark:border-slate-700/50 hover:border-primary-300/50 dark:hover:border-primary-600/50 transition-all duration-300 shadow-soft hover:shadow-medium overflow-hidden ${
                         selectingTripId === trip.id ? 'opacity-70 pointer-events-none' : ''
                       }`}>
                         {/* Background Gradient */}
@@ -356,7 +356,7 @@ export function HomePage() {
                         
                         {/* Content */}
                         <div className="relative z-10">
-                          <div className="flex items-start justify-between mb-3 sm:mb-4">
+                          <div className="flex items-start justify-between mb-2 sm:mb-3">
                             <div className="flex-1 min-w-0 pr-8 sm:pr-12">
                               <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mb-1 sm:mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight">
                                 {trip.name || `${trip.departureLocation} Trip`}
@@ -394,7 +394,7 @@ export function HomePage() {
                             </div>
                           </div>
 
-                          <div className="space-y-2 sm:space-y-3">
+                          <div className="space-y-1.5 sm:space-y-2">
                             <div className="flex items-center text-slate-600 dark:text-slate-400 text-xs sm:text-sm">
                               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
                                 <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-primary-600 dark:text-primary-400" />
@@ -462,7 +462,7 @@ export function HomePage() {
         {!isPremium && (
           <motion.div 
             variants={itemVariants}
-            className="relative rounded-3xl p-8 border-2 border-yellow-400/30 overflow-hidden cursor-pointer group"
+            className="relative rounded-3xl p-4 sm:p-6 border-2 border-yellow-400/30 overflow-hidden cursor-pointer group"
             style={{
               background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #000000 100%)',
               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
@@ -481,7 +481,7 @@ export function HomePage() {
             <div className="absolute -bottom-10 -left-10 w-24 h-24 bg-yellow-600/15 rounded-full blur-2xl"></div>
 
             <div className="relative flex items-center justify-between">
-              <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-3 sm:space-x-6"
                 <motion.div 
                   className="relative"
                   animate={{
@@ -494,13 +494,13 @@ export function HomePage() {
                   }}
                 >
                   <div 
-                    className="w-16 h-16 rounded-3xl flex items-center justify-center shadow-glow border border-yellow-400/30"
+                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-3xl flex items-center justify-center shadow-glow border border-yellow-400/30"
                     style={{
                       background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #000000 100%)',
                       boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
                     }}
                   >
-                    <Crown className="w-8 h-8 text-yellow-400 fill-current drop-shadow-lg" />
+                    <Crown className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 fill-current drop-shadow-lg" />
                   </div>
                   <motion.div
                     className="absolute -inset-2 bg-yellow-400/20 rounded-3xl blur-xl"
@@ -516,7 +516,7 @@ export function HomePage() {
                 </motion.div>
                 <div>
                   <motion.h3 
-                    className="text-lg font-bold text-yellow-400 drop-shadow-lg mb-2"
+                    className="text-base sm:text-lg font-bold text-yellow-400 drop-shadow-lg mb-1 sm:mb-2"
                     animate={{
                       scale: [1, 1.02, 1],
                     }}
@@ -527,7 +527,7 @@ export function HomePage() {
                   >
                     🚀 Unlock Premium Power!
                   </motion.h3>
-                  <p className="text-slate-300 text-sm drop-shadow-sm mb-2">
+                  <p className="text-slate-300 text-xs sm:text-sm drop-shadow-sm mb-1 sm:mb-2">
                     Unlimited trips, members, and places
                   </p>
                   <div className="flex items-center space-x-4">
@@ -549,7 +549,7 @@ export function HomePage() {
                 </div>
               </div>
               <motion.div
-                className="px-6 py-3 text-black rounded-2xl font-bold text-sm shadow-glow hover:shadow-glow-lg relative overflow-hidden group border-2 border-yellow-400"
+                className="px-4 py-2 sm:px-6 sm:py-3 text-black rounded-2xl font-bold text-xs sm:text-sm shadow-glow hover:shadow-glow-lg relative overflow-hidden group border-2 border-yellow-400"
                 style={{
                   background: 'linear-gradient(135deg, #fbbf24, #f59e0b, #d97706)',
                 }}

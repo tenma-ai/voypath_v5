@@ -268,7 +268,7 @@ export function TripDetailPage() {
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       {/* Fixed Trip Header - Compact */}
-      <div className="fixed top-16 left-0 right-0 z-30 pt-2 p-2 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
+      <div className="fixed top-16 left-0 right-0 z-30 p-2 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
         {/* Subtle Background Elements */}
         <div className="absolute inset-0 overflow-hidden">
           <motion.div
@@ -363,7 +363,7 @@ export function TripDetailPage() {
       </div>
 
       {/* View Toggle - Minimal */}
-      <div className="fixed top-28 left-0 right-0 z-30 py-1 px-2 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50">
+      <div className="fixed top-24 left-0 right-0 z-30 py-1 px-2 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50">
         <div className="flex justify-center">
           <div className="bg-slate-100/80 dark:bg-slate-700/80 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50">
             {viewOptions.map(({ key, label, icon: Icon, gradient }) => (
@@ -398,7 +398,7 @@ export function TripDetailPage() {
       </div>
 
       {/* Main Content with Enhanced Transitions */}
-      <div className="flex-1 overflow-hidden relative mt-16">
+      <div className="flex-1 overflow-hidden relative mt-20">
         {/* MapView - Always rendered but conditionally visible */}
         <div 
           className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
