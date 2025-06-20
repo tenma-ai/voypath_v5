@@ -91,7 +91,16 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
     setError(null);
 
     try {
+      console.log('Starting share link generation...');
+      console.log('Trip ID:', tripId);
+      
+      if (!tripId) {
+        setError('No trip ID provided');
+        return;
+      }
+      
       const headers = await getAuthHeaders();
+      console.log('Headers prepared:', Object.keys(headers));
       
       const permissions = shareType === 'external_view' ? {
         can_view_places: true,
@@ -117,19 +126,25 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000).toISOString() : 
         null;
 
+      const requestBody = {
+        action: 'create_share_link',
+        tripId,
+        shareType,
+        permissions,
+        password: hasPassword && isPremium ? password : null,
+        expiresAt,
+        maxUses: isPremium ? maxUses : null
+      };
+
+      console.log('Request body:', requestBody);
+
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing', {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          action: 'create_share_link',
-          tripId,
-          shareType,
-          permissions,
-          password: hasPassword && isPremium ? password : null,
-          expiresAt,
-          maxUses: isPremium ? maxUses : null
-        }),
+        body: JSON.stringify(requestBody),
       });
+
+      console.log('Response status:', response.status);
 
       if (response.ok) {
         const newShare = await response.json();
