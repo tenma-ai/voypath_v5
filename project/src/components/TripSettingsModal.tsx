@@ -1,29 +1,116 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
 import { X, Settings, Users, Shield, Calendar, Clock, UserCheck, UserX, Plus } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../lib/supabase';
 
 interface TripSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+interface TripMember {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'member';
+  joinedAt: string;
+  isOnline?: boolean;
+  avatar?: string;
+}
+
 
 export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
   const { currentTrip, updateTrip } = useStore();
   const [activeTab, setActiveTab] = useState<'general' | 'permissions' | 'deadline'>('general');
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState<TripMember[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [addPlaceDeadline, setAddPlaceDeadline] = useState(
     currentTrip?.addPlaceDeadline ? new Date(currentTrip.addPlaceDeadline).toISOString().slice(0, 16) : ''
   );
 
-  const handleRoleChange = (memberId: string, newRole: 'admin' | 'member') => {
-    setMembers(prev => 
-      prev.map(member => 
-        member.id === memberId ? { ...member, role: newRole } : member
-      )
-    );
+  // Load trip members when modal opens and currentTrip is available
+  useEffect(() => {
+    if (isOpen && currentTrip?.id) {
+      loadTripMembers();
+    }
+  }, [isOpen, currentTrip?.id]);
+
+  const loadTripMembers = async () => {
+    if (!currentTrip?.id) return;
+    
+    console.log('🔍 TripSettingsModal: Loading trip members for trip:', currentTrip.id);
+    setIsLoadingMembers(true);
+    
+    try {
+      const { data: membersData, error } = await supabase
+        .from('trip_members')
+        .select(`
+          user_id,
+          role,
+          joined_at,
+          users!inner (
+            id,
+            name,
+            email
+          )
+        `)
+        .eq('trip_id', currentTrip.id);
+
+      console.log('📊 TripSettingsModal: Trip members query result:', { membersData, error });
+
+      if (error) {
+        console.error('❌ TripSettingsModal: Error loading trip members:', error);
+        return;
+      }
+
+      if (membersData) {
+        const formattedMembers: TripMember[] = membersData.map((member: any) => ({
+          id: member.user_id,
+          name: member.users.name || member.users.email,
+          email: member.users.email,
+          role: member.role,
+          joinedAt: new Date(member.joined_at).toLocaleDateString(),
+          avatar: member.users.name?.charAt(0).toUpperCase() || member.users.email?.charAt(0).toUpperCase() || 'U',
+          isOnline: Math.random() > 0.5 // Temporary random online status
+        }));
+        
+        console.log('✅ TripSettingsModal: Formatted members data:', formattedMembers);
+        setMembers(formattedMembers);
+      }
+    } catch (error) {
+      console.error('❌ TripSettingsModal: Error loading trip members:', error);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
+
+  const handleRoleChange = async (memberId: string, newRole: 'admin' | 'member') => {
+    if (!currentTrip?.id) return;
+    
+    try {
+      // Update in database
+      const { error } = await supabase
+        .from('trip_members')
+        .update({ role: newRole })
+        .eq('trip_id', currentTrip.id)
+        .eq('user_id', memberId);
+
+      if (error) {
+        console.error('Error updating member role:', error);
+        return;
+      }
+
+      // Update local state
+      setMembers(prev => 
+        prev.map(member => 
+          member.id === memberId ? { ...member, role: newRole } : member
+        )
+      );
+    } catch (error) {
+      console.error('Error updating member role:', error);
+    }
   };
 
   const handleDeadlineChange = (deadline: string) => {
@@ -203,7 +290,18 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
 
                         {/* Members List */}
                         <div className="space-y-3">
-                          {members.map((member) => (
+                          {isLoadingMembers ? (
+                            <div className="flex items-center justify-center p-8">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                              <span className="ml-3 text-slate-600 dark:text-slate-400">Loading members...</span>
+                            </div>
+                          ) : members.length === 0 ? (
+                            <div className="text-center p-8 text-slate-500 dark:text-slate-400">
+                              <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                              <p>No members found</p>
+                            </div>
+                          ) : (
+                            members.map((member) => (
                             <motion.div
                               key={member.id}
                               className="flex items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 hover:shadow-soft transition-all duration-300"
@@ -245,7 +343,8 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
                                 </select>
                               </div>
                             </motion.div>
-                          ))}
+                          ))
+                          )}
                         </div>
                       </div>
                     </motion.div>

@@ -30,6 +30,8 @@ export function SharePage() {
   const loadTripMembers = async () => {
     if (!currentTrip) return;
 
+    console.log('🔍 Loading trip members for trip:', currentTrip.id);
+
     try {
       const { data, error } = await supabase
         .from('trip_members')
@@ -37,7 +39,7 @@ export function SharePage() {
           user_id,
           role,
           joined_at,
-          users (
+          users!inner (
             id,
             name,
             email
@@ -45,19 +47,22 @@ export function SharePage() {
         `)
         .eq('trip_id', currentTrip.id);
 
+      console.log('📊 Trip members query result:', { data, error });
+
       if (error) throw error;
 
-      const membersData = data?.map(member => ({
+      const membersData = data?.map((member: any) => ({
         id: member.user_id,
-        name: member.users?.name || 'Unknown User',
+        name: member.users?.name || member.users?.email || 'Unknown User',
         email: member.users?.email || '',
         role: member.role,
         joined_at: member.joined_at
       })) || [];
 
+      console.log('✅ Formatted members data:', membersData);
       setMembers(membersData);
     } catch (error) {
-      console.error('Failed to load trip members:', error);
+      console.error('❌ Failed to load trip members:', error);
     } finally {
       setLoading(false);
     }
