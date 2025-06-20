@@ -30,6 +30,10 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
         throw new Error('Please log in to join a trip');
       }
 
+      console.log('🔐 Session exists:', !!session);
+      console.log('🔑 Access token present:', !!session.access_token);
+      console.log('🔑 Access token length:', session.access_token?.length);
+
       // Call trip-member-management Edge Function
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/join-trip', {
         method: 'POST',
