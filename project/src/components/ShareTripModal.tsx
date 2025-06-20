@@ -148,6 +148,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
 
       if (response.ok) {
         const newShare = await response.json();
+        console.log('New share created:', newShare);
         setShareLinks([newShare, ...shareLinks]);
         
         // Reset form
@@ -155,12 +156,14 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         setHasPassword(false);
         setExpiryDays(null);
         setMaxUses(null);
+        console.log('Share creation successful!');
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Network error' }));
         console.error('Share creation failed:', response.status, errorData);
         setError(errorData.error || `Failed to create share link (${response.status})`);
       }
     } catch (error) {
+      console.error('Exception during share creation:', error);
       setError(error instanceof Error ? error.message : 'Failed to create share link');
     } finally {
       setIsLoading(false);
