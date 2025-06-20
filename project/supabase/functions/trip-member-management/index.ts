@@ -191,14 +191,22 @@ async function handleCreateInvitation(req: Request, supabase: any, userId: strin
       expires_at: expiresAt.toISOString(),
       description: requestData.description || 'Trip invitation'
     })
-    .select(`
-      *,
-      trip:trips(name, destination, start_date, end_date)
-    `)
+    .select('*')
     .single();
 
   if (invitationError) {
     throw new Error(`Failed to create invitation: ${invitationError.message}`);
+  }
+
+  // トリップ情報を取得
+  const { data: trip, error: tripError } = await supabase
+    .from('trips')
+    .select('name, destination, start_date, end_date')
+    .eq('id', requestData.trip_id)
+    .single();
+
+  if (trip) {
+    invitation.trip = trip;
   }
 
   // 使用状況イベント記録
@@ -237,25 +245,52 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
   }
 
   // 招待コード検証
+  console.log('🔍 Searching for invitation code:', requestData.invitation_code.toUpperCase());
   const { data: invitation, error: invitationError } = await supabase
     .from('invitation_codes')
-    .select(`
-      *,
-      trip:trips(id, name, max_members, total_members)
-    `)
+    .select('*')
     .eq('code', requestData.invitation_code.toUpperCase())
     .eq('is_active', true)
     .single();
 
+  console.log('📋 Invitation search result:', invitation ? 'Found' : 'Not found');
+  console.log('❌ Invitation error:', invitationError?.message || 'No error');
+
   if (invitationError || !invitation) {
+    console.log('❌ Invitation code not found or error occurred');
     return new Response(
-      JSON.stringify({ error: 'Invalid or expired invitation code' }),
+      JSON.stringify({ 
+        error: 'Invalid or expired invitation code',
+        details: invitationError?.message || 'Invitation not found'
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 404,
       }
     );
   }
+
+  // トリップ情報を取得
+  console.log('🎯 Fetching trip info for:', invitation.trip_id);
+  const { data: trip, error: tripError } = await supabase
+    .from('trips')
+    .select('id, name, max_members, total_members')
+    .eq('id', invitation.trip_id)
+    .single();
+
+  if (tripError || !trip) {
+    console.log('❌ Trip not found:', tripError?.message);
+    return new Response(
+      JSON.stringify({ error: 'Associated trip not found' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      }
+    );
+  }
+
+  // invitation オブジェクトに trip 情報を追加
+  invitation.trip = trip;
 
   // 有効期限チェック
   if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
@@ -309,6 +344,7 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
   }
 
   // メンバー追加
+  console.log('👥 Adding user as member to trip:', invitation.trip_id);
   const { data: newMember, error: memberError } = await supabase
     .from('trip_members')
     .insert({
@@ -322,16 +358,27 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
       can_optimize: true,
       can_invite_members: false
     })
-    .select(`
-      *,
-      trip:trips(name, destination, start_date, end_date),
-      user:users(name, avatar_url)
-    `)
+    .select('*')
     .single();
 
   if (memberError) {
+    console.log('❌ Failed to add member:', memberError.message);
     throw new Error(`Failed to join trip: ${memberError.message}`);
   }
+
+  // ユーザー情報を取得
+  const { data: userData } = await supabase
+    .from('users')
+    .select('name, avatar_url')
+    .eq('id', userId)
+    .single();
+
+  if (userData) {
+    newMember.user = userData;
+  }
+
+  // トリップ情報を追加
+  newMember.trip = invitation.trip;
 
   // 招待コード使用回数更新
   await supabase
