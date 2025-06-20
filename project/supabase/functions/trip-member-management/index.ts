@@ -29,8 +29,13 @@ interface MemberUpdateRequest {
 }
 
 serve(async (req) => {
+  console.log('📝 Trip Member Management Function called');
+  console.log('🔗 Request URL:', req.url);
+  console.log('📋 Request method:', req.method);
+  
   // CORS対応
   if (req.method === 'OPTIONS') {
+    console.log('✅ CORS preflight request handled');
     return new Response('ok', { headers: corsHeaders });
   }
 
@@ -89,6 +94,10 @@ serve(async (req) => {
     const method = req.method;
     const pathSegments = url.pathname.split('/').filter(Boolean);
 
+    console.log('🛣️ URL pathname:', url.pathname);
+    console.log('📁 Path segments:', pathSegments);
+    console.log('👤 Authenticated user ID:', user.id);
+
     // ルーティング
     switch (method) {
       case 'POST':
@@ -136,9 +145,18 @@ serve(async (req) => {
         );
     }
   } catch (error) {
-    console.error('Trip Member Management Error:', error);
+    console.error('❌ Trip Member Management Error:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Request URL:', req.url);
+    console.error('❌ Request method:', req.method);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: 'Check server logs for more information',
+        url: req.url,
+        method: req.method
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
