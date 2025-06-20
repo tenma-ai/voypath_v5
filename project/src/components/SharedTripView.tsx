@@ -73,7 +73,7 @@ export function SharedTripView() {
       
       console.log('📤 Request headers:', Object.keys(headers));
       
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing', {
+      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v2', {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),

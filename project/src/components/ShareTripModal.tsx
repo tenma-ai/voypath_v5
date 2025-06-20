@@ -58,7 +58,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
     try {
       const headers = await getAuthHeaders();
       
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing', {
+      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v2', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -138,7 +138,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
 
       console.log('Request body:', requestBody);
 
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing', {
+      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v2', {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
@@ -184,7 +184,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
     try {
       const headers = await getAuthHeaders();
       
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing', {
+      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v2', {
         method: 'POST',
         headers,
         body: JSON.stringify({
