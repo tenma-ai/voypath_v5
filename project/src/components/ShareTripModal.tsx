@@ -297,7 +297,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
           {!isPremium && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
               <p className="text-sm text-blue-800">
-                🎁 Upgrade to Premium for password protection, expiry control, and unlimited shares!
+                🎁 Upgrade to Premium for password protection and expiry control!
               </p>
             </div>
           )}

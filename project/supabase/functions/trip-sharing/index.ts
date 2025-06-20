@@ -75,18 +75,8 @@ Deno.serve(async (req) => {
           .eq('created_by', user.id)
           .eq('is_active', true);
 
-        const maxShares = isPremium ? 999 : 2; // Premium: unlimited, Free: 2
-        if ((shareCount || 0) >= maxShares) {
-          return new Response(
-            JSON.stringify({ 
-              error: 'Share limit reached',
-              current: shareCount,
-              max: maxShares,
-              upgrade_required: !isPremium 
-            }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+        // Remove share limits to improve app adoption
+        // Premium users still get exclusive features like password protection and expiry control
 
         // Generate secure token
         const shareToken = Array.from(crypto.getRandomValues(new Uint8Array(16)))
