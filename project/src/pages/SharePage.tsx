@@ -15,7 +15,7 @@ interface TripMember {
 
 export function SharePage() {
   const { currentTrip, user } = useStore();
-  const [joinCode, setJoinCode] = useState('');
+  const [joinCode, setJoinCode] = useState('Click refresh to generate');
   const [copied, setCopied] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [members, setMembers] = useState<TripMember[]>([]);
@@ -24,7 +24,6 @@ export function SharePage() {
   useEffect(() => {
     if (currentTrip) {
       loadTripMembers();
-      generateJoinCode();
     }
   }, [currentTrip]);
 
@@ -64,23 +63,50 @@ export function SharePage() {
     }
   };
 
-  const generateJoinCode = () => {
-    // Generate a simple join code
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 3; i++) {
-      if (i > 0) code += '-';
-      for (let j = 0; j < 3; j++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
+  const generateJoinCode = async () => {
+    if (!currentTrip) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('Not authenticated');
+        return;
       }
+
+      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/create-invitation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          trip_id: currentTrip.id,
+          max_uses: 10,
+          expires_hours: 72,
+          description: 'Trip invitation'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setJoinCode(data.invitation.code);
+        console.log('✅ Invitation created:', data);
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Failed to create invitation:', errorData);
+      }
+    } catch (error) {
+      console.error('❌ Error creating invitation:', error);
     }
-    setJoinCode(code);
   };
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(joinCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (joinCode && joinCode !== 'Click refresh to generate') {
+      navigator.clipboard.writeText(joinCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const formatJoinedDate = (dateString: string) => {
@@ -139,13 +165,17 @@ export function SharePage() {
         <div className="flex space-x-3">
           <button
             onClick={handleCopyCode}
-            className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            disabled={joinCode === 'Click refresh to generate'}
+            className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Copy className="w-4 h-4" />
             <span>{copied ? 'Copied!' : 'Copy Code'}</span>
           </button>
           
-          <button className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+          <button 
+            onClick={generateJoinCode}
+            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+          >
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>

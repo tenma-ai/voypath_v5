@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { X, Key } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useStore } from '../store/useStore';
+import { supabase } from '../lib/supabase';
 
 interface JoinTripModalProps {
   isOpen: boolean;
@@ -11,19 +13,59 @@ interface JoinTripModalProps {
 export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
   const [joinCode, setJoinCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { initializeFromDatabase } = useStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsJoining(true);
+    setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsJoining(false);
-      // Handle join logic here
-      alert('Trip joined successfully!');
+    try {
+      console.log('🚀 Attempting to join trip with code:', joinCode);
+      
+      // Get auth headers
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Please log in to join a trip');
+      }
+
+      // Call trip-member-management Edge Function
+      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/join-trip', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          invitation_code: joinCode.toUpperCase()
+        }),
+      });
+
+      console.log('📥 Response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.log('❌ Error response:', errorData);
+        throw new Error(errorData.error || 'Failed to join trip');
+      }
+
+      const data = await response.json();
+      console.log('✅ Successfully joined trip:', data);
+
+      // Refresh trips data from database
+      await initializeFromDatabase();
+      
+      alert(`Trip joined successfully! Welcome to "${data.trip.name}"`);
       onClose();
       setJoinCode('');
-    }, 1500);
+    } catch (error) {
+      console.error('❌ Failed to join trip:', error);
+      setError(error instanceof Error ? error.message : 'Failed to join trip');
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   return (
@@ -77,6 +119,12 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
                 Format: ABC-123-XYZ
               </p>
             </div>
+
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
 
             <div className="flex space-x-3">
               <button
