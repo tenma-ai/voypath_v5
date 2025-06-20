@@ -82,7 +82,7 @@ export function SimpleAuth({ onAuthenticated }: SimpleAuthProps) {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `http://127.0.0.1:5173/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
