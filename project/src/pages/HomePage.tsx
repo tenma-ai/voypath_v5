@@ -168,14 +168,14 @@ export function HomePage() {
             whileHover={{ scale: 1.02, y: -2 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-6 border border-slate-200/50 dark:border-slate-700/50 shadow-soft hover:shadow-medium transition-all duration-300">
+            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-3 sm:p-6 border border-slate-200/50 dark:border-slate-700/50 shadow-soft hover:shadow-medium transition-all duration-300">
               <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent dark:from-slate-700/50 dark:to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="relative z-10 text-center space-y-3">
-                <div className={`w-12 h-12 mx-auto bg-gradient-to-r ${stat.color} rounded-2xl flex items-center justify-center shadow-glow`}>
-                  <stat.icon className="w-6 h-6 text-white" />
+              <div className="relative z-10 text-center space-y-2 sm:space-y-3">
+                <div className={`w-8 h-8 sm:w-12 sm:h-12 mx-auto bg-gradient-to-r ${stat.color} rounded-2xl flex items-center justify-center shadow-glow`}>
+                  <stat.icon className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                 </div>
                 <div>
-                  <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{stat.value}</div>
+                  <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{stat.value}</div>
                   <div className="text-xs text-slate-600 dark:text-slate-400">{stat.label}</div>
                 </div>
               </div>
@@ -188,31 +188,31 @@ export function HomePage() {
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4">
         <motion.button
           onClick={() => setShowJoinModal(true)}
-          className="group relative flex-1 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-2 border-slate-200/50 dark:border-slate-700/50 rounded-3xl p-6 hover:border-primary-300/50 dark:hover:border-primary-600/50 transition-all duration-300 overflow-hidden"
+          className="group relative flex-1 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-2 border-slate-200/50 dark:border-slate-700/50 rounded-3xl p-3 sm:p-6 hover:border-primary-300/50 dark:hover:border-primary-600/50 transition-all duration-300 overflow-hidden"
           whileHover={{ scale: 1.02, y: -2 }}
           whileTap={{ scale: 0.98 }}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-primary-50/50 to-secondary-50/50 dark:from-primary-900/20 dark:to-secondary-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           <div className="relative z-10 flex items-center justify-center space-x-3 text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100">
-            <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600 rounded-2xl flex items-center justify-center group-hover:from-primary-100 group-hover:to-primary-200 dark:group-hover:from-primary-900/50 dark:group-hover:to-primary-800/50 transition-all duration-300">
-              <Globe className="w-6 h-6" />
+            <div className="w-8 h-8 sm:w-12 sm:h-12 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-600 rounded-2xl flex items-center justify-center group-hover:from-primary-100 group-hover:to-primary-200 dark:group-hover:from-primary-900/50 dark:group-hover:to-primary-800/50 transition-all duration-300">
+              <Globe className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
-            <span className="font-semibold text-base">Join Trip</span>
+            <span className="font-semibold text-sm sm:text-base">Join Trip</span>
           </div>
         </motion.button>
 
         <motion.button
           onClick={handleCreateTrip}
-          className="group relative flex-1 bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600 rounded-3xl p-6 shadow-glow hover:shadow-glow-lg transition-all duration-300 overflow-hidden"
+          className="group relative flex-1 bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600 rounded-3xl p-3 sm:p-6 shadow-glow hover:shadow-glow-lg transition-all duration-300 overflow-hidden"
           whileHover={{ scale: 1.02, y: -2 }}
           whileTap={{ scale: 0.98 }}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           <div className="relative z-10 flex items-center justify-center space-x-3 text-white">
-            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm group-hover:bg-white/30 transition-all duration-300">
-              <Plus className="w-6 h-6" />
+            <div className="w-8 h-8 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm group-hover:bg-white/30 transition-all duration-300">
+              <Plus className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
-            <span className="font-semibold text-base">Create Trip</span>
+            <span className="font-semibold text-sm sm:text-base">Create Trip</span>
             {!canCreateTrip() && <Crown className="w-5 h-5 text-yellow-300 fill-current" />}
           </div>
         </motion.button>
@@ -356,12 +356,12 @@ export function HomePage() {
                         
                         {/* Content */}
                         <div className="relative z-10">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1 min-w-0 pr-12">
-                              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                          <div className="flex items-start justify-between mb-3 sm:mb-4">
+                            <div className="flex-1 min-w-0 pr-8 sm:pr-12">
+                              <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mb-1 sm:mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight">
                                 {trip.name || `${trip.departureLocation} Trip`}
                               </h3>
-                              <p className="text-slate-600 dark:text-slate-400 text-sm line-clamp-2 leading-relaxed">
+                              <p className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm line-clamp-2 leading-relaxed">
                                 {trip.description || `Trip starting from ${trip.departureLocation}`}
                               </p>
                             </div>
@@ -394,33 +394,33 @@ export function HomePage() {
                             </div>
                           </div>
 
-                          <div className="space-y-3">
-                            <div className="flex items-center text-slate-600 dark:text-slate-400 text-sm">
-                              <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center mr-3">
-                                <MapPin className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                          <div className="space-y-2 sm:space-y-3">
+                            <div className="flex items-center text-slate-600 dark:text-slate-400 text-xs sm:text-sm">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                                <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-primary-600 dark:text-primary-400" />
                               </div>
-                              <span className="font-medium">From: {trip.departureLocation}</span>
+                              <span className="font-medium truncate">From: {trip.departureLocation}</span>
                             </div>
                             {trip.destination && (
-                              <div className="flex items-center text-slate-600 dark:text-slate-400 text-sm">
-                                <div className="w-8 h-8 bg-secondary-100 dark:bg-secondary-900/30 rounded-xl flex items-center justify-center mr-3">
-                                  <MapPin className="w-4 h-4 text-secondary-600 dark:text-secondary-400" />
+                              <div className="flex items-center text-slate-600 dark:text-slate-400 text-xs sm:text-sm">
+                                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-secondary-100 dark:bg-secondary-900/30 rounded-xl flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                                  <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-secondary-600 dark:text-secondary-400" />
                                 </div>
-                                <span className="font-medium">To: {trip.destination}</span>
+                                <span className="font-medium truncate">To: {trip.destination}</span>
                               </div>
                             )}
                             {trip.startDate && trip.endDate && (
-                              <div className="flex items-center text-slate-600 dark:text-slate-400 text-sm">
-                                <div className="w-8 h-8 bg-accent-100 dark:bg-accent-900/30 rounded-xl flex items-center justify-center mr-3">
-                                  <Calendar className="w-4 h-4 text-accent-600 dark:text-accent-400" />
+                              <div className="flex items-center text-slate-600 dark:text-slate-400 text-xs sm:text-sm">
+                                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-accent-100 dark:bg-accent-900/30 rounded-xl flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                                  <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-accent-600 dark:text-accent-400" />
                                 </div>
-                                <span>{formatDateRange(trip.startDate, trip.endDate)}</span>
+                                <span className="truncate">{formatDateRange(trip.startDate, trip.endDate)}</span>
                               </div>
                             )}
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center text-slate-600 dark:text-slate-400 text-sm">
-                                <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center mr-3">
-                                  <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              <div className="flex items-center text-slate-600 dark:text-slate-400 text-xs sm:text-sm">
+                                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
+                                  <Users className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 dark:text-green-400" />
                                 </div>
                                 <span>{trip.memberCount} member{trip.memberCount !== 1 ? 's' : ''}</span>
                               </div>

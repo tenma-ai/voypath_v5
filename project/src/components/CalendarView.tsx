@@ -219,7 +219,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     return (
       <div className="h-full relative">
         {/* View Toggle */}
-        <div className="absolute top-4 right-4 z-20 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1 flex">
+        <div className="fixed top-36 right-4 z-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1 flex">
           <button
             onClick={() => setViewMode('timeline')}
             className={`p-2 rounded-md transition-colors ${
@@ -243,7 +243,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
             <Grid3X3 className="w-4 h-4" />
           </button>
         </div>
-        <CalendarGridView optimizationResult={optimizationResult} />
+        <div className="mt-16">
+          <CalendarGridView optimizationResult={optimizationResult} />
+        </div>
       </div>
     );
   }
@@ -265,7 +267,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   return (
     <div className="h-full overflow-y-auto bg-gray-50 relative">
       {/* View Toggle */}
-      <div className="absolute top-4 right-4 z-20 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1 flex">
+      <div className="fixed top-36 right-4 z-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1 flex">
         <button
           onClick={() => setViewMode('timeline')}
           className={`p-2 rounded-md transition-colors ${
@@ -290,13 +292,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
         </button>
       </div>
       
-      <div className="p-6">
+      <div className="p-6 pt-20">
         <div className="space-y-8">
           {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData]) => (
             <div key={dayKey} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
               {/* Day Header */}
-              <div className="bg-blue-50 px-3 py-2 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-blue-900">
+              <div className="bg-blue-50 px-3 py-1.5 sm:py-2 border-b border-gray-200">
+                <h3 className="text-xs sm:text-sm font-semibold text-blue-900">
                   Day {dayData.day} - {new Date(dayData.date).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
@@ -307,8 +309,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
               </div>
               
               {/* Time slots for this day */}
-              <div className="p-4">
-                <div className="space-y-1">
+              <div className="p-2 sm:p-4">
+                <div className="space-y-0.5 sm:space-y-1">
                   {timeSlots.map((time, index) => {
                     const place = getPlaceForTimeSlot(time, dayData.date);
                     const isHourMark = time.endsWith(':00');
@@ -316,33 +318,33 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                     return (
                       <div
                         key={time}
-                        className={`flex items-center space-x-4 py-1 ${
-                          isHourMark ? 'border-t border-gray-200 pt-2' : ''
+                        className={`flex items-center space-x-2 sm:space-x-4 py-0.5 sm:py-1 ${
+                          isHourMark ? 'border-t border-gray-200 pt-1 sm:pt-2' : ''
                         }`}
                       >
-                        <div className={`w-12 text-xs ${isHourMark ? 'font-semibold' : 'text-gray-500'}`}>
+                        <div className={`w-10 sm:w-12 text-xs ${isHourMark ? 'font-semibold' : 'text-gray-500'}`}>
                           {time}
                         </div>
                         
                         <div className="flex-1">
                           {place ? (
                             <div 
-                              className="border-l-4 border border-gray-200 rounded-lg p-3"
+                              className="border-l-4 border border-gray-200 rounded-lg p-2 sm:p-3"
                               style={getPlaceStyle(place)}
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                  <h4 className="text-sm font-semibold text-gray-900">{place.place_name || place.name}</h4>
+                                  <h4 className="text-xs sm:text-sm font-semibold text-gray-900 leading-tight">{place.place_name || place.name}</h4>
                                   <div className="flex items-center text-gray-600 text-xs mt-1">
-                                    <Clock className="w-3 h-3 mr-1" />
-                                    <span>
+                                    <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                                    <span className="text-xs">
                                       {formatTime(place.arrival_time)} - {formatTime(place.departure_time)}
                                       ({formatDuration(place.stay_duration_minutes || 60)})
                                     </span>
                                   </div>
                                 </div>
                                 {place.rating && (
-                                  <div className="text-xs text-yellow-600">
+                                  <div className="text-xs text-yellow-600 ml-2 flex-shrink-0">
                                     ★ {place.rating.toFixed(1)}
                                   </div>
                                 )}

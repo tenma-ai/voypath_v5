@@ -500,9 +500,9 @@ function TopAppBar() {
             </div>
 
             {/* Center Title Section */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 max-w-xs">
+            <div className="flex-1 flex justify-center mx-3 min-w-0">
               <motion.div 
-                className="text-center"
+                className="text-center max-w-xs"
                 key={location.pathname}
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -515,11 +515,11 @@ function TopAppBar() {
                     </div>
                   )}
                   <div className="min-w-0">
-                    <h1 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate">
+                    <h1 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate">
                       {routeInfo.title}
                     </h1>
                     {routeInfo.subtitle && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 -mt-0.5 truncate">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 -mt-0.5 truncate hidden sm:block">
                         {routeInfo.subtitle}
                       </p>
                     )}
@@ -529,11 +529,11 @@ function TopAppBar() {
             </div>
 
             {/* Right Section */}
-            <div className="flex items-center space-x-1.5 ml-auto flex-shrink-0">
+            <div className="flex items-center space-x-1 sm:space-x-1.5 flex-shrink-0">
               {/* Theme Toggle */}
               <motion.button
                 onClick={toggleTheme}
-                className="relative p-2 hover:bg-slate-100/50 dark:hover:bg-slate-700/50 rounded-xl transition-all duration-300 group"
+                className="relative p-1.5 sm:p-2 hover:bg-slate-100/50 dark:hover:bg-slate-700/50 rounded-xl transition-all duration-300 group"
                 whileHover={{ scale: 1.05, y: -1 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -569,7 +569,7 @@ function TopAppBar() {
               {!isPremium && (
                 <motion.button
                   onClick={() => setShowPremiumModal(true)}
-                  className="relative p-2 hover:bg-slate-100/50 dark:hover:bg-slate-700/50 rounded-xl transition-all duration-300 group"
+                  className="relative p-1.5 sm:p-2 hover:bg-slate-100/50 dark:hover:bg-slate-700/50 rounded-xl transition-all duration-300 group"
                   whileHover={{ scale: 1.05, y: -1 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -587,7 +587,7 @@ function TopAppBar() {
                     whileTap={{ scale: 0.95 }}
                   >
                     <div 
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-medium hover:shadow-glow transition-all duration-300 relative overflow-hidden border-2 ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shadow-medium hover:shadow-glow transition-all duration-300 relative overflow-hidden border-2 ${
                         isPremium 
                           ? 'border-yellow-400/30' 
                           : 'border-white dark:border-slate-800'

@@ -89,7 +89,7 @@ export function ChatPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
         {messages.map((msg, index) => (
           <motion.div
             key={msg.id}
@@ -159,7 +159,7 @@ export function ChatPage() {
       </div>
 
       {/* Message Input */}
-      <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
+      <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
         <div className="flex items-center space-x-3">
           <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
             <Paperclip className="w-5 h-5 text-slate-500" />
