@@ -127,7 +127,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
           permissions,
           password: hasPassword && isPremium ? password : null,
           expiresAt,
-          maxUses: isPremium ? maxUses : Math.min(maxUses || 100, 100)
+          maxUses: isPremium ? maxUses : null
         }),
       });
 
@@ -141,8 +141,9 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         setExpiryDays(null);
         setMaxUses(null);
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to create share link');
+        const errorData = await response.json().catch(() => ({ error: 'Network error' }));
+        console.error('Share creation failed:', response.status, errorData);
+        setError(errorData.error || `Failed to create share link (${response.status})`);
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to create share link');
