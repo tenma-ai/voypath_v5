@@ -55,17 +55,26 @@ export function SharedTripView() {
     setError(null);
 
     try {
+      console.log('🔍 Loading shared trip with token:', shareToken);
+      
+      const requestBody = {
+        action: 'get_shared_trip',
+        shareToken,
+        password: passwordInput || password
+      };
+      
+      console.log('📤 Request body:', requestBody);
+      
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({
-          action: 'get_shared_trip',
-          shareToken,
-          password: passwordInput || password
-        }),
+        body: JSON.stringify(requestBody),
       });
+      
+      console.log('📥 Response status:', response.status);
 
       if (response.ok) {
         const data = await response.json();

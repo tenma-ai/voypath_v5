@@ -142,6 +142,12 @@ function App() {
     );
   }
 
+  // Check if current path is a public route
+  const currentPath = window.location.pathname;
+  const isPublicRoute = currentPath.startsWith('/shared/') || 
+                       currentPath.startsWith('/auth/') ||
+                       currentPath.startsWith('/premium/');
+
   // Main app with routing that handles both authenticated and public routes
   return (
     <ErrorBoundary>
@@ -155,20 +161,24 @@ function App() {
             <Route path="premium/cancel" element={<PremiumCancelPage />} />
             
             {/* Protected routes */}
-            {isAuthenticated ? (
-              <Route path="/" element={<Layout />}>
-                <Route index element={<HomePage />} />
-                <Route path="my-trip" element={
-                  <ErrorBoundary>
-                    <TripDetailPage />
-                  </ErrorBoundary>
-                } />
-                <Route path="my-trip/my-places" element={<MyPlacesPage />} />
-                <Route path="my-trip/chat" element={<ChatPage />} />
-                <Route path="my-trip/share" element={<SharePage />} />
-                <Route path="add-place" element={<PlaceSearchToDetail />} />
-                <Route path="profile" element={<ProfilePage />} />
-              </Route>
+            {isAuthenticated || isPublicRoute ? (
+              <>
+                {!isPublicRoute && (
+                  <Route path="/" element={<Layout />}>
+                    <Route index element={<HomePage />} />
+                    <Route path="my-trip" element={
+                      <ErrorBoundary>
+                        <TripDetailPage />
+                      </ErrorBoundary>
+                    } />
+                    <Route path="my-trip/my-places" element={<MyPlacesPage />} />
+                    <Route path="my-trip/chat" element={<ChatPage />} />
+                    <Route path="my-trip/share" element={<SharePage />} />
+                    <Route path="add-place" element={<PlaceSearchToDetail />} />
+                    <Route path="profile" element={<ProfilePage />} />
+                  </Route>
+                )}
+              </>
             ) : (
               <Route path="*" element={<SimpleAuth onAuthenticated={handleAuthenticated} />} />
             )}

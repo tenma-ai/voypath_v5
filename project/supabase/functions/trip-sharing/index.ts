@@ -18,8 +18,113 @@ Deno.serve(async (req) => {
     );
 
     const { action, ...body } = await req.json();
+    console.log('🔍 Trip-sharing action:', action);
+    console.log('📤 Request body:', body);
 
     switch (action) {
+      case 'get_shared_trip': {
+        console.log('✅ Processing get_shared_trip (no auth required)');
+        
+        // Verify apikey is present (required for Supabase Edge Functions)
+        const apikey = req.headers.get('apikey');
+        if (!apikey) {
+          console.log('❌ Missing apikey header');
+          return new Response(
+            JSON.stringify({ error: 'Missing apikey header' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const { shareToken, password } = body;
+
+        // Get share data
+        const { data: share, error: shareError } = await supabaseClient
+          .from('trip_shares')
+          .select(`
+            *,
+            trips:trip_id (
+              id, name, description, start_date, end_date,
+              places (
+                id, name, address, latitude, longitude, 
+                category, wish_level, stay_duration_minutes, notes
+              )
+            )
+          `)
+          .eq('share_token', shareToken)
+          .eq('is_active', true)
+          .single();
+
+        if (shareError || !share) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid or expired share link' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Check expiry
+        if (share.expires_at && new Date(share.expires_at) < new Date()) {
+          return new Response(
+            JSON.stringify({ error: 'Share link has expired' }),
+            { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Check usage limit
+        if (share.max_uses && share.current_uses >= share.max_uses) {
+          return new Response(
+            JSON.stringify({ error: 'Share link usage limit exceeded' }),
+            { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Check password if required
+        if (share.password_hash) {
+          if (!password) {
+            return new Response(
+              JSON.stringify({ 
+                requiresPassword: true,
+                shareId: share.id 
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // Verify password
+          const encoder = new TextEncoder();
+          const data = encoder.encode(password);
+          const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+          const passwordHashCheck = Array.from(new Uint8Array(hashBuffer))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+
+          if (passwordHashCheck !== share.password_hash) {
+            return new Response(
+              JSON.stringify({ error: 'Invalid password' }),
+              { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+
+        // Record access
+        await supabaseClient.rpc('record_share_access', {
+          p_share_token: shareToken,
+          p_ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+          p_user_agent: req.headers.get('user-agent'),
+          p_referer: req.headers.get('referer')
+        });
+
+        return new Response(
+          JSON.stringify({
+            shareId: share.id,
+            trip: share.trips,
+            permissions: share.permissions,
+            shareType: share.share_type,
+            createdAt: share.created_at
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       case 'create_share_link': {
         const authorization = req.headers.get('authorization');
         if (!authorization) {
@@ -139,97 +244,6 @@ Deno.serve(async (req) => {
             expiresAt: share.expires_at,
             maxUses: share.max_uses,
             hasPassword: !!passwordHash
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      case 'get_shared_trip': {
-        const { shareToken, password } = body;
-
-        // Get share data
-        const { data: share, error: shareError } = await supabaseClient
-          .from('trip_shares')
-          .select(`
-            *,
-            trips:trip_id (
-              id, name, description, start_date, end_date,
-              places (
-                id, name, address, latitude, longitude, 
-                category, wish_level, stay_duration_minutes, notes
-              )
-            )
-          `)
-          .eq('share_token', shareToken)
-          .eq('is_active', true)
-          .single();
-
-        if (shareError || !share) {
-          return new Response(
-            JSON.stringify({ error: 'Invalid or expired share link' }),
-            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Check expiry
-        if (share.expires_at && new Date(share.expires_at) < new Date()) {
-          return new Response(
-            JSON.stringify({ error: 'Share link has expired' }),
-            { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Check usage limit
-        if (share.max_uses && share.current_uses >= share.max_uses) {
-          return new Response(
-            JSON.stringify({ error: 'Share link usage limit exceeded' }),
-            { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Check password if required
-        if (share.password_hash) {
-          if (!password) {
-            return new Response(
-              JSON.stringify({ 
-                requiresPassword: true,
-                shareId: share.id 
-              }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          // Verify password
-          const encoder = new TextEncoder();
-          const data = encoder.encode(password);
-          const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-          const passwordHashCheck = Array.from(new Uint8Array(hashBuffer))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-
-          if (passwordHashCheck !== share.password_hash) {
-            return new Response(
-              JSON.stringify({ error: 'Invalid password' }),
-              { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-        }
-
-        // Record access
-        await supabaseClient.rpc('record_share_access', {
-          p_share_token: shareToken,
-          p_ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
-          p_user_agent: req.headers.get('user-agent'),
-          p_referer: req.headers.get('referer')
-        });
-
-        return new Response(
-          JSON.stringify({
-            shareId: share.id,
-            trip: share.trips,
-            permissions: share.permissions,
-            shareType: share.share_type,
-            createdAt: share.created_at
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
