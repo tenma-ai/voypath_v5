@@ -9,45 +9,11 @@ interface TripSettingsModalProps {
   onClose: () => void;
 }
 
-const mockMembers = [
-  {
-    id: '1',
-    name: 'Alice Johnson',
-    avatar: 'A',
-    role: 'admin',
-    isOnline: true,
-    joinedAt: '5 days ago',
-  },
-  {
-    id: '2',
-    name: 'Bob Smith',
-    avatar: 'B',
-    role: 'member',
-    isOnline: true,
-    joinedAt: '4 days ago',
-  },
-  {
-    id: '3',
-    name: 'Charlie Brown',
-    avatar: 'C',
-    role: 'member',
-    isOnline: false,
-    joinedAt: '3 days ago',
-  },
-  {
-    id: '4',
-    name: 'Diana Prince',
-    avatar: 'D',
-    role: 'member',
-    isOnline: true,
-    joinedAt: '2 days ago',
-  },
-];
 
 export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
   const { currentTrip, updateTrip } = useStore();
   const [activeTab, setActiveTab] = useState<'general' | 'permissions' | 'deadline'>('general');
-  const [members, setMembers] = useState(mockMembers);
+  const [members, setMembers] = useState([]);
   const [addPlaceDeadline, setAddPlaceDeadline] = useState(
     currentTrip?.addPlaceDeadline ? new Date(currentTrip.addPlaceDeadline).toISOString().slice(0, 16) : ''
   );

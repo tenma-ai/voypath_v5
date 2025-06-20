@@ -1,64 +1,13 @@
 import React, { useState } from 'react';
 import { Send, Paperclip, Smile, MapPin, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useStore } from '../store/useStore';
 
-const mockMessages = [
-  {
-    id: '1',
-    userId: 'user1',
-    userName: 'Alice',
-    avatar: 'A',
-    message: 'Hey everyone! I found this amazing ramen place near Shibuya. Should we add it to our list?',
-    timestamp: '10:30 AM',
-    isOwn: false,
-  },
-  {
-    id: '2',
-    userId: 'user2',
-    userName: 'Bob',
-    avatar: 'B',
-    message: 'That sounds great! What\'s the name?',
-    timestamp: '10:32 AM',
-    isOwn: false,
-  },
-  {
-    id: '3',
-    userId: 'current',
-    userName: 'You',
-    avatar: 'Y',
-    message: 'I\'m definitely interested! Is it close to our other stops?',
-    timestamp: '10:35 AM',
-    isOwn: true,
-  },
-  {
-    id: '4',
-    type: 'place-share',
-    userId: 'user1',
-    userName: 'Alice',
-    avatar: 'A',
-    place: {
-      name: 'Ichiran Ramen Shibuya',
-      category: 'Restaurant',
-      rating: 4.5,
-      image: 'https://images.unsplash.com/photo-1557872943-16a5ac26437e?w=300&h=200&fit=crop'
-    },
-    timestamp: '10:36 AM',
-    isOwn: false,
-  },
-  {
-    id: '5',
-    userId: 'user3',
-    userName: 'Charlie',
-    avatar: 'C',
-    message: 'Perfect timing! I was just getting hungry 😄',
-    timestamp: '10:38 AM',
-    isOwn: false,
-  }
-];
 
 export function ChatPage() {
+  const { currentTrip } = useStore();
   const [message, setMessage] = useState('');
-  const [messages] = useState(mockMessages);
+  const [messages] = useState([]);
 
   const handleSendMessage = () => {
     if (message.trim()) {
@@ -74,15 +23,13 @@ export function ChatPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Tokyo Adventure
+              {currentTrip?.name || 'Trip Chat'}
             </h1>
             <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
               <div className="flex items-center">
                 <div className="w-2 h-2 bg-green-400 rounded-full mr-1"></div>
-                <span>4 members</span>
+                <span>{currentTrip?.memberCount || 0} member{currentTrip?.memberCount !== 1 ? 's' : ''}</span>
               </div>
-              <span>•</span>
-              <span>3 online</span>
             </div>
           </div>
         </div>

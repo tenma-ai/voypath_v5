@@ -104,60 +104,6 @@ export function SimpleAuth({ onAuthenticated }: SimpleAuthProps) {
     }
   };
 
-  const handleDevSession = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      console.log('🔧 Creating development session...');
-      
-      // Use the trip management Edge Function approach for development
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-management', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          action: 'create_dev_session',
-          email: 'dev@voypath.test'
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.user) {
-          console.log('✅ Development session created via Edge Function:', data.user.id);
-          onAuthenticated(data.user);
-          return;
-        }
-      }
-
-      // Fallback: Create a valid development user session
-      const devUser = {
-        id: '2600c340-0ecd-4166-860f-ac4798888344',
-        email: 'dev@voypath.test',
-        user_metadata: {
-          name: 'Development User'
-        },
-        app_metadata: {},
-        aud: 'authenticated',
-        created_at: new Date().toISOString(),
-        is_anonymous: false,
-        // Add session info for RLS
-        access_token: 'dev-session-token',
-        expires_at: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-      };
-
-      console.log('✅ Development session created (fallback):', devUser.id);
-      onAuthenticated(devUser);
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -293,17 +239,6 @@ export function SimpleAuth({ onAuthenticated }: SimpleAuthProps) {
             </button>
           </div>
 
-          {import.meta.env.DEV && (
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={handleDevSession}
-                className="text-sm text-indigo-600 hover:text-indigo-500"
-              >
-                Use development session
-              </button>
-            </div>
-          )}
         </form>
       </div>
     </div>

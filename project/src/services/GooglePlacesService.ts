@@ -106,11 +106,11 @@ export class GooglePlacesService {
         return this.searchWithGoogleMapsJS(request, google);
       }
 
-      // Final fallback: Mock data for development
-      return this.generateMockSearchResults(request.query);
+      // Final fallback: Return empty array
+      return [];
     } catch (error) {
       console.error('Error searching places:', error);
-      return this.generateMockSearchResults(request.query);
+      return [];
     }
   }
 
@@ -170,56 +170,12 @@ export class GooglePlacesService {
           }));
           resolve(places);
         } else {
-          resolve(this.generateMockSearchResults(request.query));
+          resolve([]);
         }
       });
     });
   }
 
-  /**
-   * Generate mock search results for development/fallback
-   */
-  private static generateMockSearchResults(query: string): GooglePlace[] {
-    const mockResults = [
-      {
-        place_id: 'ChIJ51cu8IcbXWARiRtXIothAS4',
-        name: 'Tokyo Station',
-        formatted_address: '1 Chome Marunouchi, Chiyoda City, Tokyo 100-0005, Japan',
-        geometry: { location: { lat: 35.6812, lng: 139.7671 } },
-        rating: 4.1,
-        user_ratings_total: 15000,
-        types: ['transit_station', 'establishment']
-      },
-      {
-        place_id: 'ChIJXSModoWLGGARILWiCfeu2M0',
-        name: 'Shibuya Crossing',
-        formatted_address: '2 Chome-2-1 Shibuya, Shibuya City, Tokyo 150-0002, Japan',
-        geometry: { location: { lat: 35.6598, lng: 139.7036 } },
-        rating: 4.0,
-        user_ratings_total: 8500,
-        types: ['tourist_attraction', 'point_of_interest']
-      },
-      {
-        place_id: 'ChIJ8T1GpMGOGGARDJGcBZurVw0',
-        name: 'Senso-ji Temple',
-        formatted_address: '2 Chome-3-1 Asakusa, Taito City, Tokyo 111-0032, Japan',
-        geometry: { location: { lat: 35.7148, lng: 139.7967 } },
-        rating: 4.2,
-        user_ratings_total: 30000,
-        types: ['place_of_worship', 'tourist_attraction']
-      },
-    ];
-
-    // Filter results based on query
-    if (query && query.length > 1) {
-      return mockResults.filter(place => 
-        place.name.toLowerCase().includes(query.toLowerCase()) ||
-        place.formatted_address.toLowerCase().includes(query.toLowerCase())
-      );
-    }
-
-    return mockResults;
-  }
 
   /**
    * 近場検索（位置情報ベース）

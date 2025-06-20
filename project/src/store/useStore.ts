@@ -401,7 +401,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             .from('trips')
             .select(`
               id, name, departure_location, description, destination, 
-              start_date, end_date, owner_id, created_at
+              start_date, end_date, owner_id, created_at, total_members
             `)
             .eq('owner_id', user.id)
             .order('created_at', { ascending: false })
@@ -421,7 +421,7 @@ export const useStore = create<StoreState>()((set, get) => ({
               destination: trip.destination,
               startDate: trip.start_date,
               endDate: trip.end_date,
-              memberCount: 1,
+              memberCount: trip.total_members || 1,
               createdAt: trip.created_at,
               ownerId: trip.owner_id
             }));
@@ -702,7 +702,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             destination: savedTrip.destination,
             startDate: savedTrip.start_date,
             endDate: savedTrip.end_date,
-            memberCount: 1,
+            memberCount: savedTrip.total_members || 1,
             createdAt: savedTrip.created_at,
             ownerId: savedTrip.owner_id,
           };
