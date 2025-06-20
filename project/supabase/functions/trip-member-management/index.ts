@@ -29,9 +29,10 @@ interface MemberUpdateRequest {
 }
 
 serve(async (req) => {
-  console.log('📝 Trip Member Management Function called');
-  console.log('🔗 Request URL:', req.url);
-  console.log('📋 Request method:', req.method);
+  console.log('=== TRIP MEMBER MANAGEMENT FUNCTION START ===');
+  console.log('URL:', req.url);
+  console.log('Method:', req.method);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
   
   // CORS対応
   if (req.method === 'OPTIONS') {
