@@ -206,11 +206,11 @@ export function SharedTripView() {
     try {
       console.log('🆕 Creating guest user and joining trip:', trip.name);
       
-      // Generate unique guest email
+      // Generate unique guest email (using a simpler format)
       const timestamp = Date.now();
-      const randomId = Math.random().toString(36).substr(2, 9);
-      const guestEmail = `guest.${timestamp}.${randomId}@example.com`;
-      const guestPassword = `guest_${timestamp}_${randomId}`;
+      const randomId = Math.random().toString(36).substr(2, 6);
+      const guestEmail = `guest${timestamp}@temp-mail.org`;
+      const guestPassword = `GuestPass${timestamp}`;
       
       console.log('📧 Creating guest account with email:', guestEmail);
       
