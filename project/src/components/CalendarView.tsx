@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { Calendar, Clock, MapPin, List, Grid3X3 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getPlaceColor } from '../utils/ColorUtils';
@@ -148,61 +149,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     }
   };
 
-  // If grid mode, use the grid calendar component
-  if (viewMode === 'grid') {
-    return (
-      <div className="h-full relative">
-        {/* View Toggle */}
-        <div className="fixed top-[5.5rem] right-4 z-[99999] bg-slate-100/95 dark:bg-slate-700/95 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 shadow-lg">
-          <button
-            onClick={() => setViewMode('timeline')}
-            className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
-              viewMode === 'timeline' 
-                ? 'text-white shadow-soft bg-orange-500' 
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-            title="Timeline View"
-          >
-            <List className="w-3 h-3" />
-            <span>Timeline</span>
-          </button>
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
-              viewMode === 'grid' 
-                ? 'text-white shadow-soft bg-orange-500' 
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-            title="Grid View"
-          >
-            <Grid3X3 className="w-3 h-3" />
-            <span>Grid</span>
-          </button>
-        </div>
-        <div className="mt-12">
-          <CalendarGridView optimizationResult={optimizationResult} />
-        </div>
-      </div>
-    );
-  }
-
-  if (Object.keys(formattedResult.schedulesByDay).length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Calendar className="w-8 h-8 text-gray-400" />
-          </div>
-          <p className="text-gray-600">No calendar data available</p>
-          <p className="text-sm text-gray-500 mt-2">Optimize your route to see the calendar view</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-full overflow-y-auto bg-gray-50 relative">
-      {/* View Toggle */}
+  // Render toggle buttons using Portal to ensure they appear above all other elements
+  const renderToggleButtons = () => {
+    return ReactDOM.createPortal(
       <div className="fixed top-[5.5rem] right-4 z-[99999] bg-slate-100/95 dark:bg-slate-700/95 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 shadow-lg">
         <button
           onClick={() => setViewMode('timeline')}
@@ -228,7 +177,42 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
           <Grid3X3 className="w-3 h-3" />
           <span>Grid</span>
         </button>
+      </div>,
+      document.body
+    );
+  };
+
+  // If grid mode, use the grid calendar component
+  if (viewMode === 'grid') {
+    return (
+      <div className="h-full relative">
+        {/* View Toggle - Rendered via Portal */}
+        {renderToggleButtons()}
+        <div className="mt-12">
+          <CalendarGridView optimizationResult={optimizationResult} />
+        </div>
       </div>
+    );
+  }
+
+  if (Object.keys(formattedResult.schedulesByDay).length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Calendar className="w-8 h-8 text-gray-400" />
+          </div>
+          <p className="text-gray-600">No calendar data available</p>
+          <p className="text-sm text-gray-500 mt-2">Optimize your route to see the calendar view</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-gray-50 relative">
+      {/* View Toggle - Rendered via Portal */}
+      {renderToggleButtons()}
       
       <div className="p-6 pt-16">
         <div className="space-y-8">

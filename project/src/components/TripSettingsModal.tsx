@@ -48,28 +48,47 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
     setIsLoadingMembers(true);
     
     try {
-      const { data: membersData, error } = await supabase
+      // First get trip members
+      const { data: memberIds, error: membersError } = await supabase
         .from('trip_members')
-        .select(`
-          user_id,
-          role,
-          joined_at,
-          users!inner (
-            id,
-            name,
-            email
-          )
-        `)
+        .select('user_id, role, joined_at')
         .eq('trip_id', currentTrip.id);
 
-      console.log('📊 TripSettingsModal: Trip members query result:', { membersData, error });
-
-      if (error) {
-        console.error('❌ TripSettingsModal: Error loading trip members:', error);
+      if (membersError) {
+        console.error('❌ TripSettingsModal: Error loading trip members:', membersError);
         return;
       }
 
-      if (membersData) {
+      if (!memberIds || memberIds.length === 0) {
+        console.log('ℹ️ TripSettingsModal: No members found for trip:', currentTrip.id);
+        setMembers([]);
+        return;
+      }
+
+      // Then get user details
+      const userIds = memberIds.map(m => m.user_id);
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .in('id', userIds);
+
+      if (usersError) {
+        console.error('❌ TripSettingsModal: Error loading users:', usersError);
+        return;
+      }
+
+      // Combine the data
+      const membersData = memberIds.map(member => {
+        const user = usersData?.find(u => u.id === member.user_id);
+        return {
+          ...member,
+          users: user
+        };
+      });
+
+      console.log('📊 TripSettingsModal: Combined members data:', membersData);
+
+      if (membersData && membersData.length > 0) {
         const formattedMembers: TripMember[] = membersData.map((member: any) => ({
           id: member.user_id,
           name: member.users.name || member.users.email,

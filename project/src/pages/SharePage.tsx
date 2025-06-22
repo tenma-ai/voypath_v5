@@ -39,21 +39,43 @@ export function SharePage() {
     if (!currentTrip) return;
 
     try {
-      const { data, error } = await supabase
+      // First get trip members
+      const { data: memberIds, error: membersError } = await supabase
         .from('trip_members')
-        .select(`
-          user_id,
-          role,
-          joined_at,
-          users!inner (
-            id,
-            name,
-            email
-          )
-        `)
+        .select('user_id, role, joined_at')
         .eq('trip_id', currentTrip.id);
 
-      if (error) throw error;
+      if (membersError) {
+        console.error('❌ SharePage: Error loading trip members:', membersError);
+        return;
+      }
+
+      if (!memberIds || memberIds.length === 0) {
+        console.log('ℹ️ SharePage: No members found for trip:', currentTrip.id);
+        setMembers([]);
+        return;
+      }
+
+      // Then get user details
+      const userIds = memberIds.map(m => m.user_id);
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .in('id', userIds);
+
+      if (usersError) {
+        console.error('❌ SharePage: Error loading users:', usersError);
+        return;
+      }
+
+      // Combine the data
+      const data = memberIds.map(member => {
+        const user = usersData?.find(u => u.id === member.user_id);
+        return {
+          ...member,
+          users: user
+        };
+      });
 
       const membersData = data?.map((member: any) => ({
         id: member.user_id,
