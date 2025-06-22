@@ -8,6 +8,7 @@ import { GooglePlace } from '../services/PlaceSearchService';
 import { PlaceColorCalculator } from '../utils/PlaceColorCalculator';
 import { calculatePlaceColor, getCSSProperties, PlaceColorResult } from '../utils/PlaceColorHelper';
 import { supabase } from '../lib/supabase';
+import { MemberColorService } from '../services/MemberColorService';
 
 interface ScheduleEvent {
   id: string;
@@ -65,6 +66,7 @@ export function ListView() {
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
+  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
 
   // 場所カードのスタイルを取得する関数
   const getPlaceCardStyle = (event: ScheduleEvent): React.CSSProperties => {
@@ -87,9 +89,9 @@ export function ListView() {
     );
   }, [places, currentTrip?.id]);
   
-  // Load trip members
+  // Load trip members and colors
   useEffect(() => {
-    const loadTripMembers = async () => {
+    const loadTripMembersAndColors = async () => {
       if (!currentTrip?.id) return;
       
       const { data, error } = await supabase
@@ -100,28 +102,35 @@ export function ListView() {
       if (!error && data) {
         setTripMembers(data as TripMember[]);
       }
+
+      // Load member colors
+      try {
+        const colors = await MemberColorService.getSimpleColorMapping(currentTrip.id);
+        setMemberColors(colors);
+      } catch (error) {
+        console.error('Failed to load member colors:', error);
+      }
     };
     
-    loadTripMembers();
+    loadTripMembersAndColors();
   }, [currentTrip?.id]);
 
 
   // Get member display info for a place
   const getMemberDisplay = (place: Place) => {
-    const colorInfo = PlaceColorCalculator.calculatePlaceColorInfo(
-      place,
-      tripMembers,
-      tripPlaces
-    );
+    // Use new PlaceColorHelper with member colors
+    const members = tripMembers.map(member => ({
+      id: member.user_id,
+      name: member.user?.name || 'Unknown',
+      color: memberColors[member.user_id] || '#6B7280'
+    }));
+
+    const colorResult = calculatePlaceColor(place, members, memberColors);
     
     return {
-      contributors: colorInfo.contributors.map(contributor => ({
-        id: contributor.user_id,
-        name: contributor.user_name,
-        color: contributor.color
-      })),
-      displayType: colorInfo.display_type,
-      styles: PlaceColorCalculator.generatePlaceStyles(colorInfo)
+      contributors: colorResult.contributors,
+      displayType: colorResult.type,
+      styles: getCSSProperties(colorResult)
     };
   };
   

@@ -51,10 +51,13 @@ export function MyPlacesPage() {
     loadPlacesForCurrentTrip();
   }, [currentTrip?.id]); // Re-run when currentTrip changes
 
-  // Filter places for current trip
-  const tripPlaces = places.filter(place => 
-    currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false
-  );
+  // Filter places for current trip AND current user only (my wish places)
+  const { user } = useStore();
+  const tripPlaces = places.filter(place => {
+    const isCurrentTrip = currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false;
+    const isMyPlace = place.user_id === user?.id || place.userId === user?.id;
+    return isCurrentTrip && isMyPlace;
+  });
 
   // Exclude departure and destination places from MyPlaces view
   const displayPlaces = tripPlaces.filter(place => {

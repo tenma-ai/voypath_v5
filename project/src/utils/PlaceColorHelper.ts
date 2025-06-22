@@ -16,10 +16,11 @@ export interface PlaceColorResult {
 /**
  * 場所の貢献者に基づいて色表示を計算する
  * @param place 場所オブジェクト
- * @param members トリップメンバー一覧
+ * @param members トリップメンバー一覧（color情報を含む）
+ * @param memberColors MemberColorServiceからの色マッピング（オプション）
  * @returns 色表示設定
  */
-export function calculatePlaceColor(place: any, members: any[] = []): PlaceColorResult {
+export function calculatePlaceColor(place: any, members: any[] = [], memberColors?: Record<string, string>): PlaceColorResult {
   // システム場所（出発地・到着地・空港）の場合は特別な処理
   if (place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport') {
     return {
@@ -30,7 +31,7 @@ export function calculatePlaceColor(place: any, members: any[] = []): PlaceColor
   }
 
   // 貢献者の取得
-  const contributors = getPlaceContributors(place, members);
+  const contributors = getPlaceContributors(place, members, memberColors);
   
   if (contributors.length === 0) {
     // 貢献者がいない場合はデフォルト色
@@ -81,19 +82,32 @@ export function calculatePlaceColor(place: any, members: any[] = []): PlaceColor
  * 場所の貢献者を取得する
  * @param place 場所オブジェクト
  * @param members トリップメンバー一覧
+ * @param memberColors MemberColorServiceからの色マッピング（オプション）
  * @returns 貢献者一覧
  */
-function getPlaceContributors(place: any, members: any[]): MemberContribution[] {
+function getPlaceContributors(place: any, members: any[], memberColors?: Record<string, string>): MemberContribution[] {
   const contributors: MemberContribution[] = [];
 
   // 場所を追加したユーザー
   if (place.userId || place.user_id) {
-    const member = members.find(m => m.id === (place.userId || place.user_id));
+    const userId = place.userId || place.user_id;
+    const member = members.find(m => m.id === userId);
+    
+    // 色の優先順位: memberColors > member.color > デフォルト色
+    let color: string;
+    if (memberColors && memberColors[userId]) {
+      color = memberColors[userId];
+    } else if (member?.color) {
+      color = member.color;
+    } else {
+      color = getDefaultMemberColor(userId);
+    }
+    
     if (member) {
       contributors.push({
         userId: member.id,
         memberName: member.name,
-        color: member.color || getDefaultMemberColor(member.id)
+        color: color
       });
     }
   }
@@ -105,20 +119,33 @@ function getPlaceContributors(place: any, members: any[]): MemberContribution[] 
 }
 
 /**
- * デフォルトメンバー色を取得
+ * デフォルトメンバー色を取得（MemberColorServiceと一致）
  * @param userId ユーザーID
  * @returns CSS色文字列
  */
 function getDefaultMemberColor(userId: string): string {
+  // MemberColorServiceから色を取得するための参照色リスト
   const colors = [
-    '#EF4444', // Red
-    '#3B82F6', // Blue
-    '#10B981', // Green
-    '#F59E0B', // Yellow
-    '#8B5CF6', // Purple
-    '#EC4899', // Pink
-    '#06B6D4', // Cyan
-    '#84CC16', // Lime
+    '#0077BE', // Ocean Blue
+    '#228B22', // Forest Green
+    '#FF6B35', // Sunset Orange
+    '#7B68EE', // Royal Purple
+    '#DC143C', // Cherry Red
+    '#008080', // Teal
+    '#FFC000', // Amber
+    '#E6E6FA', // Lavender
+    '#FF7F50', // Coral
+    '#50C878', // Emerald
+    '#FF00FF', // Magenta
+    '#000080', // Navy
+    '#FF007F', // Rose
+    '#32CD32', // Lime
+    '#4B0082', // Indigo
+    '#40E0D0', // Turquoise
+    '#B22222', // Crimson
+    '#808000', // Olive
+    '#708090', // Slate
+    '#800000', // Maroon
   ];
 
   // ユーザーIDに基づいて一貫した色を選択
