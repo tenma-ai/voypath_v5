@@ -272,36 +272,52 @@ export const useStore = create<StoreState>()((set, get) => ({
           console.log('🎨 [Store] ===== STARTING loadMemberColorsForTrip =====');
           console.log('🎨 [Store] Loading member colors and data for trip:', tripId);
           
-          // Load trip members with user data
+          // Load trip members first
           console.log('🎨 [Store] Querying trip_members table...');
           const { data: membersData, error: membersError } = await supabase
             .from('trip_members')
-            .select(`
-              user_id,
-              role,
-              assigned_color_index,
-              users!inner (
-                id,
-                name,
-                email
-              )
-            `)
+            .select('user_id, role, assigned_color_index')
             .eq('trip_id', tripId);
 
-          console.log('🎨 [Store] Query result:', { membersData, membersError });
+          console.log('🎨 [Store] Trip members query result:', { membersData, membersError });
 
           if (membersError) {
             console.error('🎨 [Store] Error loading trip members:', membersError);
             throw membersError;
           }
 
+          // If no members found, set empty state and return
+          if (!membersData || membersData.length === 0) {
+            console.log('🎨 [Store] No members found for trip:', tripId);
+            set({ memberColors: {}, tripMembers: [] });
+            return;
+          }
+
+          // Load user data for each member
+          console.log('🎨 [Store] Loading user data for members...');
+          const userIds = membersData.map(m => m.user_id);
+          const { data: usersData, error: usersError } = await supabase
+            .from('users')
+            .select('id, name, email')
+            .in('id', userIds);
+
+          console.log('🎨 [Store] Users query result:', { usersData, usersError });
+
+          if (usersError) {
+            console.error('🎨 [Store] Error loading users:', usersError);
+            // Continue with members data only, without user details
+          }
+
           // Format trip members data
-          const formattedMembers = membersData?.map((member: any) => ({
-            user_id: member.user_id,
-            name: member.users.name || member.users.email || 'Unknown User',
-            email: member.users.email,
-            assigned_color_index: member.assigned_color_index
-          })) || [];
+          const formattedMembers = membersData.map((member: any) => {
+            const userData = usersData?.find(u => u.id === member.user_id);
+            return {
+              user_id: member.user_id,
+              name: userData?.name || userData?.email || 'Unknown User',
+              email: userData?.email || '',
+              assigned_color_index: member.assigned_color_index
+            };
+          });
 
           console.log('🎨 [Store] Formatted members:', formattedMembers);
 
