@@ -41,6 +41,19 @@ export function SharedTripView() {
   const { shareToken } = useParams<{ shareToken: string }>();
   const navigate = useNavigate();
   const { user, setCurrentTrip, loadTripsFromDatabase } = useStore();
+  
+  // Debug user state on component mount
+  useEffect(() => {
+    console.log('🔐 SharedTripView user state on mount:', {
+      user: user ? {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        isGuest: user.isGuest
+      } : null,
+      hasUser: !!user
+    });
+  }, [user]);
   const [shareData, setShareData] = useState<SharedTripData | null>(null);
   const [isPasswordRequired, setIsPasswordRequired] = useState(false);
   const [password, setPassword] = useState('');
@@ -105,6 +118,9 @@ export function SharedTripView() {
       if (response.ok) {
         const data = await response.json();
         
+        console.log('📨 Full trip-sharing-v3 response:', data);
+        console.log('🔑 Permissions object:', JSON.stringify(data.permissions, null, 2));
+        
         if (data.requiresPassword) {
           setIsPasswordRequired(true);
           setIsLoading(false);
@@ -114,10 +130,24 @@ export function SharedTripView() {
         setShareData(data);
         setIsPasswordRequired(false);
         
+        // Debug logging for redirect conditions
+        console.log('🔍 SharedTripView redirect check:', {
+          hasUser: !!user,
+          userId: user?.id,
+          hasTrip: !!data.trip,
+          tripId: data.trip?.id,
+          hasPermissions: !!data.permissions,
+          canJoinAsMember: data.permissions?.can_join_as_member,
+          allConditionsMet: !!(user && data.trip && data.permissions?.can_join_as_member)
+        });
+        
         // If user is authenticated, redirect to actual trip page
         if (user && data.trip && data.permissions?.can_join_as_member) {
+          console.log('✅ All conditions met, redirecting to trip page');
           await redirectToTripPage(data.trip);
           return;
+        } else {
+          console.log('❌ Redirect conditions not met, staying on shared view');
         }
       } else {
         const errorData = await response.json();
