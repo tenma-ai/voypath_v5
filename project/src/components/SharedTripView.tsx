@@ -209,7 +209,7 @@ export function SharedTripView() {
       // Generate unique guest email
       const timestamp = Date.now();
       const randomId = Math.random().toString(36).substr(2, 9);
-      const guestEmail = `guest_${timestamp}_${randomId}@voypath.local`;
+      const guestEmail = `guest.${timestamp}.${randomId}@example.com`;
       const guestPassword = `guest_${timestamp}_${randomId}`;
       
       console.log('📧 Creating guest account with email:', guestEmail);
