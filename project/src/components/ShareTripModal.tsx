@@ -20,7 +20,7 @@ interface ShareLink {
 }
 
 export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps) {
-  const { user } = useStore();
+  const { user, currentTrip } = useStore();
   const [shareType, setShareType] = useState<'external_view' | 'external_collaborate'>('external_view');
   const [hasPassword, setHasPassword] = useState(false);
   const [password, setPassword] = useState('');
@@ -41,17 +41,45 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
 
   const getAuthHeaders = async () => {
     const { supabase } = await import('../lib/supabase');
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    console.log('🔐 Session debug:', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      hasAccessToken: !!session?.access_token,
+      userId: session?.user?.id,
+      userEmail: session?.user?.email,
+      tokenPrefix: session?.access_token?.substring(0, 10) + '...',
+      tokenLength: session?.access_token?.length,
+      anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 10) + '...',
+      error
+    });
+
+    // Test token validation by making a simple authenticated request
+    try {
+      const testResponse = await supabase.auth.getUser();
+      console.log('🔍 Token validation test:', {
+        success: !testResponse.error,
+        user: testResponse.data?.user?.email,
+        error: testResponse.error?.message
+      });
+    } catch (testError) {
+      console.error('🚨 Token validation failed:', testError);
+    }
     
     if (!session) {
       throw new Error('Not authenticated');
     }
 
-    return {
+    const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${session.access_token}`,
       'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
     };
+
+    console.log('📡 Headers being sent:', Object.keys(headers));
+    
+    return headers;
   };
 
   const loadExistingShares = async () => {
@@ -137,6 +165,9 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
       };
 
       console.log('Request body:', requestBody);
+      console.log('Current user from store:', { id: user?.id, email: user?.email });
+      console.log('Current trip owner:', currentTrip?.ownerId);
+      console.log('User is trip owner:', user?.id === currentTrip?.ownerId);
 
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
         method: 'POST',
@@ -145,6 +176,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
       });
 
       console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (response.ok) {
         const newShare = await response.json();
@@ -158,9 +190,24 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         setMaxUses(null);
         console.log('Share creation successful!');
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Network error' }));
-        console.error('Share creation failed:', response.status, errorData);
-        setError(errorData.error || `Failed to create share link (${response.status})`);
+        // Get both text and try to parse as JSON
+        const responseText = await response.text();
+        console.error('Raw error response:', responseText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { error: responseText || 'Network error' };
+        }
+        
+        console.error('Share creation failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          responseHeaders: Object.fromEntries(response.headers.entries())
+        });
+        setError(errorData.error || errorData.message || `Failed to create share link (${response.status})`);
       }
     } catch (error) {
       console.error('Exception during share creation:', error);

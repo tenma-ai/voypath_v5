@@ -107,6 +107,19 @@ export function ListView() {
       try {
         const colors = await MemberColorService.getSimpleColorMapping(currentTrip.id);
         console.log('🎨 Loaded member colors for ListView:', colors);
+        
+        // Find tenmakomine@gmail.com's color
+        const tenmakomieMember = data.find(member => member.user?.email === 'tenmakomine@gmail.com');
+        if (tenmakomieMember) {
+          const tenmakomiColor = colors[tenmakomieMember.user_id];
+          console.log('🎯 tenmakomine@gmail.com color:', {
+            userId: tenmakomieMember.user_id,
+            email: tenmakomieMember.user?.email,
+            name: tenmakomieMember.user?.name,
+            assignedColor: tenmakomiColor,
+            colorIndex: tenmakomieMember.assigned_color_index
+          });
+        }
         setMemberColors(colors);
 
         // Validate color assignments and fix any issues
