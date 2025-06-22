@@ -22,8 +22,17 @@ export interface PlaceColorResult {
  * @returns 色表示設定
  */
 export function calculatePlaceColor(place: any, members: any[] = [], memberColors?: Record<string, string>): PlaceColorResult {
+  console.log('🎨 [PlaceColorHelper] Calculating color for place:', {
+    placeName: place.name,
+    placeType: place.place_type,
+    userId: place.userId || place.user_id,
+    membersCount: members.length,
+    memberColors: memberColors
+  });
+
   // システム場所（出発地・到着地・空港）の場合は特別な処理
   if (place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport') {
+    console.log('🎨 [PlaceColorHelper] System place, using gray color');
     return {
       type: 'single',
       background: '#374151', // Gray-700 for system places
@@ -33,9 +42,11 @@ export function calculatePlaceColor(place: any, members: any[] = [], memberColor
 
   // 貢献者の取得
   const contributors = getPlaceContributors(place, members, memberColors);
+  console.log('🎨 [PlaceColorHelper] Contributors found:', contributors);
   
   if (contributors.length === 0) {
     // 貢献者がいない場合はデフォルト色
+    console.log('🎨 [PlaceColorHelper] No contributors, using default gray');
     return {
       type: 'single',
       background: '#6B7280', // Gray-500
@@ -45,6 +56,7 @@ export function calculatePlaceColor(place: any, members: any[] = [], memberColor
 
   if (contributors.length === 1) {
     // 1人の貢献者: 単色表示
+    console.log('🎨 [PlaceColorHelper] Single contributor, color:', contributors[0].color);
     return {
       type: 'single',
       background: contributors[0].color,
@@ -98,7 +110,7 @@ function getPlaceContributors(place: any, members: any[], memberColors?: Record<
   // 場所を追加したユーザー
   if (place.userId || place.user_id) {
     const userId = place.userId || place.user_id;
-    const member = members.find(m => m.id === userId);
+    const member = members.find(m => m.id === userId || m.user_id === userId);
     
     // 色の優先順位: memberColors > member.color > デフォルト色
     let color: string;
@@ -112,7 +124,7 @@ function getPlaceContributors(place: any, members: any[], memberColors?: Record<
     
     if (member) {
       contributors.push({
-        userId: member.id,
+        userId: member.id || member.user_id,
         memberName: member.name,
         color: color
       });
