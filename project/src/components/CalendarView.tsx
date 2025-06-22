@@ -18,12 +18,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     
     // Use centralized color utility
     const colorResult = getPlaceColor(place);
+    console.log('🎨 [CalendarView] Color result:', colorResult);
+    
+    // Handle system places based on place type
+    if (place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport') {
+      return { borderLeftColor: '#374151', backgroundColor: '#37415110' };
+    }
     
     // Convert to calendar view styling format
-    if (colorResult.type === 'system') {
-      return { borderLeftColor: '#000000', backgroundColor: '#00000010' };
-    } else if (colorResult.type === 'single') {
-      const color = colorResult.primaryColor;
+    if (colorResult.type === 'single') {
+      const color = colorResult.background;
+      console.log('🎨 [CalendarView] Single color:', color);
       return { borderLeftColor: color, backgroundColor: `${color}10` };
     } else if (colorResult.type === 'gold') {
       return { borderLeftColor: '#FFD700', backgroundColor: '#FFD70010' };
@@ -34,10 +39,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       ).join(', ');
       return { 
         borderLeftColor: colors[0],
-        background: `linear-gradient(45deg, ${gradientStops.replace(/[\d.]+%/g, '10%')})`
+        background: `linear-gradient(45deg, ${gradientStops})`
       };
     } else {
-      return { borderLeftColor: '#9CA3AF', backgroundColor: '#9CA3AF10' };
+      // Fallback to background color
+      const color = colorResult.background || '#9CA3AF';
+      console.log('🎨 [CalendarView] Fallback color:', color);
+      return { borderLeftColor: color, backgroundColor: `${color}10` };
     }
   };
 

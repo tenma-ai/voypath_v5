@@ -17,25 +17,12 @@ interface CalendarPlace {
 }
 
 const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult }) => {
-  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
   const [currentDate, setCurrentDate] = useState(new Date());
   const [monthSchedule, setMonthSchedule] = useState<Record<string, CalendarPlace[]>>({});
-  const { currentTrip } = useStore();
+  const { currentTrip, memberColors, tripMembers } = useStore();
 
-  // Load member colors for the current trip
-  useEffect(() => {
-    const loadMemberColors = async () => {
-      if (!currentTrip?.id) return;
-      try {
-        const colorMapping = await MemberColorService.getSimpleColorMapping(currentTrip.id);
-        setMemberColors(colorMapping);
-      } catch (error) {
-        console.error('Failed to load member colors:', error);
-        setMemberColors({});
-      }
-    };
-    loadMemberColors();
-  }, [currentTrip?.id]);
+  // Use centralized member colors from store
+  console.log('🎨 [CalendarGridView] Using centralized colors:', memberColors);
 
   // Process optimization result to create month schedule
   useEffect(() => {
