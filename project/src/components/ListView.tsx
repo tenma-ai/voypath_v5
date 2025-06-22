@@ -68,17 +68,20 @@ export function ListView() {
   const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
   const [memberColors, setMemberColors] = useState<Record<string, string>>({});
 
-  // 場所カードのスタイルを取得する関数
-  const getPlaceCardStyle = (event: ScheduleEvent): React.CSSProperties => {
-    if (event.type !== 'place') return {};
+  // 場所カードのスタイルとクラス名を取得する関数
+  const getPlaceCardStyle = (event: ScheduleEvent): { style: React.CSSProperties; className: string } => {
+    if (event.type !== 'place') return { style: {}, className: '' };
     
     // 対応する実際の場所オブジェクトを検索
     const place = tripPlaces.find(p => p.id === event.id);
-    if (!place) return {};
+    if (!place) return { style: {}, className: '' };
 
     // 色表示ロジックを適用
-    const colorResult = calculatePlaceColor(place, tripMembers);
-    return getCSSProperties(colorResult);
+    const colorResult = calculatePlaceColor(place, tripMembers, memberColors);
+    return {
+      style: getCSSProperties(colorResult),
+      className: colorResult.className || ''
+    };
   };
 
   // Filter places for current trip - ensure we have valid trip ID
@@ -522,8 +525,8 @@ export function ListView() {
                     <div
                       className={`flex items-start space-x-3 p-3 rounded-lg transition-all cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
                         event.type === 'travel' ? 'pl-8' : ''
-                      } ${event.type === 'place' ? 'place-card' : ''}`}
-                      style={event.type === 'place' ? getPlaceCardStyle(event) : undefined}
+                      } ${event.type === 'place' ? `place-card ${getPlaceCardStyle(event).className}` : ''}`}
+                      style={event.type === 'place' ? getPlaceCardStyle(event).style : undefined}
                       onClick={() => event.type === 'place' && toggleEventCollapse(event.id)}
                     >
                       {/* Icon */}

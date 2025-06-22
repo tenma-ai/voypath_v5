@@ -47,6 +47,33 @@
     -webkit-line-clamp: 3;
   }
   
+  /* Place color styling classes */
+  .place-single {
+    /* 1人の貢献者: 単色表示 */
+    background-color: var(--member-color-0);
+  }
+
+  .place-gradient {
+    /* 2-4人の貢献者: グラデーション表示 */
+    background: linear-gradient(45deg, 
+      var(--member-color-0) 0%, 
+      var(--member-color-1) 50%, 
+      var(--member-color-2) 100%);
+  }
+
+  .place-gradient-two {
+    /* 2人の貢献者: 2色グラデーション */
+    background: linear-gradient(45deg, 
+      var(--member-color-0) 0%, 
+      var(--member-color-1) 100%);
+  }
+
+  .place-gold {
+    /* 5人以上の貢献者: 金色表示 */
+    background: linear-gradient(45deg, #FFD700 0%, #FFA500 50%, #FFD700 100%);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+  }
+
   .text-shadow-sm {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }

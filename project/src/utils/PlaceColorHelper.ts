@@ -11,6 +11,7 @@ export interface PlaceColorResult {
   background: string;
   boxShadow?: string;
   contributors: MemberContribution[];
+  className?: string; // CSS class name for styling
 }
 
 /**
@@ -47,6 +48,7 @@ export function calculatePlaceColor(place: any, members: any[] = [], memberColor
     return {
       type: 'single',
       background: contributors[0].color,
+      className: 'place-single',
       contributors
     };
   }
@@ -56,15 +58,19 @@ export function calculatePlaceColor(place: any, members: any[] = [], memberColor
     const gradientColors = contributors.slice(0, 3).map(c => c.color);
     
     let background: string;
+    let className: string;
     if (gradientColors.length === 2) {
       background = `linear-gradient(45deg, ${gradientColors[0]} 0%, ${gradientColors[1]} 100%)`;
+      className = 'place-gradient-two';
     } else {
       background = `linear-gradient(45deg, ${gradientColors[0]} 0%, ${gradientColors[1]} 50%, ${gradientColors[2]} 100%)`;
+      className = 'place-gradient';
     }
 
     return {
       type: 'gradient',
       background,
+      className,
       contributors
     };
   }
@@ -74,6 +80,7 @@ export function calculatePlaceColor(place: any, members: any[] = [], memberColor
     type: 'gold',
     background: 'linear-gradient(45deg, #FFD700 0%, #FFA500 50%, #FFD700 100%)',
     boxShadow: '0 0 20px rgba(255, 215, 0, 0.5)',
+    className: 'place-gold',
     contributors
   };
 }
