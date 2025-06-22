@@ -1087,31 +1087,66 @@ export const useStore = create<StoreState>()((set, get) => ({
             return;
           }
 
-          // Join the trip via share token
-          const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify({
-              action: 'join_trip',
-              shareToken: pendingTrip.shareToken
-            }),
-          });
-
-          if (response.ok) {
-            console.log('✅ Successfully joined pending trip');
-            
-            // Reload trips to include the new trip
-            await get().loadTripsFromDatabase();
-            
-            // Navigate to the trip
-            window.location.href = `/trip/${pendingTrip.tripId}`;
-          } else {
-            console.error('Failed to join pending trip:', await response.text());
+          // Get current session for auth token
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            console.error('No session found for pending trip join');
+            return;
           }
+
+          // Check if user is already a member
+          try {
+            const memberResponse = await fetch(`https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/members/${pendingTrip.tripId}`, {
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              },
+            });
+
+            if (memberResponse.ok) {
+              console.log('✅ User already a member of pending trip');
+            } else {
+              // Add user as trip member directly
+              const { error } = await supabase
+                .from('trip_members')
+                .insert({
+                  trip_id: pendingTrip.tripId,
+                  user_id: session.user.id,
+                  role: 'member',
+                  joined_at: new Date().toISOString()
+                });
+
+              if (error && !error.message.includes('duplicate')) {
+                console.error('Failed to add user to trip:', error);
+                throw error;
+              } else {
+                console.log('✅ User added as trip member');
+              }
+            }
+          } catch (memberError) {
+            console.log('Adding user as trip member...');
+            // Add user as trip member directly
+            const { error } = await supabase
+              .from('trip_members')
+              .insert({
+                trip_id: pendingTrip.tripId,
+                user_id: session.user.id,
+                role: 'member',
+                joined_at: new Date().toISOString()
+              });
+
+            if (error && !error.message.includes('duplicate')) {
+              console.error('Failed to add user to trip:', error);
+            } else {
+              console.log('✅ User added as trip member');
+            }
+          }
+
+          // Reload trips to include the new trip
+          await get().loadTripsFromDatabase();
+          
+          // Navigate to the trip
+          window.location.href = `/trip/${pendingTrip.tripId}`;
 
         } catch (error) {
           console.error('Error processing pending trip join:', error);

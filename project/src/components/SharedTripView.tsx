@@ -637,14 +637,48 @@ export function SharedTripView() {
 
             {/* Inline Auth Component */}
             <AuthForm 
-              onSuccess={(user) => {
-                // Store trip info and handle redirect
-                localStorage.setItem('voypath_pending_trip', JSON.stringify({
-                  shareToken: new URLSearchParams(window.location.search).get('token'),
-                  tripId: shareData.trip.id,
-                  tripName: shareData.trip.name
-                }));
-                window.location.reload(); // Trigger pending trip join
+              onSuccess={async (user) => {
+                try {
+                  // Store trip info for pending join
+                  const pendingTrip = {
+                    shareToken: new URLSearchParams(window.location.search).get('token'),
+                    tripId: shareData.trip.id,
+                    tripName: shareData.trip.name
+                  };
+                  
+                  console.log('🔗 Processing immediate trip join after auth:', pendingTrip);
+                  
+                  // Get current session
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) {
+                    console.error('No session found after auth');
+                    return;
+                  }
+
+                  // Add user as trip member directly
+                  const { error } = await supabase
+                    .from('trip_members')
+                    .insert({
+                      trip_id: pendingTrip.tripId,
+                      user_id: session.user.id,
+                      role: 'member',
+                      joined_at: new Date().toISOString()
+                    });
+
+                  if (error && !error.message.includes('duplicate')) {
+                    console.error('Failed to add user to trip:', error);
+                  } else {
+                    console.log('✅ User added as trip member immediately');
+                  }
+
+                  // Navigate to trip page
+                  navigate(`/trip/${pendingTrip.tripId}`);
+                  
+                } catch (error) {
+                  console.error('Error processing immediate trip join:', error);
+                  // Fallback to reload
+                  window.location.reload();
+                }
               }}
             />
 
