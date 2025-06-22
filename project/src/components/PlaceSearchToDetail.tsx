@@ -27,10 +27,32 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlace, setSelectedPlace] = useState<GooglePlace | null>(null);
 
-  // Check if a place was passed from another view
+  // Check if a place was passed from another view (including edit mode)
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [originalPlaceId, setOriginalPlaceId] = useState<string | null>(null);
+
   useEffect(() => {
     if (location.state?.selectedPlace) {
       setSelectedPlace(location.state.selectedPlace);
+      
+      // Check if this is edit mode
+      if (location.state?.editMode) {
+        setIsEditMode(true);
+        setOriginalPlaceId(location.state?.originalPlaceId || null);
+        
+        // If edit mode, load existing place data into form
+        // This would typically come from the place data in the database
+        // For now, using reasonable defaults but this should be enhanced
+        setFormData({
+          visitPriority: 3, // Should be loaded from existing place
+          duration: 120,    // Should be loaded from existing place  
+          budget: 2,
+          timeSlot: 'any',
+          visitDate: '',
+          notes: ''         // Should be loaded from existing place
+        });
+      }
+      
       // Clear the location state to prevent issues on refresh
       window.history.replaceState({}, document.title);
     }
@@ -65,7 +87,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
     setIsSubmitting(true);
     try {
       // Handle form submission
-      console.log('Submitting place:', selectedPlace, formData);
+      console.log('Submitting place:', selectedPlace, formData, 'Edit mode:', isEditMode);
       
       // Generate proper UUID for place
       const generateUUID = () => {
@@ -77,57 +99,71 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
       };
       
       // Get current user and trip from store
-      const { user, currentTrip, addPlace } = useStore.getState();
+      const { user, currentTrip, addPlace, updatePlace } = useStore.getState();
       
       if (!user || !currentTrip) {
         throw new Error('User and trip required');
       }
       
-      // Create place object with proper structure
-      const newPlace = {
-        id: generateUUID(),
-        name: selectedPlace.name,
-        category: 'attraction', // Default category
-        address: selectedPlace.formatted_address || '',
-        latitude: typeof selectedPlace.geometry?.location?.lat === 'function' 
-          ? selectedPlace.geometry.location.lat()
-          : selectedPlace.geometry?.location?.lat || 0,
-        longitude: typeof selectedPlace.geometry?.location?.lng === 'function'
-          ? selectedPlace.geometry.location.lng()
-          : selectedPlace.geometry?.location?.lng || 0,
-        rating: selectedPlace.rating || 0,
-        wishLevel: formData.visitPriority,
-        stayDuration: formData.duration / 60, // Convert minutes to hours for UI
-        priceLevel: selectedPlace.price_level || formData.budget,
-        scheduled: false,
-        visitDate: formData.visitDate || undefined,
-        notes: formData.notes || '',
-        tripId: currentTrip.id,
-        userId: user.id,
-        // Additional properties to match database schema
-        wish_level: formData.visitPriority,
-        stay_duration_minutes: formData.duration,
-        trip_id: currentTrip.id,
-        user_id: user.id,
-        google_place_id: selectedPlace.place_id,
-        google_rating: selectedPlace.rating,
-        google_price_level: selectedPlace.price_level,
-        google_types: selectedPlace.types,
-        estimated_cost: formData.budget * 10, // Rough estimate
-        image_url: selectedPlace.photos && selectedPlace.photos.length > 0 
-          ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${selectedPlace.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
-          : undefined,
-        images: selectedPlace.photos ? selectedPlace.photos.map(photo => 
-          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photo.photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
-        ) : [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      // Add to store
-      await addPlace(newPlace);
-      
-      console.log('Place added successfully:', newPlace);
+      if (isEditMode && originalPlaceId) {
+        // Edit existing place
+        await updatePlace(originalPlaceId, {
+          name: selectedPlace.name,
+          category: 'attraction', // Should preserve existing or allow editing
+          wishLevel: formData.visitPriority,
+          stayDuration: formData.duration / 60, // Convert minutes to hours for UI
+          notes: formData.notes || '',
+          wish_level: formData.visitPriority,
+          stay_duration_minutes: formData.duration,
+          updated_at: new Date().toISOString()
+        });
+        console.log('Place updated successfully:', originalPlaceId);
+      } else {
+        // Create new place object with proper structure
+        const newPlace = {
+          id: generateUUID(),
+          name: selectedPlace.name,
+          category: 'attraction', // Default category
+          address: selectedPlace.formatted_address || '',
+          latitude: typeof selectedPlace.geometry?.location?.lat === 'function' 
+            ? selectedPlace.geometry.location.lat()
+            : selectedPlace.geometry?.location?.lat || 0,
+          longitude: typeof selectedPlace.geometry?.location?.lng === 'function'
+            ? selectedPlace.geometry.location.lng()
+            : selectedPlace.geometry?.location?.lng || 0,
+          rating: selectedPlace.rating || 0,
+          wishLevel: formData.visitPriority,
+          stayDuration: formData.duration / 60, // Convert minutes to hours for UI
+          priceLevel: selectedPlace.price_level || formData.budget,
+          scheduled: false,
+          visitDate: formData.visitDate || undefined,
+          notes: formData.notes || '',
+          tripId: currentTrip.id,
+          userId: user.id,
+          // Additional properties to match database schema
+          wish_level: formData.visitPriority,
+          stay_duration_minutes: formData.duration,
+          trip_id: currentTrip.id,
+          user_id: user.id,
+          google_place_id: selectedPlace.place_id,
+          google_rating: selectedPlace.rating,
+          google_price_level: selectedPlace.price_level,
+          google_types: selectedPlace.types,
+          estimated_cost: formData.budget * 10, // Rough estimate
+          image_url: selectedPlace.photos && selectedPlace.photos.length > 0 
+            ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${selectedPlace.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
+            : undefined,
+          images: selectedPlace.photos ? selectedPlace.photos.map(photo => 
+            `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photo.photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
+          ) : [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        // Add to store
+        await addPlace(newPlace);
+        console.log('Place added successfully:', newPlace);
+      }
       
       if (onComplete) {
         onComplete();
@@ -204,7 +240,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
             <ArrowLeft className="w-6 h-6 text-slate-600 dark:text-slate-400" />
           </motion.button>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-            Configure Place
+            {isEditMode ? 'Edit Place' : 'Configure Place'}
           </h1>
         </div>
 
@@ -221,24 +257,35 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column: Place Search */}
           <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                Search Places
-              </h2>
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary-500/10 to-secondary-500/10 rounded-3xl blur-xl opacity-0 focus-within:opacity-100 transition-opacity duration-500"></div>
-                <PlaceSearchInput
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  onPlaceSelect={handlePlaceSelect}
-                  placeholder="Search for places, attractions, restaurants..."
-                  className="text-lg py-4 pl-12 pr-4 rounded-2xl w-full"
-                  searchContext={{
-                    radius: 50,
-                  }}
-                />
+            {!isEditMode ? (
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                  Search Places
+                </h2>
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary-500/10 to-secondary-500/10 rounded-3xl blur-xl opacity-0 focus-within:opacity-100 transition-opacity duration-500"></div>
+                  <PlaceSearchInput
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    onPlaceSelect={handlePlaceSelect}
+                    placeholder="Search for places, attractions, restaurants..."
+                    className="text-lg py-4 pl-12 pr-4 rounded-2xl w-full"
+                    searchContext={{
+                      radius: 50,
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                  Editing Place
+                </h2>
+                <p className="text-slate-600 dark:text-slate-400 text-sm">
+                  Update the details for this place below
+                </p>
+              </div>
+            )}
 
             {/* Selected Place Preview */}
             {selectedPlace && (
@@ -369,7 +416,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
                       <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       <span className="relative z-10 flex items-center justify-center space-x-2">
                         <Plus className="w-5 h-5" />
-                        <span>{isSubmitting ? 'Adding...' : 'Add to Trip'}</span>
+                        <span>{isSubmitting ? (isEditMode ? 'Saving...' : 'Adding...') : (isEditMode ? 'Save Changes' : 'Add to Trip')}</span>
                       </span>
                     </motion.button>
                   </div>

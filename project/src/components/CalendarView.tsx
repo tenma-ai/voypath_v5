@@ -153,7 +153,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     return (
       <div className="h-full relative">
         {/* View Toggle */}
-        <div className="fixed top-[5.5rem] right-4 z-[9995] bg-slate-100/80 dark:bg-slate-700/80 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50">
+        <div className="fixed top-[5.5rem] right-4 z-[99999] bg-slate-100/95 dark:bg-slate-700/95 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 shadow-lg">
           <button
             onClick={() => setViewMode('timeline')}
             className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
@@ -203,7 +203,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   return (
     <div className="h-full overflow-y-auto bg-gray-50 relative">
       {/* View Toggle */}
-      <div className="fixed top-[5.5rem] right-4 z-[9995] bg-slate-100/80 dark:bg-slate-700/80 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50">
+      <div className="fixed top-[5.5rem] right-4 z-[99999] bg-slate-100/95 dark:bg-slate-700/95 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 shadow-lg">
         <button
           onClick={() => setViewMode('timeline')}
           className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, MapPin, Calendar, Users, Edit, Trash2, Globe, Sparkles, TrendingUp, Clock, AlertCircle, Crown, Star, Zap, Gift } from 'lucide-react';
+import { Plus, MapPin, Calendar, Users, Edit, Trash2, Globe, Sparkles, TrendingUp, Clock, AlertCircle, Crown, Star, Zap, Gift, Settings } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { GuestProfilePrompt } from '../components/GuestProfilePrompt';
 import { CreateTripModal } from '../components/CreateTripModal';
@@ -24,6 +24,7 @@ export function HomePage() {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [showTripSettingsModal, setShowTripSettingsModal] = useState(false);
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
+  const [editTripData, setEditTripData] = useState<any>(null);
   const [premiumFeature, setPremiumFeature] = useState<'trips' | 'members' | 'places' | undefined>();
   const [selectingTripId, setSelectingTripId] = useState<string | null>(null);
 
@@ -369,6 +370,23 @@ export function HomePage() {
                               </p>
                             </div>
                             <div className="flex space-x-1">
+                              {/* Edit Trip Button - Opens CreateTripModal in edit mode */}
+                              <motion.button
+                                onClick={async (e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setEditTripData(trip);
+                                  setShowCreateModal(true);
+                                }}
+                                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                title="Edit Trip"
+                              >
+                                <Edit className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                              </motion.button>
+                              
+                              {/* Settings Button - Opens TripSettingsModal */}
                               <motion.button
                                 onClick={async (e) => {
                                   e.preventDefault();
@@ -381,8 +399,9 @@ export function HomePage() {
                                 className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
+                                title="Trip Settings"
                               >
-                                <Edit className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                                <Settings className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
                               </motion.button>
                               <motion.button
                                 onClick={async (e) => {
@@ -585,7 +604,12 @@ export function HomePage() {
       {/* Modals */}
       <CreateTripModal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          setShowCreateModal(false);
+          setEditTripData(null);
+        }}
+        editMode={!!editTripData}
+        tripData={editTripData}
       />
       <JoinTripModal
         isOpen={showJoinModal}

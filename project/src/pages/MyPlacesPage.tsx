@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Grid3X3, List, Star, Clock, AlertCircle, Plus, Edit, Trash2, MoreVertical } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { PlaceImage } from '../components/PlaceImage';
 
 export function MyPlacesPage() {
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filter, setFilter] = useState('all');
   const [editingPlace, setEditingPlace] = useState<string | null>(null);
@@ -111,13 +112,27 @@ export function MyPlacesPage() {
   };
 
   const handleEditPlace = (place: any) => {
-    setEditingPlace(place.id);
-    setEditForm({
+    // Convert place to GooglePlace format for PlaceSearchToDetail
+    const googlePlaceFormat = {
+      place_id: place.place_id || place.id,
       name: place.name,
-      category: place.category,
-      wishLevel: place.wish_level || place.wishLevel || 5,
-      stayDuration: place.stay_duration_minutes ? place.stay_duration_minutes / 60 : (place.stayDuration || 2),
-      notes: place.notes || ''
+      address: place.address,
+      location: {
+        lat: place.latitude,
+        lng: place.longitude
+      },
+      rating: place.rating,
+      photos: place.photos || [],
+      types: place.category ? [place.category] : []
+    };
+
+    // Navigate to add-place page with the selected place pre-populated
+    navigate('/add-place', { 
+      state: { 
+        selectedPlace: googlePlaceFormat,
+        editMode: true,
+        originalPlaceId: place.id
+      } 
     });
   };
 

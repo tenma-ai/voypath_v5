@@ -10,9 +10,11 @@ import { GooglePlace } from '../services/PlaceSearchService';
 interface CreateTripModalProps {
   isOpen: boolean;
   onClose: () => void;
+  editMode?: boolean;
+  tripData?: any;
 }
 
-export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
+export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }: CreateTripModalProps) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     departureLocation: '',
@@ -34,9 +36,49 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
     end: null
   });
 
-  const { createTripWithAPI } = useStore();
+  const { createTripWithAPI, updateTrip } = useStore();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Initialize form data when editing
+  React.useEffect(() => {
+    if (editMode && tripData) {
+      setFormData({
+        departureLocation: tripData.departureLocation || '',
+        name: tripData.name || '',
+        description: tripData.description || '',
+        destination: tripData.destination || '',
+        startDate: tripData.startDate || tripData.start_date || '',
+        endDate: tripData.endDate || tripData.end_date || ''
+      });
+
+      // Set same departure if destination matches departure
+      if (tripData.destination === 'same as departure location' || tripData.destination === tripData.departureLocation) {
+        setUseSameDeparture(true);
+      }
+
+      // Set selected dates for calendar
+      if (tripData.startDate || tripData.start_date) {
+        const startDate = new Date(tripData.startDate || tripData.start_date);
+        const endDate = new Date(tripData.endDate || tripData.end_date || tripData.startDate || tripData.start_date);
+        setSelectedRange({ start: startDate, end: endDate });
+      }
+    } else {
+      // Reset form when not editing
+      setFormData({
+        departureLocation: '',
+        name: '',
+        description: '',
+        destination: '',
+        startDate: '',
+        endDate: ''
+      });
+      setSelectedDeparture(null);
+      setSelectedDestination(null);
+      setUseSameDeparture(false);
+      setSelectedRange({ start: null, end: null });
+    }
+  }, [editMode, tripData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +96,7 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
         ? 'same as departure location' 
         : (selectedDestination?.formatted_address || formData.destination);
       
-      const tripData = {
+      const tripUpdateData = {
         departure_location: departureLocation,
         name: formData.name || undefined,
         description: formData.description || undefined,
@@ -63,8 +105,13 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
         end_date: selectedRange.end?.toISOString().split('T')[0] || undefined,
       };
 
-      // Try to create trip with API first, fallback to local storage
-      await createTripWithAPI(tripData);
+      if (editMode && tripData) {
+        // Update existing trip
+        await updateTrip(tripData.id, tripUpdateData);
+      } else {
+        // Create new trip
+        await createTripWithAPI(tripUpdateData);
+      }
       
       onClose();
       
@@ -82,8 +129,10 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
       setSelectedRange({ start: null, end: null });
       setUseSameDeparture(false);
       
-      // Navigate to the trip page
-      navigate('/my-trip');
+      // Navigate to the trip page only when creating new trip
+      if (!editMode) {
+        navigate('/my-trip');
+      }
     } catch (error) {
       console.error('Failed to create trip:', error);
       alert('Failed to create trip. Please try again.');
@@ -234,7 +283,7 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
                       <Sparkles className="w-5 h-5 text-white" />
                     </div>
                     <Dialog.Title className="text-xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                      Create New Trip
+                      {editMode ? 'Edit Trip' : 'Create New Trip'}
                     </Dialog.Title>
                   </div>
                   <motion.button
@@ -498,10 +547,10 @@ export function CreateTripModal({ isOpen, onClose }: CreateTripModalProps) {
                       {isSubmitting ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                          Creating...
+                          {editMode ? 'Saving...' : 'Creating...'}
                         </>
                       ) : (
-                        'Create Trip'
+                        editMode ? 'Save Changes' : 'Create Trip'
                       )}
                     </span>
                   </motion.button>

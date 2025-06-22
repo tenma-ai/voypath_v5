@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useParams } from 'react-router-dom';
-import { MapPin, Calendar, Users, Settings, Wand2, Clock, AlertCircle, Sparkles, Camera, BarChart3, X } from 'lucide-react';
+import { MapPin, Calendar, Users, Settings, Wand2, Clock, AlertCircle, Sparkles, Camera, BarChart3, X, Shield, UserCheck } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import MapView from '../components/MapView';
 import CalendarView from '../components/CalendarView';
@@ -9,6 +9,17 @@ import { OptimizationModal } from '../components/OptimizationModal';
 import { OptimizationResult } from '../components/OptimizationResult';
 import { TripSettingsModal } from '../components/TripSettingsModal';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../lib/supabase';
+
+interface TripMember {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'member';
+  joinedAt: string;
+  isOnline?: boolean;
+  avatar?: string;
+}
 
 export function TripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -16,9 +27,12 @@ export function TripDetailPage() {
   const [showOptimizationModal, setShowOptimizationModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showScorePopup, setShowScorePopup] = useState(false);
+  const [showMemberPopup, setShowMemberPopup] = useState(false);
   const [tripIcon, setTripIcon] = useState<string | null>(null);
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
   const [optimizationProgress, setOptimizationProgress] = useState(0);
+  const [members, setMembers] = useState<TripMember[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   
   // Auto-clear error after 5 seconds
   useEffect(() => {
@@ -44,7 +58,81 @@ export function TripDetailPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showScorePopup]);
+
+  // Close member popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMemberPopup) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('[data-member-popup]')) {
+          setShowMemberPopup(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMemberPopup]);
+  
   const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip } = useStore();
+
+  // Load trip members when current trip changes
+  useEffect(() => {
+    if (currentTrip?.id) {
+      loadTripMembers();
+    } else {
+      setMembers([]);
+    }
+  }, [currentTrip?.id]);
+
+  const loadTripMembers = async () => {
+    if (!currentTrip?.id) return;
+    
+    console.log('🔍 TripDetailPage: Loading trip members for trip:', currentTrip.id);
+    setIsLoadingMembers(true);
+    
+    try {
+      const { data: membersData, error } = await supabase
+        .from('trip_members')
+        .select(`
+          user_id,
+          role,
+          joined_at,
+          users!inner (
+            id,
+            name,
+            email
+          )
+        `)
+        .eq('trip_id', currentTrip.id);
+
+      console.log('📊 TripDetailPage: Trip members query result:', { membersData, error });
+
+      if (error) {
+        console.error('❌ TripDetailPage: Error loading trip members:', error);
+        return;
+      }
+
+      if (membersData) {
+        const formattedMembers: TripMember[] = membersData.map((member: any) => ({
+          id: member.user_id,
+          name: member.users.name || member.users.email,
+          email: member.users.email,
+          role: member.role,
+          joinedAt: new Date(member.joined_at).toLocaleDateString(),
+          avatar: member.users.name?.charAt(0).toUpperCase() || member.users.email?.charAt(0).toUpperCase() || 'U',
+          isOnline: Math.random() > 0.5 // Temporary random online status
+        }));
+        
+        console.log('✅ TripDetailPage: Formatted members data:', formattedMembers);
+        setMembers(formattedMembers);
+      }
+    } catch (error) {
+      console.error('❌ TripDetailPage: Error loading trip members:', error);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
 
   // Handle route parameter - set current trip if tripId is provided
   useEffect(() => {
@@ -333,9 +421,50 @@ export function TripDetailPage() {
                     <span>{formatDateRange(trip.startDate, trip.endDate)}</span>
                   </div>
                 )}
-                <div className="flex items-center space-x-1 text-xs text-slate-600 dark:text-slate-400">
-                  <Users className="w-3 h-3" />
-                  <span>{trip.memberCount}</span>
+                {/* Member Icons - Clickable */}
+                <div className="relative flex items-center space-x-1" data-member-popup>
+                  <motion.button
+                    onClick={() => setShowMemberPopup(!showMemberPopup)}
+                    className="flex items-center space-x-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg px-2 py-1 transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {isLoadingMembers ? (
+                      <div className="flex items-center space-x-1">
+                        <div className="w-3 h-3 border border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-xs text-slate-600 dark:text-slate-400">Loading...</span>
+                      </div>
+                    ) : members.length > 0 ? (
+                      <div className="flex items-center space-x-1">
+                        {/* Show up to 3 member avatars */}
+                        <div className="flex -space-x-1">
+                          {members.slice(0, 3).map((member, index) => (
+                            <div
+                              key={member.id}
+                              className="relative w-5 h-5 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center border border-white dark:border-slate-800 shadow-sm"
+                              style={{ zIndex: 3 - index }}
+                            >
+                              <span className="text-[8px] font-bold text-white">{member.avatar}</span>
+                              {member.isOnline && (
+                                <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-400 border border-white dark:border-slate-800 rounded-full"></div>
+                              )}
+                            </div>
+                          ))}
+                          {members.length > 3 && (
+                            <div className="w-5 h-5 bg-slate-300 dark:bg-slate-600 rounded-full flex items-center justify-center border border-white dark:border-slate-800 shadow-sm">
+                              <span className="text-[8px] font-bold text-slate-600 dark:text-slate-300">+{members.length - 3}</span>
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-600 dark:text-slate-400 ml-1">{members.length}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-1 text-xs text-slate-600 dark:text-slate-400">
+                        <Users className="w-3 h-3" />
+                        <span>{trip.memberCount}</span>
+                      </div>
+                    )}
+                  </motion.button>
                 </div>
               </div>
               
@@ -473,6 +602,113 @@ export function TripDetailPage() {
       </AnimatePresence>
 
       {/* Removed Optimization Result Modal - Now displayed directly in ListView/CalendarView/MapView */}
+
+      {/* Member Popup Portal - Rendered at document root for maximum z-index */}
+      {showMemberPopup && ReactDOM.createPortal(
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[99998] flex items-start justify-center pt-20"
+            style={{ zIndex: 99998 }}
+            onClick={() => setShowMemberPopup(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: -20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-96 max-w-[90vw]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Popup header */}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Trip Members</h3>
+                <button
+                  onClick={() => setShowMemberPopup(false)}
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+              
+              {/* Members list */}
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {isLoadingMembers ? (
+                  <div className="flex items-center justify-center p-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                    <span className="ml-3 text-slate-600 dark:text-slate-400">Loading members...</span>
+                  </div>
+                ) : members.length === 0 ? (
+                  <div className="text-center p-8 text-slate-500 dark:text-slate-400">
+                    <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No members found</p>
+                  </div>
+                ) : (
+                  members.map((member) => (
+                    <motion.div
+                      key={member.id}
+                      className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50 hover:shadow-sm transition-all duration-300"
+                      whileHover={{ y: -1 }}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="relative">
+                          <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center shadow-medium">
+                            <span className="text-white font-bold text-sm">{member.avatar}</span>
+                          </div>
+                          {member.isOnline && (
+                            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 border-2 border-white dark:border-slate-800 rounded-full"></div>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-slate-900 dark:text-slate-100 text-sm">
+                              {member.name}
+                            </span>
+                            {member.role === 'admin' && (
+                              <Shield className="w-3 h-3 text-blue-500" />
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {member.email}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        {member.isOnline && (
+                          <div className="px-2 py-1 bg-green-100 dark:bg-green-900/20 rounded-full">
+                            <span className="text-xs font-medium text-green-700 dark:text-green-300">Online</span>
+                          </div>
+                        )}
+                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          member.role === 'admin' 
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
+                            : 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300'
+                        }`}>
+                          {member.role === 'admin' ? 'Admin' : 'Member'}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+
+              {/* Footer info */}
+              {members.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                    <span>{members.length} member{members.length !== 1 ? 's' : ''} total</span>
+                    <span>{members.filter(m => m.role === 'admin').length} admin{members.filter(m => m.role === 'admin').length !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Score Popup Portal - Rendered at document root for maximum z-index */}
       {showScorePopup && optimizationResult && ReactDOM.createPortal(

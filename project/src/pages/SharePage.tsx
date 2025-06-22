@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, RefreshCw, Users, Settings, Crown, MoreVertical, Share2, ExternalLink } from 'lucide-react';
+import { Copy, Users, Crown, Share2, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { ShareTripModal } from '../components/ShareTripModal';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 
@@ -14,27 +13,30 @@ interface TripMember {
 }
 
 export function SharePage() {
-  const { currentTrip, user } = useStore();
-  const [joinCode, setJoinCode] = useState('Click refresh to generate');
-  const [copied, setCopied] = useState(false);
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const { currentTrip } = useStore();
+  const [joinCode, setJoinCode] = useState('');
+  const [shareLink, setShareLink] = useState('');
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [members, setMembers] = useState<TripMember[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🔄 SharePage useEffect triggered:', { currentTripId: currentTrip?.id, currentTripName: currentTrip?.name });
     if (currentTrip) {
-      console.log('🔄 SharePage: Loading members for trip:', currentTrip.name);
+      setShareLink(`${window.location.origin}/join/${currentTrip.id}`);
+      setJoinCode(generateFixedJoinCode(currentTrip.id));
       loadTripMembers();
-    } else {
-      console.log('❌ SharePage: No currentTrip available');
     }
   }, [currentTrip]);
 
+  const generateFixedJoinCode = (tripId: string) => {
+    // Generate a consistent 6-character code based on trip ID
+    const hash = tripId.slice(-6).toUpperCase();
+    return hash.length >= 6 ? hash : (hash + 'ABCDEF').slice(0, 6);
+  };
+
   const loadTripMembers = async () => {
     if (!currentTrip) return;
-
-    console.log('🔍 Loading trip members for trip:', currentTrip.id);
 
     try {
       const { data, error } = await supabase
@@ -51,8 +53,6 @@ export function SharePage() {
         `)
         .eq('trip_id', currentTrip.id);
 
-      console.log('📊 Trip members query result:', { data, error });
-
       if (error) throw error;
 
       const membersData = data?.map((member: any) => ({
@@ -63,7 +63,6 @@ export function SharePage() {
         joined_at: member.joined_at
       })) || [];
 
-      console.log('✅ Formatted members data:', membersData);
       setMembers(membersData);
     } catch (error) {
       console.error('❌ Failed to load trip members:', error);
@@ -72,50 +71,16 @@ export function SharePage() {
     }
   };
 
-  const generateJoinCode = async () => {
-    if (!currentTrip) return;
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('Not authenticated');
-        return;
-      }
-
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/create-invitation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          trip_id: currentTrip.id,
-          max_uses: 10,
-          expires_hours: 72,
-          description: 'Trip invitation'
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setJoinCode(data.invitation.code);
-        console.log('✅ Invitation created:', data);
-      } else {
-        const errorData = await response.json();
-        console.error('❌ Failed to create invitation:', errorData);
-      }
-    } catch (error) {
-      console.error('❌ Error creating invitation:', error);
-    }
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(joinCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const handleCopyCode = () => {
-    if (joinCode && joinCode !== 'Click refresh to generate') {
-      navigator.clipboard.writeText(joinCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const formatJoinedDate = (dateString: string) => {
@@ -125,143 +90,158 @@ export function SharePage() {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays === 1) return 'today';
-    if (diffDays === 2) return 'yesterday';
-    return `${diffDays} days ago`;
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
+    return date.toLocaleDateString();
   };
 
-  return (
-    <div className="p-4 space-y-6">
-      {/* External Share Section */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            External Sharing
-          </h2>
-          <button
-            onClick={() => setIsShareModalOpen(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Share2 className="w-4 h-4" />
-            <span>Create Share Link</span>
-          </button>
-        </div>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-          Create shareable links for people outside your trip. Control permissions and access.
-        </p>
-        <div className="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
-          <ExternalLink className="w-4 h-4" />
-          <span>Share with anyone, even without an account</span>
-        </div>
-      </div>
-
-      {/* Join Code Section */}
-      <div className="bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-xl p-6 border border-primary-200 dark:border-primary-800">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-          Member Invitation Code
-        </h2>
-        
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 mb-4">
-          <div className="text-center">
-            <div className="text-3xl font-mono font-bold text-slate-900 dark:text-slate-100 tracking-wider mb-2">
-              {joinCode}
-            </div>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Valid for 7 days
-            </p>
+  if (!currentTrip) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center py-8">
+            <p className="text-slate-600 dark:text-slate-400">No trip selected</p>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        <div className="flex space-x-3">
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-4">
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+            Share Trip
+          </h1>
+          <p className="text-slate-600 dark:text-slate-400">
+            Share your trip with others using the link or invitation code below
+          </p>
+        </div>
+
+        {/* Share Link Section */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 border border-slate-200 dark:border-slate-700 shadow-lg">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <Share2 className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                Share Link
+              </h2>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Anyone with this link can join your trip
+              </p>
+            </div>
+          </div>
+          
+          <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 mb-4">
+            <div className="text-sm font-mono text-slate-900 dark:text-slate-100 break-all">
+              {shareLink}
+            </div>
+          </div>
+
           <button
-            onClick={handleCopyCode}
-            disabled={joinCode === 'Click refresh to generate'}
-            className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleCopyLink}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
           >
             <Copy className="w-4 h-4" />
-            <span>{copied ? 'Copied!' : 'Copy Code'}</span>
-          </button>
-          
-          <button 
-            onClick={generateJoinCode}
-            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Members List */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Members ({members.length})
-          </h3>
-          <button className="flex items-center space-x-2 px-3 py-1 bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded-lg text-sm font-medium hover:bg-primary-200 dark:hover:bg-primary-900/30 transition-colors">
-            <Users className="w-4 h-4" />
-            <span>Invite</span>
+            <span>{copiedLink ? 'Copied!' : 'Copy Link'}</span>
           </button>
         </div>
 
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-slate-600 dark:text-slate-400 mt-2">Loading members...</p>
+        {/* Invitation Code Section */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 border border-slate-200 dark:border-slate-700 shadow-lg">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-600 rounded-xl flex items-center justify-center">
+              <ExternalLink className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                Invitation Code
+              </h2>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Share this code for easy joining
+              </p>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {members.map((member, index) => (
-              <motion.div
-                key={member.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center">
-                      <span className="text-white font-medium">
+          
+          <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-6 mb-4">
+            <div className="text-center">
+              <div className="text-4xl font-mono font-bold text-slate-900 dark:text-slate-100 tracking-wider">
+                {joinCode}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={handleCopyCode}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium"
+          >
+            <Copy className="w-4 h-4" />
+            <span>{copiedCode ? 'Copied!' : 'Copy Code'}</span>
+          </button>
+        </div>
+
+        {/* Members Section */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 border border-slate-200 dark:border-slate-700 shadow-lg">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+              <Users className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                Members ({members.length})
+              </h2>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                People who have joined this trip
+              </p>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-slate-600 dark:text-slate-400 mt-2">Loading members...</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {members.map((member, index) => (
+                <motion.div
+                  key={member.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center">
+                      <span className="text-white font-medium text-lg">
                         {member.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
-                  </div>
-                  
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-slate-900 dark:text-slate-100">
-                        {member.name}
-                      </span>
-                      {member.role === 'admin' && (
-                        <Crown className="w-4 h-4 text-yellow-500" />
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
-                      <span>{member.role === 'admin' ? 'Owner' : 'Member'}</span>
-                      <span>•</span>
-                      <span>Joined {formatJoinedDate(member.joined_at)}</span>
+                    
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium text-slate-900 dark:text-slate-100">
+                          {member.name}
+                        </span>
+                        {member.role === 'admin' && (
+                          <Crown className="w-4 h-4 text-yellow-500" />
+                        )}
+                      </div>
+                      <div className="text-sm text-slate-500 dark:text-slate-400">
+                        {member.role === 'admin' ? 'Owner' : 'Member'} • Joined {formatJoinedDate(member.joined_at)}
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {member.role !== 'admin' && user?.id === currentTrip?.ownerId && (
-                  <button className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
-                    <MoreVertical className="w-4 h-4 text-slate-500" />
-                  </button>
-                )}
-              </motion.div>
-            ))}
-          </div>
-        )}
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* Share Modal */}
-      {currentTrip && (
-        <ShareTripModal
-          isOpen={isShareModalOpen}
-          onClose={() => setIsShareModalOpen(false)}
-          tripId={currentTrip.id}
-        />
-      )}
     </div>
   );
 }
