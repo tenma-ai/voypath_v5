@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import { supabase } from '../lib/supabase';
 
 interface SharedTripData {
   shareId: string;
@@ -133,6 +134,9 @@ export function SharedTripView() {
     try {
       console.log('🔄 Redirecting to trip page:', trip.name);
       
+      // First, add user as member to the trip via share link join
+      await joinTripViaShareLink(trip.id);
+      
       // Reload trips to ensure user has access to the shared trip
       await loadTripsFromDatabase();
       
@@ -156,6 +160,59 @@ export function SharedTripView() {
     } catch (error) {
       console.error('❌ Failed to redirect to trip page:', error);
       setError('Failed to access trip. Please try joining manually.');
+    }
+  };
+
+  const joinTripViaShareLink = async (tripId: string) => {
+    try {
+      console.log('🔗 Joining trip via share link:', tripId);
+      
+      // Get current session for auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('User not authenticated');
+      }
+
+      // Check if user is already a member
+      try {
+        const memberResponse = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/members/' + tripId, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+        });
+        
+        if (memberResponse.ok) {
+          const existingMembers = await memberResponse.json();
+          const isAlreadyMember = existingMembers.some((m: any) => m.user_id === user?.id);
+          
+          if (isAlreadyMember) {
+            console.log('✅ User is already a trip member');
+            return;
+          }
+        }
+      } catch (error) {
+        console.log('⚠️ Could not check existing membership, proceeding to add user');
+      }
+
+      // Add user as member directly to database (simpler approach)
+      const { error } = await supabase
+        .from('trip_members')
+        .insert({
+          trip_id: tripId,
+          user_id: user?.id,
+          role: 'member',
+          joined_at: new Date().toISOString()
+        });
+
+      if (error && !error.message.includes('duplicate')) {
+        throw error;
+      }
+      
+      console.log('✅ User added as trip member');
+    } catch (error) {
+      console.error('❌ Failed to join trip via share link:', error);
+      throw error;
     }
   };
 
