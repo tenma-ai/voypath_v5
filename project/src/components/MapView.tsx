@@ -1,9 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Polyline } from '@react-google-maps/api';
 import { MapPin, Car, UserRound } from 'lucide-react';
-import { PlaceColorCalculator } from '../utils/PlaceColorCalculator';
-import { MemberColorService } from '../services/MemberColorService';
 import { useStore } from '../store/useStore';
+import { getPlaceColor } from '../utils/ColorUtils';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -13,8 +12,7 @@ interface MapViewProps {
 
 const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
-  const { currentTrip } = useStore();
+  const { currentTrip, memberColors, tripMembers } = useStore();
 
   // Load Google Maps API
   const { isLoaded, loadError } = useJsApiLoader({
@@ -46,48 +44,17 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
 
   const places = getAllPlaces();
 
-  // Load member colors for the current trip
-  useEffect(() => {
-    const loadMemberColors = async () => {
-      if (!currentTrip?.id) return;
+  // Colors are now loaded centrally via store
 
-      try {
-        const colorMapping = await MemberColorService.getSimpleColorMapping(currentTrip.id);
-        setMemberColors(colorMapping);
-      } catch (error) {
-        console.error('🗺️ [MapView] Failed to load member colors:', error);
-        setMemberColors({});
-      }
-    };
-
-    loadMemberColors();
-  }, [currentTrip?.id]);
-
-  // Create custom marker icon based on place color
+  // Create custom marker icon based on place color using centralized color logic
   const createCustomMarkerIcon = (place: any, index: number, allPlaces: any[]) => {
-
-    // Departure and arrival points are black
-    const placeName = place.place_name || place.name || '';
-    const placeNameLower = placeName.toLowerCase();
+    console.log('🗺️ [MapView] Creating marker for place:', place.place_name || place.name);
     
-    // Check various patterns for departure/arrival
-    const isDeparture = placeName.includes('Departure:') || 
-                       placeNameLower.includes('departure') ||
-                       index === 0;
-                       
-    const isArrival = placeName.includes('Return to Departure:') || 
-                     placeNameLower.includes('return') ||
-                     placeNameLower.includes('arrival') ||
-                     index === allPlaces.length - 1;
-                     
-    const isAirport = placeNameLower.includes('airport') || 
-                     placeName.includes('(HND)') ||
-                     placeName.includes('(NRT)') ||
-                     placeName.includes('(LGA)') ||
-                     placeName.includes('(JFK)') ||
-                     placeName.includes('(SVO)');
+    // Use centralized color utility
+    const colorResult = getPlaceColor(place);
     
-    if (isDeparture || isArrival) {
+    // Handle system places (departure/destination)
+    if (colorResult.type === 'system') {
       return {
         path: google.maps.SymbolPath.CIRCLE,
         fillColor: '#000000',
@@ -98,66 +65,18 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       };
     }
 
-    // Get actual contributors for this place
-    let contributors: any[] = [];
-
-    // First, try to get contributors from member_contribution field
-    if (place.member_contribution) {
-      if (Array.isArray(place.member_contribution)) {
-        // Direct array format
-        contributors = place.member_contribution;
-      } else if (place.member_contribution.contributors) {
-        // Object with contributors property
-        contributors = place.member_contribution.contributors;
-      } else if (typeof place.member_contribution === 'object') {
-        // Check if it's a single contributor object
-        if (place.member_contribution.user_id || place.member_contribution.userId) {
-          contributors = [place.member_contribution];
-        }
-      }
-    }
-
-    // If no contributors found, try to get from added_by/user_id fields
-    if (contributors.length === 0) {
-      const addedByUserId = place.added_by || place.addedBy || place.created_by || place.user_id;
-      if (addedByUserId) {
-        contributors = [{
-          user_id: addedByUserId,
-          userId: addedByUserId,
-          weight: 1.0
-        }];
-      }
-    }
-
-    // Ensure all contributors have actual colors
-    contributors = contributors.map(contributor => {
-      const userId = contributor.user_id || contributor.userId;
-      const userColor = memberColors[userId] || MemberColorService.getColorForOptimization(userId, memberColors);
-      return {
-        ...contributor,
-        user_id: userId,
-        color_hex: userColor
-      };
-    });
-
-
-    const contributorCount = contributors.length;
+    // Determine fill color based on centralized color result
     let fillColor = '#9CA3AF'; // Default gray
     
-    if (contributorCount === 0) {
-      fillColor = '#9CA3AF'; // Gray for no contributors
-    } else if (contributorCount === 1) {
-      // 1人の追加者: その人のメンバーカラー
-      fillColor = contributors[0].color_hex;
-    } else if (contributorCount >= 5) {
-      // 5人以上の追加者: 金色
+    if (colorResult.type === 'single') {
+      fillColor = colorResult.primaryColor;
+    } else if (colorResult.type === 'gold') {
       fillColor = '#FFD700';
-    } else {
-      // 2-4人の追加者: グラデーション（今回は最初の貢献者の色を使用、将来的にグラデーション実装）
-      fillColor = contributors[0].color_hex;
+    } else if (colorResult.type === 'gradient') {
+      // For Google Maps markers, use the primary contributor's color
       // TODO: Implement actual gradient for Google Maps markers
+      fillColor = colorResult.primaryColor;
     }
-
 
     return {
       path: google.maps.SymbolPath.CIRCLE,

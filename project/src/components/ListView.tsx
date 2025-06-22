@@ -2,13 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar, Clock, Star, Users, ChevronRight, Eye, EyeOff, Sparkles, AlertCircle, Navigation, Wand2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { Place, TripMember } from '../types/optimization';
+import { Place } from '../types/optimization';
 import { PlaceSearchInput } from './common/PlaceSearchInput';
 import { GooglePlace } from '../services/PlaceSearchService';
-import { PlaceColorCalculator } from '../utils/PlaceColorCalculator';
 import { calculatePlaceColor, getCSSProperties, PlaceColorResult } from '../utils/PlaceColorHelper';
-import { supabase } from '../lib/supabase';
-import { MemberColorService } from '../services/MemberColorService';
 
 interface ScheduleEvent {
   id: string;
@@ -61,12 +58,10 @@ const getTransportIcon = (mode?: string): string => {
 
 export function ListView() {
   const navigate = useNavigate();
-  const { places, currentTrip, isLoading, optimizationResult } = useStore();
+  const { places, currentTrip, isLoading, optimizationResult, memberColors, tripMembers } = useStore();
   const [selectedDay, setSelectedDay] = useState(new Date().toISOString().split('T')[0]);
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const [tripMembers, setTripMembers] = useState<TripMember[]>([]);
-  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
 
   // 場所カードのスタイルとクラス名を取得する関数
   const getPlaceCardStyle = (event: ScheduleEvent): { style: React.CSSProperties; className: string } => {
@@ -92,68 +87,35 @@ export function ListView() {
     );
   }, [places, currentTrip?.id]);
   
-  // Load trip members and colors
+  // Colors and trip members are now loaded centrally via store
+  // Debug logging for centralized colors
   useEffect(() => {
-    const loadTripMembersAndColors = async () => {
-      if (!currentTrip?.id) return;
+    if (currentTrip?.id && memberColors && Object.keys(memberColors).length > 0) {
+      console.log('🎨 [ListView] Using centralized member colors:', memberColors);
+      console.log('🎨 [ListView] Using centralized trip members:', tripMembers);
       
-      const { data, error } = await supabase
-        .from('trip_members')
-        .select('*, user:users(*)')
-        .eq('trip_id', currentTrip.id);
-        
-      if (!error && data) {
-        setTripMembers(data as TripMember[]);
+      // Find tenmakomine@gmail.com's color for debugging
+      const tenmakomieMember = tripMembers.find(member => member.user?.email === 'tenmakomine@gmail.com');
+      if (tenmakomieMember) {
+        const tenmakomiColor = memberColors[tenmakomieMember.user_id];
+        console.log('🎯 [ListView] tenmakomine@gmail.com color:', {
+          userId: tenmakomieMember.user_id,
+          email: tenmakomieMember.user?.email,
+          name: tenmakomieMember.user?.name,
+          assignedColor: tenmakomiColor,
+          colorIndex: tenmakomieMember.assigned_color_index
+        });
       }
-
-      // Load member colors
-      try {
-        const colors = await MemberColorService.getSimpleColorMapping(currentTrip.id);
-        console.log('🎨 Loaded member colors for ListView:', colors);
-        
-        // Find tenmakomine@gmail.com's color
-        const tenmakomieMember = data.find(member => member.user?.email === 'tenmakomine@gmail.com');
-        if (tenmakomieMember) {
-          const tenmakomiColor = colors[tenmakomieMember.user_id];
-          console.log('🎯 tenmakomine@gmail.com color:', {
-            userId: tenmakomieMember.user_id,
-            email: tenmakomieMember.user?.email,
-            name: tenmakomieMember.user?.name,
-            assignedColor: tenmakomiColor,
-            colorIndex: tenmakomieMember.assigned_color_index
-          });
-        }
-        setMemberColors(colors);
-
-        // Validate color assignments and fix any issues
-        const validation = await MemberColorService.validateColorAssignment(currentTrip.id);
-        console.log('🔍 Color assignment validation:', validation);
-        
-        if (!validation.valid) {
-          console.warn('🚨 Color assignment issues detected:', validation.issues);
-          // Fix duplicate colors first, then assign missing colors
-          await MemberColorService.fixDuplicateColors(currentTrip.id);
-          await MemberColorService.autoAssignMissingColors(currentTrip.id);
-          // Reload colors after fixing
-          const fixedColors = await MemberColorService.getSimpleColorMapping(currentTrip.id);
-          console.log('🔧 Fixed member colors:', fixedColors);
-          setMemberColors(fixedColors);
-        }
-      } catch (error) {
-        console.error('Failed to load member colors:', error);
-      }
-    };
-    
-    loadTripMembersAndColors();
-  }, [currentTrip?.id]);
+    }
+  }, [currentTrip?.id, memberColors, tripMembers]);
 
 
   // Get member display info for a place
   const getMemberDisplay = (place: Place) => {
-    // Use new PlaceColorHelper with member colors
+    // Use new PlaceColorHelper with member colors from centralized store
     const members = tripMembers.map(member => ({
       id: member.user_id,
-      name: member.user?.name || 'Unknown',
+      name: member.name || 'Unknown',
       color: memberColors[member.user_id] || '#6B7280'
     }));
 

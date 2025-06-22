@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Calendar, Clock, MapPin, List, Grid3X3 } from 'lucide-react';
-import { MemberColorService } from '../services/MemberColorService';
 import { useStore } from '../store/useStore';
+import { getPlaceColor } from '../utils/ColorUtils';
 import CalendarGridView from './CalendarGridView';
 
 interface CalendarViewProps {
@@ -9,102 +9,26 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
-  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
-  const { currentTrip } = useStore();
+  const { currentTrip, memberColors, tripMembers } = useStore();
 
-  // Load member colors for the current trip
-  useEffect(() => {
-    const loadMemberColors = async () => {
-      if (!currentTrip?.id) {
-        console.log('🔍 [CalendarView] No current trip, skipping color load');
-        return;
-      }
-
-      try {
-        console.log('🔍 [CalendarView] Loading member colors for trip:', currentTrip.id);
-        const colorMapping = await MemberColorService.getSimpleColorMapping(currentTrip.id);
-        console.log('🔍 [CalendarView] Loaded member colors:', colorMapping);
-        setMemberColors(colorMapping);
-      } catch (error) {
-        console.error('🔍 [CalendarView] Failed to load member colors:', error);
-        setMemberColors({});
-      }
-    };
-
-    loadMemberColors();
-  }, [currentTrip?.id]);
-
-  // Generate gradient style for multiple contributors
+  // Generate gradient style for multiple contributors using centralized color logic
   const getPlaceStyle = (place: any) => {
-    // 出発・到着地点: 黒色固定
-    const placeName = place.place_name || place.name || '';
-    const placeNameLower = placeName.toLowerCase();
+    console.log('🎨 [CalendarView] Getting style for place:', place.place_name || place.name);
     
-    // Check various patterns for departure/arrival
-    const isDeparture = placeName.includes('Departure:') || 
-                       placeNameLower.includes('departure');
-                       
-    const isArrival = placeName.includes('Return to Departure:') || 
-                     placeNameLower.includes('return') ||
-                     placeNameLower.includes('arrival');
+    // Use centralized color utility
+    const colorResult = getPlaceColor(place);
     
-    if (isDeparture || isArrival) {
-      console.log(`🔍 [CalendarView] Place is departure/arrival: ${placeName}`);
+    // Convert to calendar view styling format
+    if (colorResult.type === 'system') {
       return { borderLeftColor: '#000000', backgroundColor: '#00000010' };
-    }
-
-    // Get actual contributors for this place
-    let contributors: any[] = [];
-    
-    // First, try to get contributors from member_contribution field
-    if (place.member_contribution) {
-      if (Array.isArray(place.member_contribution)) {
-        contributors = place.member_contribution;
-      } else if (place.member_contribution.contributors) {
-        contributors = place.member_contribution.contributors;
-      } else if (typeof place.member_contribution === 'object') {
-        if (place.member_contribution.user_id || place.member_contribution.userId) {
-          contributors = [place.member_contribution];
-        }
-      }
-    }
-
-    // If no contributors found, try to get from added_by/user_id fields
-    if (contributors.length === 0) {
-      const addedByUserId = place.added_by || place.addedBy || place.created_by || place.user_id;
-      if (addedByUserId) {
-        contributors = [{
-          user_id: addedByUserId,
-          userId: addedByUserId,
-          weight: 1.0
-        }];
-      }
-    }
-
-    // Ensure all contributors have actual colors
-    contributors = contributors.map(contributor => {
-      const userId = contributor.user_id || contributor.userId;
-      const userColor = memberColors[userId] || MemberColorService.getColorForOptimization(userId, memberColors);
-      return {
-        ...contributor,
-        user_id: userId,
-        color_hex: userColor
-      };
-    });
-
-    const contributorCount = contributors.length;
-    
-    if (contributorCount === 0) {
-      return { borderLeftColor: '#9CA3AF', backgroundColor: '#9CA3AF10' };
-    } else if (contributorCount === 1) {
-      const color = contributors[0].color_hex;
+    } else if (colorResult.type === 'single') {
+      const color = colorResult.primaryColor;
       return { borderLeftColor: color, backgroundColor: `${color}10` };
-    } else if (contributorCount >= 5) {
+    } else if (colorResult.type === 'gold') {
       return { borderLeftColor: '#FFD700', backgroundColor: '#FFD70010' };
-    } else {
-      // 2-4人の追加者: グラデーション
-      const colors = contributors.slice(0, 4).map(c => c.color_hex);
+    } else if (colorResult.type === 'gradient') {
+      const colors = colorResult.contributors.slice(0, 4).map(c => c.color);
       const gradientStops = colors.map((color, index) => 
         `${color} ${(index * 100 / (colors.length - 1))}%`
       ).join(', ');
@@ -112,6 +36,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
         borderLeftColor: colors[0],
         background: `linear-gradient(45deg, ${gradientStops.replace(/[\d.]+%/g, '10%')})`
       };
+    } else {
+      return { borderLeftColor: '#9CA3AF', backgroundColor: '#9CA3AF10' };
     }
   };
 
