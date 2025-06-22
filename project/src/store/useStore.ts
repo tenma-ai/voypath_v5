@@ -610,7 +610,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             
             // Set the first trip as current if no current trip is set
             if (!get().currentTrip && trips.length > 0) {
-              set({ currentTrip: trips[0] });
+              console.log('🎨 [LoadTrips] Setting first trip as current and loading colors...');
+              await get().setCurrentTrip(trips[0]);
             }
           }
         } catch (error) {
@@ -718,6 +719,10 @@ export const useStore = create<StoreState>()((set, get) => ({
           const { currentTrip } = get();
           if (currentTrip) {
             console.log(`🔄 Initializing data for trip: ${currentTrip.name}`);
+            
+            // Load member colors first for consistent color display
+            console.log('🎨 [InitDB] Loading member colors during initialization...');
+            await get().loadMemberColorsForTrip(currentTrip.id);
             
             // Load places data
             await get().loadPlacesFromDatabase(currentTrip.id);
