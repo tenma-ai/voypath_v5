@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Grid3X3, List, Star, Clock, AlertCircle, Plus } from 'lucide-react';
+import { Grid3X3, List, Star, Clock, AlertCircle, Plus, Edit, Trash2, MoreVertical } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -8,7 +8,15 @@ import { PlaceImage } from '../components/PlaceImage';
 export function MyPlacesPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filter, setFilter] = useState('all');
-  const { places, currentTrip, trips, initializeFromDatabase } = useStore();
+  const [editingPlace, setEditingPlace] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    category: '',
+    wishLevel: 5,
+    stayDuration: 2,
+    notes: ''
+  });
+  const { places, currentTrip, trips, initializeFromDatabase, updatePlace, deletePlace } = useStore();
 
   // Check if deadline has passed
   const isDeadlinePassed = () => {
@@ -100,6 +108,55 @@ export function MyPlacesPage() {
         }`}
       />
     ));
+  };
+
+  const handleEditPlace = (place: any) => {
+    setEditingPlace(place.id);
+    setEditForm({
+      name: place.name,
+      category: place.category,
+      wishLevel: place.wish_level || place.wishLevel || 5,
+      stayDuration: place.stay_duration_minutes ? place.stay_duration_minutes / 60 : (place.stayDuration || 2),
+      notes: place.notes || ''
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPlace) return;
+    
+    try {
+      await updatePlace(editingPlace, {
+        name: editForm.name,
+        category: editForm.category,
+        wishLevel: editForm.wishLevel,
+        stayDuration: editForm.stayDuration,
+        notes: editForm.notes
+      });
+      setEditingPlace(null);
+    } catch (error) {
+      alert('Failed to update place. Please try again.');
+    }
+  };
+
+  const handleDeletePlace = async (placeId: string, placeName: string) => {
+    if (confirm(`Are you sure you want to delete "${placeName}"?`)) {
+      try {
+        await deletePlace(placeId);
+      } catch (error) {
+        alert('Failed to delete place. Please try again.');
+      }
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPlace(null);
+    setEditForm({
+      name: '',
+      category: '',
+      wishLevel: 5,
+      stayDuration: 2,
+      notes: ''
+    });
   };
 
   // Show message if no trip is selected
@@ -267,9 +324,31 @@ export function MyPlacesPage() {
               </div>
               
               <div className="p-3 space-y-2">
-                <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm line-clamp-2">
-                  {place.name}
-                </h3>
+                <div className="flex items-start justify-between">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm line-clamp-2 flex-1 pr-2">
+                    {place.name}
+                  </h3>
+                  <div className="flex space-x-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditPlace(place);
+                      }}
+                      className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      <Edit className="w-3 h-3 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePlace(place.id, place.name);
+                      }}
+                      className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3 text-red-500 hover:text-red-600" />
+                    </button>
+                  </div>
+                </div>
                 
                 <div className="flex items-center justify-between">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -278,13 +357,13 @@ export function MyPlacesPage() {
                     {place.category}
                   </span>
                   <div className="flex items-center space-x-1">
-                    {renderStars(place.wishLevel)}
+                    {renderStars(place.wish_level || place.wishLevel || 0)}
                   </div>
                 </div>
                 
                 <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
                   <Clock className="w-3 h-3 mr-1" />
-                  <span>{place.stayDuration}h</span>
+                  <span>{place.stay_duration_minutes ? (place.stay_duration_minutes / 60) : (place.stayDuration || 2)}h</span>
                 </div>
               </div>
             </motion.div>
@@ -321,20 +400,42 @@ export function MyPlacesPage() {
                           {place.category}
                         </span>
                         <div className="flex items-center space-x-1">
-                          {renderStars(place.wishLevel)}
+                          {renderStars(place.wish_level || place.wishLevel || 0)}
                         </div>
                       </div>
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
                         {place.address}
                       </p>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      place.scheduled
-                        ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/20 dark:text-primary-300'
-                        : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                    }`}>
-                      {place.scheduled ? place.scheduledDate : 'Not scheduled'}
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        (place.is_selected_for_optimization || place.scheduled)
+                          ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/20 dark:text-primary-300'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                      }`}>
+                        {(place.is_selected_for_optimization || place.scheduled) ? (place.scheduledDate || 'Scheduled') : 'Not scheduled'}
+                      </span>
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditPlace(place);
+                          }}
+                          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          <Edit className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePlace(place.id, place.name);
+                          }}
+                          className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-4 mt-2 text-xs text-slate-500 dark:text-slate-400">
                     <div className="flex items-center">
@@ -373,6 +474,115 @@ export function MyPlacesPage() {
               <span>Add Your First Place</span>
             </Link>
           )}
+        </div>
+      )}
+
+      {/* Edit Place Modal */}
+      {editingPlace && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md"
+          >
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+              Edit Place
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Category
+                </label>
+                <select
+                  value={editForm.category}
+                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                >
+                  <option value="Temple">Temple</option>
+                  <option value="Shrine">Shrine</option>
+                  <option value="Attraction">Attraction</option>
+                  <option value="Food">Food</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Wish Level (1-10)
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={editForm.wishLevel}
+                  onChange={(e) => setEditForm({ ...editForm, wishLevel: parseInt(e.target.value) })}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                  <span>1</span>
+                  <span className="font-medium">{editForm.wishLevel}</span>
+                  <span>10</span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Stay Duration (hours)
+                </label>
+                <input
+                  type="number"
+                  min="0.5"
+                  max="24"
+                  step="0.5"
+                  value={editForm.stayDuration}
+                  onChange={(e) => setEditForm({ ...editForm, stayDuration: parseFloat(e.target.value) })}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                  placeholder="Add any notes about this place..."
+                />
+              </div>
+            </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={handleCancelEdit}
+                className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={!editForm.name.trim()}
+                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 

@@ -117,11 +117,15 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
     }
   };
 
-  const handleDeadlineChange = (deadline: string) => {
+  const handleDeadlineChange = async (deadline: string) => {
     setAddPlaceDeadline(deadline);
     if (currentTrip) {
       const deadlineISO = deadline ? new Date(deadline).toISOString() : undefined;
-      updateTrip(currentTrip.id, { addPlaceDeadline: deadlineISO });
+      try {
+        await updateTrip(currentTrip.id, { addPlaceDeadline: deadlineISO });
+      } catch (error) {
+        console.error('Failed to update deadline:', error);
+      }
     }
   };
 
@@ -239,7 +243,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
                             <input
                               type="text"
                               value={currentTrip?.name || ''}
-                              onChange={(e) => currentTrip && updateTrip(currentTrip.id, { name: e.target.value })}
+                              onChange={(e) => currentTrip && updateTrip(currentTrip.id, { name: e.target.value }).catch(console.error)}
                               className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
                             />
                           </div>
@@ -249,7 +253,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
                             </label>
                             <textarea
                               value={currentTrip?.description || ''}
-                              onChange={(e) => currentTrip && updateTrip(currentTrip.id, { description: e.target.value })}
+                              onChange={(e) => currentTrip && updateTrip(currentTrip.id, { description: e.target.value }).catch(console.error)}
                               rows={3}
                               className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300 resize-none"
                             />

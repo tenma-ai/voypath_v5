@@ -6,6 +6,7 @@ import { GuestProfilePrompt } from '../components/GuestProfilePrompt';
 import { CreateTripModal } from '../components/CreateTripModal';
 import { JoinTripModal } from '../components/JoinTripModal';
 import { PremiumModal } from '../components/PremiumModal';
+import { TripSettingsModal } from '../components/TripSettingsModal';
 import { PremiumBadge } from '../components/PremiumBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -21,6 +22,8 @@ export function HomePage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showTripSettingsModal, setShowTripSettingsModal] = useState(false);
+  const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [premiumFeature, setPremiumFeature] = useState<'trips' | 'members' | 'places' | undefined>();
   const [selectingTripId, setSelectingTripId] = useState<string | null>(null);
 
@@ -367,9 +370,13 @@ export function HomePage() {
                             </div>
                             <div className="flex space-x-1">
                               <motion.button
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
+                                  // Set the trip as current trip and open settings modal
+                                  setEditingTripId(trip.id);
+                                  await setCurrentTrip(trip);
+                                  setShowTripSettingsModal(true);
                                 }}
                                 className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                 whileHover={{ scale: 1.1 }}
@@ -378,11 +385,15 @@ export function HomePage() {
                                 <Edit className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
                               </motion.button>
                               <motion.button
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   if (confirm('Are you sure you want to delete this trip?')) {
-                                    deleteTrip(trip.id);
+                                    try {
+                                      await deleteTrip(trip.id);
+                                    } catch (error) {
+                                      alert('Failed to delete trip. Please try again.');
+                                    }
                                   }
                                 }}
                                 className="p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
@@ -584,6 +595,10 @@ export function HomePage() {
         isOpen={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
         feature={premiumFeature}
+      />
+      <TripSettingsModal
+        isOpen={showTripSettingsModal}
+        onClose={() => setShowTripSettingsModal(false)}
       />
     </motion.div>
   );

@@ -93,8 +93,8 @@ interface StoreState {
   // Trips
   trips: Trip[];
   addTrip: (trip: Trip) => void;
-  updateTrip: (id: string, updates: Partial<Trip>) => void;
-  deleteTrip: (id: string) => void;
+  updateTrip: (id: string, updates: Partial<Trip>) => Promise<void>;
+  deleteTrip: (id: string) => Promise<void>;
 
   // Places
   places: Place[];
@@ -180,20 +180,71 @@ export const useStore = create<StoreState>()((set, get) => ({
       trips: [],
       addTrip: (trip) =>
         set((state) => ({ trips: [...state.trips, trip] })),
-      updateTrip: (id, updates) =>
-        set((state) => ({
-          trips: state.trips.map((trip) =>
-            trip.id === id ? { ...trip, ...updates } : trip
-          ),
-          // Update currentTrip if it's the one being updated
-          currentTrip: state.currentTrip?.id === id 
-            ? { ...state.currentTrip, ...updates } 
-            : state.currentTrip,
-        })),
-      deleteTrip: (id) =>
-        set((state) => ({
-          trips: state.trips.filter((trip) => trip.id !== id),
-        })),
+      updateTrip: async (id, updates) => {
+        try {
+          // Update in database first
+          const dbUpdates: any = {};
+          if (updates.name !== undefined) dbUpdates.name = updates.name;
+          if (updates.description !== undefined) dbUpdates.description = updates.description;
+          if (updates.departureLocation !== undefined) dbUpdates.departure_location = updates.departureLocation;
+          if (updates.destination !== undefined) dbUpdates.destination = updates.destination;
+          if (updates.startDate !== undefined) dbUpdates.start_date = updates.startDate;
+          if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate;
+          if (updates.addPlaceDeadline !== undefined) dbUpdates.add_place_deadline = updates.addPlaceDeadline;
+
+          const { error } = await supabase
+            .from('trips')
+            .update(dbUpdates)
+            .eq('id', id);
+
+          if (error) {
+            console.error('Failed to update trip in database:', error);
+            throw error;
+          }
+
+          // Update local state
+          set((state) => ({
+            trips: state.trips.map((trip) =>
+              trip.id === id ? { ...trip, ...updates } : trip
+            ),
+            // Update currentTrip if it's the one being updated
+            currentTrip: state.currentTrip?.id === id 
+              ? { ...state.currentTrip, ...updates } 
+              : state.currentTrip,
+          }));
+
+          console.log('✅ Trip updated successfully');
+        } catch (error) {
+          console.error('Failed to update trip:', error);
+          throw error;
+        }
+      },
+      deleteTrip: async (id) => {
+        try {
+          // Delete from database first
+          const { error } = await supabase
+            .from('trips')
+            .delete()
+            .eq('id', id);
+
+          if (error) {
+            console.error('Failed to delete trip from database:', error);
+            throw error;
+          }
+
+          // Remove from local state
+          set((state) => ({
+            trips: state.trips.filter((trip) => trip.id !== id),
+            // If deleted trip was current trip, clear it
+            currentTrip: state.currentTrip?.id === id ? null : state.currentTrip,
+          }));
+
+          console.log('✅ Trip deleted successfully');
+        } catch (error) {
+          console.error('Failed to delete trip:', error);
+          throw error;
+        }
+      },
 
       // Places
       places: [],
