@@ -142,12 +142,19 @@ export function SharedTripView() {
           allConditionsMet: !!(user && data.trip && data.permissions?.can_join_as_member)
         });
         
-        // If user is authenticated, redirect to actual trip page
-        if (user && data.trip && data.permissions?.can_join_as_member) {
-          console.log('✅ All conditions met, redirecting to trip page');
-          setIsRedirecting(true);
-          await redirectToTripPage(data.trip);
-          return;
+        // If user is authenticated or can be created as guest, redirect to actual trip page
+        if (data.trip && data.permissions?.can_join_as_member) {
+          if (user) {
+            console.log('✅ Authenticated user, redirecting to trip page');
+            setIsRedirecting(true);
+            await redirectToTripPage(data.trip);
+            return;
+          } else {
+            console.log('✅ No user, creating guest user and redirecting');
+            setIsRedirecting(true);
+            await createGuestUserAndJoinTrip(data.trip);
+            return;
+          }
         } else {
           console.log('❌ Redirect conditions not met, staying on shared view');
         }
@@ -192,6 +199,103 @@ export function SharedTripView() {
     } catch (error) {
       console.error('❌ Failed to redirect to trip page:', error);
       setError('Failed to access trip. Please try joining manually.');
+    }
+  };
+
+  const createGuestUserAndJoinTrip = async (trip: any) => {
+    try {
+      console.log('🆕 Creating guest user and joining trip:', trip.name);
+      
+      // Try anonymous authentication first
+      let guestUserId: string;
+      let useLocalStorage = false;
+      
+      try {
+        const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
+        
+        if (authError || !authData.user) {
+          console.warn('⚠️ Anonymous auth failed, using localStorage approach:', authError);
+          useLocalStorage = true;
+        } else {
+          guestUserId = authData.user.id;
+          console.log('✅ Guest user created via anonymous auth:', guestUserId);
+        }
+      } catch (error) {
+        console.warn('⚠️ Anonymous auth not available, using localStorage approach');
+        useLocalStorage = true;
+      }
+      
+      // Fallback to localStorage-based guest user
+      if (useLocalStorage) {
+        // Check if guest user already exists in localStorage
+        let existingGuestId = localStorage.getItem('voypath_guest_user_id');
+        if (!existingGuestId) {
+          // Generate unique guest ID
+          existingGuestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          localStorage.setItem('voypath_guest_user_id', existingGuestId);
+          console.log('✅ Guest user created via localStorage:', existingGuestId);
+        } else {
+          console.log('✅ Using existing localStorage guest user:', existingGuestId);
+        }
+        guestUserId = existingGuestId;
+      }
+      
+      // Create user profile
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: guestUserId,
+          name: `Guest User`,
+          email: `guest_${guestUserId.substring(0, 8)}@voypath.local`,
+          is_guest: true
+        });
+      
+      if (profileError && !profileError.message.includes('duplicate')) {
+        console.error('❌ Failed to create user profile:', profileError);
+      } else {
+        console.log('✅ Guest user profile created');
+      }
+      
+      // Add to trip members
+      const { error: memberError } = await supabase
+        .from('trip_members')
+        .insert({
+          trip_id: trip.id,
+          user_id: guestUserId,
+          role: 'member',
+          joined_at: new Date().toISOString()
+        });
+      
+      if (memberError && !memberError.message.includes('duplicate')) {
+        console.error('❌ Failed to add guest to trip:', memberError);
+      } else {
+        console.log('✅ Guest user added to trip');
+      }
+      
+      // Reload trips to include the new trip
+      await loadTripsFromDatabase();
+      
+      // Set the trip as current
+      const tripObj = {
+        id: trip.id,
+        name: trip.name,
+        description: trip.description,
+        startDate: trip.start_date,
+        endDate: trip.end_date,
+        memberCount: trip.total_members || 1,
+        createdAt: trip.created_at,
+        ownerId: trip.owner_id
+      };
+      
+      await setCurrentTrip(tripObj);
+      
+      // Navigate to trip detail page
+      navigate(`/trip/${trip.id}`);
+      
+    } catch (error) {
+      console.error('❌ Failed to create guest user and join trip:', error);
+      setError('Failed to join trip. Please try again.');
+      setIsRedirecting(false);
     }
   };
 
