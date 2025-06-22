@@ -221,6 +221,9 @@ export class MemberColorService {
         mapping[assignment.userId] = assignment.color.hex;
       });
       
+      console.log('🎨 [MemberColorService] Color mapping for trip', tripId, ':', mapping);
+      console.log('🎨 [MemberColorService] Assignments:', assignments);
+      
       return mapping;
     } catch (error) {
       console.error('Error getting simple color mapping:', error);
@@ -253,6 +256,57 @@ export class MemberColorService {
       return true;
     } catch (error) {
       console.error('Error auto-assigning colors:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Fix duplicate color assignments by reassigning colors
+   */
+  static async fixDuplicateColors(tripId: string): Promise<boolean> {
+    try {
+      const validation = await this.validateColorAssignment(tripId);
+      
+      if (validation.valid) {
+        return true; // No issues to fix
+      }
+
+      console.log('🔧 Fixing duplicate color assignments for trip:', tripId);
+
+      // Reset all color assignments and reassign from scratch
+      const { error: resetError } = await supabase
+        .from('trip_members')
+        .update({ 
+          assigned_color_index: null, 
+          color_assigned_at: null 
+        })
+        .eq('trip_id', tripId);
+
+      if (resetError) {
+        throw resetError;
+      }
+
+      // Get all members and reassign colors
+      const { data: members } = await supabase
+        .from('trip_members')
+        .select('user_id')
+        .eq('trip_id', tripId);
+
+      if (!members) return false;
+
+      // Reassign colors to all members
+      for (const member of members) {
+        try {
+          await this.assignColorToMember(tripId, member.user_id);
+        } catch (error) {
+          console.error(`Failed to reassign color to member ${member.user_id}:`, error);
+        }
+      }
+
+      console.log('✅ Fixed duplicate color assignments');
+      return true;
+    } catch (error) {
+      console.error('Error fixing duplicate colors:', error);
       return false;
     }
   }

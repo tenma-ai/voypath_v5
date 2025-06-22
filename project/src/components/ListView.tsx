@@ -106,7 +106,23 @@ export function ListView() {
       // Load member colors
       try {
         const colors = await MemberColorService.getSimpleColorMapping(currentTrip.id);
+        console.log('🎨 Loaded member colors for ListView:', colors);
         setMemberColors(colors);
+
+        // Validate color assignments and fix any issues
+        const validation = await MemberColorService.validateColorAssignment(currentTrip.id);
+        console.log('🔍 Color assignment validation:', validation);
+        
+        if (!validation.valid) {
+          console.warn('🚨 Color assignment issues detected:', validation.issues);
+          // Fix duplicate colors first, then assign missing colors
+          await MemberColorService.fixDuplicateColors(currentTrip.id);
+          await MemberColorService.autoAssignMissingColors(currentTrip.id);
+          // Reload colors after fixing
+          const fixedColors = await MemberColorService.getSimpleColorMapping(currentTrip.id);
+          console.log('🔧 Fixed member colors:', fixedColors);
+          setMemberColors(fixedColors);
+        }
       } catch (error) {
         console.error('Failed to load member colors:', error);
       }
@@ -126,6 +142,15 @@ export function ListView() {
     }));
 
     const colorResult = calculatePlaceColor(place, members, memberColors);
+    
+    console.log('🎨 Place color calculation:', {
+      placeId: place.id,
+      placeName: place.name,
+      placeUserId: place.user_id || place.userId,
+      memberColors,
+      members,
+      colorResult
+    });
     
     return {
       contributors: colorResult.contributors,
