@@ -23,6 +23,7 @@ export function SharePage() {
 
   useEffect(() => {
     if (currentTrip) {
+      console.log('🔄 SharePage: Loading members for trip:', currentTrip.name);
       loadTripMembers();
     }
   }, [currentTrip]);

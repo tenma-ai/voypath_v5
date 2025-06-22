@@ -396,21 +396,55 @@ export const useStore = create<StoreState>()((set, get) => ({
           }
 
           // Load trips where user is owner or member
-          // Note: For now, we'll just load trips by owner_id to avoid the complex OR query
-          const { data: tripsData, error } = await supabase
+          console.log('🔍 Loading trips for user:', user.id);
+          
+          // First, get trips where user is owner
+          const { data: ownedTrips, error: ownedError } = await supabase
             .from('trips')
             .select(`
               id, name, departure_location, description, destination, 
               start_date, end_date, owner_id, created_at, total_members
             `)
-            .eq('owner_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(20);
-          
-          if (error) {
-            console.error('Failed to load trips from database:', error);
+            .eq('owner_id', user.id);
+
+          if (ownedError) {
+            console.error('Failed to load owned trips:', ownedError);
             return;
           }
+
+          // Then, get trips where user is a member
+          const { data: memberTrips, error: memberError } = await supabase
+            .from('trip_members')
+            .select(`
+              trips!inner (
+                id, name, departure_location, description, destination, 
+                start_date, end_date, owner_id, created_at, total_members
+              )
+            `)
+            .eq('user_id', user.id)
+            .neq('trips.owner_id', user.id); // Exclude trips where user is owner (to avoid duplicates)
+
+          if (memberError) {
+            console.error('Failed to load member trips:', memberError);
+            return;
+          }
+
+          // Combine owned and member trips
+          const allTrips = [
+            ...(ownedTrips || []),
+            ...(memberTrips?.map(mt => mt.trips) || [])
+          ];
+
+          console.log('📊 Loaded trips:', {
+            ownedTrips: ownedTrips?.length || 0,
+            memberTrips: memberTrips?.length || 0,
+            totalTrips: allTrips.length
+          });
+
+          // Sort by created_at descending and limit to 20
+          const tripsData = allTrips
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, 20);
 
           if (tripsData && Array.isArray(tripsData)) {
             const trips: Trip[] = tripsData.map(trip => ({
