@@ -3,6 +3,171 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 
+// Inline Auth Form Component
+function AuthForm({ onSuccess }: { onSuccess: (user: any) => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<'signin' | 'signup'>('signup');
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      if (mode === 'signup' && password !== confirmPassword) {
+        throw new Error('Passwords do not match');
+      }
+
+      if (mode === 'signin') {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (error) throw error;
+        if (data.user) {
+          console.log('✅ User signed in:', data.user.id);
+          onSuccess(data.user);
+        }
+      } else {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: {
+              name: email.split('@')[0],
+            }
+          }
+        });
+        
+        if (error) {
+          if (error.status === 429 || error.message?.includes('rate')) {
+            throw new Error('Too many sign up attempts. Please wait a moment and try again.');
+          }
+          throw error;
+        }
+        if (data.user) {
+          console.log('✅ User signed up:', data.user.id);
+          onSuccess(data.user);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Authentication failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        }
+      });
+
+      if (error) throw error;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google authentication failed');
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Google Sign In */}
+      <button
+        onClick={handleGoogleAuth}
+        disabled={isLoading}
+        className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-gray-300" />
+        </div>
+        <div className="relative flex justify-center text-sm">
+          <span className="px-2 bg-white text-gray-500">or</span>
+        </div>
+      </div>
+
+      {/* Email/Password Form */}
+      <form onSubmit={handleAuth} className="space-y-3">
+        <div>
+          <input
+            type="email"
+            placeholder="Email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        <div>
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        {mode === 'signup' && (
+          <div>
+            <input
+              type="password"
+              placeholder="Confirm password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+        )}
+
+        {error && (
+          <div className="text-red-600 text-sm">{error}</div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+        >
+          {isLoading ? 'Please wait...' : (mode === 'signup' ? 'Sign Up & Join Trip' : 'Sign In & Join Trip')}
+        </button>
+      </form>
+
+      <div className="text-center">
+        <button
+          onClick={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
+          className="text-sm text-indigo-600 hover:text-indigo-500"
+        >
+          {mode === 'signup' ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface SharedTripData {
   shareId: string;
   trip: {
@@ -277,23 +442,14 @@ export function SharedTripView() {
     URL.revokeObjectURL(url);
   };
 
-  if (isLoading) {
+  if (isLoading || isRedirecting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading shared trip...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (isRedirecting) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Redirecting to trip...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">
+            {isRedirecting ? 'Joining trip...' : 'Loading shared trip...'}
+          </p>
         </div>
       </div>
     );
@@ -363,126 +519,136 @@ export function SharedTripView() {
     return null;
   }
 
-  // If user is not authenticated and can join as member, show sign-up prompt with blurred background
+  // If user is not authenticated and can join as member, show sign-up prompt with realistic background
   if (!user && shareData.permissions?.can_join_as_member) {
     return (
-      <div className="min-h-screen bg-gray-50 relative">
-        {/* Blurred Background Content */}
+      <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100 relative">
+        {/* Blurred Background Content - Realistic App UI */}
         <div className="filter blur-sm pointer-events-none">
-          {/* Header */}
-          <div className="bg-white border-b">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center justify-between h-16">
-                <div className="flex items-center">
-                  <div className="text-2xl font-bold text-indigo-600">Voypath</div>
-                  <div className="ml-4 text-sm text-gray-500">Shared Trip</div>
+          {/* Top Navigation Bar */}
+          <div className="fixed top-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-xl border-b border-slate-200/50">
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                    Voypath
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-slate-200 rounded-full"></div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-            {/* Trip Header */}
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">{shareData.trip.name}</h1>
-                  {shareData.trip.description && (
-                    <p className="text-gray-600 mb-4">{shareData.trip.description}</p>
-                  )}
-                  <div className="flex items-center space-x-6 text-sm text-gray-500">
-                    {shareData.trip.start_date && (
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
-                        </svg>
-                        {new Date(shareData.trip.start_date).toLocaleDateString()}
-                        {shareData.trip.end_date && ` - ${new Date(shareData.trip.end_date).toLocaleDateString()}`}
-                      </div>
-                    )}
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          {/* Trip Header */}
+          <div className="fixed top-12 left-0 right-0 z-[9996] bg-white/95 backdrop-blur-xl border-b border-slate-200/50">
+            <div className="p-2 border-b border-slate-200/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <h1 className="text-base font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                    {shareData.trip.name}
+                  </h1>
+                  {shareData.trip.start_date && shareData.trip.end_date && (
+                    <div className="flex items-center space-x-1 text-xs text-slate-600">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
                       </svg>
-                      {shareData.trip.places.length} places
+                      <span>{new Date(shareData.trip.start_date).toLocaleDateString()} - {new Date(shareData.trip.end_date).toLocaleDateString()}</span>
                     </div>
+                  )}
+                  <div className="flex items-center space-x-1 text-xs text-slate-600">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>{shareData.trip.total_members || 1}</span>
                   </div>
                 </div>
+                <div className="w-4 h-4 bg-slate-200 rounded"></div>
               </div>
             </div>
 
-            {/* Mock Places List */}
-            <div className="bg-white rounded-lg shadow-sm">
-              <div className="p-6 border-b">
-                <h2 className="text-xl font-semibold text-gray-900">Places to Visit</h2>
+            {/* View Toggle */}
+            <div className="p-2">
+              <div className="flex items-center space-x-1 bg-slate-100 rounded-lg p-1">
+                <div className="flex-1 py-1.5 px-3 bg-white rounded-md shadow-sm text-center">
+                  <span className="text-xs font-medium text-slate-700">Map</span>
+                </div>
+                <div className="flex-1 py-1.5 px-3 text-center">
+                  <span className="text-xs font-medium text-slate-500">Calendar</span>
+                </div>
               </div>
-              <div className="divide-y">
-                {shareData.trip.places.slice(0, 3).map((place, index) => (
-                  <div key={place.id} className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">{place.name}</h3>
-                        <p className="text-sm text-gray-500 mt-1">{place.address}</p>
-                      </div>
+            </div>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="pt-32 h-screen">
+            {/* Mock Map/Content */}
+            <div className="h-full bg-slate-100 relative">
+              {/* Mock map with places */}
+              <div className="absolute inset-4 bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="h-full bg-gradient-to-br from-emerald-50 to-blue-50 relative">
+                  {/* Mock place markers */}
+                  {shareData.trip.places.slice(0, 6).map((place, index) => (
+                    <div
+                      key={place.id}
+                      className="absolute w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-sm"
+                      style={{
+                        left: `${20 + index * 15}%`,
+                        top: `${30 + (index % 3) * 20}%`,
+                      }}
+                    >
+                      <div className="w-full h-full bg-red-500 rounded-full"></div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                  
+                  {/* Mock route lines */}
+                  <svg className="absolute inset-0 w-full h-full">
+                    <path
+                      d="M 20% 40% Q 40% 20% 60% 50% T 80% 60%"
+                      stroke="#3b82f6"
+                      strokeWidth="2"
+                      fill="none"
+                      strokeDasharray="5,5"
+                      opacity="0.6"
+                    />
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Sign-up Overlay */}
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-8 text-center">
-            <div className="mb-6">
-              <div className="mx-auto w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Sign-up Modal Overlay */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[10000]">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Join "{shareData.trip.name}"</h2>
               <p className="text-gray-600">
-                Create an account to collaborate on this amazing trip with {shareData.trip.places.length} places to explore!
+                Sign up to collaborate on this trip with {shareData.trip.places.length} amazing places!
               </p>
             </div>
 
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  // Store trip info for post-signup redirect
-                  localStorage.setItem('voypath_pending_trip', JSON.stringify({
-                    shareToken: new URLSearchParams(window.location.search).get('token'),
-                    tripId: shareData.trip.id,
-                    tripName: shareData.trip.name
-                  }));
-                  navigate('/auth');
-                }}
-                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 font-medium"
-              >
-                Sign Up & Join Trip
-              </button>
-              
-              <button
-                onClick={() => {
-                  // Store trip info for post-signin redirect
-                  localStorage.setItem('voypath_pending_trip', JSON.stringify({
-                    shareToken: new URLSearchParams(window.location.search).get('token'),
-                    tripId: shareData.trip.id,
-                    tripName: shareData.trip.name
-                  }));
-                  navigate('/auth');
-                }}
-                className="w-full bg-white text-gray-700 py-3 px-4 rounded-md border border-gray-300 hover:bg-gray-50 font-medium"
-              >
-                Already have an account? Sign In
-              </button>
-            </div>
+            {/* Inline Auth Component */}
+            <AuthForm 
+              onSuccess={(user) => {
+                // Store trip info and handle redirect
+                localStorage.setItem('voypath_pending_trip', JSON.stringify({
+                  shareToken: new URLSearchParams(window.location.search).get('token'),
+                  tripId: shareData.trip.id,
+                  tripName: shareData.trip.name
+                }));
+                window.location.reload(); // Trigger pending trip join
+              }}
+            />
 
-            <div className="mt-4 text-xs text-gray-500">
+            <div className="mt-4 text-center text-xs text-gray-500">
               By joining, you'll be able to add places, collaborate with others, and help plan this trip.
             </div>
           </div>
