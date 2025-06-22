@@ -283,12 +283,19 @@ export const useStore = create<StoreState>()((set, get) => ({
 
           if (membersError) {
             console.error('🎨 [Store] Error loading trip members:', membersError);
-            throw membersError;
+            console.error('🎨 [Store] Error code:', membersError.code);
+            console.error('🎨 [Store] Error message:', membersError.message);
+            console.error('🎨 [Store] Error details:', membersError.details);
+            // Instead of throwing, set empty state and continue
+            console.log('🎨 [Store] Setting empty member state due to error');
+            set({ memberColors: {}, tripMembers: [] });
+            return;
           }
 
           // If no members found, set empty state and return
           if (!membersData || membersData.length === 0) {
             console.log('🎨 [Store] No members found for trip:', tripId);
+            console.log('🎨 [Store] This trip may not have any members in trip_members table');
             set({ memberColors: {}, tripMembers: [] });
             return;
           }
