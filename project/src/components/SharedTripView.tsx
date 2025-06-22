@@ -142,19 +142,12 @@ export function SharedTripView() {
           allConditionsMet: !!(user && data.trip && data.permissions?.can_join_as_member)
         });
         
-        // If user is authenticated or can be created as guest, redirect to actual trip page
-        if (data.trip && data.permissions?.can_join_as_member) {
-          if (user) {
-            console.log('✅ Authenticated user, redirecting to trip page');
-            setIsRedirecting(true);
-            await redirectToTripPage(data.trip);
-            return;
-          } else {
-            console.log('✅ No user, creating guest user and redirecting');
-            setIsRedirecting(true);
-            await createGuestUserAndJoinTrip(data.trip);
-            return;
-          }
+        // If user is authenticated, redirect to actual trip page
+        if (user && data.trip && data.permissions?.can_join_as_member) {
+          console.log('✅ All conditions met, redirecting to trip page');
+          setIsRedirecting(true);
+          await redirectToTripPage(data.trip);
+          return;
         } else {
           console.log('❌ Redirect conditions not met, staying on shared view');
         }
@@ -202,89 +195,6 @@ export function SharedTripView() {
     }
   };
 
-  const createGuestUserAndJoinTrip = async (trip: any) => {
-    try {
-      console.log('🆕 Creating guest user and joining trip:', trip.name);
-      
-      // Generate unique guest email (using a simpler format)
-      const timestamp = Date.now();
-      const randomId = Math.random().toString(36).substr(2, 6);
-      const guestEmail = `guest${timestamp}@temp-mail.org`;
-      const guestPassword = `GuestPass${timestamp}`;
-      
-      console.log('📧 Creating guest account with email:', guestEmail);
-      
-      // Sign up guest user with email/password
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: guestEmail,
-        password: guestPassword,
-      });
-      
-      if (authError || !authData.user) {
-        console.error('❌ Failed to create guest account:', authError);
-        throw new Error('Failed to create guest account');
-      }
-      
-      console.log('✅ Guest account created:', authData.user.id);
-      
-      // Create user profile
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert({
-          id: authData.user.id,
-          name: `Guest User`,
-          email: guestEmail,
-          is_guest: true
-        });
-      
-      if (profileError && !profileError.message.includes('duplicate')) {
-        console.error('❌ Failed to create user profile:', profileError);
-      } else {
-        console.log('✅ Guest user profile created');
-      }
-      
-      // Add to trip members
-      const { error: memberError } = await supabase
-        .from('trip_members')
-        .insert({
-          trip_id: trip.id,
-          user_id: authData.user.id,
-          role: 'member',
-          joined_at: new Date().toISOString()
-        });
-      
-      if (memberError && !memberError.message.includes('duplicate')) {
-        console.error('❌ Failed to add guest to trip:', memberError);
-      } else {
-        console.log('✅ Guest user added to trip');
-      }
-      
-      // Reload trips to include the new trip
-      await loadTripsFromDatabase();
-      
-      // Set the trip as current
-      const tripObj = {
-        id: trip.id,
-        name: trip.name,
-        description: trip.description,
-        startDate: trip.start_date,
-        endDate: trip.end_date,
-        memberCount: trip.total_members || 1,
-        createdAt: trip.created_at,
-        ownerId: trip.owner_id
-      };
-      
-      await setCurrentTrip(tripObj);
-      
-      // Navigate to trip detail page
-      navigate(`/trip/${trip.id}`);
-      
-    } catch (error) {
-      console.error('❌ Failed to create guest user and join trip:', error);
-      setError('Failed to join trip. Please try again.');
-      setIsRedirecting(false);
-    }
-  };
 
   const joinTripViaShareLink = async (tripId: string) => {
     try {
@@ -451,6 +361,134 @@ export function SharedTripView() {
 
   if (!shareData) {
     return null;
+  }
+
+  // If user is not authenticated and can join as member, show sign-up prompt with blurred background
+  if (!user && shareData.permissions?.can_join_as_member) {
+    return (
+      <div className="min-h-screen bg-gray-50 relative">
+        {/* Blurred Background Content */}
+        <div className="filter blur-sm pointer-events-none">
+          {/* Header */}
+          <div className="bg-white border-b">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16">
+                <div className="flex items-center">
+                  <div className="text-2xl font-bold text-indigo-600">Voypath</div>
+                  <div className="ml-4 text-sm text-gray-500">Shared Trip</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+            {/* Trip Header */}
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">{shareData.trip.name}</h1>
+                  {shareData.trip.description && (
+                    <p className="text-gray-600 mb-4">{shareData.trip.description}</p>
+                  )}
+                  <div className="flex items-center space-x-6 text-sm text-gray-500">
+                    {shareData.trip.start_date && (
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
+                        </svg>
+                        {new Date(shareData.trip.start_date).toLocaleDateString()}
+                        {shareData.trip.end_date && ` - ${new Date(shareData.trip.end_date).toLocaleDateString()}`}
+                      </div>
+                    )}
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {shareData.trip.places.length} places
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mock Places List */}
+            <div className="bg-white rounded-lg shadow-sm">
+              <div className="p-6 border-b">
+                <h2 className="text-xl font-semibold text-gray-900">Places to Visit</h2>
+              </div>
+              <div className="divide-y">
+                {shareData.trip.places.slice(0, 3).map((place, index) => (
+                  <div key={place.id} className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-medium text-gray-900">{place.name}</h3>
+                        <p className="text-sm text-gray-500 mt-1">{place.address}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sign-up Overlay */}
+        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-8 text-center">
+            <div className="mb-6">
+              <div className="mx-auto w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Join "{shareData.trip.name}"</h2>
+              <p className="text-gray-600">
+                Create an account to collaborate on this amazing trip with {shareData.trip.places.length} places to explore!
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  // Store trip info for post-signup redirect
+                  localStorage.setItem('voypath_pending_trip', JSON.stringify({
+                    shareToken: new URLSearchParams(window.location.search).get('token'),
+                    tripId: shareData.trip.id,
+                    tripName: shareData.trip.name
+                  }));
+                  navigate('/auth');
+                }}
+                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 font-medium"
+              >
+                Sign Up & Join Trip
+              </button>
+              
+              <button
+                onClick={() => {
+                  // Store trip info for post-signin redirect
+                  localStorage.setItem('voypath_pending_trip', JSON.stringify({
+                    shareToken: new URLSearchParams(window.location.search).get('token'),
+                    tripId: shareData.trip.id,
+                    tripName: shareData.trip.name
+                  }));
+                  navigate('/auth');
+                }}
+                className="w-full bg-white text-gray-700 py-3 px-4 rounded-md border border-gray-300 hover:bg-gray-50 font-medium"
+              >
+                Already have an account? Sign In
+              </button>
+            </div>
+
+            <div className="mt-4 text-xs text-gray-500">
+              By joining, you'll be able to add places, collaborate with others, and help plan this trip.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

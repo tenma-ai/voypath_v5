@@ -118,6 +118,14 @@ function App() {
         } catch (dbError) {
           console.warn('⚠️ Failed to load database data (continuing anyway):', dbError);
         }
+
+        try {
+          // Check for pending trip join
+          const { useStore } = await import('./store/useStore');
+          await useStore.getState().handlePendingTripJoin();
+        } catch (pendingTripError) {
+          console.warn('⚠️ Failed to process pending trip join:', pendingTripError);
+        }
       };
 
       // Run background tasks without blocking UI

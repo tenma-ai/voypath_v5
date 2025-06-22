@@ -1065,6 +1065,58 @@ export const useStore = create<StoreState>()((set, get) => ({
           set({ isCreatingSystemPlaces: false });
         }
       },
+
+      // Handle pending trip join after authentication
+      handlePendingTripJoin: async (): Promise<void> => {
+        try {
+          const pendingTripData = localStorage.getItem('voypath_pending_trip');
+          if (!pendingTripData) {
+            return;
+          }
+
+          const pendingTrip = JSON.parse(pendingTripData);
+          console.log('🔗 Processing pending trip join:', pendingTrip);
+
+          // Clear pending trip data
+          localStorage.removeItem('voypath_pending_trip');
+
+          // Get current user
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            console.error('No authenticated user found for pending trip join');
+            return;
+          }
+
+          // Join the trip via share token
+          const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              action: 'join_trip',
+              shareToken: pendingTrip.shareToken
+            }),
+          });
+
+          if (response.ok) {
+            console.log('✅ Successfully joined pending trip');
+            
+            // Reload trips to include the new trip
+            await get().loadTripsFromDatabase();
+            
+            // Navigate to the trip
+            window.location.href = `/trip/${pendingTrip.tripId}`;
+          } else {
+            console.error('Failed to join pending trip:', await response.text());
+          }
+
+        } catch (error) {
+          console.error('Error processing pending trip join:', error);
+        }
+      },
     }));
 
 // Apply theme to document
