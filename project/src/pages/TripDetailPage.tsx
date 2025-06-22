@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
+import { useParams } from 'react-router-dom';
 import { MapPin, Calendar, Users, Settings, Wand2, Clock, AlertCircle, Sparkles, Camera, BarChart3, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import MapView from '../components/MapView';
@@ -10,6 +11,7 @@ import { TripSettingsModal } from '../components/TripSettingsModal';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function TripDetailPage() {
+  const { tripId } = useParams<{ tripId: string }>();
   const [activeView, setActiveView] = useState<'map' | 'calendar'>('map');
   const [showOptimizationModal, setShowOptimizationModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -42,7 +44,18 @@ export function TripDetailPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showScorePopup]);
-  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase } = useStore();
+  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip } = useStore();
+
+  // Handle route parameter - set current trip if tripId is provided
+  useEffect(() => {
+    if (tripId && trips.length > 0) {
+      const trip = trips.find(t => t.id === tripId);
+      if (trip && (!currentTrip || currentTrip.id !== tripId)) {
+        console.log('🔄 TripDetailPage: Setting current trip from route:', trip.name);
+        setCurrentTrip(trip);
+      }
+    }
+  }, [tripId, trips, currentTrip, setCurrentTrip]);
 
   // Load fresh data from database when page loads or trip changes
   useEffect(() => {

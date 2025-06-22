@@ -22,9 +22,12 @@ export function SharePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔄 SharePage useEffect triggered:', { currentTripId: currentTrip?.id, currentTripName: currentTrip?.name });
     if (currentTrip) {
       console.log('🔄 SharePage: Loading members for trip:', currentTrip.name);
       loadTripMembers();
+    } else {
+      console.log('❌ SharePage: No currentTrip available');
     }
   }, [currentTrip]);
 

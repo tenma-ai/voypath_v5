@@ -171,6 +171,11 @@ function App() {
                         <TripDetailPage />
                       </ErrorBoundary>
                     } />
+                    <Route path="trip/:tripId" element={
+                      <ErrorBoundary>
+                        <TripDetailPage />
+                      </ErrorBoundary>
+                    } />
                     <Route path="my-trip/my-places" element={<MyPlacesPage />} />
                     <Route path="my-trip/chat" element={<ChatPage />} />
                     <Route path="my-trip/share" element={<SharePage />} />

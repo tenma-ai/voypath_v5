@@ -32,9 +32,12 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
 
   // Load trip members when modal opens and currentTrip is available
   useEffect(() => {
+    console.log('🔄 TripSettingsModal useEffect triggered:', { isOpen, currentTripId: currentTrip?.id, currentTripName: currentTrip?.name });
     if (isOpen && currentTrip?.id) {
       console.log('🔄 TripSettingsModal: Loading members for trip:', currentTrip.name);
       loadTripMembers();
+    } else {
+      console.log('❌ TripSettingsModal: Not loading members. isOpen:', isOpen, 'currentTrip:', !!currentTrip);
     }
   }, [isOpen, currentTrip?.id]);
 

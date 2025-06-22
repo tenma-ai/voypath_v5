@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useStore } from '../store/useStore';
 
 interface SharedTripData {
   shareId: string;
@@ -38,6 +39,7 @@ interface SharedTripData {
 export function SharedTripView() {
   const { shareToken } = useParams<{ shareToken: string }>();
   const navigate = useNavigate();
+  const { user, setCurrentTrip, loadTripsFromDatabase } = useStore();
   const [shareData, setShareData] = useState<SharedTripData | null>(null);
   const [isPasswordRequired, setIsPasswordRequired] = useState(false);
   const [password, setPassword] = useState('');
@@ -110,6 +112,12 @@ export function SharedTripView() {
 
         setShareData(data);
         setIsPasswordRequired(false);
+        
+        // If user is authenticated, redirect to actual trip page
+        if (user && data.trip && data.permissions?.can_join_as_member) {
+          await redirectToTripPage(data.trip);
+          return;
+        }
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'Failed to load shared trip');
@@ -118,6 +126,36 @@ export function SharedTripView() {
       setError('Failed to load shared trip');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const redirectToTripPage = async (trip: any) => {
+    try {
+      console.log('🔄 Redirecting to trip page:', trip.name);
+      
+      // Reload trips to ensure user has access to the shared trip
+      await loadTripsFromDatabase();
+      
+      // Find the trip in user's trips and set as current
+      const tripObj = {
+        id: trip.id,
+        name: trip.name,
+        description: trip.description,
+        startDate: trip.start_date,
+        endDate: trip.end_date,
+        memberCount: trip.total_members || 1,
+        createdAt: trip.created_at,
+        ownerId: trip.owner_id
+      };
+      
+      await setCurrentTrip(tripObj);
+      
+      // Navigate to trip detail page
+      navigate(`/trip/${trip.id}`);
+      
+    } catch (error) {
+      console.error('❌ Failed to redirect to trip page:', error);
+      setError('Failed to access trip. Please try joining manually.');
     }
   };
 
