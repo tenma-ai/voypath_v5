@@ -343,6 +343,11 @@ console.log('📨 Full trip-sharing-v3 response:', data);
 console.log('🔑 Permissions object:', JSON.stringify(data.permissions, null, 2));
 ```
 
+**確認済み**: trip-sharing-v3 Edge Function は存在している（2025年6月22日テスト済み）
+- curl テストで Edge Function への接続確認済み
+- 認証エラーが発生するが、これは Function が存在することを証明
+- 問題はおそらく認証処理またはレスポンス内容にある
+
 ### ステップ3: 手動テスト手順
 1. Michele Jordanでログイン確認
 2. ブラウザコンソールでデバッグログ確認
