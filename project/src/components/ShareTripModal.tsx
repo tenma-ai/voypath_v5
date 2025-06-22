@@ -119,7 +119,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         can_optimize: false,
         can_export: true,
         can_comment: true,
-        can_join_as_member: false
+        can_join_as_member: true  // Collaborate links should allow member joining
       };
 
       const expiresAt = expiryDays ? 

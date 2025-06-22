@@ -238,17 +238,20 @@ const response = await fetch(
 
 ## 現状の問題点
 
-### 1. Share Link関連 ❌ (未解決 - 2025年6月22日更新)
+### 1. Share Link関連 ❌→✅ (解決済み - 2025年6月22日)
 - **問題**: 認証ユーザーがshare linkアクセス時にview-onlyページに留まる
 - **症状**: "Collaborative" と表示されるが、実際のVoypath trip planning pageに移動しない
-- **実装済み修正**: 
-  - データベース: `can_join_as_member: true` 設定完了
-  - SharedTripView: 自動リダイレクトロジック実装済み
-  - App.tsx: `/trip/:tripId` ルート追加済み
-- **推定原因**: 
-  - ユーザー認証状態の問題 (`user` が null)
-  - trip-sharing-v3 Edge Function からの permissions レスポンス不備
-  - フロントエンドのリダイレクト条件判定の問題
+- **根本原因発見**: ShareTripModal.tsx で `can_join_as_member: false` がハードコード
+- **解決**: ShareTripModal の collaborate link作成時に `can_join_as_member: true` に修正
+- **修正内容**:
+  ```typescript
+  // 修正前
+  can_join_as_member: false  // 全てのshare linkで無効
+  
+  // 修正後  
+  can_join_as_member: true   // Collaborate linkで有効
+  ```
+- **影響**: 今後作成されるcollaborate linkで自動メンバー追加が動作するように
 
 ### 2. Invitation Code関連 ❌ (未解決)
 - **問題**: 404エラー "Invalid or expired invitation code"
