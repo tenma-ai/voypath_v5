@@ -59,6 +59,7 @@ export function SharedTripView() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     if (shareToken) {
@@ -144,6 +145,7 @@ export function SharedTripView() {
         // If user is authenticated, redirect to actual trip page
         if (user && data.trip && data.permissions?.can_join_as_member) {
           console.log('✅ All conditions met, redirecting to trip page');
+          setIsRedirecting(true);
           await redirectToTripPage(data.trip);
           return;
         } else {
@@ -280,6 +282,17 @@ export function SharedTripView() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading shared trip...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Redirecting to trip...</p>
         </div>
       </div>
     );
