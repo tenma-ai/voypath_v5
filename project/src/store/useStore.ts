@@ -165,12 +165,14 @@ export const useStore = create<StoreState>()((set, get) => ({
             // Only reload data if switching to a different trip
             if (currentTripId !== trip.id) {
               console.log(`🔄 Switching to trip: ${trip.name}`);
+              console.log(`🎨 [Store] About to load colors for trip: ${trip.id}`);
               await get().loadMemberColorsForTrip(trip.id); // Load colors first
               await get().loadPlacesFromDatabase(trip.id);
               await get().loadOptimizationResult(trip.id);
             } else {
               console.log(`✅ Already on trip: ${trip.name}, preserving optimization results`);
               // Still reload colors to ensure consistency
+              console.log(`🎨 [Store] Reloading colors for current trip: ${trip.id}`);
               await get().loadMemberColorsForTrip(trip.id);
               // Preserve optimization results if staying on same trip
               if (currentOptimizationResult) {
@@ -178,6 +180,11 @@ export const useStore = create<StoreState>()((set, get) => ({
               }
             }
             console.log(`🔄 Current trip set to: ${trip.name} (${trip.id})`);
+            
+            // Debug: Check the state after loading
+            const { memberColors, tripMembers } = get();
+            console.log(`🎨 [Store] After loading - memberColors:`, memberColors);
+            console.log(`🎨 [Store] After loading - tripMembers:`, tripMembers);
           } catch (error) {
             console.error('Failed to load data for new trip:', error);
           }
@@ -262,9 +269,11 @@ export const useStore = create<StoreState>()((set, get) => ({
       tripMembers: [],
       loadMemberColorsForTrip: async (tripId: string) => {
         try {
+          console.log('🎨 [Store] ===== STARTING loadMemberColorsForTrip =====');
           console.log('🎨 [Store] Loading member colors and data for trip:', tripId);
           
           // Load trip members with user data
+          console.log('🎨 [Store] Querying trip_members table...');
           const { data: membersData, error: membersError } = await supabase
             .from('trip_members')
             .select(`
@@ -279,6 +288,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             `)
             .eq('trip_id', tripId);
 
+          console.log('🎨 [Store] Query result:', { membersData, membersError });
+
           if (membersError) {
             console.error('🎨 [Store] Error loading trip members:', membersError);
             throw membersError;
@@ -292,27 +303,42 @@ export const useStore = create<StoreState>()((set, get) => ({
             assigned_color_index: member.assigned_color_index
           })) || [];
 
+          console.log('🎨 [Store] Formatted members:', formattedMembers);
+
           // Load member colors using MemberColorService
+          console.log('🎨 [Store] Loading colors via MemberColorService...');
           const colorMapping = await (await import('../services/MemberColorService')).MemberColorService.getSimpleColorMapping(tripId);
+          console.log('🎨 [Store] Raw color mapping:', colorMapping);
           
           // Validate color assignment and fix any issues
+          console.log('🎨 [Store] Validating color assignments...');
           const validation = await (await import('../services/MemberColorService')).MemberColorService.validateColorAssignment(tripId);
+          console.log('🎨 [Store] Validation result:', validation);
+          
           if (!validation.valid) {
             console.warn('🎨 [Store] Color assignment issues detected, fixing...', validation.issues);
             await (await import('../services/MemberColorService')).MemberColorService.fixDuplicateColors(tripId);
             await (await import('../services/MemberColorService')).MemberColorService.autoAssignMissingColors(tripId);
             // Reload colors after fixing
             const fixedColors = await (await import('../services/MemberColorService')).MemberColorService.getSimpleColorMapping(tripId);
+            console.log('🎨 [Store] Setting fixed colors to store:', fixedColors);
             set({ memberColors: fixedColors, tripMembers: formattedMembers });
             console.log('🎨 [Store] Fixed and loaded colors:', fixedColors);
           } else {
+            console.log('🎨 [Store] Setting colors to store:', colorMapping);
             set({ memberColors: colorMapping, tripMembers: formattedMembers });
             console.log('🎨 [Store] Loaded colors (no issues):', colorMapping);
           }
 
           console.log('🎨 [Store] Trip members loaded:', formattedMembers);
+          console.log('🎨 [Store] ===== FINISHED loadMemberColorsForTrip =====');
+          
+          // Verify the state was set correctly
+          const { memberColors: finalColors, tripMembers: finalMembers } = get();
+          console.log('🎨 [Store] Final state verification:', { finalColors, finalMembers });
         } catch (error) {
           console.error('🎨 [Store] Failed to load member colors:', error);
+          console.error('🎨 [Store] Error details:', error);
           set({ memberColors: {}, tripMembers: [] });
         }
       },
