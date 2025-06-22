@@ -206,47 +206,34 @@ export function SharedTripView() {
     try {
       console.log('🆕 Creating guest user and joining trip:', trip.name);
       
-      // Try anonymous authentication first
-      let guestUserId: string;
-      let useLocalStorage = false;
+      // Generate unique guest email
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substr(2, 9);
+      const guestEmail = `guest_${timestamp}_${randomId}@voypath.local`;
+      const guestPassword = `guest_${timestamp}_${randomId}`;
       
-      try {
-        const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
-        
-        if (authError || !authData.user) {
-          console.warn('⚠️ Anonymous auth failed, using localStorage approach:', authError);
-          useLocalStorage = true;
-        } else {
-          guestUserId = authData.user.id;
-          console.log('✅ Guest user created via anonymous auth:', guestUserId);
-        }
-      } catch (error) {
-        console.warn('⚠️ Anonymous auth not available, using localStorage approach');
-        useLocalStorage = true;
+      console.log('📧 Creating guest account with email:', guestEmail);
+      
+      // Sign up guest user with email/password
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: guestEmail,
+        password: guestPassword,
+      });
+      
+      if (authError || !authData.user) {
+        console.error('❌ Failed to create guest account:', authError);
+        throw new Error('Failed to create guest account');
       }
       
-      // Fallback to localStorage-based guest user
-      if (useLocalStorage) {
-        // Check if guest user already exists in localStorage
-        let existingGuestId = localStorage.getItem('voypath_guest_user_id');
-        if (!existingGuestId) {
-          // Generate unique guest ID
-          existingGuestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          localStorage.setItem('voypath_guest_user_id', existingGuestId);
-          console.log('✅ Guest user created via localStorage:', existingGuestId);
-        } else {
-          console.log('✅ Using existing localStorage guest user:', existingGuestId);
-        }
-        guestUserId = existingGuestId;
-      }
+      console.log('✅ Guest account created:', authData.user.id);
       
       // Create user profile
       const { error: profileError } = await supabase
         .from('users')
         .insert({
-          id: guestUserId,
+          id: authData.user.id,
           name: `Guest User`,
-          email: `guest_${guestUserId.substring(0, 8)}@voypath.local`,
+          email: guestEmail,
           is_guest: true
         });
       
@@ -261,7 +248,7 @@ export function SharedTripView() {
         .from('trip_members')
         .insert({
           trip_id: trip.id,
-          user_id: guestUserId,
+          user_id: authData.user.id,
           role: 'member',
           joined_at: new Date().toISOString()
         });
