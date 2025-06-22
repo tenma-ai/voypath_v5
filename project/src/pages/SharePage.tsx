@@ -3,6 +3,7 @@ import { Copy, Users, Crown, Share2, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
+import { MemberColorService } from '../services/MemberColorService';
 
 interface TripMember {
   id: string;
@@ -10,6 +11,7 @@ interface TripMember {
   email: string;
   role: string;
   joined_at: string;
+  color?: string;
 }
 
 export function SharePage() {
@@ -42,7 +44,7 @@ export function SharePage() {
       // First get trip members
       const { data: memberIds, error: membersError } = await supabase
         .from('trip_members')
-        .select('user_id, role, joined_at')
+        .select('user_id, role, joined_at, assigned_color_index')
         .eq('trip_id', currentTrip.id);
 
       if (membersError) {
@@ -68,6 +70,10 @@ export function SharePage() {
         return;
       }
 
+      // Load member colors
+      const colorMapping = await MemberColorService.getSimpleColorMapping(currentTrip.id);
+      console.log('🎨 SharePage: Color mapping:', colorMapping);
+
       // Combine the data
       const data = memberIds.map(member => {
         const user = usersData?.find(u => u.id === member.user_id);
@@ -77,14 +83,19 @@ export function SharePage() {
         };
       });
 
-      const membersData = data?.map((member: any) => ({
-        id: member.user_id,
-        name: member.users?.name || member.users?.email || 'Unknown User',
-        email: member.users?.email || '',
-        role: member.role,
-        joined_at: member.joined_at
-      })) || [];
+      const membersData = data?.map((member: any) => {
+        const memberColor = colorMapping[member.user_id] || '#0077BE'; // Fallback color
+        return {
+          id: member.user_id,
+          name: member.users?.name || member.users?.email || 'Unknown User',
+          email: member.users?.email || '',
+          role: member.role,
+          joined_at: member.joined_at,
+          color: memberColor
+        };
+      }) || [];
 
+      console.log('✅ SharePage: Formatted members data with colors:', membersData);
       setMembers(membersData);
     } catch (error) {
       console.error('❌ Failed to load trip members:', error);
@@ -238,7 +249,10 @@ export function SharePage() {
                   className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
                 >
                   <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center">
+                    <div 
+                      className="w-12 h-12 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: member.color || '#0077BE' }}
+                    >
                       <span className="text-white font-medium text-lg">
                         {member.name.charAt(0).toUpperCase()}
                       </span>

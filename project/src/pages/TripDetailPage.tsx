@@ -10,6 +10,7 @@ import { OptimizationResult } from '../components/OptimizationResult';
 import { TripSettingsModal } from '../components/TripSettingsModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { MemberColorService } from '../services/MemberColorService';
 
 interface TripMember {
   id: string;
@@ -19,6 +20,7 @@ interface TripMember {
   joinedAt: string;
   isOnline?: boolean;
   avatar?: string;
+  color?: string;
 }
 
 export function TripDetailPage() {
@@ -33,6 +35,7 @@ export function TripDetailPage() {
   const [optimizationProgress, setOptimizationProgress] = useState(0);
   const [members, setMembers] = useState<TripMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
   
   // Auto-clear error after 5 seconds
   useEffect(() => {
@@ -92,10 +95,10 @@ export function TripDetailPage() {
     setIsLoadingMembers(true);
     
     try {
-      // First get trip members
+      // First get trip members with color assignment
       const { data: memberIds, error: membersError } = await supabase
         .from('trip_members')
-        .select('user_id, role, joined_at')
+        .select('user_id, role, joined_at, assigned_color_index')
         .eq('trip_id', currentTrip.id);
 
       if (membersError) {
@@ -121,6 +124,11 @@ export function TripDetailPage() {
         return;
       }
 
+      // Load member colors
+      const colorMapping = await MemberColorService.getSimpleColorMapping(currentTrip.id);
+      console.log('🎨 TripDetailPage: Color mapping:', colorMapping);
+      setMemberColors(colorMapping);
+
       // Combine the data
       const membersData = memberIds.map(member => {
         const user = usersData?.find(u => u.id === member.user_id);
@@ -133,17 +141,21 @@ export function TripDetailPage() {
       console.log('📊 TripDetailPage: Combined members data:', membersData);
 
       if (membersData && membersData.length > 0) {
-        const formattedMembers: TripMember[] = membersData.map((member: any) => ({
-          id: member.user_id,
-          name: member.users.name || member.users.email,
-          email: member.users.email,
-          role: member.role,
-          joinedAt: new Date(member.joined_at).toLocaleDateString(),
-          avatar: member.users.name?.charAt(0).toUpperCase() || member.users.email?.charAt(0).toUpperCase() || 'U',
-          isOnline: Math.random() > 0.5 // Temporary random online status
-        }));
+        const formattedMembers: TripMember[] = membersData.map((member: any) => {
+          const memberColor = colorMapping[member.user_id] || '#0077BE'; // Fallback color
+          return {
+            id: member.user_id,
+            name: member.users.name || member.users.email,
+            email: member.users.email,
+            role: member.role,
+            joinedAt: new Date(member.joined_at).toLocaleDateString(),
+            avatar: member.users.name?.charAt(0).toUpperCase() || member.users.email?.charAt(0).toUpperCase() || 'U',
+            color: memberColor,
+            isOnline: Math.random() > 0.5 // Temporary random online status
+          };
+        });
         
-        console.log('✅ TripDetailPage: Formatted members data:', formattedMembers);
+        console.log('✅ TripDetailPage: Formatted members data with colors:', formattedMembers);
         setMembers(formattedMembers);
       }
     } catch (error) {
@@ -460,8 +472,11 @@ export function TripDetailPage() {
                           {members.slice(0, 3).map((member, index) => (
                             <div
                               key={member.id}
-                              className="relative w-5 h-5 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center border border-white dark:border-slate-800 shadow-sm"
-                              style={{ zIndex: 3 - index }}
+                              className="relative w-5 h-5 rounded-full flex items-center justify-center border border-white dark:border-slate-800 shadow-sm"
+                              style={{ 
+                                zIndex: 3 - index,
+                                backgroundColor: member.color || '#0077BE'
+                              }}
                             >
                               <span className="text-[8px] font-bold text-white">{member.avatar}</span>
                               {member.isOnline && (
@@ -672,7 +687,10 @@ export function TripDetailPage() {
                     >
                       <div className="flex items-center space-x-3">
                         <div className="relative">
-                          <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center shadow-medium">
+                          <div 
+                            className="w-10 h-10 rounded-full flex items-center justify-center shadow-medium"
+                            style={{ backgroundColor: member.color || '#0077BE' }}
+                          >
                             <span className="text-white font-bold text-sm">{member.avatar}</span>
                           </div>
                           {member.isOnline && (
