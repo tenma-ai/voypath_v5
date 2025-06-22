@@ -52,12 +52,13 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     
     // Use centralized color utility
     const colorResult = getPlaceColor(place);
+    console.log('🗺️ [MapView] Color result:', colorResult);
     
-    // Handle system places (departure/destination)
-    if (colorResult.type === 'system') {
+    // Handle system places (departure/destination) based on place type
+    if (place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport') {
       return {
         path: google.maps.SymbolPath.CIRCLE,
-        fillColor: '#000000',
+        fillColor: '#374151', // Gray for system places
         fillOpacity: 1,
         strokeColor: '#FFFFFF',
         strokeWeight: 2,
@@ -69,14 +70,18 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     let fillColor = '#9CA3AF'; // Default gray
     
     if (colorResult.type === 'single') {
-      fillColor = colorResult.primaryColor;
+      fillColor = colorResult.background;
     } else if (colorResult.type === 'gold') {
       fillColor = '#FFD700';
     } else if (colorResult.type === 'gradient') {
       // For Google Maps markers, use the primary contributor's color
-      // TODO: Implement actual gradient for Google Maps markers
-      fillColor = colorResult.primaryColor;
+      fillColor = colorResult.contributors[0]?.color || '#9CA3AF';
+    } else {
+      // Use background color for any other case
+      fillColor = colorResult.background;
     }
+
+    console.log('🗺️ [MapView] Final marker color:', fillColor);
 
     return {
       path: google.maps.SymbolPath.CIRCLE,
