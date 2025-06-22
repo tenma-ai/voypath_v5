@@ -155,27 +155,25 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       <div className="fixed top-[5.5rem] right-4 z-[99999] bg-slate-100/95 dark:bg-slate-700/95 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 shadow-lg">
         <button
           onClick={() => setViewMode('timeline')}
-          className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
+          className={`relative p-2 rounded-md text-xs font-medium transition-all duration-300 flex items-center justify-center ${
             viewMode === 'timeline' 
               ? 'text-white shadow-soft bg-orange-500' 
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
           title="Timeline View"
         >
-          <List className="w-3 h-3" />
-          <span>Timeline</span>
+          <List className="w-4 h-4" />
         </button>
         <button
           onClick={() => setViewMode('grid')}
-          className={`relative px-2 py-1 rounded-md text-xs font-medium transition-all duration-300 flex items-center space-x-1 ${
+          className={`relative p-2 rounded-md text-xs font-medium transition-all duration-300 flex items-center justify-center ${
             viewMode === 'grid' 
               ? 'text-white shadow-soft bg-orange-500' 
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
           title="Grid View"
         >
-          <Grid3X3 className="w-3 h-3" />
-          <span>Grid</span>
+          <Grid3X3 className="w-4 h-4" />
         </button>
       </div>,
       document.body
