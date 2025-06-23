@@ -102,9 +102,9 @@ serve(async (req) => {
     // ルーティング
     switch (method) {
       case 'POST':
-        if (pathSegments.includes('create-invitation')) {
+        if (pathSegments.includes('create-invitation') || url.pathname.endsWith('/create-invitation')) {
           return await handleCreateInvitation(req, supabaseClient, user.id);
-        } else if (pathSegments.includes('join-trip')) {
+        } else if (pathSegments.includes('join-trip') || url.pathname.endsWith('/join-trip')) {
           return await handleJoinTrip(req, supabaseClient, user.id);
         } else {
           throw new Error('Invalid POST endpoint');

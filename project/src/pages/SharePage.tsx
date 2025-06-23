@@ -22,19 +22,159 @@ export function SharePage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [members, setMembers] = useState<TripMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
 
   useEffect(() => {
     if (currentTrip) {
-      setShareLink(`${window.location.origin}/join/${currentTrip.id}`);
-      setJoinCode(generateFixedJoinCode(currentTrip.id));
       loadTripMembers();
+      generateInvitationCode();
+      generateShareLink();
     }
   }, [currentTrip]);
 
-  const generateFixedJoinCode = (tripId: string) => {
-    // Generate a consistent 6-character code based on trip ID
-    const hash = tripId.slice(-6).toUpperCase();
-    return hash.length >= 6 ? hash : (hash + 'ABCDEF').slice(0, 6);
+  const generateInvitationCode = async () => {
+    if (!currentTrip) return;
+    
+    setGeneratingCode(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('🔑 Generating invitation code for trip:', currentTrip.id);
+      
+      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/create-invitation', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          trip_id: currentTrip.id,
+          max_uses: 10,
+          expires_hours: 168, // 1 week
+          description: 'Share page invitation'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Invitation code generated:', data.invitation.code);
+        setJoinCode(data.invitation.code);
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Failed to generate invitation code:', errorData);
+        // Fallback to existing code if generation fails
+        const existingCodes = await getExistingInvitationCodes();
+        if (existingCodes.length > 0) {
+          setJoinCode(existingCodes[0].code);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error generating invitation code:', error);
+      // Try to get existing codes as fallback
+      const existingCodes = await getExistingInvitationCodes();
+      if (existingCodes.length > 0) {
+        setJoinCode(existingCodes[0].code);
+      }
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
+
+  const generateShareLink = async () => {
+    if (!currentTrip) return;
+    
+    setGeneratingLink(true);
+    try {
+      console.log('🔗 Generating share link for trip:', currentTrip.id);
+      
+      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
+        method: 'POST',
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'create_share_link',
+          trip_id: currentTrip.id,
+          share_type: 'external_view',
+          permissions: {
+            can_view_places: true,
+            can_join_as_member: true,
+            can_export: true
+          }
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Share link generated:', data.shareToken);
+        setShareLink(`${window.location.origin}/shared/${data.shareToken}`);
+      } else {
+        console.error('❌ Failed to generate share link');
+        // Try to get existing share link
+        const existingLink = await getExistingShareLink();
+        if (existingLink) {
+          setShareLink(`${window.location.origin}/shared/${existingLink}`);
+        } else {
+          setShareLink(`${window.location.origin}/trip/${currentTrip.id}`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error generating share link:', error);
+      setShareLink(`${window.location.origin}/trip/${currentTrip.id}`);
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
+  const getExistingInvitationCodes = async () => {
+    if (!currentTrip) return [];
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return [];
+
+      const response = await fetch(`https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/invitations/${currentTrip.id}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.invitations || [];
+      }
+    } catch (error) {
+      console.error('❌ Error getting existing invitation codes:', error);
+    }
+    return [];
+  };
+
+  const getExistingShareLink = async () => {
+    if (!currentTrip) return null;
+    
+    try {
+      const { data, error } = await supabase
+        .from('trip_shares')
+        .select('share_token')
+        .eq('trip_id', currentTrip.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        return data[0].share_token;
+      }
+    } catch (error) {
+      console.error('❌ Error getting existing share link:', error);
+    }
+    return null;
   };
 
   const loadTripMembers = async () => {
@@ -170,14 +310,22 @@ export function SharePage() {
           </div>
           
           <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 mb-4">
-            <div className="text-sm font-mono text-slate-900 dark:text-slate-100 break-all">
-              {shareLink}
-            </div>
+            {generatingLink ? (
+              <div className="flex items-center justify-center py-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Generating link...</span>
+              </div>
+            ) : (
+              <div className="text-sm font-mono text-slate-900 dark:text-slate-100 break-all">
+                {shareLink || 'No link available'}
+              </div>
+            )}
           </div>
 
           <button
             onClick={handleCopyLink}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
+            disabled={generatingLink || !shareLink}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Copy className="w-4 h-4" />
             <span>{copiedLink ? 'Copied!' : 'Copy Link'}</span>
@@ -202,15 +350,23 @@ export function SharePage() {
           
           <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-6 mb-4">
             <div className="text-center">
-              <div className="text-4xl font-mono font-bold text-slate-900 dark:text-slate-100 tracking-wider">
-                {joinCode}
-              </div>
+              {generatingCode ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mr-2"></div>
+                  <span className="text-lg text-slate-600 dark:text-slate-400">Generating code...</span>
+                </div>
+              ) : (
+                <div className="text-4xl font-mono font-bold text-slate-900 dark:text-slate-100 tracking-wider">
+                  {joinCode || 'NO CODE'}
+                </div>
+              )}
             </div>
           </div>
 
           <button
             onClick={handleCopyCode}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium"
+            disabled={generatingCode || !joinCode}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Copy className="w-4 h-4" />
             <span>{copiedCode ? 'Copied!' : 'Copy Code'}</span>
