@@ -288,17 +288,23 @@ export function SharePage() {
 
       const membersData = data?.map((member: any) => {
         const memberColor = colorMapping[member.user_id] || '#0077BE'; // Fallback color
+        // Check if users data exists before accessing properties
+        if (!member.users) {
+          console.warn('⚠️ SharePage: No user data found for member:', member.user_id);
+          return null;
+        }
         return {
           id: member.user_id,
-          name: member.users?.name || member.users?.email || 'Unknown User',
-          email: member.users?.email || '',
+          name: member.users.name || member.users.email || 'Unknown User',
+          email: member.users.email || '',
           role: member.role,
           joined_at: member.joined_at,
           color: memberColor
         };
-      }) || [];
+      }).filter(Boolean) || []; // Filter out null values
 
       console.log('✅ SharePage: Formatted members data with colors:', membersData);
+      console.log(`✅ SharePage: Setting ${membersData.length} members`);
       setMembers(membersData);
     } catch (error) {
       console.error('❌ Failed to load trip members:', error);
@@ -445,6 +451,7 @@ export function SharePage() {
             <div>
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
                 Members ({members.length})
+                {console.log('🔍 SharePage render: members count:', members.length)}
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 People who have joined this trip

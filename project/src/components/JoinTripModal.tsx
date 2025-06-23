@@ -52,11 +52,33 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
       });
 
       console.log('📥 Response status:', response.status);
+      console.log('📥 Response headers:', response.headers);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.log('❌ Error response:', errorData);
-        throw new Error(errorData.error || 'Failed to join trip');
+        let errorMessage = 'Failed to join trip';
+        try {
+          const errorData = await response.json();
+          console.log('❌ Error response data:', errorData);
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch (parseError) {
+          console.log('❌ Could not parse error response:', parseError);
+          const errorText = await response.text();
+          console.log('❌ Error response text:', errorText);
+          if (errorText) errorMessage = errorText;
+        }
+        
+        // Provide more specific error messages
+        if (response.status === 404) {
+          errorMessage = 'Invalid invitation code. Please check the code and try again.';
+        } else if (response.status === 401) {
+          errorMessage = 'Please log in to join a trip.';
+        } else if (response.status === 403) {
+          errorMessage = 'You do not have permission to join this trip.';
+        } else if (response.status === 409) {
+          errorMessage = 'You are already a member of this trip.';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();

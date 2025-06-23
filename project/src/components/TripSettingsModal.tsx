@@ -89,15 +89,23 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
       console.log('📊 TripSettingsModal: Combined members data:', membersData);
 
       if (membersData && membersData.length > 0) {
-        const formattedMembers: TripMember[] = membersData.map((member: any) => ({
-          id: member.user_id,
-          name: member.users.name || member.users.email,
-          email: member.users.email,
-          role: member.role,
-          joinedAt: new Date(member.joined_at).toLocaleDateString(),
-          avatar: member.users.name?.charAt(0).toUpperCase() || member.users.email?.charAt(0).toUpperCase() || 'U',
-          isOnline: Math.random() > 0.5 // Temporary random online status
-        }));
+        const formattedMembers: TripMember[] = membersData
+          .filter((member: any) => {
+            if (!member.users) {
+              console.warn('⚠️ TripSettingsModal: No user data found for member:', member.user_id);
+              return false;
+            }
+            return true;
+          })
+          .map((member: any) => ({
+            id: member.user_id,
+            name: member.users.name || member.users.email || 'Unknown User',
+            email: member.users.email || '',
+            role: member.role,
+            joinedAt: new Date(member.joined_at).toLocaleDateString(),
+            avatar: member.users.name?.charAt(0).toUpperCase() || member.users.email?.charAt(0).toUpperCase() || 'U',
+            isOnline: Math.random() > 0.5 // Temporary random online status
+          }));
         
         console.log('✅ TripSettingsModal: Formatted members data:', formattedMembers);
         setMembers(formattedMembers);
