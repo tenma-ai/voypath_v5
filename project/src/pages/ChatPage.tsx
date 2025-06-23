@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Paperclip, Smile, MapPin, Calendar, Image as ImageIcon, Heart, ThumbsUp, Laugh, Reply, MoreVertical, Check, CheckCheck } from 'lucide-react';
+import { Send, Paperclip, Smile, MapPin, Calendar, Image as ImageIcon, Heart, ThumbsUp, Laugh, Reply, MoreVertical, Check, CheckCheck, X, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
@@ -59,6 +59,7 @@ export function ChatPage() {
   const [uploading, setUploading] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [showReadDetails, setShowReadDetails] = useState<string | null>(null);
   const [memberColors, setMemberColors] = useState<Record<string, string>>({});
   const [currentUserColor, setCurrentUserColor] = useState<RefinedColor | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -386,6 +387,29 @@ export function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
+  // モーダル外クリックでクローズ
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showReadDetails) {
+        const target = event.target as Element;
+        if (!target.closest('[data-read-details]') && !target.closest('button')) {
+          setShowReadDetails(null);
+        }
+      }
+      if (showEmojiPicker) {
+        const target = event.target as Element;
+        if (!target.closest('.emoji-picker') && !target.closest('[data-emoji-trigger]')) {
+          setShowEmojiPicker(null);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showReadDetails, showEmojiPicker]);
+
   // ファイル選択
   const handleFileSelect = () => {
     fileInputRef.current?.click();
@@ -526,6 +550,7 @@ export function ChatPage() {
                           onClick={() => setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)}
                           className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
                           title="React"
+                          data-emoji-trigger
                         >
                           <Smile className="w-3 h-3 text-slate-500" />
                         </button>
@@ -538,7 +563,7 @@ export function ChatPage() {
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.9 }}
-                            className={`absolute z-10 ${isOwn ? 'right-0' : 'left-0'} mt-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-2`}
+                            className={`absolute z-10 ${isOwn ? 'right-0' : 'left-0'} mt-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-2 emoji-picker`}
                           >
                             <div className="flex space-x-1">
                               {commonEmojis.map((emoji) => (
@@ -604,21 +629,88 @@ export function ChatPage() {
                     
                     {/* Read indicators below message (only for own messages) */}
                     {isOwn && msg.reads && msg.reads.length > 0 && (
-                      <div className="flex items-center space-x-1 mt-1 justify-end">
-                        {msg.reads.slice(0, 3).map((read) => {
-                          const memberColor = memberColors[read.user_id] || '#6B7280';
-                          return (
-                            <div 
-                              key={read.id}
-                              className="w-3 h-3 rounded-full border border-white"
-                              style={{ backgroundColor: memberColor }}
-                              title={`Read by ${read.user.name}`}
-                            />
-                          );
-                        })}
-                        {msg.reads.length > 3 && (
-                          <span className="text-xs text-slate-400 ml-1">+{msg.reads.length - 3}</span>
-                        )}
+                      <div className="flex items-center space-x-1 mt-1 justify-end relative">
+                        <button
+                          onClick={() => setShowReadDetails(showReadDetails === msg.id ? null : msg.id)}
+                          className="flex items-center space-x-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded px-1 py-0.5 transition-colors"
+                        >
+                          {msg.reads.slice(0, 3).map((read) => {
+                            const memberColor = memberColors[read.user_id] || '#6B7280';
+                            return (
+                              <div 
+                                key={read.id}
+                                className="w-3 h-3 rounded-full border border-white"
+                                style={{ backgroundColor: memberColor }}
+                              />
+                            );
+                          })}
+                          {msg.reads.length > 3 && (
+                            <span className="text-xs text-slate-400 ml-1">+{msg.reads.length - 3}</span>
+                          )}
+                        </button>
+
+                        {/* Read details modal */}
+                        <AnimatePresence>
+                          {showReadDetails === msg.id && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                              className="absolute bottom-full right-0 mb-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 min-w-64 max-w-sm z-50"
+                              data-read-details
+                            >
+                              <div className="p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center">
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Read by {msg.reads.length} {msg.reads.length === 1 ? 'person' : 'people'}
+                                  </h3>
+                                  <button
+                                    onClick={() => setShowReadDetails(null)}
+                                    className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                                  >
+                                    <X className="w-4 h-4 text-slate-500" />
+                                  </button>
+                                </div>
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                  {msg.reads
+                                    .sort((a, b) => new Date(b.read_at).getTime() - new Date(a.read_at).getTime())
+                                    .map((read) => {
+                                      const memberColor = memberColors[read.user_id] || '#6B7280';
+                                      return (
+                                        <div key={read.id} className="flex items-center space-x-3 py-2">
+                                          <div 
+                                            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                                            style={{ 
+                                              backgroundColor: memberColor,
+                                              color: MemberColorService.getContrastColor(memberColor)
+                                            }}
+                                          >
+                                            <span className="font-medium text-sm">
+                                              {read.user.name?.charAt(0).toUpperCase()}
+                                            </span>
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                                              {read.user.name}
+                                            </div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                              {new Date(read.read_at).toLocaleString([], {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                              })}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     )}
                   </div>
