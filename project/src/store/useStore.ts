@@ -179,6 +179,11 @@ export const useStore = create<StoreState>()((set, get) => ({
           showOptimizationSuccess: false  // Reset success animation when switching trips
         });
         
+        // Save current trip ID to localStorage for persistence
+        if (trip) {
+          localStorage.setItem('currentTripId', trip.id);
+        }
+        
         if (trip) {
           try {
             // Only reload data if switching to a different trip
@@ -730,10 +735,39 @@ export const useStore = create<StoreState>()((set, get) => ({
             set({ trips });
             console.log(`✅ Loaded ${trips.length} trips from database`);
             
-            // Set the first trip as current if no current trip is set
-            if (!get().currentTrip && trips.length > 0) {
-              console.log('🎨 [LoadTrips] Setting first trip as current and loading colors...');
-              await get().setCurrentTrip(trips[0]);
+            // Try to restore the previously selected trip or use the one from the URL
+            const currentPath = window.location.pathname;
+            const tripIdFromUrl = currentPath.match(/\/trip\/([^\/]+)/)?.[1];
+            
+            if (tripIdFromUrl) {
+              // If we have a trip ID in the URL, use that
+              const tripFromUrl = trips.find(t => t.id === tripIdFromUrl);
+              if (tripFromUrl) {
+                console.log('🔄 [LoadTrips] Restoring trip from URL:', tripFromUrl.name);
+                await get().setCurrentTrip(tripFromUrl);
+              } else if (!get().currentTrip && trips.length > 0) {
+                // URL trip not found, fall back to first trip
+                console.log('🎨 [LoadTrips] URL trip not found, setting first trip as current...');
+                await get().setCurrentTrip(trips[0]);
+              }
+            } else if (!get().currentTrip) {
+              // Try to restore from localStorage
+              const storedTripId = localStorage.getItem('currentTripId');
+              if (storedTripId) {
+                const storedTrip = trips.find(t => t.id === storedTripId);
+                if (storedTrip) {
+                  console.log('🔄 [LoadTrips] Restoring trip from localStorage:', storedTrip.name);
+                  await get().setCurrentTrip(storedTrip);
+                } else if (trips.length > 0) {
+                  // Stored trip not found, fall back to first trip
+                  console.log('🎨 [LoadTrips] Stored trip not found, setting first trip as current...');
+                  await get().setCurrentTrip(trips[0]);
+                }
+              } else if (trips.length > 0) {
+                // No stored trip, use first trip
+                console.log('🎨 [LoadTrips] No stored trip, setting first trip as current...');
+                await get().setCurrentTrip(trips[0]);
+              }
             }
           }
         } catch (error) {
@@ -1192,8 +1226,11 @@ export const useStore = create<StoreState>()((set, get) => ({
             console.log('🔍 [useStore] Converted optimizationResult:', optimizationResult);
             console.log('🔍 [useStore] Converted daily_schedules:', optimizationResult.optimization.daily_schedules);
 
-            set({ optimizationResult: optimizationResult });
-            console.log(`✅ Loaded optimization result for trip ${tripId}`);
+            set({ 
+              optimizationResult: optimizationResult,
+              hasUserOptimized: true  // Set this to true when loading existing optimization
+            });
+            console.log(`✅ Loaded optimization result for trip ${tripId}, setting hasUserOptimized to true`);
           } else {
             // No results found in database, preserve existing if available
             console.log('No optimization results found in database');

@@ -17,6 +17,9 @@ interface MapViewProps {
 const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<any>(null);
+  const [selectedRoute, setSelectedRoute] = useState<any>(null);
+  const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
   const { currentTrip, memberColors, tripMembers, hasUserOptimized, isOptimizing, showOptimizationSuccess, setShowOptimizationSuccess } = useStore();
 
   // Load Google Maps API
@@ -106,9 +109,29 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     };
   };
 
+  // Function to calculate route offset for bidirectional routes
+  const calculateRouteOffset = (lat1: number, lng1: number, lat2: number, lng2: number, offsetAmount: number = 0.001) => {
+    // Calculate perpendicular vector
+    const dx = lng2 - lng1;
+    const dy = lat2 - lat1;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    
+    if (length === 0) return { lat: 0, lng: 0 };
+    
+    // Perpendicular vector (rotate 90 degrees)
+    const perpX = -dy / length;
+    const perpY = dx / length;
+    
+    return {
+      lat: perpY * offsetAmount,
+      lng: perpX * offsetAmount
+    };
+  };
+
   // Generate route lines between places using useMemo
   const routeLines = useMemo(() => {
     const lines: any[] = [];
+    const routeMap = new Map<string, number>(); // Track routes for bidirectional detection
     
     places.forEach((place, index) => {
       
@@ -116,6 +139,16 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         const nextPlace = places[index + 1];
         
         if (place.latitude && place.longitude && nextPlace?.latitude && nextPlace?.longitude) {
+          const lat1 = Number(place.latitude);
+          const lng1 = Number(place.longitude);
+          const lat2 = Number(nextPlace.latitude);
+          const lng2 = Number(nextPlace.longitude);
+          
+          // Create route key for bidirectional detection
+          const routeKey = `${Math.min(lat1, lat2)},${Math.min(lng1, lng2)}-${Math.max(lat1, lat2)},${Math.max(lng1, lng2)}`;
+          const routeCount = routeMap.get(routeKey) || 0;
+          routeMap.set(routeKey, routeCount + 1);
+          
           // Determine line color based on transport mode
           let strokeColor = '#6B7280'; // Default gray
           let transportMode = 'walking'; // Default
@@ -125,12 +158,6 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
             transportMode = place.travel_to_next.transport_mode.toLowerCase();
           } else {
             // Fallback: try to determine based on distance (rough estimate)
-            const lat1 = Number(place.latitude);
-            const lng1 = Number(place.longitude);
-            const lat2 = Number(nextPlace.latitude);
-            const lng2 = Number(nextPlace.longitude);
-            
-            // Calculate rough distance (in degrees)
             const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
             
             // More intelligent transport mode detection
@@ -141,7 +168,6 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
             } else {
               transportMode = 'walking';
             }
-            
           }
           
           // 経路線の色分け
@@ -173,16 +199,42 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
               break;
           }
 
+          // Calculate offset for bidirectional routes
+          let path = [
+            { lat: lat1, lng: lng1 },
+            { lat: lat2, lng: lng2 }
+          ];
+          
+          // If this is the second occurrence of this route, apply offset
+          if (routeCount > 0) {
+            const offset = calculateRouteOffset(lat1, lng1, lat2, lng2, 0.002);
+            path = [
+              { lat: lat1 + offset.lat, lng: lng1 + offset.lng },
+              { lat: lat2 + offset.lat, lng: lng2 + offset.lng }
+            ];
+          }
+
+          // Create arrow icon for the middle of the route
+          const arrowIcon = {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 3,
+            strokeColor: strokeColor,
+            fillColor: strokeColor,
+            fillOpacity: 1
+          };
 
           const routeLine = {
-            path: [
-              { lat: Number(place.latitude), lng: Number(place.longitude) },
-              { lat: Number(nextPlace.latitude), lng: Number(nextPlace.longitude) }
-            ],
+            path: path,
             strokeColor: strokeColor,
             strokeOpacity: 0.8,
             strokeWeight: 3,
             key: `route-${index}`,
+            icons: [{
+              icon: arrowIcon,
+              offset: '50%' // Place arrow at the middle of the line
+            }],
+            fromPlace: place,
+            toPlace: nextPlace
           };
 
           lines.push(routeLine);
@@ -203,6 +255,14 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       const nextPlace = places[i + 1];
       
       if (currentPlace.latitude && currentPlace.longitude && nextPlace.latitude && nextPlace.longitude) {
+        const arrowIcon = {
+          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+          scale: 3,
+          strokeColor: '#6B7280',
+          fillColor: '#6B7280',
+          fillOpacity: 1
+        };
+
         basicLines.push({
           path: [
             { lat: Number(currentPlace.latitude), lng: Number(currentPlace.longitude) },
@@ -212,6 +272,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           strokeOpacity: 0.6,
           strokeWeight: 2,
           key: `basic-route-${i}`,
+          icons: [{
+            icon: arrowIcon,
+            offset: '50%'
+          }]
         });
       }
     }
@@ -221,6 +285,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
 
   const onLoad = useCallback((map: google.maps.Map) => {
     setMap(map);
+    
+    // Create info window
+    const newInfoWindow = new google.maps.InfoWindow();
+    setInfoWindow(newInfoWindow);
     
     // Force a small delay to ensure map is fully rendered
     setTimeout(() => {
@@ -249,7 +317,88 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
 
   const onUnmount = useCallback(() => {
     setMap(null);
-  }, []);
+    if (infoWindow) {
+      infoWindow.close();
+    }
+  }, [infoWindow]);
+
+  // Handle marker click
+  const handleMarkerClick = useCallback((place: any, index: number) => {
+    if (!map || !infoWindow) return;
+
+    // Get user information for the place
+    const colorResult = getPlaceColor(place);
+    let userInfo = '';
+    
+    if (colorResult.type === 'single' && colorResult.userId) {
+      const member = tripMembers.find(m => m.user_id === colorResult.userId);
+      userInfo = member?.name || 'Unknown user';
+    } else if (colorResult.type === 'gradient' && colorResult.contributors) {
+      userInfo = colorResult.contributors.map(c => c.name).join(', ');
+    } else if (colorResult.type === 'gold') {
+      userInfo = 'All members';
+    }
+
+    // Format schedule info
+    let scheduleInfo = '';
+    if (place.day_number && place.hour) {
+      scheduleInfo = `Day ${place.day_number}, ${place.hour}:00`;
+    }
+
+    // Format travel info
+    let travelInfo = '';
+    if (place.travel_to_next) {
+      const transport = place.travel_to_next.transport_mode || 'Unknown';
+      const duration = place.travel_to_next.duration_minutes || 0;
+      travelInfo = `Next: ${transport} (${duration} min)`;
+    }
+
+    const content = `
+      <div style="padding: 8px; min-width: 200px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">
+          ${place.place_name || place.name}
+        </h3>
+        ${userInfo ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Requested by:</strong> ${userInfo}</p>` : ''}
+        ${scheduleInfo ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Schedule:</strong> ${scheduleInfo}</p>` : ''}
+        ${place.duration_minutes ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Duration:</strong> ${place.duration_minutes} min</p>` : ''}
+        ${travelInfo ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Travel:</strong> ${travelInfo}</p>` : ''}
+        ${place.place_type ? `<p style="margin: 4px 0; font-size: 12px; color: #666;"><em>Type: ${place.place_type}</em></p>` : ''}
+      </div>
+    `;
+
+    infoWindow.setContent(content);
+    infoWindow.setPosition({ 
+      lat: Number(place.latitude), 
+      lng: Number(place.longitude) 
+    });
+    infoWindow.open(map);
+  }, [map, infoWindow, tripMembers]);
+
+  // Handle route click
+  const handleRouteClick = useCallback((fromPlace: any, toPlace: any, event: google.maps.PolyMouseEvent) => {
+    if (!map || !infoWindow) return;
+
+    const transport = fromPlace.travel_to_next?.transport_mode || 'Unknown';
+    const duration = fromPlace.travel_to_next?.duration_minutes || 0;
+    const distance = fromPlace.travel_to_next?.distance_km || 0;
+
+    const content = `
+      <div style="padding: 8px; min-width: 200px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">
+          Route Information
+        </h3>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>From:</strong> ${fromPlace.place_name || fromPlace.name}</p>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>To:</strong> ${toPlace.place_name || toPlace.name}</p>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>Transport:</strong> ${transport}</p>
+        ${duration > 0 ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Duration:</strong> ${duration} minutes</p>` : ''}
+        ${distance > 0 ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Distance:</strong> ${distance.toFixed(1)} km</p>` : ''}
+      </div>
+    `;
+
+    infoWindow.setContent(content);
+    infoWindow.setPosition(event.latLng);
+    infoWindow.open(map);
+  }, [map, infoWindow]);
 
   // Update map bounds when places change
   useEffect(() => {
@@ -321,6 +470,13 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
               strokeOpacity: line.strokeOpacity,
               strokeWeight: line.strokeWeight,
               geodesic: true,
+              icons: line.icons || [],
+              clickable: true
+            }}
+            onClick={(e) => {
+              if (line.fromPlace && line.toPlace) {
+                handleRouteClick(line.fromPlace, line.toPlace, e);
+              }
             }}
           />
         ))}
@@ -341,12 +497,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
                 }}
                 title={`${index + 1}. ${place.place_name || place.name}`}
                 icon={customIcon}
-                label={{
-                  text: `${index + 1}`,
-                  color: '#FFFFFF',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                }}
+                onClick={() => handleMarkerClick(place, index)}
               />
             );
           } catch (error) {

@@ -638,22 +638,6 @@ export function TripDetailPage() {
         )}
       </AnimatePresence>
 
-      {/* Optimization Result - Only show in calendar view to avoid overlap with map */}
-      <AnimatePresence>
-        {hasUserOptimized && optimizationResult && activeView === 'calendar' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-6 left-6 right-6 z-50 max-w-2xl mx-auto"
-          >
-            <OptimizationResult
-              optimizationResult={optimizationResult}
-              onClose={() => setHasUserOptimized(false)}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Member Popup Portal - Rendered at document root for maximum z-index */}
       {showMemberPopup && ReactDOM.createPortal(

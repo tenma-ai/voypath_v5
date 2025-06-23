@@ -11,6 +11,7 @@ interface CalendarViewProps {
 
 const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
+  const [selectedPlace, setSelectedPlace] = useState<any>(null);
   const { currentTrip, memberColors, tripMembers, hasUserOptimized } = useStore();
 
   // Generate gradient style for multiple contributors using centralized color logic
@@ -74,16 +75,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
 
   // Calculate actual date based on trip start date and day number
   const calculateActualDate = (dayNumber: number): Date => {
-    if (currentTrip?.start_date) {
-      const startDate = new Date(currentTrip.start_date);
-      startDate.setDate(startDate.getDate() + (dayNumber - 1));
-      return startDate;
+    if (currentTrip?.startDate || currentTrip?.start_date) {
+      const startDate = new Date(currentTrip.startDate || currentTrip.start_date);
+      const resultDate = new Date(startDate);
+      resultDate.setDate(startDate.getDate() + (dayNumber - 1));
+      return resultDate;
     }
     
     // Fallback to today + day offset if no trip start date
     const today = new Date();
-    today.setDate(today.getDate() + (dayNumber - 1));
-    return today;
+    const resultDate = new Date(today);
+    resultDate.setDate(today.getDate() + (dayNumber - 1));
+    return resultDate;
   };
 
   const formatTime = (timeString: string) => {
@@ -318,8 +321,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                             className="border-l-4 border border-gray-200 rounded-lg p-3 sm:p-4 cursor-pointer hover:shadow-md transition-shadow duration-200"
                             style={getPlaceStyle(block.place)}
                             onClick={() => {
-                              // Could add click handler for place details
-                              console.log('Place clicked:', block.place);
+                              setSelectedPlace(block.place);
                             }}
                           >
                             <div className="flex items-start justify-between">
@@ -385,6 +387,147 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
           ))}
         </div>
       </div>
+      
+      {/* Place Details Popup */}
+      {selectedPlace && ReactDOM.createPortal(
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99999] flex items-center justify-center p-4"
+          onClick={() => setSelectedPlace(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                {selectedPlace.place_name || selectedPlace.name}
+              </h3>
+              <button
+                onClick={() => setSelectedPlace(null)}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="space-y-4">
+              {/* User Information */}
+              {(() => {
+                const colorResult = getPlaceColor(selectedPlace);
+                let userInfo = null;
+                
+                if (colorResult.type === 'single' && colorResult.userId) {
+                  const member = tripMembers.find(m => m.user_id === colorResult.userId);
+                  userInfo = member?.name || 'Unknown user';
+                } else if (colorResult.type === 'gradient' && colorResult.contributors) {
+                  userInfo = colorResult.contributors.map(c => c.name).join(', ');
+                } else if (colorResult.type === 'gold') {
+                  userInfo = 'All members';
+                }
+                
+                return userInfo && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Requested by</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{userInfo}</p>
+                  </div>
+                );
+              })()}
+              
+              {/* Schedule Information */}
+              {(selectedPlace.day_number || selectedPlace.hour) && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Schedule</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {selectedPlace.day_number && `Day ${selectedPlace.day_number}`}
+                    {selectedPlace.hour && `, ${selectedPlace.hour}:00`}
+                  </p>
+                </div>
+              )}
+              
+              {/* Duration */}
+              {selectedPlace.duration_minutes && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Duration</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {formatDuration(selectedPlace.duration_minutes)}
+                  </p>
+                </div>
+              )}
+              
+              {/* Category */}
+              {selectedPlace.category && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Category</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedPlace.category}</p>
+                </div>
+              )}
+              
+              {/* Rating */}
+              {selectedPlace.rating && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Rating</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">★ {selectedPlace.rating.toFixed(1)}</p>
+                </div>
+              )}
+              
+              {/* Price Level */}
+              {selectedPlace.price_level && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Price Level</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {'$'.repeat(selectedPlace.price_level)}
+                  </p>
+                </div>
+              )}
+              
+              {/* Wish Level */}
+              {selectedPlace.wish_level && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Wish Level</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {'⭐'.repeat(selectedPlace.wish_level)} ({selectedPlace.wish_level}/5)
+                  </p>
+                </div>
+              )}
+              
+              {/* Travel to Next */}
+              {selectedPlace.travel_to_next && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Travel to Next Location</h4>
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">Transport:</span> {selectedPlace.travel_to_next.transport_mode || 'Unknown'}
+                    </p>
+                    {selectedPlace.travel_to_next.duration_minutes && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="font-medium">Duration:</span> {selectedPlace.travel_to_next.duration_minutes} minutes
+                      </p>
+                    )}
+                    {selectedPlace.travel_to_next.distance_km && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="font-medium">Distance:</span> {selectedPlace.travel_to_next.distance_km.toFixed(1)} km
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Place Type */}
+              {selectedPlace.place_type && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Type</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">{selectedPlace.place_type}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
