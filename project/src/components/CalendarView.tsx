@@ -380,10 +380,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                         return duration > 0 ? (
                           <div className="relative h-8 -mb-1">
                             {/* Vertical connection line */}
-                            <div className="absolute left-0 w-0.5 h-full" style={{ backgroundColor: transportInfo.color, marginLeft: '88px' }}></div>
+                            <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 h-full" style={{ backgroundColor: transportInfo.color }}></div>
                             
                             {/* Transport info */}
-                            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 flex items-center space-x-1 text-xs" style={{ marginLeft: '70px' }}>
+                            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 flex items-center space-x-1 text-xs">
                               <div style={{ color: transportInfo.color }}>
                                 {transportInfo.svg}
                               </div>

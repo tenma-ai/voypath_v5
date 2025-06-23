@@ -556,25 +556,35 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       return hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
     };
 
-    // Get transport icon
-    const getTransportIcon = (mode: string) => {
+    // Get transport icon SVG and color
+    const getTransportIconInfo = (mode: string) => {
       const modeLower = mode.toLowerCase();
       if (modeLower.includes('flight') || modeLower.includes('plane')) {
-        return '✈️';
+        return {
+          color: '#2563EB',
+          svg: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2v0A1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>'
+        };
       } else if (modeLower.includes('car') || modeLower.includes('drive')) {
-        return '🚗';
+        return {
+          color: '#92400E',
+          svg: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 0h12a2 2 0 0 1 0 4h-5m-7 0h12M5 9V7a1 1 0 0 1 1-1h9l3 4m-3 0h3a1 1 0 0 1 1 1v6h-2"/></svg>'
+        };
       } else {
-        return '🚶';
+        return {
+          color: '#6B7280',
+          svg: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/><path d="M12 14c-4.418 0-8 3.582-8 8h16c0-4.418-3.582-8-8-8z"/></svg>'
+        };
       }
     };
 
-    const transportIcon = getTransportIcon(transport);
+    const transportIconInfo = getTransportIconInfo(transport);
 
     const content = `
       <div style="padding: 12px; min-width: 280px; max-width: 350px;">
         <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
-          <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937; display: flex; align-items: center;">
-            ${transportIcon} Route Information
+          <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937; display: flex; align-items: center; gap: 8px;">
+            <span style="color: ${transportIconInfo.color};">${transportIconInfo.svg}</span>
+            Route Information
           </h3>
         </div>
         
@@ -591,7 +601,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           
           <div style="margin-bottom: 8px;">
             <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Transport Mode</p>
-            <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${transport}</p>
+            <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937; display: flex; align-items: center; gap: 6px;">
+              <span style="color: ${transportIconInfo.color};">${transportIconInfo.svg}</span>
+              ${transport}
+            </p>
           </div>
           
           ${duration > 0 ? `
