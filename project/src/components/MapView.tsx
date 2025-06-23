@@ -424,7 +424,27 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       dateInfo = scheduleInfo;
     }
 
-    const content = `
+    // Check if system place
+    const isSystemPlace = place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport';
+
+    const content = isSystemPlace ? `
+      <div style="padding: 12px; min-width: 280px; max-width: 350px;">
+        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
+          <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
+            ${place.place_name || place.name}
+          </h3>
+        </div>
+        
+        <div style="space-y: 8px;">
+          ${place.duration_minutes || place.stay_duration_minutes ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Stay Duration</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${formatDuration(place.duration_minutes || place.stay_duration_minutes)}</p>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    ` : `
       <div style="padding: 12px; min-width: 280px; max-width: 350px;">
         <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
           <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
@@ -434,12 +454,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         </div>
         
         <div style="space-y: 8px;">
-          ${userInfo ? `
-            <div style="margin-bottom: 8px;">
-              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Requested by</p>
-              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${userInfo}</p>
-            </div>
-          ` : ''}
+          <div style="margin-bottom: 8px;">
+            <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Added by</p>
+            <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${userInfo || 'Unknown'}</p>
+          </div>
           
           ${place.wish_level ? `
             <div style="margin-bottom: 8px;">
@@ -473,12 +491,6 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
             <div style="margin-bottom: 8px;">
               <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Notes</p>
               <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${place.notes}</p>
-            </div>
-          ` : ''}
-          
-          ${place.place_type && place.place_type !== 'member_wish' ? `
-            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
-              <p style="margin: 0; font-size: 11px; color: #9ca3af; font-style: italic;">Type: ${place.place_type}</p>
             </div>
           ` : ''}
         </div>

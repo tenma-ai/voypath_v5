@@ -396,27 +396,43 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
             
             {/* Content */}
             <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 180px)' }}>
-              {/* User Information */}
-              {(() => {
-                const colorResult = getPlaceColor(selectedPlace);
-                let userInfo = null;
-                
-                if (colorResult.type === 'single' && colorResult.userId) {
-                  const member = tripMembers.find(m => m.user_id === colorResult.userId);
-                  userInfo = member?.name || 'Unknown user';
-                } else if (colorResult.type === 'gradient' && colorResult.contributors) {
-                  userInfo = colorResult.contributors.map(c => c.name).join(', ');
-                } else if (colorResult.type === 'gold') {
-                  userInfo = 'All members';
-                }
-                
-                return userInfo && (
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Requested by</h4>
-                    <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{userInfo}</p>
-                  </div>
-                );
-              })()}
+              {/* Check if system place */}
+              {selectedPlace.place_type === 'departure' || selectedPlace.place_type === 'destination' || selectedPlace.place_type === 'airport' ? (
+                // System place - only show duration
+                <>
+                  {(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes) && (
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                      <h4 className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Duration</h4>
+                      <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
+                        {formatDuration(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes)}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Regular place - show full information
+                <>
+                  {/* User Information - Always show who added */}
+                  {(() => {
+                    const colorResult = getPlaceColor(selectedPlace);
+                    let userInfo = null;
+                    
+                    if (colorResult.type === 'single' && colorResult.userId) {
+                      const member = tripMembers.find(m => m.user_id === colorResult.userId);
+                      userInfo = member?.name || 'Unknown user';
+                    } else if (colorResult.type === 'gradient' && colorResult.contributors) {
+                      userInfo = colorResult.contributors.map(c => c.name).join(', ');
+                    } else if (colorResult.type === 'gold') {
+                      userInfo = 'All members';
+                    }
+                    
+                    return (
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Added by</h4>
+                        <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{userInfo || 'Unknown'}</p>
+                      </div>
+                    );
+                  })()}
               
               {/* Schedule and Duration Info */}
               <div className="grid grid-cols-2 gap-3">
@@ -449,29 +465,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                     <span className="text-2xl">{['⭐', '⭐', '⭐', '⭐', '⭐'].slice(0, selectedPlace.wish_level).join('')}</span>
                     <span className="text-base text-gray-900 dark:text-gray-100 font-medium">({selectedPlace.wish_level}/5)</span>
                   </div>
-                </div>
-              )}
-              
-              {/* Rating and Price */}
-              {(selectedPlace.rating || selectedPlace.price_level) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {selectedPlace.rating && (
-                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
-                      <h4 className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider mb-1">Rating</h4>
-                      <p className="text-base text-gray-900 dark:text-gray-100 font-medium flex items-center">
-                        <span className="text-yellow-500 mr-1">★</span> {selectedPlace.rating.toFixed(1)}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {selectedPlace.price_level && (
-                    <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-4">
-                      <h4 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Price Level</h4>
-                      <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
-                        {'$'.repeat(selectedPlace.price_level)}
-                      </p>
-                    </div>
-                  )}
                 </div>
               )}
               
@@ -514,6 +507,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                   <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Notes</h4>
                   <p className="text-sm text-gray-700 dark:text-gray-300">{selectedPlace.notes}</p>
                 </div>
+              )}
+                </>
               )}
             </div>
           </div>

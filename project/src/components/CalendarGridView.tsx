@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import ReactDOM from 'react-dom';
 import { Calendar, Clock, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MemberColorService } from '../services/MemberColorService';
 import { useStore } from '../store/useStore';
+import { getPlaceColor as getPlaceColorUtil } from '../utils/ColorUtils';
 
 interface CalendarGridViewProps {
   optimizationResult?: any;
@@ -19,6 +21,7 @@ interface CalendarPlace {
 const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [monthSchedule, setMonthSchedule] = useState<Record<string, CalendarPlace[]>>({});
+  const [selectedPlace, setSelectedPlace] = useState<any>(null);
   const { currentTrip, memberColors, tripMembers } = useStore();
 
   // Use centralized member colors from store
@@ -267,9 +270,10 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
                   {dayPlaces.slice(0, 2).map((place, placeIndex) => (
                     <div
                       key={place.id}
-                      className="text-xs p-0.5 rounded border-l-2 bg-slate-50 dark:bg-slate-700"
+                      className="text-xs p-0.5 rounded border-l-2 bg-slate-50 dark:bg-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
                       style={{ borderLeftColor: getPlaceColor(place) }}
                       title={`${place.name}${place.time ? ` at ${place.time}` : ''}`}
+                      onClick={() => setSelectedPlace(place)}
                     >
                       <div className="font-medium text-slate-900 dark:text-slate-100 truncate" style={{ fontSize: '10px' }}>
                         {place.name}
@@ -291,8 +295,170 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
       </div>
 
       {/* Legend - Removed to save space */}
+      
+      {/* Place Details Popup */}
+      {selectedPlace && ReactDOM.createPortal(
+        <div
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[99999] flex items-center justify-center p-4"
+          onClick={() => setSelectedPlace(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-700/50 p-0 max-w-md w-full max-h-[85vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{ 
+              background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            {/* Header with gradient background */}
+            <div className="relative bg-gradient-to-r from-primary-500 to-secondary-500 p-6 pb-4">
+              <button
+                onClick={() => setSelectedPlace(null)}
+                className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-200"
+              >
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <h3 className="text-2xl font-bold text-white pr-8">
+                {selectedPlace.place_name || selectedPlace.name}
+              </h3>
+              {selectedPlace.category && (
+                <p className="text-white/80 text-sm mt-1">{selectedPlace.category}</p>
+              )}
+            </div>
+            
+            {/* Content */}
+            <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 180px)' }}>
+              {/* Check if system place */}
+              {selectedPlace.place_type === 'departure' || selectedPlace.place_type === 'destination' || selectedPlace.place_type === 'airport' ? (
+                // System place - only show duration
+                <>
+                  {(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes) && (
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                      <h4 className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Duration</h4>
+                      <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
+                        {formatDuration(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes)}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Regular place - show full information
+                <>
+                  {/* User Information - Always show who added */}
+                  {(() => {
+                    const colorResult = getPlaceColorUtil(selectedPlace);
+                    let userInfo = null;
+                    
+                    if (colorResult.type === 'single' && colorResult.userId) {
+                      const member = tripMembers.find(m => m.user_id === colorResult.userId);
+                      userInfo = member?.name || 'Unknown user';
+                    } else if (colorResult.type === 'gradient' && colorResult.contributors) {
+                      userInfo = colorResult.contributors.map(c => c.name).join(', ');
+                    } else if (colorResult.type === 'gold') {
+                      userInfo = 'All members';
+                    }
+                    
+                    return (
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Added by</h4>
+                        <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{userInfo || 'Unknown'}</p>
+                      </div>
+                    );
+                  })()}
+              
+                  {/* Schedule and Duration Info */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {(selectedPlace.day_number || selectedPlace.hour || selectedPlace.arrival_time || selectedPlace.time) && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                        <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Schedule</h4>
+                        <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
+                          {selectedPlace.day_number && `Day ${selectedPlace.day_number}`}
+                          {selectedPlace.hour && `, ${selectedPlace.hour}:00`}
+                          {selectedPlace.time && !selectedPlace.hour && selectedPlace.time}
+                          {selectedPlace.arrival_time && !selectedPlace.hour && !selectedPlace.time && selectedPlace.arrival_time}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes || selectedPlace.duration) && (
+                      <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                        <h4 className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Duration</h4>
+                        <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
+                          {formatDuration(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes || selectedPlace.duration)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Wish Level */}
+                  {selectedPlace.wish_level && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+                      <h4 className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-1">Priority Level</h4>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-2xl">{['⭐', '⭐', '⭐', '⭐', '⭐'].slice(0, selectedPlace.wish_level).join('')}</span>
+                        <span className="text-base text-gray-900 dark:text-gray-100 font-medium">({selectedPlace.wish_level}/5)</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Travel to Next */}
+                  {selectedPlace.travel_to_next && (
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4">
+                      <h4 className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-3">Next Travel</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Transport</span>
+                          <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                            {selectedPlace.travel_to_next.transport_mode ? 
+                              selectedPlace.travel_to_next.transport_mode.charAt(0).toUpperCase() + selectedPlace.travel_to_next.transport_mode.slice(1) 
+                              : 'Unknown'}
+                          </span>
+                        </div>
+                        {selectedPlace.travel_to_next.duration_minutes && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Duration</span>
+                            <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                              {formatDuration(selectedPlace.travel_to_next.duration_minutes)}
+                            </span>
+                          </div>
+                        )}
+                        {selectedPlace.travel_to_next.distance_km && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Distance</span>
+                            <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                              {selectedPlace.travel_to_next.distance_km.toFixed(1)} km
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Notes */}
+                  {selectedPlace.notes && (
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Notes</h4>
+                      <p className="text-sm text-gray-700 dark:text-gray-300">{selectedPlace.notes}</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
+  
+  // Helper function to format duration
+  function formatDuration(minutes: number) {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
+  }
 };
 
 export default CalendarGridView;
