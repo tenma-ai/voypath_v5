@@ -65,6 +65,11 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const createCustomMarkerIcon = (place: any, index: number, allPlaces: any[]) => {
     console.log('🗺️ [MapView] Creating marker for place:', place.place_name || place.name);
     
+    // Check if Google Maps is loaded
+    if (!isLoaded || typeof google === 'undefined') {
+      return null;
+    }
+    
     // Use centralized color utility
     const colorResult = getPlaceColor(place);
     console.log('🗺️ [MapView] Color result:', colorResult);
@@ -130,6 +135,11 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
 
   // Generate route lines between places using useMemo
   const routeLines = useMemo(() => {
+    // Check if Google Maps is loaded
+    if (!isLoaded || typeof google === 'undefined') {
+      return [];
+    }
+    
     const lines: any[] = [];
     const routeMap = new Map<string, number>(); // Track routes for bidirectional detection
     
@@ -243,11 +253,16 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     });
 
     return lines;
-  }, [places]);
+  }, [places, isLoaded]);
 
   // Force generate basic lines if no route lines were created
   const finalRouteLines = useMemo(() => {
     if (routeLines.length > 0) return routeLines;
+    
+    // Check if Google Maps is loaded
+    if (!isLoaded || typeof google === 'undefined') {
+      return [];
+    }
     
     const basicLines: any[] = [];
     for (let i = 0; i < places.length - 1; i++) {
@@ -281,7 +296,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     }
     
     return basicLines;
-  }, [routeLines, places]);
+  }, [routeLines, places, isLoaded]);
 
   const onLoad = useCallback((map: google.maps.Map) => {
     setMap(map);
