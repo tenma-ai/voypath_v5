@@ -52,7 +52,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
 
   // Extract places from optimization result
   const formatOptimizationResult = (result: any) => {
-    if (!hasUserOptimized || !result?.optimization?.daily_schedules) {
+    // Show results if optimization exists (temporary fix for auto-optimization)
+    if (!result?.optimization?.daily_schedules) {
       return { schedulesByDay: {} };
     }
 

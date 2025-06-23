@@ -24,7 +24,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
   const { hasUserOptimized } = useStore();
   const [map, setMap] = useState<google.maps.Map | null>(null);
   
-  if (!isOpen || !hasUserOptimized || !optimizationResult) return null;
+  if (!isOpen || !optimizationResult) return null;
 
   // Load Google Maps API
   const { isLoaded, loadError } = useJsApiLoader({
@@ -35,7 +35,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
 
   // Extract places from optimization result
   const getAllPlaces = useCallback(() => {
-    if (!hasUserOptimized || !optimizationResult?.optimization?.daily_schedules) return [];
+    if (!optimizationResult?.optimization?.daily_schedules) return [];
     
     const places: any[] = [];
     optimizationResult.optimization.daily_schedules.forEach((schedule: any) => {

@@ -1101,8 +1101,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             console.log('🔍 [useStore] Converted optimizationResult:', optimizationResult);
             console.log('🔍 [useStore] Converted daily_schedules:', optimizationResult.optimization.daily_schedules);
 
-            set({ optimizationResult: optimizationResult });
-            console.log(`✅ Loaded optimization result for trip ${tripId}`);
+            set({ optimizationResult: optimizationResult, hasUserOptimized: true });
+            console.log(`✅ Loaded optimization result for trip ${tripId} - setting hasUserOptimized to true`);
           } else {
             // No results found in database, preserve existing if available
             console.log('No optimization results found in database');

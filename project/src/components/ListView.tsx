@@ -215,8 +215,8 @@ export function ListView() {
   const schedule = useMemo(() => {
     if (!currentTrip) return [];
     
-    // ONLY display results if user has optimized and we have optimization results with daily schedules
-    if (hasUserOptimized && optimizationResult?.optimization?.daily_schedules?.length > 0) {
+    // Show results if optimization exists (temporary fix for auto-optimization)  
+    if (optimizationResult?.optimization?.daily_schedules?.length > 0) {
       console.log('📅 ListView: Displaying optimization results with', optimizationResult.optimization.daily_schedules.length, 'days');
       
       const scheduleDays: DaySchedule[] = [];

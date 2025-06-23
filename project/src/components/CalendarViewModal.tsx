@@ -39,7 +39,7 @@ const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
 }) => {
   const { hasUserOptimized } = useStore();
   
-  if (!isOpen || !hasUserOptimized || !optimizationResult) return null;
+  if (!isOpen || !optimizationResult) return null;
 
   // formatOptimizationResult function - exact same as OptimizationResult.tsx
   const formatOptimizationResult = (result: any) => {
