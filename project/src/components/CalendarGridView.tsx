@@ -403,38 +403,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
                     </div>
                   )}
                   
-                  {/* Travel to Next */}
-                  {selectedPlace.travel_to_next && (
-                    <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4">
-                      <h4 className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-3">Next Travel</h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Transport</span>
-                          <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
-                            {selectedPlace.travel_to_next.transport_mode ? 
-                              selectedPlace.travel_to_next.transport_mode.charAt(0).toUpperCase() + selectedPlace.travel_to_next.transport_mode.slice(1) 
-                              : 'Unknown'}
-                          </span>
-                        </div>
-                        {selectedPlace.travel_to_next.duration_minutes && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Duration</span>
-                            <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
-                              {formatDuration(selectedPlace.travel_to_next.duration_minutes)}
-                            </span>
-                          </div>
-                        )}
-                        {selectedPlace.travel_to_next.distance_km && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Distance</span>
-                            <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
-                              {selectedPlace.travel_to_next.distance_km.toFixed(1)} km
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  {/* Travel info - removed since travel_to_next doesn't exist in the data */}
                   
                   {/* Notes */}
                   {selectedPlace.notes && (

@@ -185,11 +185,12 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           let strokeColor = '#6B7280'; // Default gray
           let transportMode = 'walking'; // Default
           
-          // Check for travel_to_next data
-          if (place.travel_to_next && place.travel_to_next.transport_mode) {
-            transportMode = place.travel_to_next.transport_mode.toLowerCase();
+          // Check for transport mode data from optimization result
+          // The edge function sets transport_mode on the NEXT place, not the current one
+          if (nextPlace.transport_mode) {
+            transportMode = nextPlace.transport_mode.toLowerCase();
           } else if (place.transport_mode) {
-            // Check if transport mode is directly on the place
+            // Fallback: check if transport mode is directly on the current place
             transportMode = place.transport_mode.toLowerCase();
           } else {
             // Fallback: try to determine based on distance and place types
@@ -398,13 +399,8 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       scheduleInfo = `Day ${place.day_number}, ${place.hour}:00`;
     }
 
-    // Format travel info
+    // Format travel info - removed since travel_to_next doesn't exist
     let travelInfo = '';
-    if (place.travel_to_next) {
-      const transport = place.travel_to_next.transport_mode || 'Unknown';
-      const duration = place.travel_to_next.duration_minutes || 0;
-      travelInfo = `Next: ${transport} (${duration} min)`;
-    }
 
     // Format duration
     const formatDuration = (minutes: number) => {
@@ -509,7 +505,9 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const handleRouteClick = useCallback((fromPlace: any, toPlace: any, event: google.maps.PolyMouseEvent) => {
     if (!map || !infoWindow) return;
 
-    let transport = fromPlace.travel_to_next?.transport_mode || fromPlace.transport_mode || '';
+    // The edge function sets transport_mode on the destination place
+    let transport = toPlace.transport_mode || fromPlace.transport_mode || '';
+    let duration = toPlace.travel_time_from_previous || 0;
     
     // If still no transport mode, determine based on place types
     if (!transport) {
@@ -548,8 +546,8 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     // Capitalize transport mode
     transport = transport.charAt(0).toUpperCase() + transport.slice(1).toLowerCase();
     
-    const duration = fromPlace.travel_to_next?.duration_minutes || 0;
-    const distance = fromPlace.travel_to_next?.distance_km || 0;
+    // Duration is already set above
+    const distance = 0; // Distance is not provided by the edge function
 
     // Format duration
     const formatDuration = (minutes: number) => {

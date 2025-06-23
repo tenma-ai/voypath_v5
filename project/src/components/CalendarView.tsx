@@ -345,6 +345,31 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Travel connection to next place */}
+                      {blockIndex < getGroupedPlacesForDay(dayData).length - 1 && (() => {
+                        const nextBlock = getGroupedPlacesForDay(dayData)[blockIndex + 1];
+                        const transport = nextBlock.place.transport_mode || 'walking';
+                        const duration = nextBlock.place.travel_time_from_previous || 0;
+                        const transportInfo = getTransportIcon(transport);
+                        
+                        return duration > 0 ? (
+                          <div className="relative flex items-center justify-center py-2">
+                            {/* Connection line */}
+                            <div className="absolute left-0 right-0 h-0.5" style={{ backgroundColor: transportInfo.color, marginLeft: '88px' }}></div>
+                            
+                            {/* Transport info */}
+                            <div className="relative bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700 flex items-center space-x-2 text-xs">
+                              <div style={{ color: transportInfo.color }}>
+                                {transportInfo.svg}
+                              </div>
+                              <span className="text-gray-600 dark:text-gray-400">
+                                {formatDuration(duration)}
+                              </span>
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                   ))}
                   
@@ -468,38 +493,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                 </div>
               )}
               
-              {/* Travel to Next */}
-              {selectedPlace.travel_to_next && (
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4">
-                  <h4 className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-3">Next Travel</h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Transport</span>
-                      <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
-                        {selectedPlace.travel_to_next.transport_mode ? 
-                          selectedPlace.travel_to_next.transport_mode.charAt(0).toUpperCase() + selectedPlace.travel_to_next.transport_mode.slice(1) 
-                          : 'Unknown'}
-                      </span>
-                    </div>
-                    {selectedPlace.travel_to_next.duration_minutes && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Duration</span>
-                        <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
-                          {formatDuration(selectedPlace.travel_to_next.duration_minutes)}
-                        </span>
-                      </div>
-                    )}
-                    {selectedPlace.travel_to_next.distance_km && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Distance</span>
-                        <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
-                          {selectedPlace.travel_to_next.distance_km.toFixed(1)} km
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* Travel info - removed since travel_to_next doesn't exist in the data */}
               
               {/* Notes */}
               {selectedPlace.notes && (
