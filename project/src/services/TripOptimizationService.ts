@@ -811,15 +811,15 @@ export class TripOptimizationService {
       }
       
       if (isNaN(date.getTime())) {
-        console.warn(`Invalid time format: ${timeString}`);
-        return null;
+        console.warn(`Invalid time format: ${timeString}, using default 09:00:00`);
+        return '09:00:00';
       }
       
       // Return in HH:mm:ss format
       return date.toTimeString().slice(0, 8);
     } catch (error) {
-      console.warn(`Error parsing time: ${timeString}`, error);
-      return null;
+      console.warn(`Error parsing time: ${timeString}, using default 09:00:00`, error);
+      return '09:00:00';
     }
   }
 

@@ -647,20 +647,28 @@ function createDailySchedule(places) {
       currentTime = 0;
       timeCounter = 9 * 60; // リセット
     }
-    // 時間設定
+    // 時間設定 - 1日の時間制限を適用
     if (place.travel_time_from_previous) {
       timeCounter += place.travel_time_from_previous;
     }
-    place.arrival_time = formatTime(timeCounter);
-    timeCounter += place.stay_duration_minutes;
+    
+    // 1日の終了時刻（22:00 = 1320分）を超えないよう制限
+    const maxDayEndTime = 22 * 60; // 22:00
+    const arrival = Math.min(timeCounter, maxDayEndTime);
+    place.arrival_time = formatTime(arrival);
+    
+    // 滞在時間を追加（ただし翌日にまたがらないよう調整）
+    const stayDuration = Math.min(place.stay_duration_minutes, maxDayEndTime - arrival);
+    timeCounter = arrival + stayDuration;
     place.departure_time = formatTime(timeCounter);
+    
     place.order_in_day = currentPlaces.length + 1;
     currentPlaces.push(place);
     currentTime += placeTime;
   }
   // 最後の日を追加
   if (currentPlaces.length > 0) {
-    schedules.push(createDaySchedule(currentDay, currentPlaces, timeCounter));
+    schedules.push(createDaySchedule(currentDay, currentPlaces));
   }
   console.log(`✅ Created ${schedules.length} daily schedules`);
   return schedules;
@@ -678,9 +686,22 @@ function createDaySchedule(day, places) {
   };
 }
 function formatTime(minutes) {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:00`;
+  // Handle invalid inputs
+  if (typeof minutes !== 'number' || minutes < 0) {
+    return '09:00:00';
+  }
+  
+  // Cap hours at 23:59:59 to prevent invalid time formats
+  const maxMinutesPerDay = 23 * 60 + 59; // 1439 minutes = 23:59
+  const cappedMinutes = Math.min(minutes, maxMinutesPerDay);
+  
+  const hours = Math.floor(cappedMinutes / 60);
+  const mins = cappedMinutes % 60;
+  
+  // Ensure hours are within valid range (0-23)
+  const validHours = Math.max(0, Math.min(23, hours));
+  
+  return `${validHours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:00`;
 }
 // 最適化結果の検証
 function validateOptimizationResult(places, schedules) {
