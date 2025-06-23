@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { Calendar, Clock, MapPin, List, Grid3X3 } from 'lucide-react';
+import { Calendar, Clock, MapPin, List, Grid3X3, Car, UserRound } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getPlaceColor } from '../utils/ColorUtils';
 import CalendarGridView from './CalendarGridView';
@@ -195,7 +195,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       return { 
         color: '#2563EB', 
         svg: (
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2v0A1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
           </svg>
         )
@@ -203,22 +203,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     } else if (modeLower.includes('car') || modeLower.includes('drive') || modeLower.includes('taxi')) {
       return { 
         color: '#92400E', 
-        svg: (
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M5 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 0h12a2 2 0 0 1 0 4h-5m-7 0h12M5 9V7a1 1 0 0 1 1-1h9l3 4m-3 0h3a1 1 0 0 1 1 1v6h-2"/>
-          </svg>
-        )
+        svg: <Car className="w-3 h-3" style={{ color: '#92400E' }} />
       };
     } else {
       return { 
         color: '#6B7280', 
-        svg: (
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="9" cy="21" r="1"/>
-            <circle cx="20" cy="21" r="1"/>
-            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-          </svg>
-        )
+        svg: <UserRound className="w-3 h-3" style={{ color: '#6B7280' }} />
       };
     }
   };
@@ -287,9 +277,43 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       {renderToggleButtons()}
       
       <div className="p-6 pt-16">
-        <div className="space-y-8">
-          {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData]) => (
-            <div key={dayKey} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+        <div className="space-y-0">
+          {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData], dayIndex, daysArray) => (
+            <div key={dayKey} className="relative">
+              {/* Connection from previous day */}
+              {dayIndex > 0 && (() => {
+                const prevDayData = daysArray[dayIndex - 1][1];
+                const prevDayPlaces = getGroupedPlacesForDay(prevDayData);
+                const currentDayPlaces = getGroupedPlacesForDay(dayData);
+                
+                if (prevDayPlaces.length > 0 && currentDayPlaces.length > 0) {
+                  const lastPlaceOfPrevDay = prevDayPlaces[prevDayPlaces.length - 1].place;
+                  const firstPlaceOfCurrentDay = currentDayPlaces[0].place;
+                  const transport = firstPlaceOfCurrentDay.transport_mode || 'walking';
+                  const duration = firstPlaceOfCurrentDay.travel_time_from_previous || 0;
+                  const transportInfo = getTransportIcon(transport);
+                  
+                  return duration > 0 ? (
+                    <div className="relative h-12 mb-2">
+                      {/* Vertical connection line */}
+                      <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 h-full" style={{ backgroundColor: transportInfo.color }}></div>
+                      
+                      {/* Transport info */}
+                      <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700 flex items-center space-x-2 text-xs shadow-sm">
+                        <div style={{ color: transportInfo.color }}>
+                          {transportInfo.svg}
+                        </div>
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {formatDuration(duration)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null;
+                }
+                return null;
+              })()}
+              
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm mb-8">
               {/* Day Header */}
               <div className="bg-blue-50 px-3 py-1.5 sm:py-2 border-b border-gray-200">
                 <h3 className="text-xs sm:text-sm font-semibold text-blue-900">
@@ -354,12 +378,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                         const transportInfo = getTransportIcon(transport);
                         
                         return duration > 0 ? (
-                          <div className="relative flex items-center justify-center py-2">
-                            {/* Connection line */}
-                            <div className="absolute left-0 right-0 h-0.5" style={{ backgroundColor: transportInfo.color, marginLeft: '88px' }}></div>
+                          <div className="relative h-8 -mb-1">
+                            {/* Vertical connection line */}
+                            <div className="absolute left-0 w-0.5 h-full" style={{ backgroundColor: transportInfo.color, marginLeft: '88px' }}></div>
                             
                             {/* Transport info */}
-                            <div className="relative bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700 flex items-center space-x-2 text-xs">
+                            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 flex items-center space-x-1 text-xs" style={{ marginLeft: '70px' }}>
                               <div style={{ color: transportInfo.color }}>
                                 {transportInfo.svg}
                               </div>
@@ -381,6 +405,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                     </div>
                   )}
                 </div>
+              </div>
               </div>
             </div>
           ))}
