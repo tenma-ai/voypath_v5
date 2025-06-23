@@ -43,6 +43,7 @@ export function OptimizedMapView({
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
   const [directionsRenderer, setDirectionsRenderer] = useState<google.maps.DirectionsRenderer | null>(null);
+  const [routePolylines, setRoutePolylines] = useState<google.maps.Polyline[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [routeSettings, setRouteSettings] = useState<RouteVisualizationSettings>({
@@ -237,60 +238,104 @@ export function OptimizedMapView({
     switch (type) {
       case 'departure':
         return {
-          url: `${baseUrl}00ff00|40|_|Departure`,
+          url: `${baseUrl}00ff00|40|_|📍`,
           scaledSize: new google.maps.Size(30, 30)
         };
       case 'selected':
         return {
-          url: `${baseUrl}3b82f6|40|_|${order || ''}`,
+          url: `${baseUrl}3b82f6|40|_|📍`,
           scaledSize: new google.maps.Size(35, 35)
         };
       case 'unselected':
         return {
-          url: `${baseUrl}gray|25|_|_`,
+          url: `${baseUrl}gray|25|_|📍`,
           scaledSize: new google.maps.Size(25, 25)
         };
       default:
         return {
-          url: `${baseUrl}ff0000|40|_|_`,
+          url: `${baseUrl}ff0000|40|_|📍`,
           scaledSize: new google.maps.Size(30, 30)
         };
     }
   };
 
   const createInfoWindowContent = (place: Place, type: string): string => {
+    // Find who added this place
+    const addedBy = place.user_id ? 'Member' : 'Unknown';
+    
+    // Get member color if available
+    const memberColor = memberColors[place.user_id] || '#6b7280';
+    
     const statusBadge = type === 'selected' 
       ? '<span style="background: #3b82f6; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Selected</span>'
       : '<span style="background: #6b7280; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Not Selected</span>';
     
     return `
-      <div style="max-width: 250px;">
-        <h3 style="margin: 0 0 8px 0; font-weight: bold; color: #1f2937;">${place.name}</h3>
-        ${statusBadge}
-        <p style="margin: 8px 0 4px 0; color: #6b7280; font-size: 14px;">
-          <strong>Category:</strong> ${place.category}
-        </p>
-        <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
-          <strong>Wish Level:</strong> ${place.wish_level}/5
-        </p>
-        <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
-          <strong>Duration:</strong> ${Math.floor(place.stay_duration_minutes / 60)}h ${place.stay_duration_minutes % 60}m
-        </p>
-        ${place.scheduled_date ? `
-          <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
-            <strong>Scheduled:</strong> ${place.scheduled_date}
+      <div style="max-width: 300px; font-family: system-ui, -apple-system, sans-serif;">
+        <h3 style="margin: 0 0 12px 0; font-weight: bold; color: #1f2937; font-size: 16px;">${place.name}</h3>
+        
+        <div style="margin-bottom: 12px;">
+          ${statusBadge}
+        </div>
+        
+        <div style="border-left: 3px solid ${memberColor}; padding-left: 12px; margin: 12px 0;">
+          <p style="margin: 0; color: #6b7280; font-size: 13px;">
+            <strong style="color: #374151;">Added by:</strong> ${addedBy}
           </p>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 12px; border-radius: 8px; margin: 12px 0;">
+          <p style="margin: 0 0 6px 0; color: #6b7280; font-size: 14px;">
+            <strong style="color: #374151;">Category:</strong> ${place.category}
+          </p>
+          <p style="margin: 0 0 6px 0; color: #6b7280; font-size: 14px;">
+            <strong style="color: #374151;">Wish Level:</strong> 
+            <span style="color: #f59e0b;">${'★'.repeat(place.wish_level)}${'☆'.repeat(5 - place.wish_level)}</span>
+            (${place.wish_level}/5)
+          </p>
+          <p style="margin: 0 0 6px 0; color: #6b7280; font-size: 14px;">
+            <strong style="color: #374151;">Stay Duration:</strong> ${Math.floor(place.stay_duration_minutes / 60)}h ${place.stay_duration_minutes % 60}m
+          </p>
+          ${place.rating ? `
+            <p style="margin: 0 0 6px 0; color: #6b7280; font-size: 14px;">
+              <strong style="color: #374151;">Rating:</strong> ${place.rating}/5
+            </p>
+          ` : ''}
+          ${place.price_level ? `
+            <p style="margin: 0 0 6px 0; color: #6b7280; font-size: 14px;">
+              <strong style="color: #374151;">Price Level:</strong> ${'$'.repeat(place.price_level)}
+            </p>
+          ` : ''}
+        </div>
+        
+        ${place.scheduled_date ? `
+          <div style="background: #dbeafe; padding: 8px 12px; border-radius: 6px; margin: 8px 0;">
+            <p style="margin: 0; color: #1e40af; font-size: 13px;">
+              <strong>📅 Scheduled:</strong> ${place.scheduled_date}
+              ${place.scheduled_time_start ? ` at ${place.scheduled_time_start}` : ''}
+            </p>
+          </div>
+        ` : ''}
+        
+        ${place.notes ? `
+          <div style="border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 12px;">
+            <p style="margin: 0; color: #6b7280; font-size: 13px; font-style: italic;">
+              "${place.notes}"
+            </p>
+          </div>
         ` : ''}
       </div>
     `;
   };
 
   const drawOptimizedRoute = async () => {
-    if (!map || !directionsRenderer || selectedPlaces.length < 2) return;
+    if (!map || selectedPlaces.length < 2) return;
+
+    // Clear existing polylines
+    routePolylines.forEach(polyline => polyline.setMap(null));
+    setRoutePolylines([]);
 
     try {
-      const directionsService = new google.maps.DirectionsService();
-      
       // Sort places by selection order or scheduled date
       const sortedPlaces = [...selectedPlaces].sort((a, b) => {
         if (a.selection_round && b.selection_round) {
@@ -302,32 +347,128 @@ export function OptimizedMapView({
         return 0;
       });
 
-      const waypoints = sortedPlaces.slice(1, -1).map(place => ({
-        location: new google.maps.LatLng(place.latitude!, place.longitude!),
-        stopover: true
-      }));
+      const newPolylines: google.maps.Polyline[] = [];
+      const routeSegments: Array<{from: Place, to: Place, isReturn?: boolean}> = [];
 
-      const origin = sortedPlaces[0];
-      const destination = sortedPlaces[sortedPlaces.length - 1];
+      // Create route segments
+      for (let i = 0; i < sortedPlaces.length - 1; i++) {
+        routeSegments.push({
+          from: sortedPlaces[i],
+          to: sortedPlaces[i + 1]
+        });
+      }
 
-      const request: google.maps.DirectionsRequest = {
-        origin: new google.maps.LatLng(origin.latitude!, origin.longitude!),
-        destination: new google.maps.LatLng(destination.latitude!, destination.longitude!),
-        waypoints,
-        travelMode: google.maps.TravelMode.TRANSIT,
-        unitSystem: google.maps.UnitSystem.METRIC
-      };
+      // Check if return route (same start and end point)
+      const firstPlace = sortedPlaces[0];
+      const lastPlace = sortedPlaces[sortedPlaces.length - 1];
+      if (firstPlace.latitude === lastPlace.latitude && firstPlace.longitude === lastPlace.longitude) {
+        // Add return segment
+        routeSegments.push({
+          from: lastPlace,
+          to: firstPlace,
+          isReturn: true
+        });
+      }
 
-      directionsService.route(request, (result, status) => {
-        if (status === 'OK' && result) {
-          directionsRenderer.setDirections(result);
-        } else {
-          console.error('Directions request failed:', status);
-        }
-      });
+      // Draw each segment with slight offset for return routes
+      for (let i = 0; i < routeSegments.length; i++) {
+        const segment = routeSegments[i];
+        await drawRouteSegment(segment.from, segment.to, i, segment.isReturn || false, newPolylines);
+      }
+
+      setRoutePolylines(newPolylines);
     } catch (error) {
       console.error('Error drawing route:', error);
     }
+  };
+
+  const drawRouteSegment = async (
+    fromPlace: Place,
+    toPlace: Place,
+    segmentIndex: number,
+    isReturn: boolean,
+    polylines: google.maps.Polyline[]
+  ) => {
+    const directionsService = new google.maps.DirectionsService();
+    
+    const request: google.maps.DirectionsRequest = {
+      origin: new google.maps.LatLng(fromPlace.latitude!, fromPlace.longitude!),
+      destination: new google.maps.LatLng(toPlace.latitude!, toPlace.longitude!),
+      travelMode: google.maps.TravelMode.TRANSIT,
+      unitSystem: google.maps.UnitSystem.METRIC
+    };
+
+    return new Promise<void>((resolve) => {
+      directionsService.route(request, (result, status) => {
+        if (status === 'OK' && result) {
+          const route = result.routes[0];
+          const path = route.overview_path;
+
+          // Apply offset for return routes to avoid overlap
+          const offsetPath = isReturn ? applyPathOffset(path, 0.0002) : path;
+
+          // Create polyline with arrow symbols
+          const polyline = new google.maps.Polyline({
+            path: offsetPath,
+            strokeColor: isReturn ? '#ef4444' : '#3b82f6',
+            strokeOpacity: 0.8,
+            strokeWeight: 4,
+            icons: [{
+              icon: {
+                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                scale: 6,
+                strokeColor: isReturn ? '#ef4444' : '#3b82f6',
+                strokeWeight: 2,
+                fillColor: isReturn ? '#ef4444' : '#3b82f6',
+                fillOpacity: 1,
+              },
+              offset: '50%',
+              repeat: '100px'
+            }],
+            map: map
+          });
+
+          // Add click listener for route details
+          polyline.addListener('click', (event: google.maps.MapMouseEvent) => {
+            if (onPlaceSelect) {
+              // Show route information
+              showRouteInfo(fromPlace, toPlace, event.latLng!);
+            }
+          });
+
+          polylines.push(polyline);
+        }
+        resolve();
+      });
+    });
+  };
+
+  const applyPathOffset = (path: google.maps.LatLng[], offsetDegrees: number): google.maps.LatLng[] => {
+    return path.map(point => new google.maps.LatLng(
+      point.lat() + offsetDegrees,
+      point.lng() + offsetDegrees
+    ));
+  };
+
+  const showRouteInfo = (fromPlace: Place, toPlace: Place, position: google.maps.LatLng) => {
+    const infoWindow = new google.maps.InfoWindow({
+      content: `
+        <div style="max-width: 200px;">
+          <h4 style="margin: 0 0 8px 0; font-weight: bold;">Route Information</h4>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>From:</strong> ${fromPlace.name}</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>To:</strong> ${toPlace.name}</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Mode:</strong> Transit</p>
+        </div>
+      `,
+      position: position
+    });
+
+    infoWindow.open(map);
+    
+    // Close after 3 seconds
+    setTimeout(() => {
+      infoWindow.close();
+    }, 3000);
   };
 
   const getMapStyles = () => [
@@ -345,7 +486,9 @@ export function OptimizedMapView({
 
   const cleanup = () => {
     markers.forEach(marker => marker.setMap(null));
+    routePolylines.forEach(polyline => polyline.setMap(null));
     setMarkers([]);
+    setRoutePolylines([]);
     setMap(null);
     setDirectionsRenderer(null);
   };
@@ -399,9 +542,7 @@ export function OptimizedMapView({
           </div>
           
           <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">1</span>
-            </div>
+            <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
             <span className="text-slate-600 dark:text-slate-300">Selected Places</span>
           </div>
           
@@ -411,8 +552,19 @@ export function OptimizedMapView({
           </div>
           
           <div className="flex items-center space-x-2">
-            <Route className="w-4 h-4 text-blue-500" />
-            <span className="text-slate-600 dark:text-slate-300">Optimized Route</span>
+            <div className="flex items-center">
+              <div className="w-4 h-0.5 bg-blue-500"></div>
+              <span className="text-blue-500 text-xs ml-1">→</span>
+            </div>
+            <span className="text-slate-600 dark:text-slate-300">Forward Route</span>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center">
+              <div className="w-4 h-0.5 bg-red-500"></div>
+              <span className="text-red-500 text-xs ml-1">→</span>
+            </div>
+            <span className="text-slate-600 dark:text-slate-300">Return Route</span>
           </div>
         </div>
       </div>

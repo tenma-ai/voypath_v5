@@ -72,6 +72,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
 
   const formattedResult = formatOptimizationResult(optimizationResult);
 
+  // Calculate actual date based on trip start date and day number
+  const calculateActualDate = (dayNumber: number): Date => {
+    if (currentTrip?.start_date) {
+      const startDate = new Date(currentTrip.start_date);
+      startDate.setDate(startDate.getDate() + (dayNumber - 1));
+      return startDate;
+    }
+    
+    // Fallback to today + day offset if no trip start date
+    const today = new Date();
+    today.setDate(today.getDate() + (dayNumber - 1));
+    return today;
+  };
+
   const formatTime = (timeString: string) => {
     if (!timeString) return '';
     return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('en-US', {
@@ -112,6 +126,63 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       if (!place.arrival_time || !place.departure_time) return false;
       return time >= place.arrival_time && time < place.departure_time;
     });
+  };
+
+  // New function to group consecutive places into blocks
+  const getGroupedPlacesForDay = (dayData: any) => {
+    if (!dayData.places || dayData.places.length === 0) return [];
+
+    const groupedBlocks: Array<{
+      place: any;
+      startTime: string;
+      endTime: string;
+      duration: number;
+    }> = [];
+
+    // Sort places by arrival time
+    const sortedPlaces = [...dayData.places].sort((a, b) => 
+      (a.arrival_time || '').localeCompare(b.arrival_time || '')
+    );
+
+    let currentGroup: any = null;
+
+    for (const place of sortedPlaces) {
+      if (!place.arrival_time || !place.departure_time) continue;
+
+      if (!currentGroup) {
+        // Start new group
+        currentGroup = {
+          place: place,
+          startTime: place.arrival_time,
+          endTime: place.departure_time,
+          duration: place.stay_duration_minutes || 60
+        };
+      } else if (
+        // Check if this is the same place as the current group
+        (place.place_name || place.name) === (currentGroup.place.place_name || currentGroup.place.name) &&
+        place.arrival_time === currentGroup.endTime
+      ) {
+        // Extend current group
+        currentGroup.endTime = place.departure_time;
+        currentGroup.duration += place.stay_duration_minutes || 60;
+      } else {
+        // Different place or non-consecutive time, finalize current group and start new one
+        groupedBlocks.push(currentGroup);
+        currentGroup = {
+          place: place,
+          startTime: place.arrival_time,
+          endTime: place.departure_time,
+          duration: place.stay_duration_minutes || 60
+        };
+      }
+    }
+
+    // Add the last group
+    if (currentGroup) {
+      groupedBlocks.push(currentGroup);
+    }
+
+    return groupedBlocks;
   };
 
   // Get transport icon and color
@@ -219,7 +290,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
               {/* Day Header */}
               <div className="bg-blue-50 px-3 py-1.5 sm:py-2 border-b border-gray-200">
                 <h3 className="text-xs sm:text-sm font-semibold text-blue-900">
-                  Day {dayData.day} - {new Date(dayData.date).toLocaleDateString('en-US', {
+                  Day {dayData.day} - {calculateActualDate(dayData.day).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
@@ -228,55 +299,86 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                 </h3>
               </div>
               
-              {/* Time slots for this day */}
+              {/* Grouped place blocks for this day */}
               <div className="p-2 sm:p-4">
-                <div className="space-y-0.5 sm:space-y-1">
-                  {timeSlots.map((time, index) => {
-                    const place = getPlaceForTimeSlot(time, dayData.date);
-                    const isHourMark = time.endsWith(':00');
-                    
-                    return (
-                      <div
-                        key={time}
-                        className={`flex items-center space-x-2 sm:space-x-4 py-0.5 sm:py-1 ${
-                          isHourMark ? 'border-t border-gray-200 pt-1 sm:pt-2' : ''
-                        }`}
-                      >
-                        <div className={`w-10 sm:w-12 text-xs ${isHourMark ? 'font-semibold' : 'text-gray-500'}`}>
-                          {time}
+                <div className="space-y-2 sm:space-y-3">
+                  {getGroupedPlacesForDay(dayData).map((block, blockIndex) => (
+                    <div key={blockIndex} className="relative">
+                      {/* Time indicator on the left */}
+                      <div className="flex items-start space-x-3 sm:space-x-4">
+                        <div className="w-16 sm:w-20 text-xs text-gray-600 pt-1 flex-shrink-0">
+                          <div className="font-semibold">{formatTime(block.startTime)}</div>
+                          <div className="text-gray-500">to</div>
+                          <div className="font-semibold">{formatTime(block.endTime)}</div>
                         </div>
                         
+                        {/* Place block */}
                         <div className="flex-1">
-                          {place ? (
-                            <div 
-                              className="border-l-4 border border-gray-200 rounded-lg p-2 sm:p-3"
-                              style={getPlaceStyle(place)}
-                            >
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <h4 className="text-xs sm:text-sm font-semibold text-gray-900 leading-tight">{place.place_name || place.name}</h4>
-                                  <div className="flex items-center text-gray-600 text-xs mt-1">
-                                    <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
-                                    <span className="text-xs">
-                                      {formatTime(place.arrival_time)} - {formatTime(place.departure_time)}
-                                      ({formatDuration(place.stay_duration_minutes || 60)})
+                          <div 
+                            className="border-l-4 border border-gray-200 rounded-lg p-3 sm:p-4 cursor-pointer hover:shadow-md transition-shadow duration-200"
+                            style={getPlaceStyle(block.place)}
+                            onClick={() => {
+                              // Could add click handler for place details
+                              console.log('Place clicked:', block.place);
+                            }}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h4 className="text-sm sm:text-base font-semibold text-gray-900 leading-tight mb-2">
+                                  {block.place.place_name || block.place.name}
+                                </h4>
+                                
+                                <div className="space-y-1">
+                                  <div className="flex items-center text-gray-600 text-xs sm:text-sm">
+                                    <Clock className="w-3 h-3 mr-2 flex-shrink-0" />
+                                    <span>
+                                      Total Duration: {formatDuration(block.duration)}
                                     </span>
                                   </div>
+                                  
+                                  {block.place.category && (
+                                    <div className="flex items-center text-gray-600 text-xs sm:text-sm">
+                                      <MapPin className="w-3 h-3 mr-2 flex-shrink-0" />
+                                      <span>{block.place.category}</span>
+                                    </div>
+                                  )}
+                                  
+                                  {block.place.wish_level && (
+                                    <div className="flex items-center text-gray-600 text-xs sm:text-sm">
+                                      <span className="mr-2 flex-shrink-0">🌟</span>
+                                      <span>Wish Level: {block.place.wish_level}/5</span>
+                                    </div>
+                                  )}
                                 </div>
-                                {place.rating && (
-                                  <div className="text-xs text-yellow-600 ml-2 flex-shrink-0">
-                                    ★ {place.rating.toFixed(1)}
+                              </div>
+                              
+                              <div className="ml-3 flex flex-col items-end space-y-1">
+                                {block.place.rating && (
+                                  <div className="text-xs sm:text-sm text-yellow-600 flex-shrink-0">
+                                    ★ {block.place.rating.toFixed(1)}
+                                  </div>
+                                )}
+                                
+                                {block.place.price_level && (
+                                  <div className="text-xs text-green-600 flex-shrink-0">
+                                    {'$'.repeat(block.place.price_level)}
                                   </div>
                                 )}
                               </div>
                             </div>
-                          ) : (
-                            <div className="h-2 border-l-2 border-gray-100 ml-2"></div>
-                          )}
+                          </div>
                         </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
+                  
+                  {/* Show message if no places */}
+                  {getGroupedPlacesForDay(dayData).length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No scheduled places for this day</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

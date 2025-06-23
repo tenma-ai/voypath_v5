@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, MapPin, Users, TrendingUp, CheckCircle, X, Calendar, Map, List, Eye } from 'lucide-react';
 import MapViewModal from './MapViewModal';
 import ListViewModal from './ListViewModal';
-import CalendarViewModal from './CalendarViewModal';
 
 // Edge Function response structure (from optimize-route/index.ts)
 interface OptimizationResult {
@@ -61,7 +60,7 @@ interface OptimizationResultProps {
 }
 
 export function OptimizationResult({ optimizationResult: result, onClose }: OptimizationResultProps) {
-  const [activeModal, setActiveModal] = useState<'map' | 'list' | 'calendar' | null>(null);
+  const [activeModal, setActiveModal] = useState<'map' | 'list' | null>(null);
   const [showCelebration, setShowCelebration] = useState(true);
   
   // Early return if no result
@@ -527,7 +526,7 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
       {/* View Options */}
       <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
         <h4 className="font-medium text-slate-900 dark:text-slate-100 mb-3">View Options</h4>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <motion.button
             onClick={() => setActiveModal('map')}
             className="flex items-center justify-center space-x-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
@@ -548,15 +547,6 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
             <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Timeline</span>
           </motion.button>
           
-          <motion.button
-            onClick={() => setActiveModal('calendar')}
-            className="flex items-center justify-center space-x-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Calendar className="w-4 h-4 text-purple-500" />
-            <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Calendar</span>
-          </motion.button>
         </div>
       </div>
 
@@ -575,12 +565,6 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
         )}
         {activeModal === 'list' && (
           <ListViewModal
-            result={result}
-            onClose={() => setActiveModal(null)}
-          />
-        )}
-        {activeModal === 'calendar' && (
-          <CalendarViewModal
             result={result}
             onClose={() => setActiveModal(null)}
           />
