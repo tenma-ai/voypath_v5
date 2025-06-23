@@ -208,35 +208,44 @@ export function ChatPage() {
 
   // リアクション追加/削除
   const handleReaction = async (messageId: string, emoji: string) => {
-    if (!user?.id) return;
+    if (!user?.id || !currentTrip?.id) return;
 
     try {
+      // メッセージがこのトリップのものかチェック
+      const message = messages.find(m => m.id === messageId);
+      if (!message || message.trip_id !== currentTrip.id) {
+        console.error('❌ Message not found or not in current trip');
+        return;
+      }
+
       // 既存のリアクションをチェック
-      const existingReaction = messages
-        .find(m => m.id === messageId)
-        ?.reactions.find(r => r.user_id === user.id && r.emoji === emoji);
+      const existingReaction = message.reactions.find(r => r.user_id === user.id && r.emoji === emoji);
 
       if (existingReaction) {
         // リアクション削除
         const { error } = await supabase
           .from('message_reactions')
           .delete()
-          .eq('id', existingReaction.id);
+          .eq('id', existingReaction.id)
+          .eq('user_id', user.id); // 自分のリアクションのみ削除可能
 
         if (error) throw error;
       } else {
-        // リアクション追加 - upsert を使用して重複エラーを回避
+        // リアクション追加 - 重複チェック付きで直接INSERT
         const { error } = await supabase
           .from('message_reactions')
-          .upsert({
+          .insert({
             message_id: messageId,
             user_id: user.id,
             emoji: emoji
-          }, {
-            onConflict: 'message_id,user_id,emoji'
           });
 
-        if (error) throw error;
+        if (error) {
+          // 重複エラーの場合は無視
+          if (error.code !== '23505') {
+            throw error;
+          }
+        }
       }
 
       setShowEmojiPicker(null);
