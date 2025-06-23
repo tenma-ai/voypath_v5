@@ -78,7 +78,7 @@ export function ChatPage() {
         .select(`
           *,
           user:users(id, name, avatar_url),
-          reply_to_message:chat_messages!reply_to_id(
+          -- reply disabled: chat_messages!reply_to_id(
             id, content, message_type, image_url, user:users(id, name)
           ),
           reactions:message_reactions(
@@ -156,7 +156,7 @@ export function ChatPage() {
         .select(`
           *,
           user:users(id, name, avatar_url),
-          reply_to_message:chat_messages!reply_to_id(
+          -- reply disabled: chat_messages!reply_to_id(
             id, content, message_type, image_url, user:users(id, name)
           ),
           reactions:message_reactions(*),
@@ -225,7 +225,7 @@ export function ChatPage() {
         .select(`
           *,
           user:users(id, name, avatar_url),
-          reply_to_message:chat_messages!reply_to_id(
+          -- reply disabled: chat_messages!reply_to_id(
             id, content, message_type, image_url, user:users(id, name)
           ),
           reactions:message_reactions(*),
@@ -414,7 +414,7 @@ export function ChatPage() {
               .select(`
                 *,
                 user:users(id, name, avatar_url),
-                reply_to_message:chat_messages!reply_to_id(
+                -- reply disabled: chat_messages!reply_to_id(
                   id, content, message_type, image_url, user:users(id, name)
                 ),
                 reactions:message_reactions(
@@ -694,7 +694,7 @@ export function ChatPage() {
                     )}
 
                     {/* Reply indicator */}
-                    {msg.reply_to_id && msg.reply_to_message && (
+                    {false && msg.reply_to_id && msg.reply_to_message && (
                       <div className="mb-2 text-xs text-slate-500 dark:text-slate-400 border-l-2 border-indigo-400 pl-2 max-w-xs bg-slate-50 dark:bg-slate-800 rounded p-2">
                         <div className="font-medium text-indigo-600 dark:text-indigo-400">
                           Replying to {msg.reply_to_message.user?.name}
@@ -745,8 +745,7 @@ export function ChatPage() {
                       <div className={`absolute top-0 ${isOwn ? 'left-0 transform -translate-x-full' : 'right-0 transform translate-x-full'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg px-2 py-1`}>
                         <button
                           onClick={() => {
-                            console.log('Setting reply to:', msg);
-                            setReplyTo(msg);
+                            // setReplyTo(msg); // DISABLED
                           }}
                           className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
                           title="Reply"
@@ -933,7 +932,7 @@ export function ChatPage() {
       <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
         {/* Reply indicator */}
         <AnimatePresence>
-          {replyTo && (
+          {false && replyTo && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
