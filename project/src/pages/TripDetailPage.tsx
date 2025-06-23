@@ -638,9 +638,9 @@ export function TripDetailPage() {
         )}
       </AnimatePresence>
 
-      {/* Optimization Result - Shows when user explicitly optimizes */}
+      {/* Optimization Result - Only show in calendar view to avoid overlap with map */}
       <AnimatePresence>
-        {hasUserOptimized && optimizationResult && (
+        {hasUserOptimized && optimizationResult && activeView === 'calendar' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
