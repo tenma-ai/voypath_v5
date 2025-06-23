@@ -28,10 +28,47 @@ export function SharePage() {
   useEffect(() => {
     if (currentTrip) {
       loadTripMembers();
-      generateInvitationCode();
-      generateShareLink();
+      loadExistingShareData();
     }
   }, [currentTrip]);
+
+  const loadExistingShareData = async () => {
+    if (!currentTrip) return;
+
+    console.log('📋 Loading existing share data for trip:', currentTrip.id);
+    
+    // First try to load existing invitation code
+    const existingCodes = await getExistingInvitationCodes();
+    if (existingCodes.length > 0) {
+      // Use the most recent active invitation code
+      const activeCode = existingCodes.find(code => 
+        code.is_active && 
+        (!code.expires_at || new Date(code.expires_at) > new Date()) &&
+        (!code.max_uses || code.current_uses < code.max_uses)
+      );
+      
+      if (activeCode) {
+        console.log('✅ Using existing invitation code:', activeCode.code);
+        setJoinCode(activeCode.code);
+      } else {
+        console.log('⚠️ No active invitation codes found, generating new one');
+        await generateInvitationCode();
+      }
+    } else {
+      console.log('⚠️ No invitation codes found, generating new one');
+      await generateInvitationCode();
+    }
+
+    // Then try to load existing share link
+    const existingShareToken = await getExistingShareLink();
+    if (existingShareToken) {
+      console.log('✅ Using existing share link token:', existingShareToken);
+      setShareLink(`${window.location.origin}/shared/${existingShareToken}`);
+    } else {
+      console.log('⚠️ No share link found, generating new one');
+      await generateShareLink();
+    }
+  };
 
   const generateInvitationCode = async () => {
     if (!currentTrip) return;
@@ -136,20 +173,20 @@ export function SharePage() {
     if (!currentTrip) return [];
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return [];
+      const { data, error } = await supabase
+        .from('invitation_codes')
+        .select('*')
+        .eq('trip_id', currentTrip.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
 
-      const response = await fetch(`https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/invitations/${currentTrip.id}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.invitations || [];
+      if (error) {
+        console.error('❌ Error getting existing invitation codes:', error);
+        return [];
       }
+
+      console.log(`📋 Found ${data?.length || 0} invitation codes for trip`);
+      return data || [];
     } catch (error) {
       console.error('❌ Error getting existing invitation codes:', error);
     }
@@ -162,15 +199,41 @@ export function SharePage() {
     try {
       const { data, error } = await supabase
         .from('trip_shares')
-        .select('share_token')
+        .select('*')
         .eq('trip_id', currentTrip.id)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1);
+        .order('created_at', { ascending: false });
 
-      if (data && data.length > 0) {
-        return data[0].share_token;
+      if (error) {
+        console.error('❌ Error getting existing share link:', error);
+        return null;
       }
+
+      // Find a valid share link (not expired, not at max uses)
+      const validShare = data?.find(share => 
+        (!share.expires_at || new Date(share.expires_at) > new Date()) &&
+        (!share.max_uses || share.current_uses < share.max_uses) &&
+        share.share_type === 'external_view' // We want view links in SharePage
+      );
+
+      if (validShare) {
+        console.log('✅ Found valid existing share link:', validShare.share_token);
+        return validShare.share_token;
+      }
+
+      // If no view link found, try to find any valid collaborate link
+      const collaborateShare = data?.find(share => 
+        (!share.expires_at || new Date(share.expires_at) > new Date()) &&
+        (!share.max_uses || share.current_uses < share.max_uses) &&
+        share.share_type === 'external_collaborate'
+      );
+
+      if (collaborateShare) {
+        console.log('✅ Found valid collaborate share link:', collaborateShare.share_token);
+        return collaborateShare.share_token;
+      }
+
+      console.log('⚠️ No valid share links found');
     } catch (error) {
       console.error('❌ Error getting existing share link:', error);
     }
