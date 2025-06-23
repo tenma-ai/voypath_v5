@@ -55,7 +55,7 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
 }) => {
   const { hasUserOptimized } = useStore();
   
-  if (!isOpen || !optimizationResult) return null;
+  if (!isOpen || !hasUserOptimized || !optimizationResult) return null;
 
   // formatOptimizationResult function - exact same as OptimizationResult.tsx
   const formatOptimizationResult = (result: any) => {

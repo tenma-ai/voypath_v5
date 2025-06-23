@@ -77,7 +77,7 @@ export function TripDetailPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMemberPopup]);
   
-  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip } = useStore();
+  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized } = useStore();
 
   // Load trip members when current trip changes
   useEffect(() => {
@@ -635,7 +635,22 @@ export function TripDetailPage() {
         )}
       </AnimatePresence>
 
-      {/* Removed Optimization Result Modal - Now displayed directly in ListView/CalendarView/MapView */}
+      {/* Optimization Result - Shows when user explicitly optimizes */}
+      <AnimatePresence>
+        {hasUserOptimized && optimizationResult && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 left-6 right-6 z-50 max-w-2xl mx-auto"
+          >
+            <OptimizationResult
+              optimizationResult={optimizationResult}
+              onClose={() => setHasUserOptimized(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Member Popup Portal - Rendered at document root for maximum z-index */}
       {showMemberPopup && ReactDOM.createPortal(

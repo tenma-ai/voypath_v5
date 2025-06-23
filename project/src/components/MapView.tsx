@@ -26,9 +26,8 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const getAllPlaces = useCallback(() => {
     console.log(`🗺️ [MapView] Trip: ${currentTrip?.name}, Has optimization: ${!!optimizationResult}, User optimized: ${hasUserOptimized}`);
     
-    // Show results if optimization exists (temporary fix for auto-optimization)
-    if (!optimizationResult?.optimization?.daily_schedules) {
-      console.log('🗺️ [MapView] No optimization data available');
+    if (!hasUserOptimized || !optimizationResult?.optimization?.daily_schedules) {
+      console.log('🗺️ [MapView] No user-initiated optimization data available');
       return [];
     }
     
