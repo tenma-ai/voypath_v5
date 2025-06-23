@@ -12,7 +12,7 @@ interface MapViewProps {
 
 const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const { currentTrip, memberColors, tripMembers } = useStore();
+  const { currentTrip, memberColors, tripMembers, hasUserOptimized } = useStore();
 
   // Load Google Maps API
   const { isLoaded, loadError } = useJsApiLoader({
@@ -24,10 +24,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
 
   // Extract places from optimization result
   const getAllPlaces = useCallback(() => {
-    console.log(`🗺️ [MapView] Trip: ${currentTrip?.name}, Has optimization: ${!!optimizationResult}`);
+    console.log(`🗺️ [MapView] Trip: ${currentTrip?.name}, Has optimization: ${!!optimizationResult}, User optimized: ${hasUserOptimized}`);
     
-    if (!optimizationResult?.optimization?.daily_schedules) {
-      console.log('🗺️ [MapView] No optimization data available');
+    if (!hasUserOptimized || !optimizationResult?.optimization?.daily_schedules) {
+      console.log('🗺️ [MapView] No user-initiated optimization data available');
       return [];
     }
     
@@ -40,7 +40,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     
     console.log(`🗺️ [MapView] Extracted ${places.length} places for display`);
     return places;
-  }, [optimizationResult, currentTrip?.name]);
+  }, [optimizationResult, currentTrip?.name, hasUserOptimized]);
 
   const places = getAllPlaces();
 

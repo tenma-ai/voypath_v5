@@ -35,9 +35,10 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
   const [progress, setProgress] = useState<OptimizationProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showProgress, setShowProgress] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [connectivity, setConnectivity] = useState({ normalize: false, select: false, route: false });
   
-  const { user: currentUser, places, setOptimizationResult, setUser, loadPlacesFromAPI } = useStore();
+  const { user: currentUser, places, setOptimizationResult, setUser, loadPlacesFromAPI, setHasUserOptimized } = useStore();
 
   // Create a guest user if none exists (for testing)
   React.useEffect(() => {
@@ -154,6 +155,9 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
     setError(null);
     setProgress({ stage: 'collecting', progress: 0, message: 'Starting optimization...' });
     
+    // Mark that user has explicitly initiated optimization
+    setHasUserOptimized(true);
+    
     // Force reload places from database before optimization
     console.log('🔄 Reloading places from database before optimization');
     try {
@@ -210,11 +214,16 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
         }
       }
 
+      // Show success animation
+      setProgress({ stage: 'complete', progress: 100, message: 'Optimization complete! ✨' });
+      setShowSuccess(true);
+      
       setTimeout(() => {
         setIsOptimizing(false);
         setShowProgress(false);
         setProgress(null);
-      }, 1000);
+        setShowSuccess(false);
+      }, 2500);
 
     } catch (error) {
       console.error('Optimization failed:', error);
@@ -234,6 +243,15 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
         <>
           <AlertCircle className="w-5 h-5" />
           <span>Error</span>
+        </>
+      );
+    }
+
+    if (showSuccess) {
+      return (
+        <>
+          <CheckCircle className="w-5 h-5 text-green-500" />
+          <span>Optimization Complete!</span>
         </>
       );
     }
@@ -266,6 +284,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
 
   const getButtonColor = () => {
     if (error) return 'from-red-500 to-red-600';
+    if (showSuccess) return 'from-green-500 to-emerald-600';
     if (isOptimizing && progress) return STAGE_COLORS[progress.stage] || 'from-blue-500 to-blue-600';
     if (!hasPlaces) return 'from-gray-400 to-gray-500';
     return 'from-primary-500 via-secondary-500 to-primary-600';
@@ -305,8 +324,23 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
                 <motion.div
                   className={`h-2 rounded-full bg-gradient-to-r ${STAGE_COLORS[progress.stage] || 'from-blue-500 to-blue-600'}`}
                   initial={{ width: 0 }}
-                  animate={{ width: `${progress.progress}%` }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  animate={{ 
+                    width: `${progress.progress}%`,
+                    boxShadow: showSuccess ? [
+                      '0 0 20px rgba(34, 197, 94, 0.5)',
+                      '0 0 40px rgba(34, 197, 94, 0.3)',
+                      '0 0 20px rgba(34, 197, 94, 0.5)'
+                    ] : undefined
+                  }}
+                  transition={{ 
+                    duration: 0.5, 
+                    ease: "easeOut",
+                    boxShadow: showSuccess ? {
+                      duration: 1.5,
+                      repeat: 2,
+                      repeatType: "reverse"
+                    } : undefined
+                  }}
                 />
               </div>
             </div>

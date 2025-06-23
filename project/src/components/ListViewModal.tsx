@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Clock, MapPin, Navigation } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useStore } from '../store/useStore';
 
 interface Place {
   id: string;
@@ -52,7 +53,9 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
   onSwitchToMap,
   onSwitchToCalendar
 }) => {
-  if (!isOpen || !optimizationResult) return null;
+  const { hasUserOptimized } = useStore();
+  
+  if (!isOpen || !hasUserOptimized || !optimizationResult) return null;
 
   // formatOptimizationResult function - exact same as OptimizationResult.tsx
   const formatOptimizationResult = (result: any) => {

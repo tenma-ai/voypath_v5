@@ -11,7 +11,7 @@ interface CalendarViewProps {
 
 const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
-  const { currentTrip, memberColors, tripMembers } = useStore();
+  const { currentTrip, memberColors, tripMembers, hasUserOptimized } = useStore();
 
   // Generate gradient style for multiple contributors using centralized color logic
   const getPlaceStyle = (place: any) => {
@@ -52,7 +52,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
 
   // Extract places from optimization result
   const formatOptimizationResult = (result: any) => {
-    if (!result?.optimization?.daily_schedules) {
+    if (!hasUserOptimized || !result?.optimization?.daily_schedules) {
       return { schedulesByDay: {} };
     }
 

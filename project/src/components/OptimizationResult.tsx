@@ -195,8 +195,25 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, y: 30, scale: 0.95 }}
+      animate={{ 
+        opacity: 1, 
+        y: 0, 
+        scale: 1,
+        boxShadow: [
+          "0 0 0 rgba(34, 197, 94, 0)",
+          "0 0 30px rgba(34, 197, 94, 0.2)",
+          "0 0 0 rgba(34, 197, 94, 0)"
+        ]
+      }}
+      transition={{ 
+        duration: 0.6, 
+        ease: "easeOut",
+        boxShadow: {
+          duration: 2,
+          times: [0, 0.5, 1]
+        }
+      }}
       className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 space-y-6"
     >
       {/* Header */}
@@ -224,45 +241,85 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+          className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4"
+        >
           <div className="flex items-center space-x-2">
             <MapPin className="w-4 h-4 text-blue-500" />
             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Places</span>
           </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.4, duration: 0.3 }}
+            className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1"
+          >
             {formattedResult.totalStats.places}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+          className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4"
+        >
           <div className="flex items-center space-x-2">
             <Clock className="w-4 h-4 text-green-500" />
             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Travel</span>
           </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.5, duration: 0.3 }}
+            className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1"
+          >
             {formatMinutes(formattedResult.totalStats.travelTime)}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
+          className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4"
+        >
           <div className="flex items-center space-x-2">
             <Users className="w-4 h-4 text-purple-500" />
             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Visit Time</span>
           </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.6, duration: 0.3 }}
+            className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1"
+          >
             {formatMinutes(formattedResult.totalStats.visitTime)}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.4 }}
+          className="bg-slate-50 dark:bg-slate-700 rounded-lg p-4"
+        >
           <div className="flex items-center space-x-2">
             <TrendingUp className="w-4 h-4 text-orange-500" />
             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Score</span>
           </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.7, duration: 0.3 }}
+            className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1"
+          >
             {Math.round(formattedResult.totalStats.score * 100)}%
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
 
       {/* Optimization Score Breakdown */}

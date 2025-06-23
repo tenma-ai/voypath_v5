@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Clock, MapPin, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useStore } from '../store/useStore';
 
 interface Place {
   id: string;
@@ -36,7 +37,9 @@ const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
   onSwitchToMap,
   onSwitchToList
 }) => {
-  if (!isOpen || !optimizationResult) return null;
+  const { hasUserOptimized } = useStore();
+  
+  if (!isOpen || !hasUserOptimized || !optimizationResult) return null;
 
   // formatOptimizationResult function - exact same as OptimizationResult.tsx
   const formatOptimizationResult = (result: any) => {

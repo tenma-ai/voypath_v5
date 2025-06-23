@@ -115,6 +115,10 @@ interface StoreState {
   // Optimization Results
   optimizationResult: OptimizationResult | null;
   setOptimizationResult: (result: OptimizationResult | null) => void;
+  
+  // User-initiated optimization control
+  hasUserOptimized: boolean;
+  setHasUserOptimized: (value: boolean) => void;
 
   // API Integration
   createTripWithAPI: (tripData: TripCreateData) => Promise<Trip>;
@@ -158,7 +162,7 @@ export const useStore = create<StoreState>()((set, get) => ({
         const currentOptimizationResult = get().optimizationResult;
         const currentTripId = get().currentTrip?.id;
         
-        set({ currentTrip: trip }); // Don't clear places immediately to avoid animation flicker
+        set({ currentTrip: trip, hasUserOptimized: false }); // Reset user optimization flag when switching trips
         
         if (trip) {
           try {
@@ -496,6 +500,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       // Optimization Results
       optimizationResult: null,
       setOptimizationResult: (result) => set({ optimizationResult: result }),
+      
+      // User-initiated optimization control
+      hasUserOptimized: false,
+      setHasUserOptimized: (value) => set({ hasUserOptimized: value }),
 
       // Premium functions
       canCreateTrip: () => {

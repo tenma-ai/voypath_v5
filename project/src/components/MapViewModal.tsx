@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { MapPin, X, List, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import { useStore } from '../store/useStore';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -20,7 +21,10 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
   onSwitchToList,
   onSwitchToCalendar 
 }) => {
+  const { hasUserOptimized } = useStore();
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  
+  if (!isOpen || !hasUserOptimized || !optimizationResult) return null;
 
   // Load Google Maps API
   const { isLoaded, loadError } = useJsApiLoader({
@@ -31,7 +35,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
 
   // Extract places from optimization result
   const getAllPlaces = useCallback(() => {
-    if (!optimizationResult?.optimization?.daily_schedules) return [];
+    if (!hasUserOptimized || !optimizationResult?.optimization?.daily_schedules) return [];
     
     const places: any[] = [];
     optimizationResult.optimization.daily_schedules.forEach((schedule: any) => {
@@ -42,7 +46,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
     
     console.log('🔍 [MapViewModal] Extracted places:', places);
     return places;
-  }, [optimizationResult]);
+  }, [optimizationResult, hasUserOptimized]);
 
   const places = getAllPlaces();
 

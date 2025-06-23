@@ -58,7 +58,7 @@ const getTransportIcon = (mode?: string): string => {
 
 export function ListView() {
   const navigate = useNavigate();
-  const { places, currentTrip, isLoading, optimizationResult, memberColors, tripMembers } = useStore();
+  const { places, currentTrip, isLoading, optimizationResult, memberColors, tripMembers, hasUserOptimized } = useStore();
   const [selectedDay, setSelectedDay] = useState(new Date().toISOString().split('T')[0]);
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -215,8 +215,8 @@ export function ListView() {
   const schedule = useMemo(() => {
     if (!currentTrip) return [];
     
-    // ONLY display results if we have optimization results with daily schedules
-    if (optimizationResult?.optimization?.daily_schedules?.length > 0) {
+    // ONLY display results if user has optimized and we have optimization results with daily schedules
+    if (hasUserOptimized && optimizationResult?.optimization?.daily_schedules?.length > 0) {
       console.log('📅 ListView: Displaying optimization results with', optimizationResult.optimization.daily_schedules.length, 'days');
       
       const scheduleDays: DaySchedule[] = [];
@@ -339,7 +339,7 @@ export function ListView() {
     // NO optimization results - show message to optimize first
     console.log('❌ ListView: No optimization results to display');
     return [];
-  }, [currentTrip, optimizationResult]);
+  }, [currentTrip, optimizationResult, hasUserOptimized]);
 
   const toggleEventCollapse = (eventId: string) => {
     setCollapsedEvents(prev => {
