@@ -156,6 +156,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
     setProgress({ stage: 'collecting', progress: 0, message: 'Starting optimization...' });
     
     // Mark that user has explicitly initiated optimization
+    console.log('🎯 [OptimizeRouteButton] Setting hasUserOptimized to true');
     setHasUserOptimized(true);
     
     // Force reload places from database before optimization
@@ -198,6 +199,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       );
 
       if (result.success && result.optimization_result) {
+        console.log('🎯 [OptimizeRouteButton] Optimization success! hasUserOptimized should be true');
         setOptimizationResult(result.optimization_result);
         
         // Refresh places data to show updated schedule

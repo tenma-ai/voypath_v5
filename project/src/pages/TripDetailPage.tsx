@@ -174,7 +174,7 @@ export function TripDetailPage() {
         setCurrentTrip(trip);
       }
     }
-  }, [tripId, trips, currentTrip, setCurrentTrip]);
+  }, [tripId, trips.length, currentTrip?.id, setCurrentTrip]); // Only depend on currentTrip.id, not the full object
 
   // Load fresh data from database when page loads or trip changes
   useEffect(() => {

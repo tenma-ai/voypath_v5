@@ -161,8 +161,18 @@ export const useStore = create<StoreState>()((set, get) => ({
       setCurrentTrip: async (trip) => {
         const currentOptimizationResult = get().optimizationResult;
         const currentTripId = get().currentTrip?.id;
+        const currentHasUserOptimized = get().hasUserOptimized;
         
-        set({ currentTrip: trip, hasUserOptimized: false }); // Reset user optimization flag when switching trips
+        // Only reset hasUserOptimized when actually switching to a different trip
+        const isNewTrip = currentTripId !== trip.id;
+        const newHasUserOptimized = isNewTrip ? false : currentHasUserOptimized;
+        
+        console.log(`🎯 [setCurrentTrip] Trip: ${trip.name}, isNewTrip: ${isNewTrip}, currentHasUserOptimized: ${currentHasUserOptimized}, newHasUserOptimized: ${newHasUserOptimized}`);
+        
+        set({ 
+          currentTrip: trip, 
+          hasUserOptimized: newHasUserOptimized 
+        });
         
         if (trip) {
           try {
@@ -503,7 +513,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       
       // User-initiated optimization control
       hasUserOptimized: false,
-      setHasUserOptimized: (value) => set({ hasUserOptimized: value }),
+      setHasUserOptimized: (value) => {
+        console.log(`🎯 [setHasUserOptimized] Setting hasUserOptimized to: ${value}`);
+        set({ hasUserOptimized: value });
+      },
 
       // Premium functions
       canCreateTrip: () => {
