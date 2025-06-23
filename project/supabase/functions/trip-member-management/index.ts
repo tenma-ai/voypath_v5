@@ -56,14 +56,18 @@ serve(async (req) => {
       );
     }
 
-    // Supabase クライアント初期化
+    // Supabase クライアント初期化 - Service Roleキーを使用してRLSをバイパス
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
         global: {
           headers: { Authorization: authHeader },
         },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
       }
     );
 
@@ -270,12 +274,18 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
 
   // 招待コード検証
   console.log('🔍 Searching for invitation code:', requestData.invitation_code.toUpperCase());
+  console.log('📊 Querying invitation_codes table...');
   const { data: invitations, error: invitationError } = await supabase
     .from('invitation_codes')
     .select('*')
     .eq('code', requestData.invitation_code.toUpperCase())
     .eq('is_active', true)
     .limit(1);
+  
+  console.log('📊 Full query result:', {
+    invitations: invitations,
+    error: invitationError
+  });
 
   console.log('📋 Invitation search result:', invitations?.length ? `Found ${invitations.length} records` : 'Not found');
   console.log('❌ Invitation error:', invitationError?.message || 'No error');

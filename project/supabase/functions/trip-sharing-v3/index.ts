@@ -42,10 +42,16 @@ serve(async (req) => {
   }
 
   try {
-    // Supabase クライアント初期化（認証不要の場合もあるため、anon keyで初期化）
+    // Supabase クライアント初期化 - Service Roleキーを使用してRLSをバイパス
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     );
 
     if (req.method !== 'POST') {
@@ -188,14 +194,22 @@ async function handleCreateShareLink(requestData: CreateShareLinkRequest, supaba
 
 async function handleGetSharedTrip(requestData: GetSharedTripRequest, supabase: any) {
   console.log('🔍 Getting shared trip for token:', requestData.shareToken);
+  console.log('📊 Full request data:', JSON.stringify(requestData));
 
   // 共有リンクの検索
+  console.log('🔍 Searching trip_shares table...');
   const { data: shareData, error: shareError } = await supabase
     .from('trip_shares')
     .select('*')
     .eq('share_token', requestData.shareToken)
     .eq('is_active', true)
     .single();
+  
+  console.log('📊 Query result:', { 
+    found: !!shareData, 
+    error: shareError?.message,
+    shareData: shareData ? 'Found share data' : 'No data'
+  });
 
   if (shareError || !shareData) {
     console.log('❌ Share link not found:', requestData.shareToken);
