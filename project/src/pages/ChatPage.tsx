@@ -78,13 +78,9 @@ export function ChatPage() {
         .select(`
           *,
           user:users(id, name, avatar_url),
-          -- reply disabled: chat_messages!reply_to_id(
-            id, content, message_type, image_url, user:users(id, name)
-          ),
           reactions:message_reactions(
             id, emoji, user_id, created_at,
             user:users(id, name)
-          ),
           reads:message_reads(
             id, user_id, read_at,
             user:users(id, name)
@@ -156,9 +152,6 @@ export function ChatPage() {
         .select(`
           *,
           user:users(id, name, avatar_url),
-          -- reply disabled: chat_messages!reply_to_id(
-            id, content, message_type, image_url, user:users(id, name)
-          ),
           reactions:message_reactions(*),
           reads:message_reads(*)
         `)
@@ -225,9 +218,6 @@ export function ChatPage() {
         .select(`
           *,
           user:users(id, name, avatar_url),
-          -- reply disabled: chat_messages!reply_to_id(
-            id, content, message_type, image_url, user:users(id, name)
-          ),
           reactions:message_reactions(*),
           reads:message_reads(*)
         `)
@@ -414,14 +404,10 @@ export function ChatPage() {
               .select(`
                 *,
                 user:users(id, name, avatar_url),
-                -- reply disabled: chat_messages!reply_to_id(
-                  id, content, message_type, image_url, user:users(id, name)
-                ),
-                reactions:message_reactions(
+                                  reactions:message_reactions(
                   id, emoji, user_id, created_at,
                   user:users(id, name)
-                ),
-                reads:message_reads(
+                      reads:message_reads(
                   id, user_id, read_at,
                   user:users(id, name)
                 )
