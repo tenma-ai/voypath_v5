@@ -1,19 +1,388 @@
-import React, { useState } from 'react';
-import { Send, Paperclip, Smile, MapPin, Calendar } from 'lucide-react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Send, Paperclip, Smile, MapPin, Calendar, Image as ImageIcon, Heart, ThumbsUp, Laugh, Reply, MoreVertical, Check, CheckCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
+import { supabase } from '../lib/supabase';
+
+interface ChatMessage {
+  id: string;
+  trip_id: string;
+  user_id: string;
+  content: string | null;
+  message_type: 'text' | 'image' | 'system';
+  image_url: string | null;
+  image_metadata: any;
+  reply_to_id: string | null;
+  edited_at: string | null;
+  created_at: string;
+  updated_at: string;
+  user: {
+    id: string;
+    name: string;
+    avatar_url?: string;
+  };
+  reactions: MessageReaction[];
+  reads: MessageRead[];
+  reply_to?: ChatMessage;
+}
+
+interface MessageReaction {
+  id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+  user: {
+    id: string;
+    name: string;
+  };
+}
+
+interface MessageRead {
+  id: string;
+  message_id: string;
+  user_id: string;
+  read_at: string;
+  user: {
+    id: string;
+    name: string;
+  };
+}
 
 
 export function ChatPage() {
-  const { currentTrip } = useStore();
+  const { currentTrip, user } = useStore();
   const [message, setMessage] = useState('');
-  const [messages] = useState([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      // Handle message sending
-      setMessage('');
+  const commonEmojis = ['❤️', '👍', '😂', '😮', '😢', '😡'];
+
+  // メッセージ読み込み
+  const loadMessages = useCallback(async () => {
+    if (!currentTrip?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select(`
+          *,
+          user:users(id, name, avatar_url),
+          reply_to:chat_messages(
+            id, content, user:users(id, name)
+          ),
+          reactions:message_reactions(
+            id, emoji, user_id, created_at,
+            user:users(id, name)
+          ),
+          reads:message_reads(
+            id, user_id, read_at,
+            user:users(id, name)
+          )
+        `)
+        .eq('trip_id', currentTrip.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      
+      setMessages(data || []);
+      
+      // 新しいメッセージを既読にする
+      if (data && data.length > 0) {
+        await markMessagesAsRead(data.map(m => m.id));
+      }
+    } catch (error) {
+      console.error('❌ Failed to load messages:', error);
+    } finally {
+      setLoading(false);
     }
+  }, [currentTrip?.id, user?.id]);
+
+  // メッセージ送信
+  const handleSendMessage = async () => {
+    if (!message.trim() || !currentTrip?.id || !user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert({
+          trip_id: currentTrip.id,
+          user_id: user.id,
+          content: message,
+          message_type: 'text',
+          reply_to_id: replyTo?.id || null
+        })
+        .select(`
+          *,
+          user:users(id, name, avatar_url),
+          reply_to:chat_messages(
+            id, content, user:users(id, name)
+          ),
+          reactions:message_reactions(*),
+          reads:message_reads(*)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      setMessage('');
+      setReplyTo(null);
+      
+      // 新しいメッセージをローカル状態に追加
+      setMessages(prev => [...prev, { ...data, reactions: [], reads: [] }]);
+      
+    } catch (error) {
+      console.error('❌ Failed to send message:', error);
+    }
+  };
+
+  // 写真アップロード
+  const handleImageUpload = async (file: File) => {
+    if (!currentTrip?.id || !user?.id) return;
+
+    setUploading(true);
+    try {
+      // ファイル名生成
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      // Supabase Storageにアップロード
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('chat-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // 公開URLを取得
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-images')
+        .getPublicUrl(fileName);
+
+      // メッセージとして保存
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert({
+          trip_id: currentTrip.id,
+          user_id: user.id,
+          content: null,
+          message_type: 'image',
+          image_url: publicUrl,
+          image_metadata: {
+            original_name: file.name,
+            size: file.size,
+            type: file.type
+          },
+          reply_to_id: replyTo?.id || null
+        })
+        .select(`
+          *,
+          user:users(id, name, avatar_url),
+          reply_to:chat_messages(
+            id, content, user:users(id, name)
+          ),
+          reactions:message_reactions(*),
+          reads:message_reads(*)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      setReplyTo(null);
+      setMessages(prev => [...prev, { ...data, reactions: [], reads: [] }]);
+      
+    } catch (error) {
+      console.error('❌ Failed to upload image:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // リアクション追加/削除
+  const handleReaction = async (messageId: string, emoji: string) => {
+    if (!user?.id) return;
+
+    try {
+      // 既存のリアクションをチェック
+      const existingReaction = messages
+        .find(m => m.id === messageId)
+        ?.reactions.find(r => r.user_id === user.id && r.emoji === emoji);
+
+      if (existingReaction) {
+        // リアクション削除
+        const { error } = await supabase
+          .from('message_reactions')
+          .delete()
+          .eq('id', existingReaction.id);
+
+        if (error) throw error;
+      } else {
+        // リアクション追加
+        const { error } = await supabase
+          .from('message_reactions')
+          .insert({
+            message_id: messageId,
+            user_id: user.id,
+            emoji: emoji
+          });
+
+        if (error) throw error;
+      }
+
+      setShowEmojiPicker(null);
+    } catch (error) {
+      console.error('❌ Failed to handle reaction:', error);
+    }
+  };
+
+  // メッセージ既読
+  const markMessagesAsRead = async (messageIds: string[]) => {
+    if (!user?.id || messageIds.length === 0) return;
+
+    try {
+      const readData = messageIds.map(messageId => ({
+        message_id: messageId,
+        user_id: user.id
+      }));
+
+      const { error } = await supabase
+        .from('message_reads')
+        .upsert(readData, { onConflict: 'message_id,user_id' });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('❌ Failed to mark messages as read:', error);
+    }
+  };
+
+  // リアルタイム連携設定
+  useEffect(() => {
+    if (!currentTrip?.id) return;
+
+    const channel = supabase
+      .channel(`chat:${currentTrip.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `trip_id=eq.${currentTrip.id}`
+        },
+        async (payload) => {
+          // 新しいメッセージを取得（関連データも含む）
+          const { data } = await supabase
+            .from('chat_messages')
+            .select(`
+              *,
+              user:users(id, name, avatar_url),
+              reply_to:chat_messages(
+                id, content, user:users(id, name)
+              ),
+              reactions:message_reactions(
+                id, emoji, user_id, created_at,
+                user:users(id, name)
+              ),
+              reads:message_reads(
+                id, user_id, read_at,
+                user:users(id, name)
+              )
+            `)
+            .eq('id', payload.new.id)
+            .single();
+
+          if (data && data.user_id !== user?.id) {
+            setMessages(prev => [...prev, data]);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'message_reactions',
+        },
+        () => {
+          // リアクションが追加されたらメッセージを再読み込み
+          loadMessages();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'message_reactions',
+        },
+        () => {
+          // リアクションが削除されたらメッセージを再読み込み
+          loadMessages();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'message_reads',
+        },
+        () => {
+          // 既読が追加されたらメッセージを再読み込み
+          loadMessages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentTrip?.id, user?.id, loadMessages]);
+
+  // 初期データ読み込み
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
+
+  // 自動スクロール
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // ファイル選択
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      handleImageUpload(file);
+    }
+    e.target.value = '';
+  };
+
+  // 既読状態のヘルパー関数
+  const getReadStatus = (message: ChatMessage) => {
+    if (message.user_id !== user?.id) return null;
+    
+    const readCount = message.reads?.length || 0;
+    const tripMemberCount = currentTrip?.memberCount || 1;
+    
+    if (readCount >= tripMemberCount - 1) { // 自分以外全員が既読
+      return 'all-read';
+    } else if (readCount > 0) {
+      return 'some-read';
+    }
+    return 'unread';
   };
 
   return (
@@ -37,79 +406,218 @@ export function ChatPage() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
-        {messages.map((msg, index) => (
-          <motion.div
-            key={msg.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`flex space-x-3 max-w-xs lg:max-w-md ${msg.isOwn ? 'flex-row-reverse space-x-reverse' : ''}`}>
-              {!msg.isOwn && (
-                <div className="w-8 h-8 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-medium text-sm">{msg.avatar}</span>
-                </div>
-              )}
-              
-              <div className={`flex flex-col ${msg.isOwn ? 'items-end' : 'items-start'}`}>
-                {!msg.isOwn && (
-                  <span className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                    {msg.userName}
-                  </span>
-                )}
-                
-                {msg.type === 'place-share' ? (
-                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 max-w-xs">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <MapPin className="w-4 h-4 text-primary-500" />
-                      <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                        Shared a place
+        {loading ? (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
+              <Send className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+              No messages yet
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400 max-w-sm">
+              Start the conversation by sending the first message to your trip members.
+            </p>
+          </div>
+        ) : (
+          messages.map((msg, index) => {
+            const isOwn = msg.user_id === user?.id;
+            const readStatus = getReadStatus(msg);
+            
+            return (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.02 }}
+                className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`flex space-x-3 max-w-xs lg:max-w-md ${isOwn ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                  {!isOwn && (
+                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-medium text-sm">
+                        {msg.user.name?.charAt(0).toUpperCase()}
                       </span>
                     </div>
-                    <div className="flex items-start space-x-3">
-                      <img
-                        src={msg.place.image}
-                        alt={msg.place.name}
-                        className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                          {msg.place.name}
-                        </h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {msg.place.category} • ⭐ {msg.place.rating}
-                        </p>
+                  )}
+                  
+                  <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                    {!isOwn && (
+                      <span className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                        {msg.user.name}
+                      </span>
+                    )}
+
+                    {/* Reply indicator */}
+                    {msg.reply_to && (
+                      <div className="mb-2 text-xs text-slate-500 dark:text-slate-400 border-l-2 border-slate-300 dark:border-slate-600 pl-2 max-w-xs">
+                        <div className="font-medium">{msg.reply_to.user?.name}</div>
+                        <div className="truncate">{msg.reply_to.content}</div>
                       </div>
+                    )}
+                    
+                    <div className="relative group">
+                      {msg.message_type === 'image' ? (
+                        <div className={`rounded-2xl overflow-hidden ${isOwn ? 'ml-8' : 'mr-8'}`}>
+                          <img
+                            src={msg.image_url || ''}
+                            alt="Shared image"
+                            className="max-w-xs max-h-64 object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className={`px-4 py-2 rounded-2xl ${
+                          isOwn
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
+                        }`}>
+                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        </div>
+                      )}
+
+                      {/* Message actions */}
+                      <div className={`absolute top-0 ${isOwn ? 'left-0 transform -translate-x-full' : 'right-0 transform translate-x-full'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg px-2 py-1`}>
+                        <button
+                          onClick={() => setReplyTo(msg)}
+                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                          title="Reply"
+                        >
+                          <Reply className="w-3 h-3 text-slate-500" />
+                        </button>
+                        <button
+                          onClick={() => setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)}
+                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                          title="React"
+                        >
+                          <Smile className="w-3 h-3 text-slate-500" />
+                        </button>
+                      </div>
+
+                      {/* Emoji picker */}
+                      <AnimatePresence>
+                        {showEmojiPicker === msg.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className={`absolute z-10 ${isOwn ? 'right-0' : 'left-0'} mt-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-2`}
+                          >
+                            <div className="flex space-x-1">
+                              {commonEmojis.map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  onClick={() => handleReaction(msg.id, emoji)}
+                                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                    <button className="w-full mt-2 px-3 py-1 bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded-lg text-sm font-medium hover:bg-primary-200 dark:hover:bg-primary-900/30 transition-colors">
-                      View Place
-                    </button>
+
+                    {/* Reactions */}
+                    {msg.reactions && msg.reactions.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1 max-w-xs">
+                        {Object.entries(
+                          msg.reactions.reduce((acc, reaction) => {
+                            if (!acc[reaction.emoji]) acc[reaction.emoji] = [];
+                            acc[reaction.emoji].push(reaction);
+                            return acc;
+                          }, {} as Record<string, typeof msg.reactions>)
+                        ).map(([emoji, reactions]) => (
+                          <button
+                            key={emoji}
+                            onClick={() => handleReaction(msg.id, emoji)}
+                            className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
+                              reactions.some(r => r.user_id === user?.id)
+                                ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                            title={reactions.map(r => r.user.name).join(', ')}
+                          >
+                            <span>{emoji}</span>
+                            <span>{reactions.length}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className={`flex items-center space-x-2 mt-1 ${isOwn ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      
+                      {/* Read status for own messages */}
+                      {isOwn && readStatus && (
+                        <div className="flex items-center">
+                          {readStatus === 'all-read' ? (
+                            <CheckCheck className="w-3 h-3 text-blue-500" title="Read by everyone" />
+                          ) : readStatus === 'some-read' ? (
+                            <CheckCheck className="w-3 h-3 text-slate-400" title="Read by some" />
+                          ) : (
+                            <Check className="w-3 h-3 text-slate-400" title="Sent" />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <div className={`px-4 py-2 rounded-2xl ${
-                    msg.isOwn
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
-                  }`}>
-                    <p className="text-sm">{msg.message}</p>
-                  </div>
-                )}
-                
-                <span className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {msg.timestamp}
-                </span>
-              </div>
-            </div>
-          </motion.div>
-        ))}
+                </div>
+              </motion.div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Message Input */}
       <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
+        {/* Reply indicator */}
+        <AnimatePresence>
+          {replyTo && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="mb-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border-l-4 border-indigo-500"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-1">
+                    Replying to {replyTo.user.name}
+                  </div>
+                  <div className="text-sm text-slate-600 dark:text-slate-400 truncate">
+                    {replyTo.content || 'Image'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setReplyTo(null)}
+                  className="ml-2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  ×
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex items-center space-x-3">
-          <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
-            <Paperclip className="w-5 h-5 text-slate-500" />
+          <button 
+            onClick={handleFileSelect}
+            disabled={uploading}
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+            title="Upload image"
+          >
+            {uploading ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-500"></div>
+            ) : (
+              <ImageIcon className="w-5 h-5 text-slate-500" />
+            )}
           </button>
           
           <div className="flex-1 relative">
@@ -118,23 +626,29 @@ export function ChatPage() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Type a message..."
-              className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              className="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-full bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              disabled={uploading}
             />
           </div>
           
-          <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
-            <Smile className="w-5 h-5 text-slate-500" />
-          </button>
-          
           <button
             onClick={handleSendMessage}
-            disabled={!message.trim()}
-            className="p-2 bg-primary-500 hover:bg-primary-600 disabled:bg-slate-300 dark:disabled:bg-slate-600 rounded-full transition-colors disabled:cursor-not-allowed"
+            disabled={!message.trim() || uploading}
+            className="p-2 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-600 rounded-full transition-colors disabled:cursor-not-allowed"
           >
             <Send className="w-5 h-5 text-white" />
           </button>
         </div>
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
       </div>
     </div>
   );
