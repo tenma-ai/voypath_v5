@@ -174,13 +174,10 @@ function App() {
                 {!isPublicRoute && (
                   <Route path="/" element={<Layout />}>
                     <Route index element={<HomePage />} />
-                    {/* TripDetailPage routes disabled - not currently in use */}
-                    {/* <Route path="my-trip" element={
-                      <ErrorBoundary>
-                        <TripDetailPage />
-                      </ErrorBoundary>
-                    } />
-                    <Route path="trip/:tripId" element={
+                    {/* Redirect my-trip to home page since TripDetailPage is disabled */}
+                    <Route path="my-trip" element={<HomePage />} />
+                    {/* TripDetailPage route disabled - not currently in use */}
+                    {/* <Route path="trip/:tripId" element={
                       <ErrorBoundary>
                         <TripDetailPage />
                       </ErrorBoundary>
