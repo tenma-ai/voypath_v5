@@ -25,6 +25,7 @@ interface ChatMessage {
   reactions: MessageReaction[];
   reads: MessageRead[];
   reply_to?: ChatMessage;
+  reply_to_message?: ChatMessage;
 }
 
 interface MessageReaction {
@@ -77,7 +78,7 @@ export function ChatPage() {
         .select(`
           *,
           user:users(id, name, avatar_url),
-          reply_to:chat_messages(
+          reply_to_message:chat_messages!reply_to_id(
             id, content, message_type, image_url, user:users(id, name)
           ),
           reactions:message_reactions(
@@ -155,7 +156,7 @@ export function ChatPage() {
         .select(`
           *,
           user:users(id, name, avatar_url),
-          reply_to:chat_messages(
+          reply_to_message:chat_messages!reply_to_id(
             id, content, message_type, image_url, user:users(id, name)
           ),
           reactions:message_reactions(*),
@@ -224,7 +225,7 @@ export function ChatPage() {
         .select(`
           *,
           user:users(id, name, avatar_url),
-          reply_to:chat_messages(
+          reply_to_message:chat_messages!reply_to_id(
             id, content, message_type, image_url, user:users(id, name)
           ),
           reactions:message_reactions(*),
@@ -413,7 +414,7 @@ export function ChatPage() {
               .select(`
                 *,
                 user:users(id, name, avatar_url),
-                reply_to:chat_messages(
+                reply_to_message:chat_messages!reply_to_id(
                   id, content, message_type, image_url, user:users(id, name)
                 ),
                 reactions:message_reactions(
@@ -693,26 +694,26 @@ export function ChatPage() {
                     )}
 
                     {/* Reply indicator */}
-                    {msg.reply_to_id && msg.reply_to && (
+                    {msg.reply_to_id && msg.reply_to_message && (
                       <div className="mb-2 text-xs text-slate-500 dark:text-slate-400 border-l-2 border-indigo-400 pl-2 max-w-xs bg-slate-50 dark:bg-slate-800 rounded p-2">
                         <div className="font-medium text-indigo-600 dark:text-indigo-400">
-                          Replying to {msg.reply_to.user?.name}
+                          Replying to {msg.reply_to_message.user?.name}
                         </div>
                         <div className="truncate text-slate-600 dark:text-slate-300">
                           {(() => {
                             console.log('Reply content debug:', {
-                              message_type: msg.reply_to.message_type,
-                              content: msg.reply_to.content,
-                              image_url: msg.reply_to.image_url,
+                              message_type: msg.reply_to_message.message_type,
+                              content: msg.reply_to_message.content,
+                              image_url: msg.reply_to_message.image_url,
                               full_reply_to: msg.reply_to
                             });
                             
-                            if (msg.reply_to.message_type === 'image') {
+                            if (msg.reply_to_message.message_type === 'image') {
                               return '📷 Image';
                             }
                             
-                            if (msg.reply_to.content && msg.reply_to.content.trim()) {
-                              return msg.reply_to.content;
+                            if (msg.reply_to_message.content && msg.reply_to_message.content.trim()) {
+                              return msg.reply_to_message.content;
                             }
                             
                             return 'Message';
