@@ -467,11 +467,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                     const colorResult = getPlaceColor(selectedPlace);
                     let userInfo = null;
                     
-                    if (colorResult.type === 'single' && colorResult.userId) {
-                      const member = tripMembers.find(m => m.user_id === colorResult.userId);
-                      userInfo = member?.name || 'Unknown user';
+                    if (colorResult.type === 'single' && colorResult.contributors.length > 0) {
+                      userInfo = colorResult.contributors[0].memberName || 'Unknown user';
                     } else if (colorResult.type === 'gradient' && colorResult.contributors) {
-                      userInfo = colorResult.contributors.map(c => c.name).join(', ');
+                      userInfo = colorResult.contributors.map(c => c.memberName).join(', ');
                     } else if (colorResult.type === 'gold') {
                       userInfo = 'All members';
                     }

@@ -13,6 +13,7 @@ export interface PlaceColorResult {
   boxShadow?: string;
   contributors: MemberContribution[];
   className?: string; // CSS class name for styling
+  userId?: string; // For backward compatibility with single contributor
 }
 
 /**
@@ -62,7 +63,8 @@ export function calculatePlaceColor(place: any, members: any[] = [], memberColor
       type: 'single',
       background: contributors[0].color,
       className: 'place-single',
-      contributors
+      contributors,
+      userId: contributors[0].userId // For backward compatibility
     };
   }
 
