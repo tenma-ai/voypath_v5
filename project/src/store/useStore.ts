@@ -119,6 +119,10 @@ interface StoreState {
   // User-initiated optimization control
   hasUserOptimized: boolean;
   setHasUserOptimized: (value: boolean) => void;
+  
+  // Success animation control
+  showOptimizationSuccess: boolean;
+  setShowOptimizationSuccess: (value: boolean) => void;
 
   // API Integration
   createTripWithAPI: (tripData: TripCreateData) => Promise<Trip>;
@@ -171,7 +175,8 @@ export const useStore = create<StoreState>()((set, get) => ({
         
         set({ 
           currentTrip: trip, 
-          hasUserOptimized: newHasUserOptimized 
+          hasUserOptimized: newHasUserOptimized,
+          showOptimizationSuccess: false  // Reset success animation when switching trips
         });
         
         if (trip) {
@@ -516,6 +521,13 @@ export const useStore = create<StoreState>()((set, get) => ({
       setHasUserOptimized: (value) => {
         console.log(`🎯 [setHasUserOptimized] Setting hasUserOptimized to: ${value}`);
         set({ hasUserOptimized: value });
+      },
+      
+      // Success animation control - only triggers once per optimization
+      showOptimizationSuccess: false,
+      setShowOptimizationSuccess: (value) => {
+        console.log(`🎉 [setShowOptimizationSuccess] Setting showOptimizationSuccess to: ${value}`);
+        set({ showOptimizationSuccess: value });
       },
 
       // Premium functions

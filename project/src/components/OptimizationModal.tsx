@@ -28,7 +28,7 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
   const [connectivity, setConnectivity] = useState({ normalize: false, select: false, route: false });
   const [progressSubscription, setProgressSubscription] = useState<(() => void) | null>(null);
 
-  const { setOptimizationResult, currentUser, setHasUserOptimized } = useStore();
+  const { setOptimizationResult, currentUser, setHasUserOptimized, setShowOptimizationSuccess } = useStore();
 
   // Check Edge Functions connectivity on mount
   useEffect(() => {
@@ -182,6 +182,7 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
 
       if (result.success) {
         setOptimizationResult(result.optimization_result);
+        setShowOptimizationSuccess(true); // Trigger success animation
         
         // Final progress update
         const finalProgress = { 

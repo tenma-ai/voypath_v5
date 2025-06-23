@@ -6,7 +6,7 @@ import { useStore } from '../store/useStore';
 
 export function FloatingActionButtons() {
   const location = useLocation();
-  const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult, setHasUserOptimized } = useStore();
+  const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult, setHasUserOptimized, setShowOptimizationSuccess } = useStore();
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
 
   // Check if deadline has passed
@@ -60,6 +60,7 @@ export function FloatingActionButtons() {
       if (result.success && result.optimization) {
         console.log('✅ Optimization successful!', result);
         setOptimizationResult(result);
+        setShowOptimizationSuccess(true); // Trigger success animation
       } else {
         console.error('❌ Optimization failed:', result.error);
         setOptimizationError(result.error || 'Optimization failed');

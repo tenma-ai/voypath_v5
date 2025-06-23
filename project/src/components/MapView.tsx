@@ -16,7 +16,7 @@ interface MapViewProps {
 const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
-  const { currentTrip, memberColors, tripMembers, hasUserOptimized, isOptimizing } = useStore();
+  const { currentTrip, memberColors, tripMembers, hasUserOptimized, isOptimizing, showOptimizationSuccess, setShowOptimizationSuccess } = useStore();
 
   // Load Google Maps API
   const { isLoaded, loadError } = useJsApiLoader({
@@ -25,12 +25,12 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     libraries: libraries
   });
 
-  // Handle optimization success animation
+  // Handle optimization success animation - only show when explicitly triggered
   useEffect(() => {
-    if (!isOptimizing && hasUserOptimized && optimizationResult) {
+    if (showOptimizationSuccess && optimizationResult) {
       setShowSuccessOverlay(true);
     }
-  }, [isOptimizing, hasUserOptimized, optimizationResult]);
+  }, [showOptimizationSuccess, optimizationResult]);
 
 
   // Extract places from optimization result
@@ -383,7 +383,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           <OptimizationSuccessOverlay 
             key="success"
             optimizationResult={optimizationResult}
-            onComplete={() => setShowSuccessOverlay(false)}
+            onComplete={() => {
+              setShowSuccessOverlay(false);
+              setShowOptimizationSuccess(false);
+            }}
           />
         )}
       </AnimatePresence>
