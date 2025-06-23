@@ -699,10 +699,24 @@ export function ChatPage() {
                           Replying to {msg.reply_to.user?.name}
                         </div>
                         <div className="truncate text-slate-600 dark:text-slate-300">
-                          {msg.reply_to.message_type === 'image' 
-                            ? 'Image'
-                            : (msg.reply_to.content || 'Message')
-                          }
+                          {(() => {
+                            console.log('Reply content debug:', {
+                              message_type: msg.reply_to.message_type,
+                              content: msg.reply_to.content,
+                              image_url: msg.reply_to.image_url,
+                              full_reply_to: msg.reply_to
+                            });
+                            
+                            if (msg.reply_to.message_type === 'image') {
+                              return '📷 Image';
+                            }
+                            
+                            if (msg.reply_to.content && msg.reply_to.content.trim()) {
+                              return msg.reply_to.content;
+                            }
+                            
+                            return 'Message';
+                          })()}
                         </div>
                       </div>
                     )}
@@ -932,7 +946,7 @@ export function ChatPage() {
                   </div>
                   <div className="text-sm text-slate-600 dark:text-slate-400 truncate">
                     {replyTo.message_type === 'image' 
-                      ? 'Image'
+                      ? '\ud83d\udcf7 Image'
                       : (replyTo.content || 'Message')
                     }
                   </div>
