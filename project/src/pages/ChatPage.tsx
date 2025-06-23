@@ -602,9 +602,9 @@ export function ChatPage() {
                       )}
                     </div>
                     
-                    {/* Read indicators below message */}
-                    {!isOwn && msg.reads && msg.reads.length > 0 && (
-                      <div className="flex items-center space-x-1 mt-1">
+                    {/* Read indicators below message (only for own messages) */}
+                    {isOwn && msg.reads && msg.reads.length > 0 && (
+                      <div className="flex items-center space-x-1 mt-1 justify-end">
                         {msg.reads.slice(0, 3).map((read) => {
                           const memberColor = memberColors[read.user_id] || '#6B7280';
                           return (
