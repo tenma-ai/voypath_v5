@@ -195,15 +195,26 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
             // Fallback: try to determine based on distance and place types
             const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
             
-            // Check if either place is an airport
-            const isAirportTravel = 
-              (place.place_type === 'airport' || nextPlace.place_type === 'airport') ||
-              (place.name?.toLowerCase().includes('airport') || nextPlace.name?.toLowerCase().includes('airport')) ||
-              (place.place_name?.toLowerCase().includes('airport') || nextPlace.place_name?.toLowerCase().includes('airport'));
+            // Check if both places are airports or if one is destination/departure
+            const fromIsAirport = place.place_type === 'airport' || 
+              place.name?.toLowerCase().includes('airport') || 
+              place.place_name?.toLowerCase().includes('airport');
+            const toIsAirport = nextPlace.place_type === 'airport' || 
+              nextPlace.name?.toLowerCase().includes('airport') || 
+              nextPlace.place_name?.toLowerCase().includes('airport');
+            const fromIsSystem = place.place_type === 'departure' || place.place_type === 'destination';
+            const toIsSystem = nextPlace.place_type === 'departure' || nextPlace.place_type === 'destination';
             
-            if (isAirportTravel || distance > 5) {
+            // If connecting two airports or airport to/from departure/destination, it's a flight
+            if ((fromIsAirport && toIsAirport) || 
+                (fromIsAirport && toIsSystem) || 
+                (fromIsSystem && toIsAirport)) {
               transportMode = 'flight';
-            } else if (distance > 0.1) {
+            } else if (distance > 5) {
+              // Long distance between non-airports is also flight
+              transportMode = 'flight';
+            } else if (distance > 0.1 || fromIsAirport || toIsAirport) {
+              // Short/medium distance or single airport connection is car
               transportMode = 'car';
             } else {
               transportMode = 'walking';
@@ -490,27 +501,35 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     
     // If still no transport mode, determine based on place types
     if (!transport) {
-      const isAirportTravel = 
-        (fromPlace.place_type === 'airport' || toPlace.place_type === 'airport') ||
-        (fromPlace.name?.toLowerCase().includes('airport') || toPlace.name?.toLowerCase().includes('airport')) ||
-        (fromPlace.place_name?.toLowerCase().includes('airport') || toPlace.place_name?.toLowerCase().includes('airport'));
+      const lat1 = Number(fromPlace.latitude);
+      const lng1 = Number(fromPlace.longitude);
+      const lat2 = Number(toPlace.latitude);
+      const lng2 = Number(toPlace.longitude);
+      const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
       
-      if (isAirportTravel) {
+      // Check if both places are airports or if one is destination/departure
+      const fromIsAirport = fromPlace.place_type === 'airport' || 
+        fromPlace.name?.toLowerCase().includes('airport') || 
+        fromPlace.place_name?.toLowerCase().includes('airport');
+      const toIsAirport = toPlace.place_type === 'airport' || 
+        toPlace.name?.toLowerCase().includes('airport') || 
+        toPlace.place_name?.toLowerCase().includes('airport');
+      const fromIsSystem = fromPlace.place_type === 'departure' || fromPlace.place_type === 'destination';
+      const toIsSystem = toPlace.place_type === 'departure' || toPlace.place_type === 'destination';
+      
+      // If connecting two airports or airport to/from departure/destination, it's a flight
+      if ((fromIsAirport && toIsAirport) || 
+          (fromIsAirport && toIsSystem) || 
+          (fromIsSystem && toIsAirport)) {
         transport = 'Flight';
+      } else if (distance > 5) {
+        // Long distance between non-airports is also flight
+        transport = 'Flight';
+      } else if (distance > 0.1 || fromIsAirport || toIsAirport) {
+        // Short/medium distance or single airport connection is car
+        transport = 'Car';
       } else {
-        const lat1 = Number(fromPlace.latitude);
-        const lng1 = Number(fromPlace.longitude);
-        const lat2 = Number(toPlace.latitude);
-        const lng2 = Number(toPlace.longitude);
-        const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
-        
-        if (distance > 5) {
-          transport = 'Flight';
-        } else if (distance > 0.1) {
-          transport = 'Car';
-        } else {
-          transport = 'Walking';
-        }
+        transport = 'Walking';
       }
     }
     
