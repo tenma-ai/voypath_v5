@@ -8,7 +8,7 @@ export function OptimizationLoadingOverlay() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-50 bg-gradient-to-br from-slate-900/95 via-slate-800/90 to-slate-900/95 backdrop-blur-xl flex items-center justify-center"
+      className="absolute inset-0 z-50 bg-gradient-to-br from-primary-900/95 via-primary-800/90 to-secondary-900/95 backdrop-blur-xl flex items-center justify-center"
     >
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
@@ -16,7 +16,7 @@ export function OptimizationLoadingOverlay() {
         {Array.from({ length: 15 }).map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-2 h-2 bg-gradient-to-r from-primary-400/30 to-secondary-400/30 rounded-full"
+            className="absolute w-2 h-2 bg-gradient-to-r from-primary-400/40 to-secondary-400/40 rounded-full"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -41,8 +41,8 @@ export function OptimizationLoadingOverlay() {
           className="absolute inset-0 opacity-20"
           style={{
             background: `
-              linear-gradient(45deg, transparent 48%, rgba(59, 130, 246, 0.5) 49%, rgba(59, 130, 246, 0.5) 51%, transparent 52%),
-              linear-gradient(-45deg, transparent 48%, rgba(168, 85, 247, 0.5) 49%, rgba(168, 85, 247, 0.5) 51%, transparent 52%)
+              linear-gradient(45deg, transparent 48%, rgba(14, 165, 233, 0.5) 49%, rgba(14, 165, 233, 0.5) 51%, transparent 52%),
+              linear-gradient(-45deg, transparent 48%, rgba(59, 130, 246, 0.5) 49%, rgba(59, 130, 246, 0.5) 51%, transparent 52%)
             `,
             backgroundSize: '60px 60px',
           }}
@@ -63,13 +63,13 @@ export function OptimizationLoadingOverlay() {
         <div className="relative mb-8">
           {/* Spinning outer ring */}
           <motion.div
-            className="w-32 h-32 mx-auto border-4 border-primary-500/30 rounded-full relative"
+            className="w-32 h-32 mx-auto border-4 border-primary-400/40 rounded-full relative"
             animate={{ rotate: 360 }}
             transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
           >
             {/* Inner rotating elements */}
             <motion.div
-              className="absolute inset-2 border-2 border-secondary-400/50 rounded-full"
+              className="absolute inset-2 border-2 border-secondary-400/60 rounded-full"
               animate={{ rotate: -360 }}
               transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             />
@@ -77,13 +77,13 @@ export function OptimizationLoadingOverlay() {
             {/* Central icon */}
             <div className="absolute inset-0 flex items-center justify-center">
               <motion.div
-                className="w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-600 rounded-full flex items-center justify-center shadow-2xl"
+                className="w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-full flex items-center justify-center shadow-2xl"
                 animate={{
                   scale: [1, 1.1, 1],
                   boxShadow: [
-                    "0 0 0 0 rgba(59, 130, 246, 0.7)",
-                    "0 0 0 10px rgba(59, 130, 246, 0)",
-                    "0 0 0 0 rgba(59, 130, 246, 0)"
+                    "0 0 0 0 rgba(14, 165, 233, 0.7)",
+                    "0 0 0 10px rgba(14, 165, 233, 0)",
+                    "0 0 0 0 rgba(14, 165, 233, 0)"
                   ],
                 }}
                 transition={{
@@ -105,7 +105,7 @@ export function OptimizationLoadingOverlay() {
             {[MapPin, Route, Sparkles].map((Icon, index) => (
               <motion.div
                 key={index}
-                className="absolute w-8 h-8 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center"
+                className="absolute w-8 h-8 bg-primary-400/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-primary-300/30"
                 style={{
                   top: '50%',
                   left: '50%',
@@ -123,7 +123,7 @@ export function OptimizationLoadingOverlay() {
                   delay: index * 0.5,
                 }}
               >
-                <Icon className="w-4 h-4 text-white/70" />
+                <Icon className="w-4 h-4 text-primary-100" />
               </motion.div>
             ))}
           </motion.div>
@@ -136,12 +136,12 @@ export function OptimizationLoadingOverlay() {
           transition={{ delay: 0.3 }}
           className="space-y-4"
         >
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-slate-100 to-white bg-clip-text text-transparent">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-primary-50 via-white to-secondary-50 bg-clip-text text-transparent">
             Optimizing Your Journey
           </h2>
           
           <motion.p
-            className="text-slate-300 text-lg leading-relaxed"
+            className="text-primary-100 text-lg leading-relaxed"
             animate={{ opacity: [0.7, 1, 0.7] }}
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
           >
@@ -163,8 +163,8 @@ export function OptimizationLoadingOverlay() {
                   ease: "easeInOut",
                 }}
               >
-                <div className="w-2 h-2 bg-primary-400 rounded-full" />
-                <span className="text-xs text-slate-400 font-medium">{stage}</span>
+                <div className="w-2 h-2 bg-primary-300 rounded-full" />
+                <span className="text-xs text-primary-200 font-medium">{stage}</span>
               </motion.div>
             ))}
           </div>
@@ -179,7 +179,7 @@ export function OptimizationLoadingOverlay() {
           {Array.from({ length: 5 }).map((_, i) => (
             <motion.div
               key={i}
-              className="w-1 h-1 bg-white/20 rounded-full"
+              className="w-1 h-1 bg-primary-200/40 rounded-full"
               animate={{ scale: [0.5, 1, 0.5] }}
               transition={{
                 duration: 1,

@@ -33,7 +33,7 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-50 bg-gradient-to-br from-green-900/95 via-emerald-800/90 to-green-900/95 backdrop-blur-xl flex items-center justify-center overflow-hidden"
+      className="absolute inset-0 z-50 bg-gradient-to-br from-primary-900/95 via-secondary-800/90 to-primary-900/95 backdrop-blur-xl flex items-center justify-center overflow-hidden"
     >
       {/* Celebration Effects */}
       <AnimatePresence mode="wait">
@@ -49,7 +49,7 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
             {Array.from({ length: 30 }).map((_, i) => (
               <motion.div
                 key={i}
-                className="absolute w-1 h-1 bg-yellow-400 rounded-full"
+                className="absolute w-1 h-1 bg-primary-300 rounded-full"
                 style={{
                   left: `${50 + (Math.random() - 0.5) * 100}%`,
                   top: `${50 + (Math.random() - 0.5) * 100}%`,
@@ -83,12 +83,12 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
                 className="relative mx-auto mb-6"
               >
                 <motion.div
-                  className="w-32 h-32 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-2xl"
+                  className="w-32 h-32 bg-gradient-to-br from-primary-400 to-secondary-500 rounded-full flex items-center justify-center shadow-2xl"
                   animate={{
                     boxShadow: [
-                      "0 0 0 0 rgba(34, 197, 94, 0.7)",
-                      "0 0 0 20px rgba(34, 197, 94, 0)",
-                      "0 0 0 0 rgba(34, 197, 94, 0)"
+                      "0 0 0 0 rgba(14, 165, 233, 0.7)",
+                      "0 0 0 20px rgba(14, 165, 233, 0)",
+                      "0 0 0 0 rgba(14, 165, 233, 0)"
                     ],
                   }}
                   transition={{
@@ -104,7 +104,7 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
                 {[Trophy, Star, Zap, Sparkles].map((Icon, index) => (
                   <motion.div
                     key={index}
-                    className="absolute w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center"
+                    className="absolute w-8 h-8 bg-primary-400/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-primary-300/30"
                     style={{
                       top: '50%',
                       left: '50%',
@@ -123,7 +123,7 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
                       ease: "easeOut",
                     }}
                   >
-                    <Icon className="w-4 h-4 text-white" />
+                    <Icon className="w-4 h-4 text-primary-100" />
                   </motion.div>
                 ))}
               </motion.div>
@@ -132,7 +132,7 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
-                className="text-4xl md:text-5xl font-bold text-white mb-4"
+                className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary-50 via-white to-secondary-50 bg-clip-text text-transparent mb-4"
               >
                 Optimization Success!
               </motion.h1>
@@ -141,7 +141,7 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.7 }}
-                className="text-xl text-green-100 font-medium"
+                className="text-xl text-primary-100 font-medium"
               >
                 Your perfect journey has been created
               </motion.p>
@@ -181,10 +181,10 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
                   initial={{ opacity: 0, scale: 0.5 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.3 }}
-                  className="bg-gradient-to-br from-blue-500/30 to-blue-600/30 rounded-xl p-4 border border-blue-400/30"
+                  className="bg-gradient-to-br from-primary-500/30 to-primary-600/30 rounded-xl p-4 border border-primary-400/30"
                 >
                   <div className="text-3xl font-bold text-white">{Math.round(fairnessScore)}%</div>
-                  <div className="text-blue-100 text-sm font-medium">Fairness</div>
+                  <div className="text-primary-100 text-sm font-medium">Fairness</div>
                 </motion.div>
 
                 {/* Efficiency Score */}
@@ -192,10 +192,10 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
                   initial={{ opacity: 0, scale: 0.5 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4 }}
-                  className="bg-gradient-to-br from-purple-500/30 to-purple-600/30 rounded-xl p-4 border border-purple-400/30"
+                  className="bg-gradient-to-br from-secondary-500/30 to-secondary-600/30 rounded-xl p-4 border border-secondary-400/30"
                 >
                   <div className="text-3xl font-bold text-white">{Math.round(efficiencyScore)}%</div>
-                  <div className="text-purple-100 text-sm font-medium">Efficiency</div>
+                  <div className="text-secondary-100 text-sm font-medium">Efficiency</div>
                 </motion.div>
               </div>
 
@@ -207,7 +207,7 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
                   transition={{ delay: 0.5 }}
                   className="text-center"
                 >
-                  <div className="text-white/80 text-sm">
+                  <div className="text-primary-100/80 text-sm">
                     Optimized in {Math.round(executionTime / 1000)}s with AI algorithms
                   </div>
                 </motion.div>
@@ -234,7 +234,7 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
                 repeat: Infinity,
                 ease: "easeInOut",
               }}
-              className="text-white text-lg font-medium"
+              className="text-primary-50 text-lg font-medium"
             >
               Loading your optimized journey...
             </motion.div>
@@ -249,9 +249,9 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
           className="absolute inset-0 opacity-30"
           animate={{
             background: [
-              "radial-gradient(circle at 20% 80%, rgba(34, 197, 94, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.3) 0%, transparent 50%)",
-              "radial-gradient(circle at 80% 80%, rgba(34, 197, 94, 0.3) 0%, transparent 50%), radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.3) 0%, transparent 50%)",
-              "radial-gradient(circle at 20% 80%, rgba(34, 197, 94, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.3) 0%, transparent 50%)",
+              "radial-gradient(circle at 20% 80%, rgba(14, 165, 233, 0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.2) 0%, transparent 50%)",
+              "radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.2) 0%, transparent 50%), radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.2) 0%, transparent 50%)",
+              "radial-gradient(circle at 20% 80%, rgba(14, 165, 233, 0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.2) 0%, transparent 50%)",
             ],
           }}
           transition={{
@@ -265,7 +265,7 @@ export function OptimizationSuccessOverlay({ onComplete, optimizationResult }: O
         {Array.from({ length: 20 }).map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-1 h-1 bg-white/30 rounded-full"
+            className="absolute w-1 h-1 bg-primary-200/40 rounded-full"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,

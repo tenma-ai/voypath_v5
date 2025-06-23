@@ -228,7 +228,7 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
                   key={i}
                   className="absolute w-1 h-1 rounded-full"
                   style={{
-                    backgroundColor: ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B'][i % 4],
+                    backgroundColor: ['#22c55e', '#0ea5e9', '#3b82f6', '#22c55e'][i % 4],
                     left: `${20 + Math.random() * 60}%`,
                     top: `${20 + Math.random() * 60}%`,
                   }}
