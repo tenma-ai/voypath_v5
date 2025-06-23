@@ -287,6 +287,18 @@ export const useStore = create<StoreState>()((set, get) => ({
       memberColors: {},
       tripMembers: [],
       loadMemberColorsForTrip: async (tripId: string) => {
+        // Define fallback colors for members
+        const FALLBACK_COLORS = [
+          '#0077BE', // Ocean Blue
+          '#FF6B6B', // Red
+          '#4ECDC4', // Teal
+          '#45B7D1', // Light Blue
+          '#96CEB4', // Green
+          '#FFD93D', // Yellow
+          '#95A99C', // Gray Green
+          '#DDA0DD', // Plum
+        ];
+
         try {
           console.log('🎨 [Store] ===== STARTING loadMemberColorsForTrip =====');
           console.log('🎨 [Store] Loading member colors and data for trip:', tripId);
@@ -305,9 +317,17 @@ export const useStore = create<StoreState>()((set, get) => ({
             console.error('🎨 [Store] Error code:', membersError.code);
             console.error('🎨 [Store] Error message:', membersError.message);
             console.error('🎨 [Store] Error details:', membersError.details);
-            // Instead of throwing, set empty state and continue
-            console.log('🎨 [Store] Setting empty member state due to error');
-            set({ memberColors: {}, tripMembers: [] });
+            
+            // Try to use fallback colors for current user at least
+            const { user } = get();
+            if (user) {
+              const fallbackColorMap: Record<string, string> = {};
+              fallbackColorMap[user.id] = FALLBACK_COLORS[0];
+              console.log('🎨 [Store] Using fallback color for current user:', fallbackColorMap);
+              set({ memberColors: fallbackColorMap, tripMembers: [] });
+            } else {
+              set({ memberColors: {}, tripMembers: [] });
+            }
             return;
           }
 
@@ -315,7 +335,17 @@ export const useStore = create<StoreState>()((set, get) => ({
           if (!membersData || membersData.length === 0) {
             console.log('🎨 [Store] No members found for trip:', tripId);
             console.log('🎨 [Store] This trip may not have any members in trip_members table');
-            set({ memberColors: {}, tripMembers: [] });
+            
+            // Try to use fallback colors for current user at least
+            const { user } = get();
+            if (user) {
+              const fallbackColorMap: Record<string, string> = {};
+              fallbackColorMap[user.id] = FALLBACK_COLORS[0];
+              console.log('🎨 [Store] Using fallback color for current user (no members):', fallbackColorMap);
+              set({ memberColors: fallbackColorMap, tripMembers: [] });
+            } else {
+              set({ memberColors: {}, tripMembers: [] });
+            }
             return;
           }
 
@@ -352,6 +382,20 @@ export const useStore = create<StoreState>()((set, get) => ({
           const colorMapping = await (await import('../services/MemberColorService')).MemberColorService.getSimpleColorMapping(tripId);
           console.log('🎨 [Store] Raw color mapping:', colorMapping);
           
+          // Apply fallback colors if any are missing or invalid
+          const finalColorMapping: Record<string, string> = {};
+          membersData.forEach((member, index) => {
+            const existingColor = colorMapping[member.user_id];
+            if (!existingColor || existingColor === '#000000' || existingColor === 'undefined' || existingColor === '') {
+              console.warn(`🎨 [Store] Using fallback color for member ${member.user_id}`);
+              finalColorMapping[member.user_id] = FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+            } else {
+              finalColorMapping[member.user_id] = existingColor;
+            }
+          });
+          
+          console.log('🎨 [Store] Final color mapping with fallbacks:', finalColorMapping);
+          
           // Validate color assignment and fix any issues
           console.log('🎨 [Store] Validating color assignments...');
           const validation = await (await import('../services/MemberColorService')).MemberColorService.validateColorAssignment(tripId);
@@ -363,13 +407,25 @@ export const useStore = create<StoreState>()((set, get) => ({
             await (await import('../services/MemberColorService')).MemberColorService.autoAssignMissingColors(tripId);
             // Reload colors after fixing
             const fixedColors = await (await import('../services/MemberColorService')).MemberColorService.getSimpleColorMapping(tripId);
-            console.log('🎨 [Store] Setting fixed colors to store:', fixedColors);
-            set({ memberColors: fixedColors, tripMembers: formattedMembers });
-            console.log('🎨 [Store] Fixed and loaded colors:', fixedColors);
+            
+            // Apply fallback colors again to fixed colors
+            const finalFixedColors: Record<string, string> = {};
+            membersData.forEach((member, index) => {
+              const fixedColor = fixedColors[member.user_id];
+              if (!fixedColor || fixedColor === '#000000' || fixedColor === 'undefined' || fixedColor === '') {
+                finalFixedColors[member.user_id] = FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+              } else {
+                finalFixedColors[member.user_id] = fixedColor;
+              }
+            });
+            
+            console.log('🎨 [Store] Setting fixed colors with fallbacks to store:', finalFixedColors);
+            set({ memberColors: finalFixedColors, tripMembers: formattedMembers });
+            console.log('🎨 [Store] Fixed and loaded colors:', finalFixedColors);
           } else {
-            console.log('🎨 [Store] Setting colors to store:', colorMapping);
-            set({ memberColors: colorMapping, tripMembers: formattedMembers });
-            console.log('🎨 [Store] Loaded colors (no issues):', colorMapping);
+            console.log('🎨 [Store] Setting colors with fallbacks to store:', finalColorMapping);
+            set({ memberColors: finalColorMapping, tripMembers: formattedMembers });
+            console.log('🎨 [Store] Loaded colors (no issues):', finalColorMapping);
           }
 
           console.log('🎨 [Store] Trip members loaded:', formattedMembers);
@@ -381,7 +437,17 @@ export const useStore = create<StoreState>()((set, get) => ({
         } catch (error) {
           console.error('🎨 [Store] Failed to load member colors:', error);
           console.error('🎨 [Store] Error details:', error);
-          set({ memberColors: {}, tripMembers: [] });
+          
+          // Apply emergency fallback colors
+          const { user } = get();
+          if (user) {
+            const emergencyColorMap: Record<string, string> = {};
+            emergencyColorMap[user.id] = FALLBACK_COLORS[0];
+            console.log('🎨 [Store] Using emergency fallback color for current user:', emergencyColorMap);
+            set({ memberColors: emergencyColorMap, tripMembers: [] });
+          } else {
+            set({ memberColors: {}, tripMembers: [] });
+          }
         }
       },
       addPlace: async (place) => {

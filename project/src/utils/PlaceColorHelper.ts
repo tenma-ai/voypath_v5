@@ -1,4 +1,5 @@
 // 場所の色表示ロジック共通ヘルパー
+import { getColorOrFallback, FALLBACK_COLORS, debugColorIssue } from './ColorFallbackUtils';
 
 export interface MemberContribution {
   userId: string;
@@ -115,11 +116,16 @@ function getPlaceContributors(place: any, members: any[], memberColors?: Record<
     // 色の優先順位: memberColors > member.color > デフォルト色
     let color: string;
     if (memberColors && memberColors[userId]) {
-      color = memberColors[userId];
+      color = getColorOrFallback(memberColors[userId], 0);
     } else if (member?.color) {
-      color = member.color;
+      color = getColorOrFallback(member.color, 0);
     } else {
       color = getDefaultMemberColor(userId);
+    }
+    
+    // Debug color issue if needed
+    if (process.env.NODE_ENV === 'development') {
+      debugColorIssue('PlaceColorHelper.getPlaceContributors', place, memberColors || {}, color);
     }
     
     if (member) {
@@ -143,33 +149,9 @@ function getPlaceContributors(place: any, members: any[], memberColors?: Record<
  * @returns CSS色文字列
  */
 function getDefaultMemberColor(userId: string): string {
-  // MemberColorServiceから色を取得するための参照色リスト
-  const colors = [
-    '#0077BE', // Ocean Blue
-    '#228B22', // Forest Green
-    '#FF6B35', // Sunset Orange
-    '#7B68EE', // Royal Purple
-    '#DC143C', // Cherry Red
-    '#008080', // Teal
-    '#FFC000', // Amber
-    '#E6E6FA', // Lavender
-    '#FF7F50', // Coral
-    '#50C878', // Emerald
-    '#FF00FF', // Magenta
-    '#000080', // Navy
-    '#FF007F', // Rose
-    '#32CD32', // Lime
-    '#4B0082', // Indigo
-    '#40E0D0', // Turquoise
-    '#B22222', // Crimson
-    '#808000', // Olive
-    '#708090', // Slate
-    '#800000', // Maroon
-  ];
-
   // ユーザーIDに基づいて一貫した色を選択
   const hash = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return colors[hash % colors.length];
+  return FALLBACK_COLORS[hash % FALLBACK_COLORS.length];
 }
 
 /**

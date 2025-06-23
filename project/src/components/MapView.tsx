@@ -6,6 +6,7 @@ import { getPlaceColor } from '../utils/ColorUtils';
 import { OptimizationLoadingOverlay } from './OptimizationLoadingOverlay';
 import { OptimizationSuccessOverlay } from './OptimizationSuccessOverlay';
 import { AnimatePresence } from 'framer-motion';
+import { getColorOrFallback } from '../utils/ColorFallbackUtils';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -81,18 +82,19 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     let fillColor = '#9CA3AF'; // Default gray
     
     if (colorResult.type === 'single') {
-      fillColor = colorResult.background;
+      fillColor = getColorOrFallback(colorResult.background, index);
     } else if (colorResult.type === 'gold') {
       fillColor = '#FFD700';
     } else if (colorResult.type === 'gradient') {
       // For Google Maps markers, use the primary contributor's color
-      fillColor = colorResult.contributors[0]?.color || '#9CA3AF';
+      const primaryColor = colorResult.contributors[0]?.color;
+      fillColor = getColorOrFallback(primaryColor, index);
     } else {
       // Use background color for any other case
-      fillColor = colorResult.background;
+      fillColor = getColorOrFallback(colorResult.background, index);
     }
 
-    console.log('🗺️ [MapView] Final marker color:', fillColor);
+    console.log('🗺️ [MapView] Final marker color with fallback:', fillColor);
 
     return {
       path: google.maps.SymbolPath.CIRCLE,

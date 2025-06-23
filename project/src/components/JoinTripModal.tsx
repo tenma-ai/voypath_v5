@@ -34,6 +34,10 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
       console.log('🔑 Access token present:', !!session.access_token);
       console.log('🔑 Access token length:', session.access_token?.length);
 
+      // Remove hyphens from the code if present
+      const cleanCode = joinCode.replace(/-/g, '').toUpperCase();
+      console.log('🔑 Cleaned invitation code:', cleanCode);
+
       // Call trip-member-management Edge Function
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/join-trip', {
         method: 'POST',
@@ -43,7 +47,7 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          invitation_code: joinCode.toUpperCase()
+          invitation_code: cleanCode
         }),
       });
 
@@ -115,12 +119,12 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
                 required
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="ABC-123-XYZ"
+                placeholder="ABCD1234"
                 className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-center text-lg font-mono tracking-wider"
                 maxLength={11}
               />
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Format: ABC-123-XYZ
+                Enter the 8-character code (hyphens optional)
               </p>
             </div>
 
