@@ -82,7 +82,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         fillOpacity: 1,
         strokeColor: '#FFFFFF',
         strokeWeight: 2,
-        scale: 12,
+        scale: 8,
       };
     }
 
@@ -110,27 +110,49 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       fillOpacity: 1,
       strokeColor: '#FFFFFF',
       strokeWeight: 2,
-      scale: 10,
+      scale: 7,
     };
   };
 
-  // Function to calculate route offset for bidirectional routes
-  const calculateRouteOffset = (lat1: number, lng1: number, lat2: number, lng2: number, offsetAmount: number = 0.001) => {
-    // Calculate perpendicular vector
+  // Function to create curved path for bidirectional routes
+  const createCurvedPath = (lat1: number, lng1: number, lat2: number, lng2: number, curve: number = 0.15) => {
+    // Calculate midpoint
+    const midLat = (lat1 + lat2) / 2;
+    const midLng = (lng1 + lng2) / 2;
+    
+    // Calculate perpendicular direction
     const dx = lng2 - lng1;
     const dy = lat2 - lat1;
     const length = Math.sqrt(dx * dx + dy * dy);
     
-    if (length === 0) return { lat: 0, lng: 0 };
+    if (length === 0) return [{ lat: lat1, lng: lng1 }, { lat: lat2, lng: lng2 }];
     
     // Perpendicular vector (rotate 90 degrees)
     const perpX = -dy / length;
     const perpY = dx / length;
     
-    return {
-      lat: perpY * offsetAmount,
-      lng: perpX * offsetAmount
-    };
+    // Create control point offset by curve amount
+    const controlLat = midLat + perpY * length * curve;
+    const controlLng = midLng + perpX * length * curve;
+    
+    // Create curved path with multiple points for smooth curve
+    const points = [];
+    const numPoints = 20;
+    
+    for (let i = 0; i <= numPoints; i++) {
+      const t = i / numPoints;
+      const t2 = t * t;
+      const mt = 1 - t;
+      const mt2 = mt * mt;
+      
+      // Quadratic Bezier curve formula
+      const lat = mt2 * lat1 + 2 * mt * t * controlLat + t2 * lat2;
+      const lng = mt2 * lng1 + 2 * mt * t * controlLng + t2 * lng2;
+      
+      points.push({ lat, lng });
+    }
+    
+    return points;
   };
 
   // Generate route lines between places using useMemo
@@ -166,14 +188,22 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           // Check for travel_to_next data
           if (place.travel_to_next && place.travel_to_next.transport_mode) {
             transportMode = place.travel_to_next.transport_mode.toLowerCase();
+          } else if (place.transport_mode) {
+            // Check if transport mode is directly on the place
+            transportMode = place.transport_mode.toLowerCase();
           } else {
-            // Fallback: try to determine based on distance (rough estimate)
+            // Fallback: try to determine based on distance and place types
             const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
             
-            // More intelligent transport mode detection
-            if (distance > 5) { // International travel
+            // Check if either place is an airport
+            const isAirportTravel = 
+              (place.place_type === 'airport' || nextPlace.place_type === 'airport') ||
+              (place.name?.toLowerCase().includes('airport') || nextPlace.name?.toLowerCase().includes('airport')) ||
+              (place.place_name?.toLowerCase().includes('airport') || nextPlace.place_name?.toLowerCase().includes('airport'));
+            
+            if (isAirportTravel || distance > 5) {
               transportMode = 'flight';
-            } else if (distance > 0.1) { // Regional travel
+            } else if (distance > 0.1) {
               transportMode = 'car';
             } else {
               transportMode = 'walking';
@@ -209,19 +239,16 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
               break;
           }
 
-          // Calculate offset for bidirectional routes
-          let path = [
-            { lat: lat1, lng: lng1 },
-            { lat: lat2, lng: lng2 }
-          ];
+          // Calculate path - use curved path for bidirectional routes
+          let path;
           
-          // If this is the second occurrence of this route, apply offset
+          // If this is the second occurrence of this route, create curved path
           if (routeCount > 0) {
-            const offset = calculateRouteOffset(lat1, lng1, lat2, lng2, 0.002);
-            path = [
-              { lat: lat1 + offset.lat, lng: lng1 + offset.lng },
-              { lat: lat2 + offset.lat, lng: lng2 + offset.lng }
-            ];
+            // Curve in opposite direction for return route
+            path = createCurvedPath(lat1, lng1, lat2, lng2, -0.1);
+          } else {
+            // First occurrence - slight curve for better visibility
+            path = createCurvedPath(lat1, lng1, lat2, lng2, 0.1);
           }
 
           // Create arrow icon for the middle of the route
@@ -368,16 +395,82 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       travelInfo = `Next: ${transport} (${duration} min)`;
     }
 
+    // Format duration
+    const formatDuration = (minutes: number) => {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
+    };
+
+    // Format wish level with stars
+    const wishStars = place.wish_level ? '⭐'.repeat(place.wish_level) : '';
+
+    // Format dates if available
+    let dateInfo = '';
+    if (place.arrival_time && place.departure_time) {
+      dateInfo = `${place.arrival_time} - ${place.departure_time}`;
+    } else if (scheduleInfo) {
+      dateInfo = scheduleInfo;
+    }
+
     const content = `
-      <div style="padding: 8px; min-width: 200px;">
-        <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">
-          ${place.place_name || place.name}
-        </h3>
-        ${userInfo ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Requested by:</strong> ${userInfo}</p>` : ''}
-        ${scheduleInfo ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Schedule:</strong> ${scheduleInfo}</p>` : ''}
-        ${place.duration_minutes ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Duration:</strong> ${place.duration_minutes} min</p>` : ''}
-        ${travelInfo ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Travel:</strong> ${travelInfo}</p>` : ''}
-        ${place.place_type ? `<p style="margin: 4px 0; font-size: 12px; color: #666;"><em>Type: ${place.place_type}</em></p>` : ''}
+      <div style="padding: 12px; min-width: 280px; max-width: 350px;">
+        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
+          <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
+            ${place.place_name || place.name}
+          </h3>
+          ${place.category ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">${place.category}</p>` : ''}
+        </div>
+        
+        <div style="space-y: 8px;">
+          ${userInfo ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Requested by</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${userInfo}</p>
+            </div>
+          ` : ''}
+          
+          ${place.wish_level ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Priority</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${wishStars} (${place.wish_level}/5)</p>
+            </div>
+          ` : ''}
+          
+          ${dateInfo ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Schedule</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${dateInfo}</p>
+            </div>
+          ` : ''}
+          
+          ${place.duration_minutes || place.stay_duration_minutes ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Stay Duration</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${formatDuration(place.duration_minutes || place.stay_duration_minutes)}</p>
+            </div>
+          ` : ''}
+          
+          ${travelInfo ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Next Travel</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${travelInfo}</p>
+            </div>
+          ` : ''}
+          
+          ${place.notes ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Notes</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${place.notes}</p>
+            </div>
+          ` : ''}
+          
+          ${place.place_type && place.place_type !== 'member_wish' ? `
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; font-size: 11px; color: #9ca3af; font-style: italic;">Type: ${place.place_type}</p>
+            </div>
+          ` : ''}
+        </div>
       </div>
     `;
 
@@ -393,20 +486,99 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const handleRouteClick = useCallback((fromPlace: any, toPlace: any, event: google.maps.PolyMouseEvent) => {
     if (!map || !infoWindow) return;
 
-    const transport = fromPlace.travel_to_next?.transport_mode || 'Unknown';
+    let transport = fromPlace.travel_to_next?.transport_mode || fromPlace.transport_mode || '';
+    
+    // If still no transport mode, determine based on place types
+    if (!transport) {
+      const isAirportTravel = 
+        (fromPlace.place_type === 'airport' || toPlace.place_type === 'airport') ||
+        (fromPlace.name?.toLowerCase().includes('airport') || toPlace.name?.toLowerCase().includes('airport')) ||
+        (fromPlace.place_name?.toLowerCase().includes('airport') || toPlace.place_name?.toLowerCase().includes('airport'));
+      
+      if (isAirportTravel) {
+        transport = 'Flight';
+      } else {
+        const lat1 = Number(fromPlace.latitude);
+        const lng1 = Number(fromPlace.longitude);
+        const lat2 = Number(toPlace.latitude);
+        const lng2 = Number(toPlace.longitude);
+        const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
+        
+        if (distance > 5) {
+          transport = 'Flight';
+        } else if (distance > 0.1) {
+          transport = 'Car';
+        } else {
+          transport = 'Walking';
+        }
+      }
+    }
+    
+    // Capitalize transport mode
+    transport = transport.charAt(0).toUpperCase() + transport.slice(1).toLowerCase();
+    
     const duration = fromPlace.travel_to_next?.duration_minutes || 0;
     const distance = fromPlace.travel_to_next?.distance_km || 0;
 
+    // Format duration
+    const formatDuration = (minutes: number) => {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
+    };
+
+    // Get transport icon
+    const getTransportIcon = (mode: string) => {
+      const modeLower = mode.toLowerCase();
+      if (modeLower.includes('flight') || modeLower.includes('plane')) {
+        return '✈️';
+      } else if (modeLower.includes('car') || modeLower.includes('drive')) {
+        return '🚗';
+      } else {
+        return '🚶';
+      }
+    };
+
+    const transportIcon = getTransportIcon(transport);
+
     const content = `
-      <div style="padding: 8px; min-width: 200px;">
-        <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">
-          Route Information
-        </h3>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>From:</strong> ${fromPlace.place_name || fromPlace.name}</p>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>To:</strong> ${toPlace.place_name || toPlace.name}</p>
-        <p style="margin: 4px 0; font-size: 14px;"><strong>Transport:</strong> ${transport}</p>
-        ${duration > 0 ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Duration:</strong> ${duration} minutes</p>` : ''}
-        ${distance > 0 ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Distance:</strong> ${distance.toFixed(1)} km</p>` : ''}
+      <div style="padding: 12px; min-width: 280px; max-width: 350px;">
+        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
+          <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937; display: flex; align-items: center;">
+            ${transportIcon} Route Information
+          </h3>
+        </div>
+        
+        <div style="space-y: 8px;">
+          <div style="margin-bottom: 8px;">
+            <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">From</p>
+            <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${fromPlace.place_name || fromPlace.name}</p>
+          </div>
+          
+          <div style="margin-bottom: 8px;">
+            <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">To</p>
+            <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${toPlace.place_name || toPlace.name}</p>
+          </div>
+          
+          <div style="margin-bottom: 8px;">
+            <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Transport Mode</p>
+            <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${transport}</p>
+          </div>
+          
+          ${duration > 0 ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Duration</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${formatDuration(duration)}</p>
+            </div>
+          ` : ''}
+          
+          ${distance > 0 ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Distance</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${distance.toFixed(1)} km</p>
+            </div>
+          ` : ''}
+        </div>
       </div>
     `;
 

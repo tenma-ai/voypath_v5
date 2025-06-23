@@ -330,42 +330,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                   {block.place.place_name || block.place.name}
                                 </h4>
                                 
-                                <div className="space-y-1">
-                                  <div className="flex items-center text-gray-600 text-xs sm:text-sm">
-                                    <Clock className="w-3 h-3 mr-2 flex-shrink-0" />
-                                    <span>
-                                      Total Duration: {formatDuration(block.duration)}
-                                    </span>
-                                  </div>
-                                  
-                                  {block.place.category && (
-                                    <div className="flex items-center text-gray-600 text-xs sm:text-sm">
-                                      <MapPin className="w-3 h-3 mr-2 flex-shrink-0" />
-                                      <span>{block.place.category}</span>
-                                    </div>
-                                  )}
-                                  
-                                  {block.place.wish_level && (
-                                    <div className="flex items-center text-gray-600 text-xs sm:text-sm">
-                                      <span className="mr-2 flex-shrink-0">🌟</span>
-                                      <span>Wish Level: {block.place.wish_level}/5</span>
-                                    </div>
-                                  )}
+                                <div className="flex items-center text-gray-600 text-xs sm:text-sm">
+                                  <Clock className="w-3 h-3 mr-2 flex-shrink-0" />
+                                  <span>
+                                    {formatDuration(block.duration)}
+                                  </span>
                                 </div>
                               </div>
                               
-                              <div className="ml-3 flex flex-col items-end space-y-1">
-                                {block.place.rating && (
-                                  <div className="text-xs sm:text-sm text-yellow-600 flex-shrink-0">
-                                    ★ {block.place.rating.toFixed(1)}
-                                  </div>
-                                )}
-                                
-                                {block.place.price_level && (
-                                  <div className="text-xs text-green-600 flex-shrink-0">
-                                    {'$'.repeat(block.place.price_level)}
-                                  </div>
-                                )}
+                              <div className="ml-3 text-xs text-gray-500">
+                                Click for details
                               </div>
                             </div>
                           </div>
@@ -391,30 +365,37 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       {/* Place Details Popup */}
       {selectedPlace && ReactDOM.createPortal(
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99999] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[99999] flex items-center justify-center p-4"
           onClick={() => setSelectedPlace(null)}
         >
           <div
-            className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
+            className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-700/50 p-0 max-w-md w-full max-h-[85vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
+            style={{ 
+              background: 'linear-gradient(to bottom, #ffffff, #fafafa)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
           >
-            {/* Header */}
-            <div className="flex items-start justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                {selectedPlace.place_name || selectedPlace.name}
-              </h3>
+            {/* Header with gradient background */}
+            <div className="relative bg-gradient-to-r from-primary-500 to-secondary-500 p-6 pb-4">
               <button
                 onClick={() => setSelectedPlace(null)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-200"
               >
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
+              <h3 className="text-2xl font-bold text-white pr-8">
+                {selectedPlace.place_name || selectedPlace.name}
+              </h3>
+              {selectedPlace.category && (
+                <p className="text-white/80 text-sm mt-1">{selectedPlace.category}</p>
+              )}
             </div>
             
             {/* Content */}
-            <div className="space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 180px)' }}>
               {/* User Information */}
               {(() => {
                 const colorResult = getPlaceColor(selectedPlace);
@@ -430,97 +411,108 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                 }
                 
                 return userInfo && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Requested by</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{userInfo}</p>
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Requested by</h4>
+                    <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{userInfo}</p>
                   </div>
                 );
               })()}
               
-              {/* Schedule Information */}
-              {(selectedPlace.day_number || selectedPlace.hour) && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Schedule</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {selectedPlace.day_number && `Day ${selectedPlace.day_number}`}
-                    {selectedPlace.hour && `, ${selectedPlace.hour}:00`}
-                  </p>
-                </div>
-              )}
-              
-              {/* Duration */}
-              {selectedPlace.duration_minutes && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Duration</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {formatDuration(selectedPlace.duration_minutes)}
-                  </p>
-                </div>
-              )}
-              
-              {/* Category */}
-              {selectedPlace.category && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Category</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedPlace.category}</p>
-                </div>
-              )}
-              
-              {/* Rating */}
-              {selectedPlace.rating && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Rating</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">★ {selectedPlace.rating.toFixed(1)}</p>
-                </div>
-              )}
-              
-              {/* Price Level */}
-              {selectedPlace.price_level && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Price Level</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {'$'.repeat(selectedPlace.price_level)}
-                  </p>
-                </div>
-              )}
+              {/* Schedule and Duration Info */}
+              <div className="grid grid-cols-2 gap-3">
+                {(selectedPlace.day_number || selectedPlace.hour || selectedPlace.arrival_time) && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                    <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Schedule</h4>
+                    <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
+                      {selectedPlace.day_number && `Day ${selectedPlace.day_number}`}
+                      {selectedPlace.hour && `, ${selectedPlace.hour}:00`}
+                      {selectedPlace.arrival_time && !selectedPlace.hour && selectedPlace.arrival_time}
+                    </p>
+                  </div>
+                )}
+                
+                {(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes) && (
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                    <h4 className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Duration</h4>
+                    <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
+                      {formatDuration(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes)}
+                    </p>
+                  </div>
+                )}
+              </div>
               
               {/* Wish Level */}
               {selectedPlace.wish_level && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Wish Level</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {'⭐'.repeat(selectedPlace.wish_level)} ({selectedPlace.wish_level}/5)
-                  </p>
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+                  <h4 className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-1">Priority Level</h4>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl">{['⭐', '⭐', '⭐', '⭐', '⭐'].slice(0, selectedPlace.wish_level).join('')}</span>
+                    <span className="text-base text-gray-900 dark:text-gray-100 font-medium">({selectedPlace.wish_level}/5)</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Rating and Price */}
+              {(selectedPlace.rating || selectedPlace.price_level) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {selectedPlace.rating && (
+                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
+                      <h4 className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider mb-1">Rating</h4>
+                      <p className="text-base text-gray-900 dark:text-gray-100 font-medium flex items-center">
+                        <span className="text-yellow-500 mr-1">★</span> {selectedPlace.rating.toFixed(1)}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {selectedPlace.price_level && (
+                    <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-4">
+                      <h4 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Price Level</h4>
+                      <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
+                        {'$'.repeat(selectedPlace.price_level)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
               
               {/* Travel to Next */}
               {selectedPlace.travel_to_next && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Travel to Next Location</h4>
-                  <div className="space-y-1">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      <span className="font-medium">Transport:</span> {selectedPlace.travel_to_next.transport_mode || 'Unknown'}
-                    </p>
+                <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4">
+                  <h4 className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-3">Next Travel</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Transport</span>
+                      <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                        {selectedPlace.travel_to_next.transport_mode ? 
+                          selectedPlace.travel_to_next.transport_mode.charAt(0).toUpperCase() + selectedPlace.travel_to_next.transport_mode.slice(1) 
+                          : 'Unknown'}
+                      </span>
+                    </div>
                     {selectedPlace.travel_to_next.duration_minutes && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        <span className="font-medium">Duration:</span> {selectedPlace.travel_to_next.duration_minutes} minutes
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Duration</span>
+                        <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                          {formatDuration(selectedPlace.travel_to_next.duration_minutes)}
+                        </span>
+                      </div>
                     )}
                     {selectedPlace.travel_to_next.distance_km && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        <span className="font-medium">Distance:</span> {selectedPlace.travel_to_next.distance_km.toFixed(1)} km
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Distance</span>
+                        <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                          {selectedPlace.travel_to_next.distance_km.toFixed(1)} km
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
               )}
               
-              {/* Place Type */}
-              {selectedPlace.place_type && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Type</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">{selectedPlace.place_type}</p>
+              {/* Notes */}
+              {selectedPlace.notes && (
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Notes</h4>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{selectedPlace.notes}</p>
                 </div>
               )}
             </div>
