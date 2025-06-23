@@ -78,7 +78,7 @@ export function ChatPage() {
           *,
           user:users(id, name, avatar_url),
           reply_to:chat_messages(
-            id, content, user:users(id, name)
+            id, content, message_type, image_url, user:users(id, name)
           ),
           reactions:message_reactions(
             id, emoji, user_id, created_at,
@@ -134,11 +134,7 @@ export function ChatPage() {
       },
       reactions: [],
       reads: [],
-      reply_to: replyToMsg ? {
-        id: replyToMsg.id,
-        content: replyToMsg.content,
-        user: replyToMsg.user
-      } : undefined
+      reply_to: replyToMsg
     };
 
     // UIを即座に更新
@@ -160,7 +156,7 @@ export function ChatPage() {
           *,
           user:users(id, name, avatar_url),
           reply_to:chat_messages(
-            id, content, user:users(id, name)
+            id, content, message_type, image_url, user:users(id, name)
           ),
           reactions:message_reactions(*),
           reads:message_reads(*)
@@ -229,7 +225,7 @@ export function ChatPage() {
           *,
           user:users(id, name, avatar_url),
           reply_to:chat_messages(
-            id, content, user:users(id, name)
+            id, content, message_type, image_url, user:users(id, name)
           ),
           reactions:message_reactions(*),
           reads:message_reads(*)
@@ -418,7 +414,7 @@ export function ChatPage() {
                 *,
                 user:users(id, name, avatar_url),
                 reply_to:chat_messages(
-                  id, content, user:users(id, name)
+                  id, content, message_type, image_url, user:users(id, name)
                 ),
                 reactions:message_reactions(
                   id, emoji, user_id, created_at,
@@ -697,13 +693,16 @@ export function ChatPage() {
                     )}
 
                     {/* Reply indicator */}
-                    {msg.reply_to && (
+                    {msg.reply_to_id && msg.reply_to && (
                       <div className="mb-2 text-xs text-slate-500 dark:text-slate-400 border-l-2 border-indigo-400 pl-2 max-w-xs bg-slate-50 dark:bg-slate-800 rounded p-2">
                         <div className="font-medium text-indigo-600 dark:text-indigo-400">
                           Replying to {msg.reply_to.user?.name}
                         </div>
                         <div className="truncate text-slate-600 dark:text-slate-300">
-                          {msg.reply_to.content || 'Message'}
+                          {msg.reply_to.message_type === 'image' 
+                            ? 'Image'
+                            : (msg.reply_to.content || 'Message')
+                          }
                         </div>
                       </div>
                     )}
@@ -929,10 +928,13 @@ export function ChatPage() {
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-1">
-                    Replying to {replyTo.user.name}
+                    Replying to {replyTo.user?.name || 'Unknown User'}
                   </div>
                   <div className="text-sm text-slate-600 dark:text-slate-400 truncate">
-                    {replyTo.content || (replyTo.image_url ? 'Image' : 'Message')}
+                    {replyTo.message_type === 'image' 
+                      ? 'Image'
+                      : (replyTo.content || 'Message')
+                    }
                   </div>
                 </div>
                 <button
