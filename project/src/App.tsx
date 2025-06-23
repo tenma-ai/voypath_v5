@@ -5,7 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { SimpleAuth } from './components/SimpleAuth';
 import { Layout } from './components/Layout';
 import { HomePage } from './pages/HomePage';
-import { TripDetailPage } from './pages/TripDetailPage';
+// import { TripDetailPage } from './pages/TripDetailPage'; // Currently disabled
 import { MyPlacesPage } from './pages/MyPlacesPage';
 import { PlaceSearchToDetail } from './components/PlaceSearchToDetail';
 import { ChatPage } from './pages/ChatPage';
@@ -174,7 +174,8 @@ function App() {
                 {!isPublicRoute && (
                   <Route path="/" element={<Layout />}>
                     <Route index element={<HomePage />} />
-                    <Route path="my-trip" element={
+                    {/* TripDetailPage routes disabled - not currently in use */}
+                    {/* <Route path="my-trip" element={
                       <ErrorBoundary>
                         <TripDetailPage />
                       </ErrorBoundary>
@@ -183,7 +184,7 @@ function App() {
                       <ErrorBoundary>
                         <TripDetailPage />
                       </ErrorBoundary>
-                    } />
+                    } /> */}
                     <Route path="my-trip/my-places" element={<MyPlacesPage />} />
                     <Route path="my-trip/chat" element={<ChatPage />} />
                     <Route path="my-trip/share" element={<SharePage />} />

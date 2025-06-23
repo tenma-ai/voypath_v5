@@ -3,6 +3,9 @@ import { GoogleMap, useJsApiLoader, Marker, Polyline } from '@react-google-maps/
 import { MapPin, Car, UserRound } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getPlaceColor } from '../utils/ColorUtils';
+import { OptimizationLoadingOverlay } from './OptimizationLoadingOverlay';
+import { OptimizationSuccessOverlay } from './OptimizationSuccessOverlay';
+import { AnimatePresence } from 'framer-motion';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -12,7 +15,8 @@ interface MapViewProps {
 
 const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const { currentTrip, memberColors, tripMembers, hasUserOptimized } = useStore();
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const { currentTrip, memberColors, tripMembers, hasUserOptimized, isOptimizing } = useStore();
 
   // Load Google Maps API
   const { isLoaded, loadError } = useJsApiLoader({
@@ -20,6 +24,13 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
     libraries: libraries
   });
+
+  // Handle optimization success animation
+  useEffect(() => {
+    if (!isOptimizing && hasUserOptimized && optimizationResult) {
+      setShowSuccessOverlay(true);
+    }
+  }, [isOptimizing, hasUserOptimized, optimizationResult]);
 
 
   // Extract places from optimization result
@@ -362,6 +373,20 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           </div>
         </div>
       </div>
+
+      {/* Optimization Overlays */}
+      <AnimatePresence mode="wait">
+        {isOptimizing && (
+          <OptimizationLoadingOverlay key="loading" />
+        )}
+        {showSuccessOverlay && (
+          <OptimizationSuccessOverlay 
+            key="success"
+            optimizationResult={optimizationResult}
+            onComplete={() => setShowSuccessOverlay(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

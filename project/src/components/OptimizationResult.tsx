@@ -62,6 +62,7 @@ interface OptimizationResultProps {
 
 export function OptimizationResult({ optimizationResult: result, onClose }: OptimizationResultProps) {
   const [activeModal, setActiveModal] = useState<'map' | 'list' | 'calendar' | null>(null);
+  const [showCelebration, setShowCelebration] = useState(true);
   
   // Early return if no result
   if (!result) {
@@ -216,25 +217,77 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
       }}
       className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 space-y-6"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header with Celebration */}
+      <div className="flex items-center justify-between relative overflow-hidden">
+        {/* Celebration confetti */}
+        <AnimatePresence>
+          {showCelebration && (
+            <>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-1 h-1 rounded-full"
+                  style={{
+                    backgroundColor: ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B'][i % 4],
+                    left: `${20 + Math.random() * 60}%`,
+                    top: `${20 + Math.random() * 60}%`,
+                  }}
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{
+                    opacity: [0, 1, 0],
+                    scale: [0, 1, 0],
+                    x: [(Math.random() - 0.5) * 100],
+                    y: [(Math.random() - 0.5) * 100],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    delay: Math.random() * 0.5,
+                  }}
+                  onAnimationComplete={() => {
+                    if (i === 11) setShowCelebration(false);
+                  }}
+                />
+              ))}
+            </>
+          )}
+        </AnimatePresence>
+
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Route Optimization Complete
-          </h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+          <motion.h3 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-lg font-semibold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"
+          >
+            🎉 Route Optimization Complete!
+          </motion.h3>
+          <motion.p 
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-sm text-slate-600 dark:text-slate-400 mt-1"
+          >
             {formattedResult.summary}
-          </p>
+          </motion.p>
         </div>
+        
         <div className="flex items-center space-x-2">
-          <CheckCircle className="w-6 h-6 text-green-500" />
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: "spring", stiffness: 300 }}
+          >
+            <CheckCircle className="w-6 h-6 text-green-500" />
+          </motion.div>
           {onClose && (
-            <button
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
               onClick={onClose}
               className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
             >
               <X className="w-5 h-5 text-slate-500" />
-            </button>
+            </motion.button>
           )}
         </div>
       </div>
