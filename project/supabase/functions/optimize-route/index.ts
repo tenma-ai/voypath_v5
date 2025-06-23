@@ -17,7 +17,7 @@ function calculateDistance(point1, point2) {
   return R * c;
 }
 // 移動手段の判定（改善版）
-function determineTransportMode(distance, fromAirport = faではlse, toAirport = false) {
+function determineTransportMode(distance, fromAirport = false, toAirport = false) {
   console.log(`🚗 Distance: ${distance.toFixed(1)}km, fromAirport: ${fromAirport}, toAirport: ${toAirport}`);
   // 距離ベースの判定を優先（空港であっても近距離は車を使用）
   if (distance <= 2) {
@@ -113,7 +113,7 @@ function filterPlacesByFairness(places, maxPlaces) {
   // ラウンドロビンで選択
   let round = 0;
   while(selectedVisitPlaces.length < maxVisitPlaces && Array.from(userGroups.values()).some((arr)=>arr.length > 0)){
-    for (const [userId, userPlaces] of userGroups){
+    for (const [, userPlaces] of userGroups){
       if (userPlaces.length > 0 && selectedVisitPlaces.length < maxVisitPlaces) {
         selectedVisitPlaces.push(userPlaces.shift());
       }
@@ -173,7 +173,7 @@ async function insertAirportsIfNeeded(supabase, places) {
               longitude: depAirport.longitude,
               category: 'airport',
               place_type: 'airport',
-              stay_duration_minutes: 120, // 空港は2時間で固定
+              stay_duration_minutes: 120,
               wish_level: 1,
               user_id: currentPlace.user_id,
               is_airport: true,
@@ -194,7 +194,7 @@ async function insertAirportsIfNeeded(supabase, places) {
               longitude: arrAirport.longitude,
               category: 'airport',
               place_type: 'airport',
-              stay_duration_minutes: 120, // 空港は2時間で固定
+              stay_duration_minutes: 120,
               wish_level: 1,
               user_id: nextPlace.user_id,
               is_airport: true,
@@ -244,12 +244,12 @@ function isInternationalAirport(airport) {
   if (type && !type.includes('airport')) {
     return false;
   }
-  // 国際空港を示すキーワード
-  const internationalKeywords = [
-    'international',
-    'intl',
-    'airport'
-  ];
+  // 国際空港を示すキーワード（現在未使用だが将来の拡張用）
+  // const internationalKeywords = [
+  //   'international', 
+  //   'intl',
+  //   'airport'
+  // ];
   // 主要な国際空港のIATAコード（確実に含めたいもの）
   const majorInternationalAirports = [
     'NRT',
@@ -572,10 +572,8 @@ function optimizeRouteOrder(places) {
     const destName = destination.name || '';
     console.log(`  Processing destination: ${destName}`);
     console.log(`  Departure name: ${depName}`);
-    
     // 往復判定：名前に明確に「same as departure」が含まれる場合のみ往復として扱う
     const isExplicitRoundTrip = destName.toLowerCase().includes('same as departure');
-    
     if (isExplicitRoundTrip && departure) {
       // 復路として出発地のコピーを作成
       const returnPlace = {
@@ -637,15 +635,13 @@ function createDailySchedule(places) {
     // フライトの場合は到着が翌日になるので新しい日を作成
     if (place.transport_mode === 'flight' && currentPlaces.length > 0) {
       // 現在の日を完了
-      schedules.push(createDaySchedule(currentDay, currentPlaces, timeCounter));
+      schedules.push(createDaySchedule(currentDay, currentPlaces));
       currentDay++;
       currentPlaces = [];
       currentTime = 0;
       timeCounter = 9 * 60; // 翌日の9:00 AMから開始
-    }
-    // 通常の時間超過チェック（フライト以外）
-    else if (currentTime + placeTime > maxDailyMinutes && currentPlaces.length > 0) {
-      schedules.push(createDaySchedule(currentDay, currentPlaces, timeCounter));
+    } else if (currentTime + placeTime > maxDailyMinutes && currentPlaces.length > 0) {
+      schedules.push(createDaySchedule(currentDay, currentPlaces));
       currentDay++;
       currentPlaces = [];
       currentTime = 0;
@@ -669,7 +665,7 @@ function createDailySchedule(places) {
   console.log(`✅ Created ${schedules.length} daily schedules`);
   return schedules;
 }
-function createDaySchedule(day, places, timeCounter) {
+function createDaySchedule(day, places) {
   const date = new Date();
   date.setDate(date.getDate() + day - 1);
   return {
@@ -808,7 +804,7 @@ Deno.serve(async (req)=>{
     });
     // 1. 滞在時間の正規化と確認（stay_duration_minutesが適切に設定されているか）
     console.log('🔄 Ensuring proper stay durations for all places');
-    places.forEach((place, index) => {
+    places.forEach((place, index)=>{
       // 空港の場合は120分に固定、それ以外はユーザー設定値を使用
       if (place.place_type === 'airport' || place.category === 'airport') {
         place.stay_duration_minutes = 120;
@@ -821,7 +817,6 @@ Deno.serve(async (req)=>{
         console.log(`  ${place.name}: Using configured duration of ${place.stay_duration_minutes} minutes`);
       }
     });
-    
     // 2. 希望度の正規化（必須機能）
     const normalizedPlaces = normalizePreferences(places);
     // 3. 場所の絞り込み（公平性考慮）
@@ -856,10 +851,9 @@ Deno.serve(async (req)=>{
       is_active: true,
       algorithm_version: 'simplified-v1'
     }).select();
-    
     if (saveError) {
       console.error('❌ Failed to save optimization result:', saveError);
-      // 保存に失敗してもレスポンスは返す（一時的なメモリ結果として）
+    // 保存に失敗してもレスポンスは返す（一時的なメモリ結果として）
     } else {
       console.log('✅ Optimization result saved successfully:', savedResult?.[0]?.id);
     }
