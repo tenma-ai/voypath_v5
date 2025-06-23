@@ -268,6 +268,9 @@ export function TripDetailPage() {
     setOptimizationError(null);
 
     try {
+      console.log('🔍 [TripDetailPage] Starting optimization trigger - setting hasUserOptimized to true');
+      setHasUserOptimized(true);
+      
       // Import TripOptimizationService dynamically
       const { TripOptimizationService } = await import('../services/TripOptimizationService');
       

@@ -28,7 +28,7 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
   const [connectivity, setConnectivity] = useState({ normalize: false, select: false, route: false });
   const [progressSubscription, setProgressSubscription] = useState<(() => void) | null>(null);
 
-  const { setOptimizationResult, currentUser } = useStore();
+  const { setOptimizationResult, currentUser, setHasUserOptimized } = useStore();
 
   // Check Edge Functions connectivity on mount
   useEffect(() => {
@@ -126,6 +126,9 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
       return;
     }
 
+    console.log('🔍 [OptimizationModal] Starting optimization trigger - setting hasUserOptimized to true');
+    setHasUserOptimized(true);
+    
     setIsOptimizing(true);
     setError(null);
     setProgress({ stage: 'collecting', progress: 0, message: 'Starting optimization...' });

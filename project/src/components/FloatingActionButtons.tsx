@@ -6,7 +6,7 @@ import { useStore } from '../store/useStore';
 
 export function FloatingActionButtons() {
   const location = useLocation();
-  const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult } = useStore();
+  const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult, setHasUserOptimized } = useStore();
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
 
   // Check if deadline has passed
@@ -37,6 +37,9 @@ export function FloatingActionButtons() {
     setOptimizationError(null);
 
     try {
+      console.log('🔍 [FloatingActionButtons] Starting optimization trigger - setting hasUserOptimized to true');
+      setHasUserOptimized(true);
+      
       // Import TripOptimizationService dynamically
       const { TripOptimizationService } = await import('../services/TripOptimizationService');
       
