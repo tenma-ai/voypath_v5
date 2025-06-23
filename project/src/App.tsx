@@ -162,38 +162,35 @@ function App() {
       <StripeProvider>
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
           <Routes>
-            {/* Public routes (no auth required) */}
+            {/* Public routes (no auth required) - Always render these */}
             <Route path="auth/callback" element={<AuthCallback />} />
             <Route path="shared/:shareToken" element={<SharedTripView />} />
             <Route path="premium/success" element={<PremiumSuccessPage />} />
             <Route path="premium/cancel" element={<PremiumCancelPage />} />
             
             {/* Protected routes */}
-            {isAuthenticated || isPublicRoute ? (
-              <>
-                {!isPublicRoute && (
-                  <Route path="/" element={<Layout />}>
-                    <Route index element={<HomePage />} />
-                    <Route path="my-trip" element={
-                      <ErrorBoundary>
-                        <TripDetailPage />
-                      </ErrorBoundary>
-                    } />
-                    <Route path="trip/:tripId" element={
-                      <ErrorBoundary>
-                        <TripDetailPage />
-                      </ErrorBoundary>
-                    } />
-                    <Route path="my-trip/my-places" element={<MyPlacesPage />} />
-                    <Route path="my-trip/chat" element={<ChatPage />} />
-                    <Route path="my-trip/share" element={<SharePage />} />
-                    <Route path="add-place" element={<PlaceSearchToDetail />} />
-                    <Route path="profile" element={<ProfilePage />} />
-                  </Route>
-                )}
-              </>
+            {isAuthenticated ? (
+              <Route path="/" element={<Layout />}>
+                <Route index element={<HomePage />} />
+                <Route path="my-trip" element={
+                  <ErrorBoundary>
+                    <TripDetailPage />
+                  </ErrorBoundary>
+                } />
+                <Route path="trip/:tripId" element={
+                  <ErrorBoundary>
+                    <TripDetailPage />
+                  </ErrorBoundary>
+                } />
+                <Route path="my-trip/my-places" element={<MyPlacesPage />} />
+                <Route path="my-trip/chat" element={<ChatPage />} />
+                <Route path="my-trip/share" element={<SharePage />} />
+                <Route path="add-place" element={<PlaceSearchToDetail />} />
+                <Route path="profile" element={<ProfilePage />} />
+              </Route>
             ) : (
-              <Route path="*" element={<SimpleAuth onAuthenticated={handleAuthenticated} />} />
+              /* Show auth screen for non-public routes when not authenticated */
+              !isPublicRoute && <Route path="*" element={<SimpleAuth onAuthenticated={handleAuthenticated} />} />
             )}
           </Routes>
         </div>

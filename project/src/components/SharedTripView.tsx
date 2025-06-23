@@ -226,6 +226,15 @@ export function SharedTripView() {
   const [error, setError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
+  console.log('🚀 SharedTripView render state:', {
+    shareToken,
+    isLoading,
+    error,
+    hasShareData: !!shareData,
+    isPasswordRequired,
+    isRedirecting
+  });
+
   useEffect(() => {
     if (shareToken) {
       loadSharedTrip();
