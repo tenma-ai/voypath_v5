@@ -107,9 +107,40 @@ export function ChatPage() {
     }
   }, [currentTrip?.id, user?.id]);
 
-  // メッセージ送信
+  // メッセージ送信（楽観的更新）
   const handleSendMessage = async () => {
     if (!message.trim() || !currentTrip?.id || !user?.id) return;
+
+    const messageContent = message;
+    const replyToMsg = replyTo;
+    
+    // 楽観的更新：即座にUIを更新
+    const optimisticMessage: ChatMessage = {
+      id: `temp-${Date.now()}`,
+      trip_id: currentTrip.id,
+      user_id: user.id,
+      content: messageContent,
+      message_type: 'text',
+      image_url: null,
+      image_metadata: null,
+      reply_to_id: replyToMsg?.id || null,
+      edited_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user: {
+        id: user.id,
+        name: user.name || 'You',
+        avatar_url: user.avatar_url
+      },
+      reactions: [],
+      reads: [],
+      reply_to: replyToMsg
+    };
+
+    // UIを即座に更新
+    setMessage('');
+    setReplyTo(null);
+    setMessages(prev => [...prev, optimisticMessage]);
 
     try {
       const { data, error } = await supabase
@@ -117,9 +148,9 @@ export function ChatPage() {
         .insert({
           trip_id: currentTrip.id,
           user_id: user.id,
-          content: message,
+          content: messageContent,
           message_type: 'text',
-          reply_to_id: replyTo?.id || null
+          reply_to_id: replyToMsg?.id || null
         })
         .select(`
           *,
@@ -134,14 +165,21 @@ export function ChatPage() {
 
       if (error) throw error;
 
-      setMessage('');
-      setReplyTo(null);
-      
-      // 新しいメッセージをローカル状態に追加
-      setMessages(prev => [...prev, { ...data, reactions: [], reads: [] }]);
+      // 成功時：楽観的メッセージを実際のデータで置き換え
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === optimisticMessage.id 
+            ? { ...data, reactions: [], reads: [] }
+            : msg
+        )
+      );
       
     } catch (error) {
       console.error('❌ Failed to send message:', error);
+      // エラー時：楽観的メッセージを削除し、入力を復元
+      setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+      setMessage(messageContent);
+      setReplyTo(replyToMsg);
     }
   };
 
@@ -206,7 +244,7 @@ export function ChatPage() {
     }
   };
 
-  // リアクション追加/削除
+  // リアクション追加/削除（楽観的更新）
   const handleReaction = async (messageId: string, emoji: string) => {
     if (!user?.id || !currentTrip?.id) return;
 
@@ -220,31 +258,109 @@ export function ChatPage() {
 
       // 既存のリアクションをチェック
       const existingReaction = message.reactions.find(r => r.user_id === user.id && r.emoji === emoji);
-
+      
+      // 楽観的更新：即座にUIを更新
       if (existingReaction) {
-        // リアクション削除
+        // リアクション削除（楽観的）
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === messageId 
+              ? {
+                  ...msg,
+                  reactions: msg.reactions.filter(r => r.id !== existingReaction.id)
+                }
+              : msg
+          )
+        );
+
+        // サーバーに削除リクエスト
         const { error } = await supabase
           .from('message_reactions')
           .delete()
           .eq('id', existingReaction.id)
-          .eq('user_id', user.id); // 自分のリアクションのみ削除可能
+          .eq('user_id', user.id);
 
-        if (error) throw error;
+        if (error) {
+          // エラー時：楽観的更新を元に戻す
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === messageId 
+                ? {
+                    ...msg,
+                    reactions: [...msg.reactions, existingReaction]
+                  }
+                : msg
+            )
+          );
+          throw error;
+        }
       } else {
-        // リアクション追加 - 重複チェック付きで直接INSERT
-        const { error } = await supabase
+        // リアクション追加（楽観的）
+        const newReaction = {
+          id: `temp-${Date.now()}`,
+          message_id: messageId,
+          user_id: user.id,
+          emoji: emoji,
+          created_at: new Date().toISOString(),
+          user: {
+            id: user.id,
+            name: user.name || 'You'
+          }
+        };
+
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === messageId 
+              ? {
+                  ...msg,
+                  reactions: [...msg.reactions, newReaction]
+                }
+              : msg
+          )
+        );
+
+        // サーバーに追加リクエスト
+        const { data, error } = await supabase
           .from('message_reactions')
           .insert({
             message_id: messageId,
             user_id: user.id,
             emoji: emoji
-          });
+          })
+          .select('id, message_id, user_id, emoji, created_at')
+          .single();
 
         if (error) {
-          // 重複エラーの場合は無視
+          // 重複エラーでない場合は楽観的更新を元に戻す
           if (error.code !== '23505') {
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === messageId 
+                  ? {
+                      ...msg,
+                      reactions: msg.reactions.filter(r => r.id !== newReaction.id)
+                    }
+                  : msg
+              )
+            );
             throw error;
           }
+        } else if (data) {
+          // 成功時：一時IDを実際のIDに置き換え
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === messageId 
+                ? {
+                    ...msg,
+                    reactions: msg.reactions.map(r => 
+                      r.id === newReaction.id 
+                        ? { ...newReaction, id: data.id }
+                        : r
+                    )
+                  }
+                : msg
+            )
+          );
         }
       }
 
@@ -274,7 +390,7 @@ export function ChatPage() {
     }
   };
 
-  // リアルタイム連携設定 (LINEスタイル)
+  // リアルタイム連携設定 (大手アプリスタイル)
   useEffect(() => {
     if (!currentTrip?.id || !user?.id) return;
 
@@ -330,13 +446,51 @@ export function ChatPage() {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
-          table: 'message_reactions',
+          table: 'message_reactions'
         },
-        () => {
-          // リアクションの変更があったら再読み込み
-          loadMessages();
+        async (payload) => {
+          // 自分のリアクションでない場合のみ処理（楽観的更新と重複回避）
+          if (payload.new.user_id !== user.id) {
+            const { data: reactionData } = await supabase
+              .from('message_reactions')
+              .select('id, message_id, user_id, emoji, created_at, user:users(id, name)')
+              .eq('id', payload.new.id)
+              .single();
+
+            if (reactionData) {
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === reactionData.message_id
+                    ? {
+                        ...msg,
+                        reactions: [...msg.reactions, reactionData]
+                      }
+                    : msg
+                )
+              );
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'message_reactions'
+        },
+        (payload) => {
+          // 削除されたリアクションを除去
+          if (payload.old.user_id !== user.id) {
+            setMessages(prev => 
+              prev.map(msg => ({
+                ...msg,
+                reactions: msg.reactions.filter(r => r.id !== payload.old.id)
+              }))
+            );
+          }
         }
       )
       .on(
@@ -344,11 +498,30 @@ export function ChatPage() {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'message_reads',
+          table: 'message_reads'
         },
-        () => {
-          // 既読が追加されたら再読み込み
-          loadMessages();
+        async (payload) => {
+          // 自分の既読でない場合のみ処理
+          if (payload.new.user_id !== user.id) {
+            const { data: readData } = await supabase
+              .from('message_reads')
+              .select('id, message_id, user_id, read_at, user:users(id, name)')
+              .eq('id', payload.new.id)
+              .single();
+
+            if (readData) {
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === readData.message_id
+                    ? {
+                        ...msg,
+                        reads: [...msg.reads, readData]
+                      }
+                    : msg
+                )
+              );
+            }
+          }
         }
       )
       .subscribe();
