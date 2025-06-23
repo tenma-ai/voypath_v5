@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Paperclip, Smile, MapPin, Calendar, Image as ImageIcon, Heart, ThumbsUp, Laugh, Reply, MoreVertical, Check, CheckCheck, X, Clock } from 'lucide-react';
+import { Send, Paperclip, Smile, MapPin, Calendar, Image as ImageIcon, Heart, ThumbsUp, Laugh, MoreVertical, Check, CheckCheck, X, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
@@ -58,7 +58,6 @@ export function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const [showReadDetails, setShowReadDetails] = useState<string | null>(null);
   const [memberColors, setMemberColors] = useState<Record<string, string>>({});
@@ -81,6 +80,7 @@ export function ChatPage() {
           reactions:message_reactions(
             id, emoji, user_id, created_at,
             user:users(id, name)
+          ),
           reads:message_reads(
             id, user_id, read_at,
             user:users(id, name)
@@ -109,7 +109,6 @@ export function ChatPage() {
     if (!message.trim() || !currentTrip?.id || !user?.id) return;
 
     const messageContent = message;
-    const replyToMsg = replyTo;
     
     // 楽観的更新：即座にUIを更新
     const optimisticMessage: ChatMessage = {
@@ -120,7 +119,7 @@ export function ChatPage() {
       message_type: 'text',
       image_url: null,
       image_metadata: null,
-      reply_to_id: replyToMsg?.id || null,
+      reply_to_id: null,
       edited_at: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -130,13 +129,11 @@ export function ChatPage() {
         avatar_url: user.avatar_url
       },
       reactions: [],
-      reads: [],
-      reply_to: replyToMsg
+      reads: []
     };
 
     // UIを即座に更新
     setMessage('');
-    setReplyTo(null);
     setMessages(prev => [...prev, optimisticMessage]);
 
     try {
@@ -147,7 +144,7 @@ export function ChatPage() {
           user_id: user.id,
           content: messageContent,
           message_type: 'text',
-          reply_to_id: replyToMsg?.id || null
+          reply_to_id: null
         })
         .select(`
           *,
@@ -173,7 +170,6 @@ export function ChatPage() {
       // エラー時：楽観的メッセージを削除し、入力を復元
       setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
       setMessage(messageContent);
-      setReplyTo(replyToMsg);
     }
   };
 
@@ -213,7 +209,7 @@ export function ChatPage() {
             size: file.size,
             type: file.type
           },
-          reply_to_id: replyTo?.id || null
+          reply_to_id: null
         })
         .select(`
           *,
@@ -225,7 +221,6 @@ export function ChatPage() {
 
       if (error) throw error;
 
-      setReplyTo(null);
       setMessages(prev => [...prev, { ...data, reactions: [], reads: [] }]);
       
     } catch (error) {
@@ -404,10 +399,11 @@ export function ChatPage() {
               .select(`
                 *,
                 user:users(id, name, avatar_url),
-                                  reactions:message_reactions(
+                reactions:message_reactions(
                   id, emoji, user_id, created_at,
                   user:users(id, name)
-                      reads:message_reads(
+                ),
+                reads:message_reads(
                   id, user_id, read_at,
                   user:users(id, name)
                 )
@@ -679,34 +675,6 @@ export function ChatPage() {
                       </span>
                     )}
 
-                    {/* Reply indicator */}
-                    {false && msg.reply_to_id && msg.reply_to_message && (
-                      <div className="mb-2 text-xs text-slate-500 dark:text-slate-400 border-l-2 border-indigo-400 pl-2 max-w-xs bg-slate-50 dark:bg-slate-800 rounded p-2">
-                        <div className="font-medium text-indigo-600 dark:text-indigo-400">
-                          Replying to {msg.reply_to_message.user?.name}
-                        </div>
-                        <div className="truncate text-slate-600 dark:text-slate-300">
-                          {(() => {
-                            console.log('Reply content debug:', {
-                              message_type: msg.reply_to_message.message_type,
-                              content: msg.reply_to_message.content,
-                              image_url: msg.reply_to_message.image_url,
-                              full_reply_to: msg.reply_to
-                            });
-                            
-                            if (msg.reply_to_message.message_type === 'image') {
-                              return '📷 Image';
-                            }
-                            
-                            if (msg.reply_to_message.content && msg.reply_to_message.content.trim()) {
-                              return msg.reply_to_message.content;
-                            }
-                            
-                            return 'Message';
-                          })()}
-                        </div>
-                      </div>
-                    )}
                     
                     <div className="relative group">
                       {msg.message_type === 'image' ? (
@@ -729,15 +697,6 @@ export function ChatPage() {
 
                       {/* Message actions */}
                       <div className={`absolute top-0 ${isOwn ? 'left-0 transform -translate-x-full' : 'right-0 transform translate-x-full'} opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg px-2 py-1`}>
-                        <button
-                          onClick={() => {
-                            // setReplyTo(msg); // DISABLED
-                          }}
-                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                          title="Reply"
-                        >
-                          <Reply className="w-3 h-3 text-slate-500" />
-                        </button>
                         <button
                           onClick={() => setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)}
                           className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
@@ -916,38 +875,6 @@ export function ChatPage() {
 
       {/* Message Input */}
       <div className="fixed bottom-16 left-0 right-0 p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
-        {/* Reply indicator */}
-        <AnimatePresence>
-          {false && replyTo && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="mb-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border-l-4 border-indigo-500"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-1">
-                    Replying to {replyTo.user?.name || 'Unknown User'}
-                  </div>
-                  <div className="text-sm text-slate-600 dark:text-slate-400 truncate">
-                    {replyTo.message_type === 'image' 
-                      ? '\ud83d\udcf7 Image'
-                      : (replyTo.content || 'Message')
-                    }
-                  </div>
-                </div>
-                <button
-                  onClick={() => setReplyTo(null)}
-                  className="ml-2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                >
-                  ×
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <div className="flex items-center space-x-3">
           <button 
             onClick={handleFileSelect}
