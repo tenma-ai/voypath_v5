@@ -3,6 +3,7 @@ import { Send, Paperclip, Smile, MapPin, Calendar, Image as ImageIcon, Heart, Th
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
+import { MemberColorService, type RefinedColor } from '../services/MemberColorService';
 
 interface ChatMessage {
   id: string;
@@ -58,6 +59,8 @@ export function ChatPage() {
   const [uploading, setUploading] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
+  const [currentUserColor, setCurrentUserColor] = useState<RefinedColor | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -221,13 +224,15 @@ export function ChatPage() {
 
         if (error) throw error;
       } else {
-        // リアクション追加
+        // リアクション追加 - upsert を使用して重複エラーを回避
         const { error } = await supabase
           .from('message_reactions')
-          .insert({
+          .upsert({
             message_id: messageId,
             user_id: user.id,
             emoji: emoji
+          }, {
+            onConflict: 'message_id,user_id,emoji'
           });
 
         if (error) throw error;
@@ -259,9 +264,9 @@ export function ChatPage() {
     }
   };
 
-  // リアルタイム連携設定
+  // リアルタイム連携設定 (LINEスタイル)
   useEffect(() => {
-    if (!currentTrip?.id) return;
+    if (!currentTrip?.id || !user?.id) return;
 
     const channel = supabase
       .channel(`chat:${currentTrip.id}`)
@@ -274,53 +279,53 @@ export function ChatPage() {
           filter: `trip_id=eq.${currentTrip.id}`
         },
         async (payload) => {
-          // 新しいメッセージを取得（関連データも含む）
-          const { data } = await supabase
-            .from('chat_messages')
-            .select(`
-              *,
-              user:users(id, name, avatar_url),
-              reply_to:chat_messages(
-                id, content, user:users(id, name)
-              ),
-              reactions:message_reactions(
-                id, emoji, user_id, created_at,
-                user:users(id, name)
-              ),
-              reads:message_reads(
-                id, user_id, read_at,
-                user:users(id, name)
-              )
-            `)
-            .eq('id', payload.new.id)
-            .single();
+          // 自分が送信したメッセージでない場合のみ処理
+          if (payload.new.user_id !== user.id) {
+            // 新しいメッセージを取得（関連データも含む）
+            const { data } = await supabase
+              .from('chat_messages')
+              .select(`
+                *,
+                user:users(id, name, avatar_url),
+                reply_to:chat_messages(
+                  id, content, user:users(id, name)
+                ),
+                reactions:message_reactions(
+                  id, emoji, user_id, created_at,
+                  user:users(id, name)
+                ),
+                reads:message_reads(
+                  id, user_id, read_at,
+                  user:users(id, name)
+                )
+              `)
+              .eq('id', payload.new.id)
+              .single();
 
-          if (data && data.user_id !== user?.id) {
-            setMessages(prev => [...prev, data]);
+            if (data) {
+              setMessages(prev => {
+                // 重複チェック
+                if (prev.some(msg => msg.id === data.id)) {
+                  return prev;
+                }
+                return [...prev, data];
+              });
+              
+              // 受信したメッセージを既読にする
+              await markMessagesAsRead([data.id]);
+            }
           }
         }
       )
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'message_reactions',
         },
         () => {
-          // リアクションが追加されたらメッセージを再読み込み
-          loadMessages();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'message_reactions',
-        },
-        () => {
-          // リアクションが削除されたらメッセージを再読み込み
+          // リアクションの変更があったら再読み込み
           loadMessages();
         }
       )
@@ -332,7 +337,7 @@ export function ChatPage() {
           table: 'message_reads',
         },
         () => {
-          // 既読が追加されたらメッセージを再読み込み
+          // 既読が追加されたら再読み込み
           loadMessages();
         }
       )
@@ -341,12 +346,36 @@ export function ChatPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentTrip?.id, user?.id, loadMessages]);
+  }, [currentTrip?.id, user?.id]);
+
+  // メンバーカラー読み込み
+  const loadMemberColors = useCallback(async () => {
+    if (!currentTrip?.id || !user?.id) return;
+
+    try {
+      // すべてのメンバーのカラーマッピングを取得
+      const colorMapping = await MemberColorService.getSimpleColorMapping(currentTrip.id);
+      setMemberColors(colorMapping);
+      
+      // 現在のユーザーのカラーを取得
+      const userColor = await MemberColorService.getMemberColor(currentTrip.id, user.id);
+      setCurrentUserColor(userColor);
+      
+      // ユーザーにカラーが割り当てられていない場合は割り当て
+      if (!userColor) {
+        const assignedColor = await MemberColorService.assignColorToMember(currentTrip.id, user.id);
+        setCurrentUserColor(assignedColor);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load member colors:', error);
+    }
+  }, [currentTrip?.id, user?.id]);
 
   // 初期データ読み込み
   useEffect(() => {
     loadMessages();
-  }, [loadMessages]);
+    loadMemberColors();
+  }, [loadMessages, loadMemberColors]);
 
   // 自動スクロール
   const scrollToBottom = () => {
@@ -437,8 +466,14 @@ export function ChatPage() {
               >
                 <div className={`flex space-x-3 max-w-xs lg:max-w-md ${isOwn ? 'flex-row-reverse space-x-reverse' : ''}`}>
                   {!isOwn && (
-                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white font-medium text-sm">
+                    <div 
+                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ 
+                        backgroundColor: memberColors[msg.user_id] || '#6B7280',
+                        color: MemberColorService.getContrastColor(memberColors[msg.user_id] || '#6B7280')
+                      }}
+                    >
+                      <span className="font-medium text-sm">
                         {msg.user.name?.charAt(0).toUpperCase()}
                       </span>
                     </div>
@@ -566,6 +601,26 @@ export function ChatPage() {
                         </div>
                       )}
                     </div>
+                    
+                    {/* Read indicators below message */}
+                    {!isOwn && msg.reads && msg.reads.length > 0 && (
+                      <div className="flex items-center space-x-1 mt-1">
+                        {msg.reads.slice(0, 3).map((read) => {
+                          const memberColor = memberColors[read.user_id] || '#6B7280';
+                          return (
+                            <div 
+                              key={read.id}
+                              className="w-3 h-3 rounded-full border border-white"
+                              style={{ backgroundColor: memberColor }}
+                              title={`Read by ${read.user.name}`}
+                            />
+                          );
+                        })}
+                        {msg.reads.length > 3 && (
+                          <span className="text-xs text-slate-400 ml-1">+{msg.reads.length - 3}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
