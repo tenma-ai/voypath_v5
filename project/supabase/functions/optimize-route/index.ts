@@ -88,14 +88,35 @@ function normalizePreferences(places) {
   return places;
 }
 // 場所の絞り込み（公平性考慮）
-function filterPlacesByFairness(places, maxPlaces) {
+function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
   console.log('🔄 Filtering places by fairness');
   const systemPlaces = places.filter((p)=>p.place_type === 'departure' || p.place_type === 'destination');
   const visitPlaces = places.filter((p)=>p.place_type === 'visit');
-  if (visitPlaces.length <= maxPlaces - systemPlaces.length) {
+  
+  // If available days is specified, calculate max places based on time constraints
+  let effectiveMaxPlaces = maxPlaces;
+  if (availableDays !== null) {
+    // Assume max 10 hours of activities per day (600 minutes)
+    const maxMinutesPerDay = 600;
+    const totalAvailableMinutes = availableDays * maxMinutesPerDay;
+    
+    // Calculate average stay time + travel time per place
+    const avgStayTime = visitPlaces.reduce((sum, p) => sum + (p.stay_duration_minutes || 120), 0) / visitPlaces.length || 120;
+    const avgTravelTime = 60; // Assume 60 minutes average travel between places
+    const avgTimePerPlace = avgStayTime + avgTravelTime;
+    
+    // Calculate max places that can fit in available days
+    const timeBasedMaxPlaces = Math.floor(totalAvailableMinutes / avgTimePerPlace);
+    effectiveMaxPlaces = Math.min(maxPlaces, timeBasedMaxPlaces);
+    
+    console.log(`📅 Available days: ${availableDays}, max places by time: ${timeBasedMaxPlaces}, effective max: ${effectiveMaxPlaces}`);
+  }
+  
+  if (visitPlaces.length <= effectiveMaxPlaces - systemPlaces.length) {
     console.log('✅ All places fit within limit');
     return places;
   }
+  
   // ラウンドロビン方式で公平に選択
   const userGroups = new Map();
   visitPlaces.forEach((place)=>{
@@ -109,18 +130,32 @@ function filterPlacesByFairness(places, maxPlaces) {
     places.sort((a, b)=>(b.normalized_wish_level || 1) - (a.normalized_wish_level || 1));
   });
   const selectedVisitPlaces = [];
-  const maxVisitPlaces = maxPlaces - systemPlaces.length;
+  const maxVisitPlaces = effectiveMaxPlaces - systemPlaces.length;
+  
   // ラウンドロビンで選択
   let round = 0;
   while(selectedVisitPlaces.length < maxVisitPlaces && Array.from(userGroups.values()).some((arr)=>arr.length > 0)){
     for (const [, userPlaces] of userGroups){
       if (userPlaces.length > 0 && selectedVisitPlaces.length < maxVisitPlaces) {
-        selectedVisitPlaces.push(userPlaces.shift());
+        const selectedPlace = userPlaces.shift();
+        selectedPlace.selection_round = round + 1; // Track which round this place was selected
+        selectedVisitPlaces.push(selectedPlace);
       }
     }
     round++;
   }
+  
+  // Log fairness statistics
+  const userSelections = new Map();
+  selectedVisitPlaces.forEach(place => {
+    userSelections.set(place.user_id, (userSelections.get(place.user_id) || 0) + 1);
+  });
   console.log(`✅ Selected ${selectedVisitPlaces.length} visit places in ${round} rounds`);
+  console.log(`📊 Fairness distribution:`);
+  userSelections.forEach((count, userId) => {
+    console.log(`   User ${userId}: ${count} places selected`);
+  });
+  
   return [
     ...systemPlaces,
     ...selectedVisitPlaces
@@ -620,62 +655,80 @@ function calculateRouteDetails(places) {
   return route;
 }
 // 日別スケジュール分割
-function createDailySchedule(places) {
+function createDailySchedule(places, tripStartDate = null, availableDays = null) {
   console.log('🔄 Creating daily schedule');
-  const maxDailyHours = 12; // 1日最大12時間
+  const maxDailyHours = 10; // 1日最大10時間（より現実的に調整）
   const maxDailyMinutes = maxDailyHours * 60;
   const schedules = [];
   let currentDay = 1;
   let currentPlaces = [];
   let currentTime = 0;
   let timeCounter = 9 * 60; // 9:00 AMから開始
+  
   for(let i = 0; i < places.length; i++){
     const place = places[i];
     const placeTime = place.stay_duration_minutes + (place.travel_time_from_previous || 0);
+    
+    // Check if we've exceeded available days
+    if (availableDays !== null && currentDay > availableDays) {
+      console.log(`⚠️ Reached trip duration limit (${availableDays} days). Stopping schedule.`);
+      break;
+    }
+    
     // フライトの場合は到着が翌日になるので新しい日を作成
     if (place.transport_mode === 'flight' && currentPlaces.length > 0) {
       // 現在の日を完了
-      schedules.push(createDaySchedule(currentDay, currentPlaces));
+      schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
       currentDay++;
       currentPlaces = [];
       currentTime = 0;
       timeCounter = 9 * 60; // 翌日の9:00 AMから開始
     } else if (currentTime + placeTime > maxDailyMinutes && currentPlaces.length > 0) {
-      schedules.push(createDaySchedule(currentDay, currentPlaces));
+      schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
       currentDay++;
       currentPlaces = [];
       currentTime = 0;
       timeCounter = 9 * 60; // リセット
     }
+    
+    // Check again if we've exceeded available days after creating a new day
+    if (availableDays !== null && currentDay > availableDays) {
+      console.log(`⚠️ Reached trip duration limit (${availableDays} days). Stopping schedule.`);
+      break;
+    }
+    
     // 時間設定 - 1日の時間制限を適用
     if (place.travel_time_from_previous) {
       timeCounter += place.travel_time_from_previous;
     }
-    
-    // 1日の終了時刻（22:00 = 1320分）を超えないよう制限
-    const maxDayEndTime = 22 * 60; // 22:00
+    // 1日の終了時刻（20:00 = 1200分）を超えないよう制限（より現実的に）
+    const maxDayEndTime = 20 * 60; // 20:00
     const arrival = Math.min(timeCounter, maxDayEndTime);
     place.arrival_time = formatTime(arrival);
-    
     // 滞在時間を追加（ただし翌日にまたがらないよう調整）
     const stayDuration = Math.min(place.stay_duration_minutes, maxDayEndTime - arrival);
     timeCounter = arrival + stayDuration;
     place.departure_time = formatTime(timeCounter);
-    
     place.order_in_day = currentPlaces.length + 1;
     currentPlaces.push(place);
     currentTime += placeTime;
   }
-  // 最後の日を追加
-  if (currentPlaces.length > 0) {
-    schedules.push(createDaySchedule(currentDay, currentPlaces));
+  // 最後の日を追加（日数制限内の場合のみ）
+  if (currentPlaces.length > 0 && (availableDays === null || currentDay <= availableDays)) {
+    schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
   }
-  console.log(`✅ Created ${schedules.length} daily schedules`);
+  console.log(`✅ Created ${schedules.length} daily schedules (limit was ${availableDays || 'none'} days)`);
   return schedules;
 }
-function createDaySchedule(day, places) {
-  const date = new Date();
-  date.setDate(date.getDate() + day - 1);
+function createDaySchedule(day, places, tripStartDate = null) {
+  let date;
+  if (tripStartDate) {
+    date = new Date(tripStartDate);
+    date.setDate(date.getDate() + day - 1);
+  } else {
+    date = new Date();
+    date.setDate(date.getDate() + day - 1);
+  }
   return {
     day,
     date: date.toISOString().split('T')[0],
@@ -690,17 +743,13 @@ function formatTime(minutes) {
   if (typeof minutes !== 'number' || minutes < 0) {
     return '09:00:00';
   }
-  
   // Cap hours at 23:59:59 to prevent invalid time formats
   const maxMinutesPerDay = 23 * 60 + 59; // 1439 minutes = 23:59
   const cappedMinutes = Math.min(minutes, maxMinutesPerDay);
-  
   const hours = Math.floor(cappedMinutes / 60);
   const mins = cappedMinutes % 60;
-  
   // Ensure hours are within valid range (0-23)
   const validHours = Math.max(0, Math.min(23, hours));
-  
   return `${validHours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:00`;
 }
 // 最適化結果の検証
@@ -808,6 +857,27 @@ Deno.serve(async (req)=>{
     }
     console.log(`📍 Processing ${user_places?.length || 0} places for trip ${trip_id}`);
     const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    
+    // Get trip details including dates
+    const { data: tripData, error: tripError } = await supabase
+      .from('trips')
+      .select('start_date, end_date')
+      .eq('id', trip_id)
+      .single();
+    
+    if (tripError || !tripData) {
+      throw new Error(`Failed to get trip details: ${tripError?.message || 'Trip not found'}`);
+    }
+    
+    // Calculate available days
+    let availableDays = 1;
+    if (tripData.start_date && tripData.end_date) {
+      const startDate = new Date(tripData.start_date);
+      const endDate = new Date(tripData.end_date);
+      availableDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    }
+    console.log(`📅 Trip duration: ${availableDays} days`);
+    
     // データベースから場所を取得（user_placesが提供されていない場合）
     let places = user_places;
     if (!places || places.length === 0) {
@@ -840,9 +910,9 @@ Deno.serve(async (req)=>{
     });
     // 2. 希望度の正規化（必須機能）
     const normalizedPlaces = normalizePreferences(places);
-    // 3. 場所の絞り込み（公平性考慮）
+    // 3. 場所の絞り込み（公平性考慮）- Pass available days for time-based filtering
     const maxPlaces = constraints?.max_places || 20;
-    const filteredPlaces = filterPlacesByFairness(normalizedPlaces, maxPlaces);
+    const filteredPlaces = filterPlacesByFairness(normalizedPlaces, maxPlaces, availableDays);
     // 4. 出発地・目的地の固定（必須機能）
     const departure = filteredPlaces.find((p)=>p.place_type === 'departure');
     const destination = filteredPlaces.find((p)=>p.place_type === 'destination');
@@ -853,11 +923,62 @@ Deno.serve(async (req)=>{
     const routeWithAirports = await insertAirportsIfNeeded(supabase, optimizedRoute);
     // 7. 移動時間・移動手段計算
     const routeWithDetails = calculateRouteDetails(routeWithAirports);
-    // 8. 日別スケジュール作成
-    const dailySchedules = createDailySchedule(routeWithDetails);
+    // 8. 日別スケジュール作成 - Pass trip start date and available days
+    const dailySchedules = createDailySchedule(routeWithDetails, tripData.start_date, availableDays);
     // 9. 最適化スコア計算
     const optimizationScore = calculateOptimizationScore(routeWithDetails, dailySchedules);
     const executionTime = Date.now() - startTime;
+    
+    // Update places in database to mark which were selected
+    console.log('📝 Updating place selection status in database...');
+    const selectedPlaceIds = new Set(routeWithDetails.map(p => p.id));
+    const allPlaceIds = places.map(p => p.id);
+    
+    // Mark selected places
+    if (selectedPlaceIds.size > 0) {
+      const { error: updateSelectedError } = await supabase
+        .from('places')
+        .update({ 
+          is_selected_for_optimization: true,
+          selection_round: null // Will be updated below for round-robin selected places
+        })
+        .in('id', Array.from(selectedPlaceIds));
+      
+      if (updateSelectedError) {
+        console.error('❌ Failed to update selected places:', updateSelectedError);
+      }
+    }
+    
+    // Mark unselected places
+    const unselectedIds = allPlaceIds.filter(id => !selectedPlaceIds.has(id));
+    if (unselectedIds.length > 0) {
+      const { error: updateUnselectedError } = await supabase
+        .from('places')
+        .update({ 
+          is_selected_for_optimization: false,
+          selection_round: null
+        })
+        .in('id', unselectedIds);
+      
+      if (updateUnselectedError) {
+        console.error('❌ Failed to update unselected places:', updateUnselectedError);
+      }
+    }
+    
+    // Update selection round for places that have it
+    for (const place of routeWithDetails) {
+      if (place.selection_round) {
+        const { error: roundError } = await supabase
+          .from('places')
+          .update({ selection_round: place.selection_round })
+          .eq('id', place.id);
+        
+        if (roundError) {
+          console.error(`❌ Failed to update selection round for place ${place.id}:`, roundError);
+        }
+      }
+    }
+    
     // 10. 結果保存
     console.log('💾 Saving optimization result to database...');
     const { data: savedResult, error: saveError } = await supabase.from('optimization_results').insert({
