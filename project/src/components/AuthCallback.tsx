@@ -34,8 +34,16 @@ export function AuthCallback() {
         if (data.session && data.session.user) {
           console.log('✅ Auth callback successful:', data.session.user.id);
           console.log('✅ Provider:', data.session.user.app_metadata?.provider);
-          // The main App component will handle the authentication state change
-          navigate('/');
+          
+          // Check for pending share token
+          const pendingShareToken = localStorage.getItem('pendingShareToken');
+          if (pendingShareToken) {
+            console.log('🔗 Found pending share token, redirecting to shared trip:', pendingShareToken);
+            navigate(`/shared/${pendingShareToken}`);
+          } else {
+            // The main App component will handle the authentication state change
+            navigate('/');
+          }
         } else {
           console.log('❌ No session found in auth callback');
           navigate('/');

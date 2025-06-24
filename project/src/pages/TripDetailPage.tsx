@@ -79,6 +79,17 @@ export function TripDetailPage() {
   
   const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized } = useStore();
 
+  // Set the correct trip when tripId param is provided
+  useEffect(() => {
+    if (tripId && trips.length > 0) {
+      const targetTrip = trips.find(t => t.id === tripId);
+      if (targetTrip && (!currentTrip || currentTrip.id !== tripId)) {
+        console.log('🎯 TripDetailPage: Setting current trip from URL param:', tripId);
+        setCurrentTrip(targetTrip);
+      }
+    }
+  }, [tripId, trips, currentTrip, setCurrentTrip]);
+
   // Load trip members when current trip changes
   useEffect(() => {
     if (currentTrip?.id) {
