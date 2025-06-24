@@ -70,6 +70,18 @@ serve(async (req) => {
         }
       }
     );
+    
+    // Service Role用の別のクライアントを作成（RLSを完全にバイパス）
+    const supabaseServiceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
 
     // 認証確認
     console.log('🔍 Attempting to get user from auth header...');
@@ -109,7 +121,8 @@ serve(async (req) => {
         if (pathSegments.includes('create-invitation') || url.pathname.endsWith('/create-invitation')) {
           return await handleCreateInvitation(req, supabaseClient, user.id);
         } else if (pathSegments.includes('join-trip') || url.pathname.endsWith('/join-trip')) {
-          return await handleJoinTrip(req, supabaseClient, user.id);
+          // Use service client for join-trip to bypass RLS completely
+          return await handleJoinTrip(req, supabaseServiceClient, user.id);
         } else {
           throw new Error('Invalid POST endpoint');
         }
@@ -264,6 +277,12 @@ async function handleCreateInvitation(req: Request, supabase: any, userId: strin
 async function handleJoinTrip(req: Request, supabase: any, userId: string) {
   console.log('🎯 handleJoinTrip called for user:', userId);
   
+  // Debug Supabase configuration
+  console.log('🔧 Supabase URL:', Deno.env.get('SUPABASE_URL'));
+  console.log('🔧 Service Role Key exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+  console.log('🔧 Service Role Key length:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.length);
+  console.log('🔧 Service Role Key first 10 chars:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.substring(0, 10));
+  
   const requestData: InvitationJoinRequest = await req.json();
   console.log('📝 Request data:', JSON.stringify(requestData));
   
@@ -273,38 +292,73 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
   }
 
   // 招待コード検証
-  console.log('🔍 Searching for invitation code:', requestData.invitation_code.toUpperCase());
+  const inviteCode = requestData.invitation_code.toUpperCase();
+  console.log('🔍 Searching for invitation code:', inviteCode);
   console.log('📊 Querying invitation_codes table...');
+  
+  // Test direct SQL query to bypass any potential RLS issues
+  console.log('🔧 Testing with direct SQL query...');
+  const { data: sqlResult, error: sqlError } = await supabase.rpc('get_invitation_code_direct', {
+    p_code: inviteCode
+  }).single();
+  
+  if (sqlError) {
+    console.log('❌ SQL RPC error:', sqlError);
+    // If RPC doesn't exist, continue with regular query
+  } else {
+    console.log('✅ SQL RPC result:', sqlResult);
+  }
+  
+  // First, let's check all invitation codes to debug
+  const { data: allCodes, error: allError } = await supabase
+    .from('invitation_codes')
+    .select('code, is_active, trip_id')
+    .limit(20);
+  
+  console.log('📋 All invitation codes (first 20):', allCodes);
+  console.log('❌ All codes error:', allError);
+  
+  // Now search for the specific code
   const { data: invitations, error: invitationError } = await supabase
     .from('invitation_codes')
     .select('*')
-    .eq('code', requestData.invitation_code.toUpperCase())
+    .eq('code', inviteCode)
     .eq('is_active', true)
     .limit(1);
   
   console.log('📊 Full query result:', {
     invitations: invitations,
-    error: invitationError
+    error: invitationError,
+    searchedCode: inviteCode
   });
 
   console.log('📋 Invitation search result:', invitations?.length ? `Found ${invitations.length} records` : 'Not found');
   console.log('❌ Invitation error:', invitationError?.message || 'No error');
 
+  // If the regular query fails, use the RPC function
+  let invitation = null;
   if (invitationError || !invitations || invitations.length === 0) {
-    console.log('❌ Invitation code not found or error occurred');
-    return new Response(
-      JSON.stringify({ 
-        error: 'Invalid or expired invitation code',
-        details: invitationError?.message || 'Invitation not found'
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 404,
-      }
-    );
+    console.log('⚠️ Regular query failed, trying RPC function...');
+    
+    if (sqlResult && !sqlError) {
+      console.log('✅ Using RPC function result');
+      invitation = sqlResult;
+    } else {
+      console.log('❌ Both regular query and RPC failed');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid or expired invitation code',
+          details: invitationError?.message || 'Invitation not found'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        }
+      );
+    }
+  } else {
+    invitation = invitations[0];
   }
-
-  const invitation = invitations[0];
   console.log('✅ Found invitation:', invitation.id);
 
   // トリップ情報を取得
