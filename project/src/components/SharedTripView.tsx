@@ -359,7 +359,17 @@ export function SharedTripView() {
       console.log('🔄 Redirecting to trip page:', trip.name);
       
       // First, add user as member to the trip via share link join
-      await joinTripViaShareLink(trip.id);
+      const joinSuccess = await joinTripViaShareLink(trip.id);
+      
+      if (!joinSuccess) {
+        console.error('❌ Failed to join trip, aborting redirect');
+        setError('Failed to join trip. Please try again.');
+        setIsRedirecting(false);
+        return;
+      }
+      
+      // Wait a bit for database to update
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Reload trips to ensure user has access to the shared trip
       await loadTripsFromDatabase();
@@ -379,27 +389,27 @@ export function SharedTripView() {
       // Set as current trip and ensure it's selected
       await setCurrentTrip(tripObj);
       
-      // Add a small delay to ensure state is updated
-      setTimeout(() => {
-        // Navigate to trip detail page
-        navigate(`/trip/${trip.id}`);
-      }, 100);
+      // Navigate to trip detail page
+      console.log('✅ Navigating to trip page:', trip.id);
+      navigate(`/trip/${trip.id}`);
       
     } catch (error) {
       console.error('❌ Failed to redirect to trip page:', error);
       setError('Failed to access trip. Please try joining manually.');
+      setIsRedirecting(false);
     }
   };
 
 
-  const joinTripViaShareLink = async (tripId: string) => {
+  const joinTripViaShareLink = async (tripId: string): Promise<boolean> => {
     try {
       console.log('🔗 Joining trip via share link:', tripId);
       
       // Get current session for auth token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error('User not authenticated');
+        console.error('❌ No session found');
+        return false;
       }
 
       const userId = session.user.id;
@@ -407,49 +417,50 @@ export function SharedTripView() {
 
       // Check if user is already a member
       try {
-        const memberResponse = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/members/' + tripId, {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          },
-        });
+        const { data: existingMember, error: checkError } = await supabase
+          .from('trip_members')
+          .select('user_id')
+          .eq('trip_id', tripId)
+          .eq('user_id', userId)
+          .single();
         
-        if (memberResponse.ok) {
-          const membersData = await memberResponse.json();
-          const members = membersData.members || [];
-          const isAlreadyMember = members.some((m: any) => m.user_id === userId);
-          
-          if (isAlreadyMember) {
-            console.log('✅ User is already a trip member');
-            return;
-          }
+        if (existingMember && !checkError) {
+          console.log('✅ User is already a trip member');
+          return true;
         }
       } catch (error) {
-        console.log('⚠️ Could not check existing membership, proceeding to add user');
+        console.log('⚠️ User is not a member yet, proceeding to add');
       }
 
       // Add user as member with proper permissions based on share type
-      const { error } = await supabase
+      const { data: newMember, error } = await supabase
         .from('trip_members')
         .insert({
           trip_id: tripId,
           user_id: userId,
           role: 'member',
           joined_at: new Date().toISOString(),
-          can_add_places: shareData?.permissions?.can_add_places || false,
+          can_add_places: shareData?.permissions?.can_add_places || true,
           can_edit_places: shareData?.permissions?.can_edit_places || false,
-          can_optimize: shareData?.permissions?.can_optimize || false,
+          can_optimize: shareData?.permissions?.can_optimize || true,
           can_invite_members: false
-        });
+        })
+        .select();
 
-      if (error && !error.message.includes('duplicate')) {
-        throw error;
+      if (error) {
+        if (error.message.includes('duplicate')) {
+          console.log('✅ User is already a member (duplicate key)');
+          return true;
+        }
+        console.error('❌ Error adding user to trip:', error);
+        return false;
       }
       
-      console.log('✅ User added as trip member with permissions:', shareData?.permissions);
+      console.log('✅ User added as trip member:', newMember);
+      return true;
     } catch (error) {
       console.error('❌ Failed to join trip via share link:', error);
-      throw error;
+      return false;
     }
   };
 
@@ -680,7 +691,7 @@ export function SharedTripView() {
                 try {
                   // Store trip info for pending join
                   const pendingTrip = {
-                    shareToken: new URLSearchParams(window.location.search).get('token'),
+                    shareToken: shareToken,
                     tripId: shareData.trip.id,
                     tripName: shareData.trip.name
                   };
@@ -688,7 +699,7 @@ export function SharedTripView() {
                   console.log('🔗 Processing immediate trip join after auth:', pendingTrip);
                   
                   // Wait a bit for auth state to stabilize
-                  await new Promise(resolve => setTimeout(resolve, 500));
+                  await new Promise(resolve => setTimeout(resolve, 1000));
                   
                   // Get current session
                   const { data: { session } } = await supabase.auth.getSession();
@@ -700,32 +711,42 @@ export function SharedTripView() {
                     return;
                   }
 
+                  console.log('✅ Session found, user ID:', session.user.id);
+
                   // Add user as trip member with proper permissions
-                  const { error } = await supabase
+                  const { data: newMember, error } = await supabase
                     .from('trip_members')
                     .insert({
                       trip_id: pendingTrip.tripId,
                       user_id: session.user.id,
                       role: 'member',
                       joined_at: new Date().toISOString(),
-                      can_add_places: shareData.permissions?.can_add_places || false,
+                      can_add_places: shareData.permissions?.can_add_places || true,
                       can_edit_places: shareData.permissions?.can_edit_places || false,
-                      can_optimize: shareData.permissions?.can_optimize || false,
+                      can_optimize: shareData.permissions?.can_optimize || true,
                       can_invite_members: false
-                    });
+                    })
+                    .select();
 
-                  if (error && !error.message.includes('duplicate')) {
-                    console.error('Failed to add user to trip:', error);
+                  if (error) {
+                    if (!error.message.includes('duplicate')) {
+                      console.error('Failed to add user to trip:', error);
+                      localStorage.setItem('pendingShareToken', shareToken || '');
+                      window.location.reload();
+                      return;
+                    }
                   } else {
-                    console.log('✅ User added as trip member immediately with permissions:', shareData.permissions);
+                    console.log('✅ User added as trip member:', newMember);
                   }
 
-                  // Navigate to trip detail page
-                  navigate(`/trip/${pendingTrip.tripId}`);
+                  // Store share token and reload to properly initialize the app
+                  localStorage.setItem('pendingShareToken', shareToken || '');
+                  window.location.reload();
                   
                 } catch (error) {
                   console.error('Error processing immediate trip join:', error);
-                  // Fallback to reload
+                  // Store share token and reload
+                  localStorage.setItem('pendingShareToken', shareToken || '');
                   window.location.reload();
                 }
               }}

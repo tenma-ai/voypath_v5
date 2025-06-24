@@ -77,18 +77,33 @@ export function TripDetailPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMemberPopup]);
   
-  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized } = useStore();
+  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized, loadTripsFromDatabase } = useStore();
 
   // Set the correct trip when tripId param is provided
   useEffect(() => {
-    if (tripId && trips.length > 0) {
-      const targetTrip = trips.find(t => t.id === tripId);
-      if (targetTrip && (!currentTrip || currentTrip.id !== tripId)) {
-        console.log('🎯 TripDetailPage: Setting current trip from URL param:', tripId);
-        setCurrentTrip(targetTrip);
+    const checkAndSetTrip = async () => {
+      if (tripId) {
+        // If trips are not loaded yet, try loading them
+        if (trips.length === 0) {
+          console.log('🔄 TripDetailPage: No trips loaded yet, attempting to load...');
+          await loadTripsFromDatabase();
+          return; // Will re-run when trips update
+        }
+        
+        const targetTrip = trips.find(t => t.id === tripId);
+        if (targetTrip && (!currentTrip || currentTrip.id !== tripId)) {
+          console.log('🎯 TripDetailPage: Setting current trip from URL param:', tripId);
+          await setCurrentTrip(targetTrip);
+        } else if (!targetTrip) {
+          console.log('⚠️ TripDetailPage: Trip not found in user trips:', tripId);
+          // Try loading trips again in case it was just added
+          await loadTripsFromDatabase();
+        }
       }
-    }
-  }, [tripId, trips, currentTrip, setCurrentTrip]);
+    };
+    
+    checkAndSetTrip();
+  }, [tripId, trips, currentTrip, setCurrentTrip, loadTripsFromDatabase]);
 
   // Load trip members when current trip changes
   useEffect(() => {
