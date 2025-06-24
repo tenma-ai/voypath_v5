@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, MapPin, Calendar, Users, Edit, Trash2, Globe, Sparkles, TrendingUp, Clock, AlertCircle, Crown, Star, Zap, Gift, Settings } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -9,6 +9,7 @@ import { PremiumModal } from '../components/PremiumModal';
 import { TripSettingsModal } from '../components/TripSettingsModal';
 import { PremiumBadge } from '../components/PremiumBadge';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../lib/supabase';
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -27,6 +28,14 @@ export function HomePage() {
   const [editTripData, setEditTripData] = useState<any>(null);
   const [premiumFeature, setPremiumFeature] = useState<'trips' | 'members' | 'places' | undefined>();
   const [selectingTripId, setSelectingTripId] = useState<string | null>(null);
+  
+  // User statistics state
+  const [userStats, setUserStats] = useState({
+    placesVisited: 0,
+    routesOptimized: 0,
+    tripsPlanned: trips.length
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -87,6 +96,42 @@ export function HomePage() {
   };
 
   const isPremium = user?.isPremium && (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
+  
+  // Load user statistics
+  useEffect(() => {
+    const loadUserStats = async () => {
+      if (!user) {
+        setIsLoadingStats(false);
+        return;
+      }
+      
+      try {
+        // Get places visited (unique places across all trips)
+        const { count: placesCount } = await supabase
+          .from('places')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        
+        // Get routes optimized (count of optimization results created by user)
+        const { count: optimizationCount } = await supabase
+          .from('optimization_results')
+          .select('*', { count: 'exact', head: true })
+          .eq('created_by', user.id);
+        
+        setUserStats({
+          placesVisited: placesCount || 0,
+          routesOptimized: optimizationCount || 0,
+          tripsPlanned: trips.length
+        });
+      } catch (error) {
+        console.error('Failed to load user stats:', error);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+    
+    loadUserStats();
+  }, [user, trips]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -162,9 +207,9 @@ export function HomePage() {
       {/* Quick Stats */}
       <motion.div variants={itemVariants} className="grid grid-cols-3 gap-4 lg:gap-6">
         {[
-          { icon: MapPin, label: 'Places Visited', value: '127', color: 'from-primary-500 to-primary-600' },
-          { icon: TrendingUp, label: 'Routes Optimized', value: '43', color: 'from-secondary-500 to-secondary-600' },
-          { icon: Sparkles, label: 'Trips Planned', value: trips.length.toString(), color: 'from-accent-500 to-accent-600' },
+          { icon: MapPin, label: 'Places Added', value: isLoadingStats ? '...' : userStats.placesVisited.toString(), color: 'from-primary-500 to-primary-600' },
+          { icon: TrendingUp, label: 'Routes Optimized', value: isLoadingStats ? '...' : userStats.routesOptimized.toString(), color: 'from-secondary-500 to-secondary-600' },
+          { icon: Sparkles, label: 'Trips Planned', value: userStats.tripsPlanned.toString(), color: 'from-accent-500 to-accent-600' },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
