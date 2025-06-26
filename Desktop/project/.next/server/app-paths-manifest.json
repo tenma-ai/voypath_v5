@@ -1,0 +1,7 @@
+{
+  "/trips/new/page": "app/trips/new/page.js",
+  "/my-trip/page": "app/my-trip/page.js",
+  "/my-trip/my-places/add/page": "app/my-trip/my-places/add/page.js",
+  "/my-trip/chat/page": "app/my-trip/chat/page.js",
+  "/my-trip/my-places/page": "app/my-trip/my-places/page.js"
+}

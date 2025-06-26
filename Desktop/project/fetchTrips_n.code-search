@@ -1,0 +1,9 @@
+# Query: fetchTrips();\\n
+# ContextLines: 1
+
+1 件の結果 - 1 ファイル
+
+tmp/my-trip-new.tsx:
+  79      
+  80:     fetchTrips();  }, [sessionId, selectedTripId]);
+  81    }, [sessionId]);
