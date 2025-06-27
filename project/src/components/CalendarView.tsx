@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { Calendar, Clock, MapPin, List, Grid3X3, Car, UserRound } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getPlaceColor } from '../utils/ColorUtils';
+import { DateUtils } from '../utils/DateUtils';
 import CalendarGridView from './CalendarGridView';
 
 interface CalendarViewProps {
@@ -73,20 +74,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
 
   const formattedResult = formatOptimizationResult(optimizationResult);
 
-  // Calculate actual date based on trip start date and day number
+  // Calculate actual date based on trip start date and day number using DateUtils
   const calculateActualDate = (dayNumber: number): Date => {
-    if (currentTrip?.startDate || currentTrip?.start_date) {
-      const startDate = new Date(currentTrip.startDate || currentTrip.start_date);
-      const resultDate = new Date(startDate);
-      resultDate.setDate(startDate.getDate() + (dayNumber - 1));
-      return resultDate;
-    }
-    
-    // Fallback to today + day offset if no trip start date
-    const today = new Date();
-    const resultDate = new Date(today);
-    resultDate.setDate(today.getDate() + (dayNumber - 1));
-    return resultDate;
+    return DateUtils.calculateTripDate(currentTrip, dayNumber);
   };
 
   const formatTime = (timeString: string) => {
@@ -96,6 +86,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       minute: '2-digit',
       hour12: false
     });
+  };
+
+  const formatDate = (date: Date) => {
+    return DateUtils.formatCalendarDate(date);
   };
 
   const formatDuration = (minutes: number) => {
@@ -317,12 +311,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
               {/* Day Header */}
               <div className="bg-blue-50 px-3 py-1.5 sm:py-2 border-b border-gray-200">
                 <h3 className="text-xs sm:text-sm font-semibold text-blue-900">
-                  Day {dayData.day} - {calculateActualDate(dayData.day).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    weekday: 'long'
-                  })}
+                  Day {dayData.day} - {formatDate(calculateActualDate(dayData.day))}
                 </h3>
               </div>
               

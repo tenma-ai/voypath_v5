@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Clock, MapPin, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useStore } from '../store/useStore';
+import { DateUtils } from '../utils/DateUtils';
 
 interface Place {
   id: string;
@@ -221,12 +222,7 @@ const CalendarViewModal: React.FC<CalendarViewModalProps> = ({
                     {/* Day Header */}
                     <div className="bg-blue-50 px-3 py-2 border-b border-gray-200">
                       <h3 className="text-sm font-semibold text-blue-900">
-                        Day {dayData.day} - {new Date(dayData.date).toLocaleDateString('ja-JP', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          weekday: 'long'
-                        })}
+                        Day {dayData.day} - {DateUtils.formatCalendarDate(new Date(dayData.date))}
                       </h3>
                     </div>
                     

@@ -4,6 +4,7 @@ import { Calendar, Clock, MapPin, ChevronLeft, ChevronRight } from 'lucide-react
 import { MemberColorService } from '../services/MemberColorService';
 import { useStore } from '../store/useStore';
 import { getPlaceColor as getPlaceColorUtil } from '../utils/ColorUtils';
+import { DateUtils } from '../utils/DateUtils';
 
 interface CalendarGridViewProps {
   optimizationResult?: any;
@@ -43,10 +44,10 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
       console.log(`🔍 [CalendarGridView] Processing day ${dayIndex}:`, daySchedule);
       
       if (daySchedule.scheduled_places && Array.isArray(daySchedule.scheduled_places)) {
-        // Use day index to create dates if no date is provided
+        // Use trip start date and day number for consistent date calculation
         const scheduleDate = daySchedule.date 
           ? new Date(daySchedule.date)
-          : new Date(Date.now() + dayIndex * 24 * 60 * 60 * 1000); // Add days from today
+          : DateUtils.calculateTripDate(currentTrip, daySchedule.day || (dayIndex + 1));
         
         const dateKey = scheduleDate.toDateString();
         console.log(`🔍 [CalendarGridView] Date key for day ${dayIndex}: ${dateKey}`);
@@ -76,7 +77,17 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
     setMonthSchedule(schedule);
   }, [optimizationResult]);
 
-  // Generate calendar grid
+  // Initialize calendar to start from trip start date instead of today
+  useEffect(() => {
+    if (currentTrip) {
+      const tripStartDate = DateUtils.getTripStartDate(currentTrip);
+      if (tripStartDate) {
+        setCurrentDate(tripStartDate);
+      }
+    }
+  }, [currentTrip]);
+
+  // Generate calendar grid with complete weeks (fix week 29,30 cutoff issue)
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -84,17 +95,28 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startingDayOfWeek = firstDay.getDay(); // 0 = Sunday
+    const endingDayOfWeek = lastDay.getDay(); // 0 = Sunday
 
     const days = [];
     
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
+    // Add days from previous month to complete the first week
+    const prevMonth = new Date(year, month - 1, 0);
+    const daysFromPrevMonth = startingDayOfWeek;
+    for (let i = daysFromPrevMonth; i > 0; i--) {
+      const prevDate = new Date(year, month - 1, prevMonth.getDate() - i + 1);
+      days.push(prevDate);
     }
     
-    // Add all days of the month
+    // Add all days of the current month
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(new Date(year, month, day));
+    }
+    
+    // Add days from next month to complete the last week
+    const remainingCells = 42 - days.length; // 6 weeks * 7 days = 42 cells
+    for (let day = 1; day <= remainingCells; day++) {
+      const nextDate = new Date(year, month + 1, day);
+      days.push(nextDate);
     }
     
     return days;
@@ -183,7 +205,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-              {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+              {monthNames[currentDate.getMonth()]}
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-400">
               {Object.keys(monthSchedule).length} scheduled days
@@ -200,10 +222,17 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
             <ChevronLeft className="w-4 h-4 text-slate-600 dark:text-slate-400" />
           </button>
           <button
-            onClick={() => setCurrentDate(new Date())}
+            onClick={() => {
+              const tripStartDate = DateUtils.getTripStartDate(currentTrip);
+              if (tripStartDate) {
+                setCurrentDate(tripStartDate);
+              } else {
+                setCurrentDate(new Date());
+              }
+            }}
             className="px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
           >
-            Today
+            Trip Start
           </button>
           <button
             onClick={() => navigateMonth('next')}
@@ -231,18 +260,10 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
         {/* Calendar Days */}
         <div className="grid grid-cols-7">
           {days.map((day, index) => {
-            if (!day) {
-              return (
-                <div
-                  key={`empty-${index}`}
-                  className="h-20 border-r border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50"
-                />
-              );
-            }
-
             const dateKey = day.toDateString();
             const dayPlaces = monthSchedule[dateKey] || [];
             const isToday = day.toDateString() === new Date().toDateString();
+            const isCurrentMonth = day.getMonth() === currentDate.getMonth();
             
             // Debug log for days with places
             if (dayPlaces.length > 0) {
@@ -253,38 +274,58 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
               <div
                 key={day.toISOString()}
                 className={`h-20 border-r border-b border-slate-200 dark:border-slate-700 p-1 overflow-y-auto ${
-                  isToday ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-white dark:bg-slate-800'
+                  isToday 
+                    ? 'bg-blue-50 dark:bg-blue-900/20' 
+                    : isCurrentMonth 
+                      ? 'bg-white dark:bg-slate-800'
+                      : 'bg-slate-50/50 dark:bg-slate-800/30'
                 }`}
               >
                 {/* Date Number */}
                 <div className={`text-xs font-medium mb-0.5 ${
                   isToday 
                     ? 'text-blue-600 dark:text-blue-400' 
-                    : 'text-slate-900 dark:text-slate-100'
+                    : isCurrentMonth
+                      ? 'text-slate-900 dark:text-slate-100'
+                      : 'text-slate-400 dark:text-slate-500'
                 }`}>
                   {day.getDate()}
                 </div>
 
                 {/* Places for this day */}
                 <div className="space-y-0.5">
-                  {dayPlaces.slice(0, 2).map((place, placeIndex) => (
-                    <div
-                      key={place.id}
-                      className="text-xs p-0.5 rounded border-l-2 bg-slate-50 dark:bg-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
-                      style={{ borderLeftColor: getPlaceColor(place) }}
-                      title={`${place.name}${place.time ? ` at ${place.time}` : ''}`}
-                      onClick={() => setSelectedPlace(place)}
-                    >
-                      <div className="font-medium text-slate-900 dark:text-slate-100 truncate" style={{ fontSize: '10px' }}>
-                        {place.name}
+                  {dayPlaces.slice(0, 3).map((place, placeIndex) => {
+                    const placeColor = getPlaceColor(place);
+                    const timeDisplay = place.time ? place.time.slice(0, 5) : '';
+                    
+                    return (
+                      <div
+                        key={place.id}
+                        className="text-xs p-1 rounded border-l-2 cursor-pointer hover:shadow-sm transition-all duration-200"
+                        style={{ 
+                          borderLeftColor: placeColor,
+                          backgroundColor: `${placeColor}15`,
+                          borderLeftWidth: '3px'
+                        }}
+                        title={`${place.name}${place.time ? ` at ${place.time}` : ''}`}
+                        onClick={() => setSelectedPlace(place)}
+                      >
+                        <div className="font-medium text-slate-900 dark:text-slate-100 truncate leading-tight" style={{ fontSize: '9px' }}>
+                          {place.name}
+                        </div>
+                        {timeDisplay && (
+                          <div className="text-slate-600 dark:text-slate-400 truncate" style={{ fontSize: '8px' }}>
+                            {timeDisplay}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   
-                  {/* Show "more" indicator if there are more than 2 places */}
-                  {dayPlaces.length > 2 && (
-                    <div className="text-slate-500 dark:text-slate-400 px-0.5" style={{ fontSize: '10px' }}>
-                      +{dayPlaces.length - 2} more
+                  {/* Show "more" indicator if there are more than 3 places */}
+                  {dayPlaces.length > 3 && (
+                    <div className="text-slate-500 dark:text-slate-400 px-1 py-0.5 text-center" style={{ fontSize: '8px' }}>
+                      +{dayPlaces.length - 3} more
                     </div>
                   )}
                 </div>

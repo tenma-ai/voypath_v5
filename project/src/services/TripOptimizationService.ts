@@ -6,6 +6,7 @@
 
 import { supabase } from '../lib/supabase'
 import { MemberColorService } from './MemberColorService'
+import { DateUtils } from '../utils/DateUtils'
 import { 
   Place, 
   Trip, 
@@ -909,8 +910,9 @@ export class TripOptimizationService {
           }
 
           if (existingPlaces && existingPlaces.length > 0) {
-            // Use actual trip start date instead of daySchedule.date
-            const scheduleDate = trip?.start_date || daySchedule.date;
+            // Use actual scheduled date for this day, calculated from trip start date + day number
+            const scheduleDate = daySchedule.date || 
+              (trip?.start_date ? DateUtils.calculateTripDate({ start_date: trip.start_date }, daySchedule.day).toISOString().split('T')[0] : null);
             
             const { error } = await supabase
               .from('places')
