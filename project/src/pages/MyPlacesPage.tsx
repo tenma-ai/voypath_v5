@@ -18,7 +18,7 @@ export function MyPlacesPage() {
     stayDuration: 2,
     notes: ''
   });
-  const { places, currentTrip, trips, initializeFromDatabase, updatePlace, deletePlace } = useStore();
+  const { places, currentTrip, trips, initializeFromDatabase, updatePlace, deletePlace, hasUserOptimized, tripMembers, user } = useStore();
 
   // Check if deadline has passed
   const isDeadlinePassed = () => {
@@ -77,29 +77,59 @@ export function MyPlacesPage() {
   });
   
   // Choose which places to display based on active tab
-  const tripPlaces = activeTab === 'trip' ? allTripPlaces : myTripPlaces;
-
-  // Exclude departure and destination places from MyPlaces view
-  const displayPlaces = tripPlaces.filter(place => {
-    // Filter out system transportation places
-    const isSystemTransport = 
-      place.place_type === 'departure' || 
-      place.place_type === 'destination' ||
-      place.category === 'departure_point' ||
-      place.category === 'destination_point' ||
-      place.category === 'transportation' ||
-      place.source === 'system';
-    
-    return !isSystemTransport;
-  });
+  let displayPlaces;
+  if (activeTab === 'trip') {
+    // Trip places: All members' Scheduled places aggregated
+    displayPlaces = allTripPlaces.filter(place => {
+      // Filter out system transportation places
+      const isSystemTransport = 
+        place.place_type === 'departure' || 
+        place.place_type === 'destination' ||
+        place.category === 'departure_point' ||
+        place.category === 'destination_point' ||
+        place.category === 'transportation' ||
+        place.source === 'system';
+      
+      if (isSystemTransport) return false;
+      
+      // Only show scheduled places in trip view
+      return place.scheduled || place.is_selected_for_optimization;
+    });
+  } else {
+    // My places: All my places regardless of status
+    displayPlaces = myTripPlaces.filter(place => {
+      // Filter out system transportation places
+      const isSystemTransport = 
+        place.place_type === 'departure' || 
+        place.place_type === 'destination' ||
+        place.category === 'departure_point' ||
+        place.category === 'destination_point' ||
+        place.category === 'transportation' ||
+        place.source === 'system';
+      
+      return !isSystemTransport;
+    });
+  }
 
   const getPlaceStatus = (place: any) => {
-    // Check if place is actually scheduled (has been through optimization)
-    if (place.scheduled || (place.is_selected_for_optimization && place.optimized_at)) return 'scheduled';
-    // Check if place has pending status or is selected for optimization but not yet optimized
-    if (place.status === 'pending' || (place.is_selected_for_optimization && !place.optimized_at)) return 'pending';
-    // Otherwise it's unscheduled (not selected for optimization)
-    return 'unscheduled';
+    // Correct Places definitions according to requirements:
+    // Pending: Self-added but Optimize button not executed
+    // Scheduled: Optimize button executed and adopted as group place  
+    // Unscheduled: Optimize button executed but not adopted as group place
+    
+    if (!hasUserOptimized) {
+      // If user hasn't run optimization yet, all user places are pending
+      return 'pending';
+    }
+    
+    // After optimization has been run:
+    if (place.scheduled || place.is_selected_for_optimization) {
+      // Place was adopted by the optimization algorithm
+      return 'scheduled';
+    } else {
+      // Place was not adopted by the optimization algorithm
+      return 'unscheduled';
+    }
   };
   
   const filteredPlaces = displayPlaces.filter(place => {
@@ -298,7 +328,10 @@ export function MyPlacesPage() {
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>Trip Places ({allTripPlaces.filter(p => !p.place_type || (!['departure', 'destination'].includes(p.place_type) && p.category !== 'transportation')).length})</span>
+          <span>Trip Places ({allTripPlaces.filter(p => {
+            const isSystemTransport = p.place_type === 'departure' || p.place_type === 'destination' || p.category === 'transportation' || p.source === 'system';
+            return !isSystemTransport && (p.scheduled || p.is_selected_for_optimization);
+          }).length})</span>
         </button>
         <button
           onClick={() => setActiveTab('my')}
@@ -309,7 +342,10 @@ export function MyPlacesPage() {
           }`}
         >
           <Star className="w-4 h-4" />
-          <span>My Places ({myTripPlaces.filter(p => !p.place_type || (!['departure', 'destination'].includes(p.place_type) && p.category !== 'transportation')).length})</span>
+          <span>My Places ({myTripPlaces.filter(p => {
+            const isSystemTransport = p.place_type === 'departure' || p.place_type === 'destination' || p.category === 'transportation' || p.source === 'system';
+            return !isSystemTransport;
+          }).length})</span>
         </button>
       </div>
 
@@ -358,7 +394,7 @@ export function MyPlacesPage() {
 
       {/* Places Grid/List */}
       {viewMode === 'grid' ? (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {filteredPlaces.map((place, index) => (
             <motion.div
               key={place.id}
@@ -372,9 +408,9 @@ export function MyPlacesPage() {
                   placeName={place.name}
                   fallbackUrl={place.image_url || place.image || '/api/placeholder/400/300'}
                   alt={place.name}
-                  className="w-full h-32 object-cover"
+                  className="w-full h-24 sm:h-32 object-cover"
                 />
-                <div className="absolute top-2 right-2">
+                <div className="absolute top-1 sm:top-2 right-1 sm:right-2">
                   {(() => {
                     const status = getPlaceStatus(place);
                     const statusConfig = {
@@ -401,27 +437,27 @@ export function MyPlacesPage() {
                     const IconComponent = config.icon;
                     
                     return (
-                      <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+                      <div className={`flex items-center space-x-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
                         <IconComponent className="w-3 h-3" />
-                        <span>{config.label}</span>
+                        <span className="hidden sm:inline">{config.label}</span>
                       </div>
                     );
                   })()}
                 </div>
               </div>
               
-              <div className="p-3 space-y-2">
+              <div className="p-2 sm:p-3 space-y-1.5 sm:space-y-2">
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm line-clamp-2 flex-1 pr-2">
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-sm line-clamp-2 flex-1 pr-1 sm:pr-2">
                     {place.name}
                   </h3>
-                  <div className="flex space-x-1">
+                  <div className="flex space-x-0.5 sm:space-x-1 flex-shrink-0">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleEditPlace(place);
                       }}
-                      className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                      className="p-0.5 sm:p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                     >
                       <Edit className="w-3 h-3 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
                     </button>
@@ -430,27 +466,27 @@ export function MyPlacesPage() {
                         e.stopPropagation();
                         handleDeletePlace(place.id, place.name);
                       }}
-                      className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      className="p-0.5 sm:p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       <Trash2 className="w-3 h-3 text-red-500 hover:text-red-600" />
                     </button>
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                <div className="flex items-center justify-between gap-1">
+                  <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium truncate flex-shrink ${
                     categoryColors[place.category as keyof typeof categoryColors] || 'bg-slate-100 text-slate-600'
                   }`}>
                     {place.category}
                   </span>
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-0.5 flex-shrink-0">
                     {renderStars(place.wish_level || place.wishLevel || 0)}
                   </div>
                 </div>
                 
                 <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
-                  <Clock className="w-3 h-3 mr-1" />
-                  <span>{place.stay_duration_minutes ? (place.stay_duration_minutes / 60) : (place.stayDuration || 2)}h</span>
+                  <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                  <span className="truncate">{place.stay_duration_minutes ? (place.stay_duration_minutes / 60) : (place.stayDuration || 2)}h</span>
                 </div>
               </div>
             </motion.div>

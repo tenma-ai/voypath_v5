@@ -75,12 +75,14 @@ export function Layout() {
       <TopAppBar />
       
       <motion.main 
-        className="pb-24 pt-16 relative z-10"
+        className="pb-24 pt-16 relative z-10 overflow-x-hidden"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.3 }}
       >
-        <Outlet />
+        <div className="min-h-[calc(100vh-6rem)] px-3 sm:px-4 lg:px-6">
+          <Outlet />
+        </div>
       </motion.main>
       
       <Navigation />

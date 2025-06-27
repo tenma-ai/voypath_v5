@@ -14,6 +14,27 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    position: relative;
+  }
+  
+  /* Prevent horizontal scroll and maintain fixed positioning for navigation */
+  .fixed-nav {
+    position: fixed !important;
+    z-index: 9999;
+  }
+  
+  /* Mobile zoom and scroll fixes */
+  @media (max-width: 768px) {
+    body {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+      touch-action: pan-y;
+    }
+    
+    input, textarea, select {
+      font-size: 16px; /* Prevents zoom on iOS */
+    }
   }
 }
 

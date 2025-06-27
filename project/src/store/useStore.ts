@@ -445,7 +445,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           }
         }
       },
-      addPlace: async (place) => {
+      addPlace: async (place, options?: { skipDuplicateCheck?: boolean; autoMerge?: boolean }) => {
         const { currentTrip, user } = get();
         
         // Ensure we have current trip and user
@@ -454,6 +454,46 @@ export const useStore = create<StoreState>()((set, get) => ({
         }
         if (!user) {
           throw new Error('User not authenticated');
+        }
+
+        // Check for duplicates unless explicitly skipped
+        if (!options?.skipDuplicateCheck) {
+          try {
+            const { PlaceDuplicateService } = await import('../services/PlaceDuplicateService');
+            const duplicates = await PlaceDuplicateService.checkForDuplicates(currentTrip.id, {
+              google_place_id: place.google_place_id,
+              name: place.name,
+              latitude: place.latitude,
+              longitude: place.longitude
+            });
+
+            if (duplicates.length > 0) {
+              console.log('🔍 [Store] Found potential duplicates:', duplicates);
+              
+              if (options?.autoMerge) {
+                // Auto-merge with existing place (take highest values)
+                const existingPlace = duplicates[0];
+                const mergedData = {
+                  wish_level: Math.max(existingPlace.wish_level, place.wish_level || place.wishLevel || 5),
+                  stay_duration_minutes: Math.max(
+                    existingPlace.stay_duration_minutes, 
+                    Math.max(30, place.stay_duration_minutes || (place.stayDuration || 2) * 60)
+                  ),
+                  notes: [existingPlace.notes, place.notes].filter(Boolean).join(' | ') || null
+                };
+
+                // Update existing place instead of creating new one
+                await get().updatePlace(existingPlace.id, mergedData);
+                console.log('✅ [Store] Auto-merged with existing place');
+                return { merged: true, existingPlace, duplicates };
+              } else {
+                // Return duplicates for UI handling
+                return { duplicates, requiresUserDecision: true };
+              }
+            }
+          } catch (error) {
+            console.warn('Duplicate check failed, proceeding with place addition:', error);
+          }
         }
 
         // Ensure place has correct trip and user IDs
@@ -495,7 +535,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             image_url: placeWithIds.image_url,
             images: placeWithIds.images,
             is_selected_for_optimization: false,  // Places start as pending, not auto-selected for optimization
-          status: 'pending'  // New places are pending until user decides to optimize
+            status: 'pending'  // New places are pending until user decides to optimize
           };
 
           const result = await addPlaceToDatabase(placeData);
@@ -503,6 +543,8 @@ export const useStore = create<StoreState>()((set, get) => ({
           
           // Reload places for current trip to ensure consistency
           await get().loadPlacesFromDatabase(currentTrip.id);
+          
+          return { success: true, place: result.place };
           
         } catch (error) {
           console.error('Failed to save place to database:', error);
@@ -566,6 +608,93 @@ export const useStore = create<StoreState>()((set, get) => ({
           }
         } catch (error) {
           console.error('Failed to delete place:', error);
+        }
+      },
+
+      // Duplicate management
+      findDuplicatesInTrip: async (tripId?: string) => {
+        const { currentTrip } = get();
+        const targetTripId = tripId || currentTrip?.id;
+        
+        if (!targetTripId) {
+          throw new Error('No trip ID provided');
+        }
+
+        try {
+          const { PlaceDuplicateService } = await import('../services/PlaceDuplicateService');
+          return await PlaceDuplicateService.findAllDuplicatesInTrip(targetTripId);
+        } catch (error) {
+          console.error('Failed to find duplicates:', error);
+          return [];
+        }
+      },
+
+      mergeDuplicateGroup: async (duplicateGroup) => {
+        try {
+          const { PlaceDuplicateService } = await import('../services/PlaceDuplicateService');
+          const success = await PlaceDuplicateService.mergeDuplicatePlaces(duplicateGroup);
+          
+          if (success) {
+            // Reload places to reflect the merge
+            const { currentTrip } = get();
+            if (currentTrip) {
+              await get().loadPlacesFromDatabase(currentTrip.id);
+            }
+          }
+          
+          return success;
+        } catch (error) {
+          console.error('Failed to merge duplicate group:', error);
+          return false;
+        }
+      },
+
+      autoMergeAllDuplicates: async (tripId?: string) => {
+        const { currentTrip } = get();
+        const targetTripId = tripId || currentTrip?.id;
+        
+        if (!targetTripId) {
+          throw new Error('No trip ID provided');
+        }
+
+        try {
+          const { PlaceDuplicateService } = await import('../services/PlaceDuplicateService');
+          const mergedCount = await PlaceDuplicateService.autoMergeAllDuplicates(targetTripId);
+          
+          // Reload places to reflect the merges
+          await get().loadPlacesFromDatabase(targetTripId);
+          
+          return mergedCount;
+        } catch (error) {
+          console.error('Failed to auto-merge duplicates:', error);
+          return 0;
+        }
+      },
+
+      getDuplicateSummary: async (tripId?: string) => {
+        const { currentTrip } = get();
+        const targetTripId = tripId || currentTrip?.id;
+        
+        if (!targetTripId) {
+          return {
+            totalDuplicateGroups: 0,
+            totalDuplicatePlaces: 0,
+            potentialSavings: 'No trip selected',
+            groups: []
+          };
+        }
+
+        try {
+          const { PlaceDuplicateService } = await import('../services/PlaceDuplicateService');
+          return await PlaceDuplicateService.getDuplicateSummary(targetTripId);
+        } catch (error) {
+          console.error('Failed to get duplicate summary:', error);
+          return {
+            totalDuplicateGroups: 0,
+            totalDuplicatePlaces: 0,
+            potentialSavings: 'Error calculating',
+            groups: []
+          };
         }
       },
 

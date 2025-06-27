@@ -4,6 +4,7 @@
  * Integrates all Phase 8 visualization components
  */
 import React, { useState, useEffect } from 'react';
+import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar,
@@ -95,70 +96,14 @@ export default function OptimizationResultsVisualization({
   onShare,
   className = ''
 }: OptimizationResultsVisualizationProps) {
+  const { memberColors } = useStore();
   const [viewMode, setViewMode] = useState<ViewMode>('overview');
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('split');
   const [selectedDay, setSelectedDay] = useState(0);
-  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [showProgressVisualization, setShowProgressVisualization] = useState(true);
 
-  useEffect(() => {
-    initializeMemberColors();
-  }, [optimizedTrip, optimizationResult, initializeMemberColors]);
-
-  const initializeMemberColors = async () => {
-    // Use optimizationResult if available, fallback to optimizedTrip
-    const dataSource = optimizationResult || optimizedTrip;
-    if (!dataSource) return;
-
-    try {
-      // Try to get trip ID from either source
-      const tripId = optimizedTrip?.tripId || 'fallback-trip';
-      
-      // Get existing color mapping or create fallback
-      const colorMapping = tripId !== 'fallback-trip' 
-        ? await MemberColorService.getSimpleColorMapping(tripId)
-        : {};
-      
-      // If no colors assigned, create fallback mapping
-      if (Object.keys(colorMapping).length === 0) {
-        const fallbackColors: Record<string, string> = {};
-        
-        // Extract unique member IDs from optimization result or optimized trip
-        const memberIds = new Set<string>();
-        
-        if (optimizationResult?.optimization?.places) {
-          // Extract from Edge Function response
-          optimizationResult.optimization.places.forEach(place => {
-            if (place.user_id) {
-              memberIds.add(place.user_id);
-            }
-          });
-        } else if (optimizedTrip?.detailedSchedule) {
-          // Extract from legacy optimized trip
-          optimizedTrip.detailedSchedule.forEach(day => {
-            day.places.forEach(place => {
-              place.member_preferences?.forEach(pref => {
-                memberIds.add(pref.member_id);
-              });
-            });
-          });
-        }
-
-        // Assign colors to members
-        Array.from(memberIds).forEach((memberId, index) => {
-          fallbackColors[memberId] = MemberColorService.getColorForOptimization(memberId, {});
-        });
-
-        setMemberColors(fallbackColors);
-      } else {
-        setMemberColors(colorMapping);
-      }
-    } catch (error) {
-      console.error('Error initializing member colors:', error);
-      setMemberColors({});
-    }
-  };
+  // Member colors are now loaded centrally via store
 
   const handlePlaceSelect = (place: OptimizedPlace) => {
     setViewMode('details');

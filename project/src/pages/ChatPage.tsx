@@ -53,14 +53,13 @@ interface MessageRead {
 
 
 export function ChatPage() {
-  const { currentTrip, user } = useStore();
+  const { currentTrip, user, memberColors } = useStore();
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const [showReadDetails, setShowReadDetails] = useState<string | null>(null);
-  const [memberColors, setMemberColors] = useState<Record<string, string>>({});
   const [currentUserColor, setCurrentUserColor] = useState<RefinedColor | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -514,15 +513,11 @@ export function ChatPage() {
     };
   }, [currentTrip?.id, user?.id]);
 
-  // メンバーカラー読み込み
-  const loadMemberColors = useCallback(async () => {
+  // 現在のユーザーのカラー取得 (memberColors は store から取得)
+  const loadCurrentUserColor = useCallback(async () => {
     if (!currentTrip?.id || !user?.id) return;
 
     try {
-      // すべてのメンバーのカラーマッピングを取得
-      const colorMapping = await MemberColorService.getSimpleColorMapping(currentTrip.id);
-      setMemberColors(colorMapping);
-      
       // 現在のユーザーのカラーを取得
       const userColor = await MemberColorService.getMemberColor(currentTrip.id, user.id);
       setCurrentUserColor(userColor);
@@ -533,15 +528,15 @@ export function ChatPage() {
         setCurrentUserColor(assignedColor);
       }
     } catch (error) {
-      console.error('❌ Failed to load member colors:', error);
+      console.error('❌ Failed to load current user color:', error);
     }
   }, [currentTrip?.id, user?.id]);
 
   // 初期データ読み込み
   useEffect(() => {
     loadMessages();
-    loadMemberColors();
-  }, [loadMessages, loadMemberColors]);
+    loadCurrentUserColor();
+  }, [loadMessages, loadCurrentUserColor]);
 
   // 自動スクロール
   const scrollToBottom = () => {
