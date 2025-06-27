@@ -826,18 +826,21 @@ export function ChatPage() {
                               onClick={() => setShowReadDetails(showReadDetails === msg.id ? null : msg.id)}
                               className="flex items-center space-x-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded px-1 py-0.5 transition-colors"
                             >
-                              {msg.reads.slice(0, 3).map((read) => {
-                                const memberColor = memberColors[read.user_id] || '#6B7280';
-                                return (
-                                  <div 
-                                    key={read.id}
-                                    className="w-3 h-3 rounded-full border border-white"
-                                    style={{ backgroundColor: memberColor }}
-                                  />
-                                );
-                              })}
-                              {msg.reads.length > 3 && (
-                                <span className="text-xs text-slate-400 ml-1">+{msg.reads.length - 3}</span>
+                              {msg.reads
+                                .filter(read => read.user_id !== user?.id) // 自分を除外
+                                .slice(0, 3)
+                                .map((read) => {
+                                  const memberColor = memberColors[read.user_id] || '#6B7280';
+                                  return (
+                                    <div 
+                                      key={read.id}
+                                      className="w-3 h-3 rounded-full border border-white"
+                                      style={{ backgroundColor: memberColor }}
+                                    />
+                                  );
+                                })}
+                              {msg.reads.filter(read => read.user_id !== user?.id).length > 3 && (
+                                <span className="text-xs text-slate-400 ml-1">+{msg.reads.filter(read => read.user_id !== user?.id).length - 3}</span>
                               )}
                             </button>
                           </div>
@@ -869,7 +872,7 @@ export function ChatPage() {
                                 <div className="flex items-center justify-between mb-3">
                                   <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center">
                                     <Clock className="w-4 h-4 mr-2" />
-                                    Read by {msg.reads.length} {msg.reads.length === 1 ? 'person' : 'people'}
+                                    Read by {msg.reads.filter(read => read.user_id !== user?.id).length} {msg.reads.filter(read => read.user_id !== user?.id).length === 1 ? 'person' : 'people'}
                                   </h3>
                                   <button
                                     onClick={() => setShowReadDetails(null)}
@@ -880,6 +883,7 @@ export function ChatPage() {
                                 </div>
                                 <div className="space-y-2 max-h-48 overflow-y-auto">
                                   {msg.reads
+                                    .filter(read => read.user_id !== user?.id) // 自分を除外
                                     .sort((a, b) => new Date(b.read_at).getTime() - new Date(a.read_at).getTime())
                                     .map((read) => {
                                       const memberColor = memberColors[read.user_id] || '#6B7280';

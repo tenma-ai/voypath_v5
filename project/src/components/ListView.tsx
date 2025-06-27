@@ -6,6 +6,7 @@ import { Place } from '../types/optimization';
 import { PlaceSearchInput } from './common/PlaceSearchInput';
 import { GooglePlace } from '../services/PlaceSearchService';
 import { calculatePlaceColor, getCSSProperties, PlaceColorResult } from '../utils/PlaceColorHelper';
+import { TransportIcon, getTransportColor, getTransportEmoji } from '../utils/transportIcons';
 
 interface ScheduleEvent {
   id: string;
@@ -34,26 +35,10 @@ interface DaySchedule {
   events: ScheduleEvent[];
 }
 
-// Transportation mode colors (車・飛行機・徒歩のみ)
-const transportColors = {
-  walking: '#10B981',        // Green
-  car: '#6B7280',            // Gray
-  flight: '#EC4899',         // Pink
-  travel: '#3B82F6',         // Blue for generic travel
-  default: '#6B7280'         // Gray default
-};
-
-// Transportation mode icons (車・飛行機・徒歩のみ)
+// Use centralized transport utilities from utils/transportIcons.tsx
+// Legacy function for backward compatibility
 const getTransportIcon = (mode?: string): string => {
-  const transportIcons = {
-    walking: '🚶',
-    car: '🚗',
-    flight: '✈️',
-    travel: '🚗',
-    default: '🚶'
-  };
-  
-  return transportIcons[mode] || transportIcons.default;
+  return getTransportEmoji(mode || 'car');
 };
 
 export function ListView() {

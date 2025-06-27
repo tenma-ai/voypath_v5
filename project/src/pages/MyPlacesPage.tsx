@@ -11,6 +11,7 @@ export function MyPlacesPage() {
   const [activeTab, setActiveTab] = useState<'trip' | 'my'>('my');
   const [filter, setFilter] = useState('all');
   const [editingPlace, setEditingPlace] = useState<string | null>(null);
+  const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
   const [editForm, setEditForm] = useState({
     name: '',
     category: '',
@@ -18,7 +19,7 @@ export function MyPlacesPage() {
     stayDuration: 2,
     notes: ''
   });
-  const { places, currentTrip, trips, initializeFromDatabase, updatePlace, deletePlace, hasUserOptimized, tripMembers, user } = useStore();
+  const { places, currentTrip, trips, initializeFromDatabase, updatePlace, deletePlace, hasUserOptimized, tripMembers, user, memberColors } = useStore();
 
   // Check if deadline has passed
   const isDeadlinePassed = () => {
@@ -138,6 +139,25 @@ export function MyPlacesPage() {
     if (filter === 'unscheduled') return status === 'unscheduled';
     if (filter === 'pending') return status === 'pending';
     return true;
+  }).sort((a, b) => {
+    // Sort by status first (Scheduled → Pending → Unscheduled), then by visit order
+    const statusA = getPlaceStatus(a);
+    const statusB = getPlaceStatus(b);
+    
+    const statusPriority = { 'scheduled': 0, 'pending': 1, 'unscheduled': 2 };
+    const priorityDiff = statusPriority[statusA as keyof typeof statusPriority] - statusPriority[statusB as keyof typeof statusPriority];
+    
+    if (priorityDiff !== 0) return priorityDiff;
+    
+    // Within same status, sort by visit order (scheduled_date or created_at)
+    const dateA = a.scheduled_date || a.scheduledDate || a.created_at;
+    const dateB = b.scheduled_date || b.scheduledDate || b.created_at;
+    
+    if (dateA && dateB) {
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
+    }
+    
+    return 0;
   });
 
   const categoryColors = {
@@ -221,6 +241,30 @@ export function MyPlacesPage() {
       stayDuration: 2,
       notes: ''
     });
+  };
+
+  const handleCardFlip = (placeId: string) => {
+    const newFlippedCards = new Set(flippedCards);
+    if (newFlippedCards.has(placeId)) {
+      newFlippedCards.delete(placeId);
+    } else {
+      newFlippedCards.add(placeId);
+    }
+    setFlippedCards(newFlippedCards);
+  };
+
+  // Get member info for a place
+  const getMemberInfo = (place: any) => {
+    const userId = place.user_id || place.userId;
+    if (!userId) return { name: 'Unknown', color: '#6B7280' };
+    
+    const member = tripMembers.find(m => m.user_id === userId);
+    const memberColor = memberColors[userId] || '#6B7280';
+    
+    return {
+      name: member?.name || 'Unknown Member',
+      color: memberColor
+    };
   };
 
   // Show message if no trip is selected
@@ -394,102 +438,186 @@ export function MyPlacesPage() {
       {/* Places Grid/List */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          {filteredPlaces.map((place, index) => (
-            <motion.div
-              key={place.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-lg transition-shadow"
-            >
-              <div className="relative">
-                <PlaceImage
-                  placeName={place.name}
-                  fallbackUrl={place.image_url || place.image || '/api/placeholder/400/300'}
-                  alt={place.name}
-                  className="w-full h-24 sm:h-32 object-cover"
-                />
-                <div className="absolute top-1 sm:top-2 right-1 sm:right-2">
-                  {(() => {
-                    const status = getPlaceStatus(place);
-                    const statusConfig = {
-                      scheduled: { 
-                        bg: 'bg-green-100 dark:bg-green-900/20', 
-                        text: 'text-green-800 dark:text-green-300',
-                        icon: CheckCircle,
-                        label: place.scheduledDate || 'Scheduled'
-                      },
-                      pending: { 
-                        bg: 'bg-yellow-100 dark:bg-yellow-900/20', 
-                        text: 'text-yellow-800 dark:text-yellow-300',
-                        icon: HelpCircle,
-                        label: 'Pending'
-                      },
-                      unscheduled: { 
-                        bg: 'bg-slate-100 dark:bg-slate-700', 
-                        text: 'text-slate-600 dark:text-slate-400',
-                        icon: Clock,
-                        label: 'Unscheduled'
-                      }
-                    };
-                    const config = statusConfig[status as keyof typeof statusConfig];
-                    const IconComponent = config.icon;
+          {filteredPlaces.map((place, index) => {
+            const isFlipped = flippedCards.has(place.id);
+            const status = getPlaceStatus(place);
+            const memberInfo = getMemberInfo(place);
+            
+            return (
+              <motion.div
+                key={place.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="relative bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer"
+                style={{ perspective: '1000px', height: '250px' }}
+                onClick={() => handleCardFlip(place.id)}
+              >
+                <div 
+                  className={`relative w-full h-full transition-transform duration-500 transform-gpu ${isFlipped ? 'rotate-y-180' : ''}`}
+                  style={{ transformStyle: 'preserve-3d' }}
+                >
+                  {/* Front Side */}
+                  <div 
+                    className="absolute inset-0 w-full h-full backface-hidden"
+                    style={{ backfaceVisibility: 'hidden' }}
+                  >
+                    <div className="relative h-3/5">
+                      <PlaceImage
+                        placeName={place.name}
+                        fallbackUrl={place.image_url || place.image || '/api/placeholder/400/300'}
+                        alt={place.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Status Badge - Only show for My Places */}
+                      {activeTab === 'my' && (
+                        <div className="absolute top-2 right-2">
+                          {(() => {
+                            const statusConfig = {
+                              scheduled: { 
+                                bg: 'bg-green-100 dark:bg-green-900/20', 
+                                text: 'text-green-800 dark:text-green-300',
+                                icon: CheckCircle
+                              },
+                              pending: { 
+                                bg: 'bg-yellow-100 dark:bg-yellow-900/20', 
+                                text: 'text-yellow-800 dark:text-yellow-300',
+                                icon: HelpCircle
+                              },
+                              unscheduled: { 
+                                bg: 'bg-slate-100 dark:bg-slate-700', 
+                                text: 'text-slate-600 dark:text-slate-400',
+                                icon: Clock
+                              }
+                            };
+                            const config = statusConfig[status as keyof typeof statusConfig];
+                            const IconComponent = config.icon;
+                            
+                            return (
+                              <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+                                <IconComponent className="w-3 h-3" />
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
                     
-                    return (
-                      <div className={`flex items-center space-x-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-                        <IconComponent className="w-3 h-3" />
-                        <span className="hidden sm:inline">{config.label}</span>
+                    <div className="p-3 h-2/5 flex flex-col justify-between">
+                      <div>
+                        {/* Date and Place Name */}
+                        <div className="mb-2">
+                          {(place.scheduled_date || place.scheduledDate) && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                              {new Date(place.scheduled_date || place.scheduledDate).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </div>
+                          )}
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm line-clamp-2">
+                            {place.name}
+                          </h3>
+                        </div>
                       </div>
-                    );
-                  })()}
-                </div>
-              </div>
-              
-              <div className="p-2 sm:p-3 space-y-1.5 sm:space-y-2">
-                <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-sm line-clamp-2 flex-1 pr-1 sm:pr-2">
-                    {place.name}
-                  </h3>
-                  <div className="flex space-x-0.5 sm:space-x-1 flex-shrink-0">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditPlace(place);
-                      }}
-                      className="p-0.5 sm:p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <Edit className="w-3 h-3 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeletePlace(place.id, place.name);
-                      }}
-                      className="p-0.5 sm:p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3 text-red-500 hover:text-red-600" />
-                    </button>
+                      
+                      {/* Edit/Delete Actions */}
+                      <div className="flex justify-end space-x-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditPlace(place);
+                          }}
+                          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          <Edit className="w-3 h-3 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePlace(place.id, place.name);
+                          }}
+                          className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3 text-red-500 hover:text-red-600" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Back Side */}
+                  <div 
+                    className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 p-4 flex flex-col justify-between"
+                    style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                  >
+                    <div className="space-y-3">
+                      {/* Visit Time */}
+                      {(place.scheduled_date || place.scheduledDate) && (
+                        <div>
+                          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Visit Time</div>
+                          <div className="text-sm text-slate-900 dark:text-slate-100">
+                            {new Date(place.scheduled_date || place.scheduledDate).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Added by (Trip Places only) */}
+                      {activeTab === 'trip' && (
+                        <div>
+                          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Added by</div>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <div 
+                              className="w-4 h-4 rounded-full"
+                              style={{ backgroundColor: memberInfo.color }}
+                            ></div>
+                            <span className="text-sm text-slate-900 dark:text-slate-100">{memberInfo.name}</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Wish Level */}
+                      <div>
+                        <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Wish Level</div>
+                        <div className="flex items-center space-x-1 mt-1">
+                          {renderStars(place.wish_level || place.wishLevel || 0)}
+                        </div>
+                      </div>
+                      
+                      {/* Place Type */}
+                      <div>
+                        <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Type</div>
+                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${
+                          categoryColors[place.category as keyof typeof categoryColors] || 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {place.category}
+                        </span>
+                      </div>
+                      
+                      {/* Duration */}
+                      <div>
+                        <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Duration</div>
+                        <div className="flex items-center space-x-1 mt-1">
+                          <Clock className="w-3 h-3 text-slate-500" />
+                          <span className="text-sm text-slate-900 dark:text-slate-100">
+                            {place.stay_duration_minutes ? (place.stay_duration_minutes / 60) : (place.stayDuration || 2)}h
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="text-xs text-slate-400 text-center">
+                      Click to flip back
+                    </div>
                   </div>
                 </div>
-                
-                <div className="flex items-center justify-between gap-1">
-                  <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium truncate flex-shrink ${
-                    categoryColors[place.category as keyof typeof categoryColors] || 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {place.category}
-                  </span>
-                  <div className="flex items-center space-x-0.5 flex-shrink-0">
-                    {renderStars(place.wish_level || place.wishLevel || 0)}
-                  </div>
-                </div>
-                
-                <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
-                  <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
-                  <span className="truncate">{place.stay_duration_minutes ? (place.stay_duration_minutes / 60) : (place.stayDuration || 2)}h</span>
-                </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       ) : (
         <div className="space-y-3">

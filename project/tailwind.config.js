@@ -244,6 +244,12 @@ export default {
         'smooth-in': 'cubic-bezier(0.4, 0, 1, 1)',
         'smooth-out': 'cubic-bezier(0, 0, 0.2, 1)',
       },
+      transform: {
+        'preserve-3d': 'preserve-3d',
+      },
+      rotate: {
+        'y-180': 'rotateY(180deg)',
+      },
     },
   },
   plugins: [],

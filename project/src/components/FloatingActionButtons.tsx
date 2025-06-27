@@ -166,7 +166,7 @@ export function FloatingActionButtons() {
             
             {/* Tooltip */}
             <div className="absolute right-full mr-3 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-sm rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap pointer-events-none">
-              Add Place
+              Add
               <div className="absolute left-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-l-slate-900 dark:border-l-slate-700"></div>
             </div>
           </motion.div>

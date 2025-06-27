@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Clock, MapPin, DollarSign, Car, Train, Calendar, Star, AlertCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Place, DetailedSchedule, PlaceWithTiming } from '../types/optimization';
+import { TransportIcon, getTransportColor, getTransportEmoji } from '../utils/transportIcons';
 
 interface OptimizedTimelineViewProps {
   optimizationResult?: DetailedSchedule;
@@ -154,18 +155,9 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
     return meals;
   };
 
-  const getTransportIcon = (mode: string) => {
-    switch (mode) {
-      case 'walking':
-      case 'walk':
-        return '🚶';
-      case 'car':
-        return '🚗';
-      case 'flight':
-        return '✈️';
-      default:
-        return '🚗'; // デフォルトは車
-    }
+  // Use centralized transport utility
+  const getTransportIconLocal = (mode: string) => {
+    return getTransportEmoji(mode);
   };
 
   const getCategoryIcon = (category: string) => {
@@ -386,9 +378,11 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
                           className="relative flex items-center space-x-4 ml-8"
                         >
                           <div className="w-8 h-8 bg-slate-300 dark:bg-slate-600 rounded-lg flex items-center justify-center">
-                            {React.createElement(getTransportIcon(item.transportMode || 'transit'), {
-                              className: "w-4 h-4 text-slate-600 dark:text-slate-300"
-                            })}
+                            <TransportIcon 
+                              mode={item.transportMode || 'car'} 
+                              size={16}
+                              className="filter brightness-0 dark:brightness-100 opacity-70"
+                            />
                           </div>
                           <div className="text-sm text-slate-500 dark:text-slate-400">
                             {formatDuration(item.travelTimeToNext!)} travel time

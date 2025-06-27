@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, MapPin, Users, TrendingUp, CheckCircle, X, Calendar, Map, List, Eye } from 'lucide-react';
 import MapViewModal from './MapViewModal';
 import ListViewModal from './ListViewModal';
+import { TransportIcon, getTransportColor, getTransportEmoji } from '../utils/transportIcons';
 
 // Edge Function response structure (from optimize-route/index.ts)
 interface OptimizationResult {
@@ -139,19 +140,9 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
     return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}min` : `${hours}h`;
   };
 
-  const getTransportIcon = (mode: string): string => {
-    switch (mode?.toLowerCase()) {
-      case 'driving':
-      case 'car':
-        return '🚗';
-      case 'walking':
-      case 'walk':
-        return '🚶';
-      case 'flight':
-        return '✈️';
-      default:
-        return '🚗'; // デフォルトは車
-    }
+  // Use centralized transport utility
+  const getTransportIconLocal = (mode: string): string => {
+    return getTransportEmoji(mode);
   };
 
   const formatTime = (timeString: string): string => {
@@ -506,9 +497,13 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 text-slate-500 dark:text-slate-400">
-                        <span className="text-xs">
-                          {getTransportIcon(scheduledPlace?.transport_mode)}
-                        </span>
+                        <div className="flex items-center">
+                          <TransportIcon 
+                            mode={scheduledPlace?.transport_mode || 'car'} 
+                            size={14}
+                            className="filter brightness-0 dark:brightness-100 opacity-70"
+                          />
+                        </div>
                         {(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0) > 0 && (
                           <span className="text-xs">
                             {formatMinutes(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0)}
