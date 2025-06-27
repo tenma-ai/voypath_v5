@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Grid3X3, List, Star, Clock, AlertCircle, Plus, Edit, Trash2, MoreVertical } from 'lucide-react';
+import { Grid3X3, List, Star, Clock, AlertCircle, Plus, Edit, Trash2, MoreVertical, CheckCircle, HelpCircle, Users } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { PlaceImage } from '../components/PlaceImage';
 export function MyPlacesPage() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [activeTab, setActiveTab] = useState<'trip' | 'my'>('my');
   const [filter, setFilter] = useState('all');
   const [editingPlace, setEditingPlace] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
@@ -60,13 +61,23 @@ export function MyPlacesPage() {
     loadPlacesForCurrentTrip();
   }, [currentTrip?.id]); // Re-run when currentTrip changes
 
-  // Filter places for current trip AND current user only (my wish places)
+  // Get all trip places and my places separately
   const { user } = useStore();
-  const tripPlaces = places.filter(place => {
+  
+  // All places for the current trip (from all users)
+  const allTripPlaces = places.filter(place => {
     const isCurrentTrip = currentTrip ? (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) : false;
-    const isMyPlace = place.user_id === user?.id || place.userId === user?.id;
-    return isCurrentTrip && isMyPlace;
+    return isCurrentTrip;
   });
+  
+  // Only my places for the current trip
+  const myTripPlaces = allTripPlaces.filter(place => {
+    const isMyPlace = place.user_id === user?.id || place.userId === user?.id;
+    return isMyPlace;
+  });
+  
+  // Choose which places to display based on active tab
+  const tripPlaces = activeTab === 'trip' ? allTripPlaces : myTripPlaces;
 
   // Exclude departure and destination places from MyPlaces view
   const displayPlaces = tripPlaces.filter(place => {
@@ -82,12 +93,21 @@ export function MyPlacesPage() {
     return !isSystemTransport;
   });
 
+  const getPlaceStatus = (place: any) => {
+    // Check if place has a pending status
+    if (place.status === 'pending') return 'pending';
+    // Check if place is scheduled/selected for optimization
+    if (place.is_selected_for_optimization || place.scheduled) return 'scheduled';
+    // Otherwise it's unscheduled
+    return 'unscheduled';
+  };
+  
   const filteredPlaces = displayPlaces.filter(place => {
-    // Use database field is_selected_for_optimization for scheduled status
-    const isScheduled = place.is_selected_for_optimization || false;
+    const status = getPlaceStatus(place);
     
-    if (filter === 'scheduled') return isScheduled;
-    if (filter === 'unscheduled') return !isScheduled;
+    if (filter === 'scheduled') return status === 'scheduled';
+    if (filter === 'unscheduled') return status === 'unscheduled';
+    if (filter === 'pending') return status === 'pending';
     return true;
   });
 
@@ -240,11 +260,7 @@ export function MyPlacesPage() {
             {currentTrip.name || `${currentTrip.departureLocation} Trip`} - Places
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            {filteredPlaces.length} places • {filteredPlaces.filter(p => 
-              p.is_selected_for_optimization !== undefined 
-                ? p.is_selected_for_optimization 
-                : p.scheduled
-            ).length} scheduled
+            {activeTab === 'trip' ? 'All team places' : 'My places'} • {filteredPlaces.length} total
           </p>
         </div>
         <div className="flex space-x-2">
@@ -271,38 +287,74 @@ export function MyPlacesPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
-        {[
-          { key: 'all', label: 'All', count: displayPlaces.length },
-          { 
-            key: 'scheduled', 
-            label: 'Scheduled', 
-            count: displayPlaces.filter(p => p.is_selected_for_optimization !== undefined 
-              ? p.is_selected_for_optimization 
-              : p.scheduled).length 
-          },
-          { 
-            key: 'unscheduled', 
-            label: 'Unscheduled', 
-            count: displayPlaces.filter(p => p.is_selected_for_optimization !== undefined 
-              ? !p.is_selected_for_optimization 
-              : !p.scheduled).length 
-          },
-        ].map(({ key, label, count }) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              filter === key
-                ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            {label} ({count})
-          </button>
-        ))}
+      {/* Tab Navigation */}
+      <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+        <button
+          onClick={() => setActiveTab('trip')}
+          className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            activeTab === 'trip'
+              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Trip Places ({allTripPlaces.filter(p => !p.place_type || (!['departure', 'destination'].includes(p.place_type) && p.category !== 'transportation')).length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('my')}
+          className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            activeTab === 'my'
+              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <Star className="w-4 h-4" />
+          <span>My Places ({myTripPlaces.filter(p => !p.place_type || (!['departure', 'destination'].includes(p.place_type) && p.category !== 'transportation')).length})</span>
+        </button>
       </div>
+
+      {/* Status Filters - Only show for My Places tab */}
+      {activeTab === 'my' && (
+        <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
+          {[
+            { key: 'all', label: 'All', count: displayPlaces.length, icon: null },
+            { 
+              key: 'scheduled', 
+              label: 'Scheduled', 
+              count: displayPlaces.filter(p => getPlaceStatus(p) === 'scheduled').length,
+              icon: CheckCircle,
+              color: 'text-green-600'
+            },
+            { 
+              key: 'pending', 
+              label: 'Pending', 
+              count: displayPlaces.filter(p => getPlaceStatus(p) === 'pending').length,
+              icon: HelpCircle,
+              color: 'text-yellow-600'
+            },
+            { 
+              key: 'unscheduled', 
+              label: 'Unscheduled', 
+              count: displayPlaces.filter(p => getPlaceStatus(p) === 'unscheduled').length,
+              icon: Clock,
+              color: 'text-slate-600'
+            },
+          ].map(({ key, label, count, icon: Icon, color }) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`flex-shrink-0 flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                filter === key
+                  ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              {Icon && <Icon className={`w-4 h-4 ${filter === key ? '' : color || ''}`} />}
+              <span>{label} ({count})</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Places Grid/List */}
       {viewMode === 'grid' ? (
@@ -324,15 +376,35 @@ export function MyPlacesPage() {
                 />
                 <div className="absolute top-2 right-2">
                   {(() => {
-                    const isScheduled = place.is_selected_for_optimization || place.scheduled;
+                    const status = getPlaceStatus(place);
+                    const statusConfig = {
+                      scheduled: { 
+                        bg: 'bg-green-100 dark:bg-green-900/20', 
+                        text: 'text-green-800 dark:text-green-300',
+                        icon: CheckCircle,
+                        label: place.scheduledDate || 'Scheduled'
+                      },
+                      pending: { 
+                        bg: 'bg-yellow-100 dark:bg-yellow-900/20', 
+                        text: 'text-yellow-800 dark:text-yellow-300',
+                        icon: HelpCircle,
+                        label: 'Pending'
+                      },
+                      unscheduled: { 
+                        bg: 'bg-slate-100 dark:bg-slate-700', 
+                        text: 'text-slate-600 dark:text-slate-400',
+                        icon: Clock,
+                        label: 'Unscheduled'
+                      }
+                    };
+                    const config = statusConfig[status as keyof typeof statusConfig];
+                    const IconComponent = config.icon;
+                    
                     return (
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        isScheduled
-                          ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/20 dark:text-primary-300'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                      }`}>
-                        {isScheduled ? (place.scheduledDate || 'Scheduled') : 'Not scheduled'}
-                      </span>
+                      <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+                        <IconComponent className="w-3 h-3" />
+                        <span>{config.label}</span>
+                      </div>
                     );
                   })()}
                 </div>
@@ -423,13 +495,38 @@ export function MyPlacesPage() {
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        (place.is_selected_for_optimization || place.scheduled)
-                          ? 'bg-primary-100 text-primary-800 dark:bg-primary-900/20 dark:text-primary-300'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                      }`}>
-                        {(place.is_selected_for_optimization || place.scheduled) ? (place.scheduledDate || 'Scheduled') : 'Not scheduled'}
-                      </span>
+                      {(() => {
+                        const status = getPlaceStatus(place);
+                        const statusConfig = {
+                          scheduled: { 
+                            bg: 'bg-green-100 dark:bg-green-900/20', 
+                            text: 'text-green-800 dark:text-green-300',
+                            icon: CheckCircle,
+                            label: place.scheduledDate || 'Scheduled'
+                          },
+                          pending: { 
+                            bg: 'bg-yellow-100 dark:bg-yellow-900/20', 
+                            text: 'text-yellow-800 dark:text-yellow-300',
+                            icon: HelpCircle,
+                            label: 'Pending'
+                          },
+                          unscheduled: { 
+                            bg: 'bg-slate-100 dark:bg-slate-700', 
+                            text: 'text-slate-600 dark:text-slate-400',
+                            icon: Clock,
+                            label: 'Unscheduled'
+                          }
+                        };
+                        const config = statusConfig[status as keyof typeof statusConfig];
+                        const IconComponent = config.icon;
+                        
+                        return (
+                          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+                            <IconComponent className="w-3 h-3" />
+                            <span>{config.label}</span>
+                          </div>
+                        );
+                      })()}
                       <div className="flex space-x-1">
                         <button
                           onClick={(e) => {
@@ -475,10 +572,13 @@ export function MyPlacesPage() {
             <Clock className="w-8 h-8 text-slate-400" />
           </div>
           <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
-            No places found
+            {activeTab === 'trip' ? 'No trip places found' : 'No places found'}
           </h3>
           <p className="text-slate-500 dark:text-slate-400 mb-6">
-            Add places to your trip to see them here
+            {activeTab === 'trip' 
+              ? 'No places have been added to this trip yet'
+              : 'Add places to your wishlist to see them here'
+            }
           </p>
           {!isDeadlinePassed() && (
             <Link
