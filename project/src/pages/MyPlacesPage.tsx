@@ -62,7 +62,6 @@ export function MyPlacesPage() {
   }, [currentTrip?.id]); // Re-run when currentTrip changes
 
   // Get all trip places and my places separately
-  const { user } = useStore();
   
   // All places for the current trip (from all users)
   const allTripPlaces = places.filter(place => {
