@@ -292,17 +292,7 @@ export const useStore = create<StoreState>()((set, get) => ({
       memberColors: {},
       tripMembers: [],
       loadMemberColorsForTrip: async (tripId: string) => {
-        // Define fallback colors for members
-        const FALLBACK_COLORS = [
-          '#0077BE', // Ocean Blue
-          '#FF6B6B', // Red
-          '#4ECDC4', // Teal
-          '#45B7D1', // Light Blue
-          '#96CEB4', // Green
-          '#FFD93D', // Yellow
-          '#95A99C', // Gray Green
-          '#DDA0DD', // Plum
-        ];
+        const { MemberColorService } = await import('../services/MemberColorService');
 
         try {
           console.log('🎨 [Store] ===== STARTING loadMemberColorsForTrip =====');
@@ -327,7 +317,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             const { user } = get();
             if (user) {
               const fallbackColorMap: Record<string, string> = {};
-              fallbackColorMap[user.id] = FALLBACK_COLORS[0];
+              fallbackColorMap[user.id] = MemberColorService.getColorByIndex(0).hex;
               console.log('🎨 [Store] Using fallback color for current user:', fallbackColorMap);
               set({ memberColors: fallbackColorMap, tripMembers: [] });
             } else {
@@ -345,7 +335,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             const { user } = get();
             if (user) {
               const fallbackColorMap: Record<string, string> = {};
-              fallbackColorMap[user.id] = FALLBACK_COLORS[0];
+              fallbackColorMap[user.id] = MemberColorService.getColorByIndex(0).hex;
               console.log('🎨 [Store] Using fallback color for current user (no members):', fallbackColorMap);
               set({ memberColors: fallbackColorMap, tripMembers: [] });
             } else {
@@ -393,7 +383,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             const existingColor = colorMapping[member.user_id];
             if (!existingColor || existingColor === '#000000' || existingColor === 'undefined' || existingColor === '') {
               console.warn(`🎨 [Store] Using fallback color for member ${member.user_id}`);
-              finalColorMapping[member.user_id] = FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+              finalColorMapping[member.user_id] = MemberColorService.getColorByIndex(index).hex;
             } else {
               finalColorMapping[member.user_id] = existingColor;
             }
@@ -418,7 +408,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             membersData.forEach((member, index) => {
               const fixedColor = fixedColors[member.user_id];
               if (!fixedColor || fixedColor === '#000000' || fixedColor === 'undefined' || fixedColor === '') {
-                finalFixedColors[member.user_id] = FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+                finalFixedColors[member.user_id] = MemberColorService.getColorByIndex(index).hex;
               } else {
                 finalFixedColors[member.user_id] = fixedColor;
               }
@@ -447,7 +437,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           const { user } = get();
           if (user) {
             const emergencyColorMap: Record<string, string> = {};
-            emergencyColorMap[user.id] = FALLBACK_COLORS[0];
+            emergencyColorMap[user.id] = MemberColorService.getColorByIndex(0).hex;
             console.log('🎨 [Store] Using emergency fallback color for current user:', emergencyColorMap);
             set({ memberColors: emergencyColorMap, tripMembers: [] });
           } else {
@@ -504,7 +494,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             notes: placeWithIds.notes,
             image_url: placeWithIds.image_url,
             images: placeWithIds.images,
-            is_selected_for_optimization: true  // Automatically select new places for optimization
+            is_selected_for_optimization: false,  // Places start as pending, not auto-selected for optimization
+          status: 'pending'  // New places are pending until user decides to optimize
           };
 
           const result = await addPlaceToDatabase(placeData);

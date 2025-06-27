@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '../lib/supabase'
+import { MemberColorService } from './MemberColorService'
 import { 
   Place, 
   Trip, 
@@ -333,7 +334,7 @@ export class TripOptimizationService {
       const transformedPlaces = (places || []).map(place => {
         const member = members?.find(m => m.user_id === place.user_id);
         const memberColor = member?.assigned_color_index ? 
-          `#${['FF6B6B', '4ECDC4', '45B7D1', 'FFA07A', '98D8C8'][member.assigned_color_index % 5]}` : '#666666';
+          MemberColorService.getColorByIndex(member.assigned_color_index).hex : '#666666';
         
         return {
           id: place.id,
@@ -356,7 +357,7 @@ export class TripOptimizationService {
       const transformedMembers = (members || []).map(member => ({
         id: member.user_id,
         name: member.user_id, // Use user_id as name for now
-        color: member.assigned_color_index ? `#${['FF6B6B', '4ECDC4', '45B7D1', 'FFA07A', '98D8C8'][member.assigned_color_index % 5]}` : '#666666',
+        color: member.assigned_color_index ? MemberColorService.getColorByIndex(member.assigned_color_index).hex : '#666666',
         preference_weight: 1.0
       }));
 

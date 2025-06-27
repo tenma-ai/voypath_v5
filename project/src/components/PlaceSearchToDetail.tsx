@@ -416,7 +416,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
                       <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       <span className="relative z-10 flex items-center justify-center space-x-2">
                         <Plus className="w-5 h-5" />
-                        <span>{isSubmitting ? (isEditMode ? 'Saving...' : 'Adding...') : (isEditMode ? 'Save Changes' : 'Add to Trip')}</span>
+                        <span>{isSubmitting ? (isEditMode ? 'Saving...' : 'Adding...') : (isEditMode ? 'Save Changes' : 'Add')}</span>
                       </span>
                     </motion.button>
                   </div>

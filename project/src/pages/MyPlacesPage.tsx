@@ -94,11 +94,11 @@ export function MyPlacesPage() {
   });
 
   const getPlaceStatus = (place: any) => {
-    // Check if place has a pending status
-    if (place.status === 'pending') return 'pending';
-    // Check if place is scheduled/selected for optimization
-    if (place.is_selected_for_optimization || place.scheduled) return 'scheduled';
-    // Otherwise it's unscheduled
+    // Check if place is actually scheduled (has been through optimization)
+    if (place.scheduled || (place.is_selected_for_optimization && place.optimized_at)) return 'scheduled';
+    // Check if place has pending status or is selected for optimization but not yet optimized
+    if (place.status === 'pending' || (place.is_selected_for_optimization && !place.optimized_at)) return 'pending';
+    // Otherwise it's unscheduled (not selected for optimization)
     return 'unscheduled';
   };
   

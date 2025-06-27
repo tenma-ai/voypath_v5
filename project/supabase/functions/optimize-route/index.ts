@@ -161,21 +161,83 @@ function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
     ...selectedVisitPlaces
   ];
 }
-// 重複除去のためのヘルパー関数
+// Enhanced duplicate removal with longest stay time preference and color blending
 function removeDuplicatePlaces(places) {
-  const uniquePlaces = [];
-  const seenPlaces = new Set();
-  for (const place of places){
-    // 重複判定のキー: 緯度経度と名前で判定
+  const uniquePlacesMap = new Map();
+  const duplicateGroups = new Map();
+  
+  // Group places by location key
+  for (const place of places) {
     const placeKey = `${place.latitude.toFixed(4)}-${place.longitude.toFixed(4)}-${place.name}`;
-    if (!seenPlaces.has(placeKey)) {
-      seenPlaces.add(placeKey);
-      uniquePlaces.push(place);
+    
+    if (!duplicateGroups.has(placeKey)) {
+      duplicateGroups.set(placeKey, []);
+    }
+    duplicateGroups.get(placeKey).push(place);
+  }
+  
+  // Process each group and merge duplicates
+  for (const [placeKey, groupPlaces] of duplicateGroups) {
+    if (groupPlaces.length === 1) {
+      uniquePlacesMap.set(placeKey, groupPlaces[0]);
     } else {
-      console.log(`⏭️ Removed duplicate place: ${place.name}`);
+      // Multiple places at same location - merge them
+      console.log(`🔄 Merging ${groupPlaces.length} duplicate places: ${groupPlaces[0].name}`);
+      
+      // Find place with longest stay duration
+      const longestStay = groupPlaces.reduce((max, place) => 
+        (place.stay_duration_minutes || 120) > (max.stay_duration_minutes || 120) ? place : max
+      );
+      
+      // Collect all contributors for color blending
+      const contributors = groupPlaces.map(p => ({
+        user_id: p.user_id,
+        display_color_hex: p.display_color_hex || '#0077BE',
+        wish_level: p.wish_level || 3
+      }));
+      
+      // Create merged place with enhanced properties
+      const mergedPlace = {
+        ...longestStay,
+        stay_duration_minutes: longestStay.stay_duration_minutes,
+        wish_level: Math.max(...groupPlaces.map(p => p.wish_level || 3)),
+        contributors: contributors,
+        contributor_count: contributors.length,
+        // Set color type based on contributor count
+        color_type: contributors.length === 1 ? 'single' : 
+                   contributors.length <= 4 ? 'gradient' : 'popular',
+        display_color_hex: contributors.length === 1 ? contributors[0].display_color_hex :
+                          contributors.length <= 4 ? blendColors(contributors.map(c => c.display_color_hex)) :
+                          '#FFD700' // Gold for popular places
+      };
+      
+      uniquePlacesMap.set(placeKey, mergedPlace);
     }
   }
-  return uniquePlaces;
+  
+  return Array.from(uniquePlacesMap.values());
+}
+
+// Helper function to blend multiple colors for gradient effect
+function blendColors(hexColors) {
+  if (hexColors.length === 1) return hexColors[0];
+  if (hexColors.length === 0) return '#0077BE';
+  
+  // Convert hex to RGB
+  const rgbColors = hexColors.map(hex => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return { r, g, b };
+  });
+  
+  // Average the RGB values
+  const avgR = Math.round(rgbColors.reduce((sum, color) => sum + color.r, 0) / rgbColors.length);
+  const avgG = Math.round(rgbColors.reduce((sum, color) => sum + color.g, 0) / rgbColors.length);
+  const avgB = Math.round(rgbColors.reduce((sum, color) => sum + color.b, 0) / rgbColors.length);
+  
+  // Convert back to hex
+  return `#${avgR.toString(16).padStart(2, '0')}${avgG.toString(16).padStart(2, '0')}${avgB.toString(16).padStart(2, '0')}`;
 }
 // 空港検出・挿入（シンプル版）
 async function insertAirportsIfNeeded(supabase, places) {
@@ -885,6 +947,11 @@ Deno.serve(async (req)=>{
       if (error) throw new Error(`Database error: ${error.message}`);
       places = data || [];
     }
+    
+    // Remove duplicates and merge places at the same location
+    console.log(`🔄 Checking for duplicate places among ${places.length} places`);
+    places = removeDuplicatePlaces(places);
+    console.log(`✅ After deduplication: ${places.length} unique places`);
     if (places.length === 0) {
       throw new Error('No places found for optimization');
     }

@@ -147,7 +147,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
                 streetViewControl: false,
                 mapTypeControl: false,
                 fullscreenControl: true,
-                gestureHandling: 'auto',
+                gestureHandling: 'greedy',
                 disableDefaultUI: true,
               }}
             >

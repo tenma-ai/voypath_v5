@@ -22,7 +22,7 @@ interface TripMember {
 
 
 export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
-  const { currentTrip, updateTrip } = useStore();
+  const { currentTrip, updateTrip, user } = useStore();
   const [activeTab, setActiveTab] = useState<'general' | 'permissions' | 'deadline'>('general');
   const [members, setMembers] = useState<TripMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
@@ -118,7 +118,20 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
   };
 
   const handleRoleChange = async (memberId: string, newRole: 'admin' | 'member') => {
-    if (!currentTrip?.id) return;
+    if (!currentTrip?.id || !user?.id) return;
+    
+    // Prevent users from changing their own role
+    if (memberId === user.id) {
+      alert('You cannot change your own role. Please ask another admin to change your role.');
+      return;
+    }
+    
+    // Check if current user is admin
+    const currentUserMember = members.find(m => m.id === user.id);
+    if (!currentUserMember || currentUserMember.role !== 'admin') {
+      alert('Only admins can change member roles.');
+      return;
+    }
     
     try {
       // Update in database
@@ -368,14 +381,25 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
                               </div>
 
                               <div className="flex items-center space-x-3">
-                                <select
-                                  value={member.role}
-                                  onChange={(e) => handleRoleChange(member.id, e.target.value as 'admin' | 'member')}
-                                  className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm font-medium focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                >
-                                  <option value="member">Member</option>
-                                  <option value="admin">Admin</option>
-                                </select>
+                                {(() => {
+                                  const currentUserMember = members.find(m => m.id === user?.id);
+                                  const canChangeRole = currentUserMember?.role === 'admin' && member.id !== user?.id;
+                                  
+                                  return canChangeRole ? (
+                                    <select
+                                      value={member.role}
+                                      onChange={(e) => handleRoleChange(member.id, e.target.value as 'admin' | 'member')}
+                                      className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm font-medium focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                    >
+                                      <option value="member">Member</option>
+                                      <option value="admin">Admin</option>
+                                    </select>
+                                  ) : (
+                                    <span className="px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 rounded-xl">
+                                      {member.role === 'admin' ? 'Admin' : 'Member'}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                             </motion.div>
                           ))

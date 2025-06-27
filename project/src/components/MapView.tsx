@@ -684,7 +684,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: true,
-          gestureHandling: 'auto',
+          gestureHandling: 'greedy',
           disableDefaultUI: true,
         }}
       >

@@ -1,19 +1,9 @@
 /**
  * Color fallback utilities to ensure colors are always visible
+ * Now uses centralized MemberColorService for consistency
  */
 
-export const FALLBACK_COLORS = [
-  '#0077BE', // Ocean Blue
-  '#FF6B6B', // Red
-  '#4ECDC4', // Teal
-  '#45B7D1', // Light Blue
-  '#96CEB4', // Green
-  '#FFD93D', // Yellow
-  '#95A99C', // Gray Green
-  '#DDA0DD', // Plum
-  '#F4A460', // Sandy Brown
-  '#20B2AA', // Light Sea Green
-];
+import { MemberColorService } from '../services/MemberColorService';
 
 /**
  * Get a valid color, using fallback if necessary
@@ -32,7 +22,7 @@ export function getColorOrFallback(
       color.toLowerCase() === 'rgb(0, 0, 0)' ||
       color.toLowerCase() === 'rgba(0, 0, 0, 1)') {
     console.warn(`🎨 Invalid color detected: "${color}", using fallback`);
-    return FALLBACK_COLORS[fallbackIndex % FALLBACK_COLORS.length];
+    return MemberColorService.getColorByIndex(fallbackIndex).hex;
   }
   
   return color;
@@ -50,7 +40,7 @@ export function getPlaceColorWithFallback(
   
   if (!userId) {
     console.warn('🎨 No user ID found for place:', place.name);
-    return FALLBACK_COLORS[0]; // Default to first fallback color
+    return MemberColorService.getColorByIndex(0).hex; // Default to first fallback color
   }
   
   const color = memberColors[userId];

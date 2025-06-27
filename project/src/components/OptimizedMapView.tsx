@@ -105,7 +105,7 @@ export function OptimizedMapView({
         streetViewControl: false,
         fullscreenControl: false,
         zoomControl: true,
-        gestureHandling: 'cooperative'
+        gestureHandling: 'greedy'
       });
 
       const renderer = new google.maps.DirectionsRenderer({

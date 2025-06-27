@@ -291,7 +291,8 @@ export const addPlaceToDatabase = async (placeData: any) => {
       image_url: placeData.image_url,
       images: placeData.images,
       scheduled: false,
-      is_selected_for_optimization: true // Auto-enable for optimization when user adds places
+      is_selected_for_optimization: false, // Places start as pending, not auto-selected
+      status: placeData.status || 'pending' // Default to pending status
     }
     
     // Insert into Supabase using regular client
