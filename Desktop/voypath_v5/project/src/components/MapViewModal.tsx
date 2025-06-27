@@ -3,6 +3,8 @@ import { MapPin, X, List, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { useStore } from '../store/useStore';
+import MapTouchUtils from '../utils/mapTouchUtils';
+import '../styles/map-touch-improvements.css';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -53,6 +55,9 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
   const onLoad = useCallback((map: google.maps.Map) => {
     console.log('🔍 [MapViewModal] Map loaded successfully');
     setMap(map);
+    
+    // Apply touch optimizations
+    MapTouchUtils.optimizeMapForTouch(map);
   }, []);
 
   const onUnmount = useCallback(() => {
@@ -138,6 +143,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
           ) : (
             <GoogleMap
               mapContainerStyle={{ width: '100%', height: '100%' }}
+              mapContainerClassName="map-container"
               center={{ lat: 35.6812, lng: 139.7671 }}
               zoom={6}
               onLoad={onLoad}
@@ -147,7 +153,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
                 streetViewControl: false,
                 mapTypeControl: false,
                 fullscreenControl: true,
-                gestureHandling: 'auto',
+                gestureHandling: 'greedy',
                 disableDefaultUI: true,
               }}
             >

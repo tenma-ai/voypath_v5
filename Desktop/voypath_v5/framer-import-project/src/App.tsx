@@ -1,6 +1,9 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
+import PremiumPage from './components/PremiumPage';
 import './App.css';
+import './styles/responsive.css';
+import './styles/scroll-zoom-fixes.css';
 
 function App() {
   useEffect(() => {
@@ -20,18 +23,31 @@ function App() {
     checkAuth();
   }, []);
 
+  // Check if this is the premium page
+  const isPremiumPage = window.location.pathname === '/premium' || window.location.hash === '#premium';
+  
+  if (isPremiumPage) {
+    return <PremiumPage />;
+  }
+
   return (
     <div className="app">
       {/* Navigation */}
       <nav className="nav-header">
         <div className="nav-content">
-          <div className="logo">
+          <motion.div 
+            className="logo"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            style={{ cursor: 'pointer' }}
+            onClick={() => window.location.href = 'https://voypath.app'}
+          >
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
               <circle cx="16" cy="16" r="16" fill="var(--color-accent)" />
               <path d="M10 16L14 20L22 12" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span className="logo-text">Voypath</span>
-          </div>
+          </motion.div>
           <motion.button 
             className="cta-button nav-cta"
             whileHover={{ scale: 1.05 }}

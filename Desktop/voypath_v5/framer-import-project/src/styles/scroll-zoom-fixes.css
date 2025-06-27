@@ -1,0 +1,486 @@
+/**
+ * Scroll/Zoom Fixed Display Improvements
+ * Fixes for mobile scrolling, browser zoom, and fixed positioning issues
+ */
+
+/* ========================================
+   1. Enhanced Viewport and Safe Area Support
+   ======================================== */
+
+/* Better viewport configuration for iOS Safari and modern browsers */
+html {
+  /* Prevent horizontal overflow during zoom */
+  overflow-x: hidden;
+  /* Smooth scrolling with better performance */
+  scroll-behavior: smooth;
+  /* iOS Safari bounce scroll fix */
+  -webkit-overflow-scrolling: touch;
+  /* Better touch handling */
+  touch-action: manipulation;
+  /* GPU acceleration */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+body {
+  /* Prevent horizontal overflow */
+  overflow-x: hidden;
+  /* Use viewport units that account for dynamic viewport */
+  width: 100%;
+  max-width: 100%;
+  /* Prevent zoom on input focus (iOS) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Safe area support */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* ========================================
+   2. Fixed Navigation Improvements
+   ======================================== */
+
+.nav-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1000;
+  
+  /* Safe area support for devices with notches */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  
+  /* GPU acceleration for smooth scrolling */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
+  
+  /* Prevent overflow during zoom */
+  overflow-x: hidden;
+  
+  /* Better backdrop on iOS */
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  
+  /* iOS Safari specific fixes */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Navigation adjustments for zoom levels */
+@media (min-resolution: 1.5dppx) {
+  .nav-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* ========================================
+   3. Modal Overlay Fixes
+   ======================================== */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+  
+  /* Safe area support */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  
+  /* Improved scrolling behavior */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  
+  /* GPU acceleration */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: opacity, transform;
+  
+  /* Better touch handling */
+  touch-action: manipulation;
+  
+  /* iOS Safari specific */
+  -webkit-touch-callout: none;
+}
+
+/* Modal content container */
+.modal-content {
+  /* Better positioning for zoom */
+  margin: auto;
+  max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem);
+  max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 2rem);
+  
+  /* GPU acceleration */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
+  
+  /* Better overflow handling */
+  overflow: hidden;
+}
+
+/* ========================================
+   4. Floating Action Button Fixes
+   ======================================== */
+
+.floating-button,
+[class*="fixed bottom-"],
+[class*="fixed top-"] {
+  /* Better positioning with safe areas */
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  right: calc(1rem + env(safe-area-inset-right));
+  
+  /* GPU acceleration */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
+  
+  /* Better touch handling */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  
+  /* Prevent zoom issues */
+  -webkit-user-select: none;
+  user-select: none;
+  
+  /* Better stacking */
+  isolation: isolate;
+}
+
+/* Chat button specific fixes */
+.fixed.bottom-4.left-4 {
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  left: calc(1rem + env(safe-area-inset-left));
+}
+
+/* ========================================
+   5. Z-Index Hierarchy
+   ======================================== */
+
+/* Define clear stacking context */
+.z-10 { z-index: 10; }
+.z-20 { z-index: 20; }
+.z-30 { z-index: 30; }
+.z-40 { z-index: 40; }
+.z-50 { z-index: 50; }
+
+/* Navigation layer */
+.nav-header { z-index: 1000; }
+
+/* Dropdown/tooltip layer */
+.dropdown-menu,
+.tooltip { z-index: 1100; }
+
+/* Modal backdrop layer */
+.modal-overlay { z-index: 2000; }
+
+/* Modal content layer */
+.modal-content { z-index: 2001; }
+
+/* Notification/toast layer */
+.notification,
+.toast { z-index: 3000; }
+
+/* Debug/dev tools layer */
+.debug-overlay { z-index: 9999; }
+
+/* ========================================
+   6. Zoom-Aware Styling
+   ======================================== */
+
+/* Zoom level adaptations */
+@media (min-resolution: 1.25dppx) {
+  .nav-header,
+  .modal-overlay,
+  .floating-button {
+    /* Slightly larger touch targets */
+    min-height: 48px;
+  }
+  
+  /* Better border visibility */
+  .modal-content {
+    border-width: 1.5px;
+  }
+}
+
+@media (min-resolution: 2dppx) {
+  .nav-header,
+  .modal-overlay,
+  .floating-button {
+    /* Even larger touch targets for high DPI */
+    min-height: 52px;
+  }
+  
+  /* Sharper borders */
+  .modal-content {
+    border-width: 2px;
+  }
+}
+
+/* ========================================
+   7. iOS Safari Specific Fixes
+   ======================================== */
+
+/* iOS Safari viewport height fix */
+@supports (-webkit-touch-callout: none) {
+  .modal-overlay {
+    /* Use fixed height instead of 100vh on iOS */
+    height: -webkit-fill-available;
+  }
+  
+  .modal-content {
+    max-height: calc(-webkit-fill-available - 2rem);
+  }
+  
+  /* Better safe area handling */
+  .nav-header {
+    background: rgba(255, 255, 255, 0.95);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+
+/* iOS Safari address bar compensation */
+@media screen and (max-width: 768px) {
+  .modal-overlay {
+    /* Account for dynamic viewport */
+    height: 100dvh; /* dvh = dynamic viewport height */
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* ========================================
+   8. Touch and Interaction Improvements
+   ======================================== */
+
+/* Better touch handling for all interactive elements */
+button,
+[role="button"],
+.clickable,
+.interactive {
+  /* Prevent zoom on tap */
+  touch-action: manipulation;
+  
+  /* Remove tap highlights */
+  -webkit-tap-highlight-color: transparent;
+  
+  /* Better user selection */
+  -webkit-user-select: none;
+  user-select: none;
+  
+  /* GPU acceleration for animations */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+/* Scrollable containers */
+.scrollable,
+.overflow-auto,
+.overflow-y-auto {
+  /* Better iOS scrolling */
+  -webkit-overflow-scrolling: touch;
+  
+  /* Better scroll momentum */
+  overscroll-behavior: contain;
+  
+  /* GPU acceleration */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: scroll-position;
+}
+
+/* ========================================
+   9. Animation Performance Optimizations
+   ======================================== */
+
+/* Elements with scale animations */
+[data-animate="scale"],
+.scale-animation,
+.hover-scale {
+  /* GPU acceleration */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
+  
+  /* Better anti-aliasing */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Framer Motion scale fixes */
+[data-framer-component] {
+  /* Better performance for Framer components */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* ========================================
+   10. Accessibility and Zoom Support
+   ======================================== */
+
+/* Respect user zoom preferences */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  
+  /* Disable scale animations if user prefers reduced motion */
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .modal-overlay {
+    background: rgba(0, 0, 0, 0.8);
+  }
+  
+  .nav-header {
+    border-bottom: 2px solid;
+  }
+}
+
+/* ========================================
+   11. Debug Utilities (Development Only)
+   ======================================== */
+
+/* Visual debug for fixed positioned elements */
+.debug-fixed {
+  outline: 2px dashed red !important;
+  background: rgba(255, 0, 0, 0.1) !important;
+}
+
+.debug-safe-area {
+  /* Visualize safe areas */
+  background: 
+    linear-gradient(to right, rgba(255, 0, 0, 0.3) env(safe-area-inset-left), transparent env(safe-area-inset-left)),
+    linear-gradient(to left, rgba(255, 0, 0, 0.3) env(safe-area-inset-right), transparent env(safe-area-inset-right)),
+    linear-gradient(to bottom, rgba(255, 0, 0, 0.3) env(safe-area-inset-top), transparent env(safe-area-inset-top)),
+    linear-gradient(to top, rgba(255, 0, 0, 0.3) env(safe-area-inset-bottom), transparent env(safe-area-inset-bottom));
+}
+
+/* ========================================
+   12. Map Touch Scrolling Optimizations
+   ======================================== */
+
+/* One-finger map scrolling improvements */
+.map-container,
+.gm-style,
+[data-testid="map-container"] {
+  /* Enable one-finger panning and zooming */
+  touch-action: pan-x pan-y pinch-zoom !important;
+  
+  /* Smooth touch interactions */
+  -webkit-overflow-scrolling: touch !important;
+  
+  /* Prevent text selection during map interaction */
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  user-select: none !important;
+  
+  /* Hardware acceleration for smooth performance */
+  will-change: transform !important;
+  transform: translateZ(0) !important;
+  
+  /* Prevent touch callouts */
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Map controls optimization for touch */
+.gm-style .gm-control-active,
+.gm-style button {
+  /* Larger touch targets */
+  min-width: 44px !important;
+  min-height: 44px !important;
+  
+  /* Better touch feedback */
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Prevent body scroll when interacting with map */
+body.map-active {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Map marker touch optimization */
+.gm-style img[src*="marker"],
+.gm-style .gm-marker {
+  /* Larger touch area */
+  padding: 8px !important;
+  margin: -8px !important;
+  
+  /* Smooth interaction feedback */
+  transition: transform 0.2s ease !important;
+}
+
+.gm-style img[src*="marker"]:active,
+.gm-style .gm-marker:active {
+  transform: scale(1.1) !important;
+}
+
+/* Mobile-specific map optimizations */
+@media (max-width: 768px) {
+  .gm-style .gm-control-active,
+  .gm-style button {
+    /* Even larger touch targets on mobile */
+    min-width: 48px !important;
+    min-height: 48px !important;
+  }
+  
+  /* Better map text visibility on mobile */
+  .gm-style div[style*="font"] {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+  }
+}
+
+/* Touch device optimization */
+@media (hover: none) and (pointer: coarse) {
+  .map-container,
+  .gm-style {
+    /* Optimize for touch-only devices */
+    touch-action: pan-x pan-y pinch-zoom !important;
+  }
+  
+  /* Reduce animation complexity on touch devices */
+  .gm-style > div {
+    transition: none !important;
+    will-change: auto !important;
+  }
+}
+
+/* Safe area handling for fullscreen maps */
+@supports (padding: max(0px)) {
+  .map-container.fullscreen {
+    padding-top: max(16px, env(safe-area-inset-top)) !important;
+    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+  }
+}

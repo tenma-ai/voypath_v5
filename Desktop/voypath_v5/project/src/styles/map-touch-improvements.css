@@ -1,0 +1,178 @@
+/**
+ * Map Touch Improvements - One-finger scrolling and touch optimization
+ */
+
+/* Map container touch optimizations */
+.map-container,
+[data-testid="map-container"],
+.gm-style,
+.gm-style > div:first-child {
+  /* Enable one-finger panning and zooming */
+  touch-action: pan-x pan-y pinch-zoom !important;
+  
+  /* Smooth touch scrolling */
+  -webkit-overflow-scrolling: touch !important;
+  
+  /* Prevent touch callouts on mobile */
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  
+  /* Hardware acceleration for smooth performance */
+  will-change: transform !important;
+  transform: translateZ(0) !important;
+  
+  /* Prevent text selection while panning */
+  user-select: none !important;
+}
+
+/* Optimize map controls for touch */
+.gm-style .gm-style-iw,
+.gm-style .gm-ui-hover-effect {
+  touch-action: manipulation !important;
+}
+
+/* Ensure map tiles load smoothly during touch interactions */
+.gm-style > div,
+.gm-style img {
+  /* GPU acceleration for map tiles */
+  will-change: transform !important;
+  transform: translateZ(0) !important;
+  
+  /* Smooth image rendering during zoom/pan */
+  image-rendering: -webkit-optimize-contrast !important;
+  image-rendering: optimize-contrast !important;
+}
+
+/* Map controls touch targets */
+.gm-style .gm-control-active {
+  /* Larger touch targets for controls */
+  min-width: 44px !important;
+  min-height: 44px !important;
+  
+  /* Better touch feedback */
+  touch-action: manipulation !important;
+}
+
+/* Modal map specific improvements */
+.map-modal .map-container {
+  /* Prevent conflicts with modal scrolling */
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* Prevent body scroll when interacting with map */
+.map-active {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+}
+
+/* Map loading states - smooth transitions */
+.gm-style > div:first-child {
+  transition: opacity 0.3s ease !important;
+}
+
+/* InfoWindow touch optimizations */
+.gm-style .gm-style-iw-d {
+  /* Better scrolling in info windows */
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+}
+
+/* Map marker touch areas */
+.gm-style img[src*="marker"] {
+  /* Larger touch area for markers */
+  padding: 8px !important;
+  margin: -8px !important;
+  
+  /* Smooth interaction feedback */
+  transition: transform 0.2s ease !important;
+}
+
+.gm-style img[src*="marker"]:active {
+  transform: scale(1.1) !important;
+}
+
+/* Fullscreen map optimizations */
+.gm-fullscreen-control {
+  touch-action: manipulation !important;
+}
+
+/* Responsive map adjustments for mobile */
+@media (max-width: 768px) {
+  .map-container,
+  .gm-style {
+    /* Optimize for mobile touch */
+    touch-action: pan-x pan-y pinch-zoom !important;
+  }
+  
+  /* Larger touch targets on mobile */
+  .gm-style .gm-control-active {
+    min-width: 48px !important;
+    min-height: 48px !important;
+  }
+  
+  /* Better text readability on mobile maps */
+  .gm-style div[style*="font"] {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+  }
+}
+
+/* Dark mode map optimizations */
+@media (prefers-color-scheme: dark) {
+  .gm-style {
+    /* Better contrast for dark mode */
+    filter: invert(0.9) hue-rotate(180deg) !important;
+  }
+  
+  .gm-style img,
+  .gm-style .gm-control-active img {
+    /* Restore image colors in dark mode */
+    filter: invert(0.9) hue-rotate(180deg) !important;
+  }
+}
+
+/* Safe area adjustments for mobile devices */
+@supports (padding: max(0px)) {
+  .map-container.fullscreen {
+    /* Account for notches and safe areas */
+    padding-top: max(16px, env(safe-area-inset-top)) !important;
+    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+  }
+}
+
+/* Performance optimizations for older devices */
+@media (hover: none) and (pointer: coarse) {
+  /* Touch-only devices */
+  .gm-style {
+    /* Reduce animation complexity on touch devices */
+    transition: none !important;
+  }
+  
+  .gm-style > div {
+    /* Faster rendering on mobile */
+    will-change: auto !important;
+  }
+}
+
+/* Accessibility improvements */
+.gm-style button,
+.gm-style [role="button"] {
+  /* Ensure buttons are focusable */
+  outline: 2px solid transparent !important;
+  outline-offset: 2px !important;
+}
+
+.gm-style button:focus,
+.gm-style [role="button"]:focus {
+  outline-color: #3b82f6 !important;
+}
+
+/* Prevent zoom on double-tap for iOS Safari */
+.map-container * {
+  touch-action: manipulation !important;
+}

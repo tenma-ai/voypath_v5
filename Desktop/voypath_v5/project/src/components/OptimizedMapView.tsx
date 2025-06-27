@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Route, AlertCircle, Loader, Clock, MapPin, Navigation, Eye, EyeOff, Filter } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Place, DetailedSchedule, OptimizedTrip, OptimizedPlace } from '../types/optimization';
+import MapTouchUtils from '../utils/mapTouchUtils';
+import '../styles/map-touch-improvements.css';
 
 interface OptimizedMapViewProps {
   optimizationResult?: DetailedSchedule;
@@ -105,7 +107,7 @@ export function OptimizedMapView({
         streetViewControl: false,
         fullscreenControl: false,
         zoomControl: true,
-        gestureHandling: 'cooperative'
+        gestureHandling: 'greedy'
       });
 
       const renderer = new google.maps.DirectionsRenderer({
@@ -118,6 +120,12 @@ export function OptimizedMapView({
       });
 
       renderer.setMap(mapInstance);
+      
+      // Apply touch optimizations
+      MapTouchUtils.optimizeMapForTouch(mapInstance);
+      if (mapRef.current) {
+        MapTouchUtils.initializeMapTouch(mapRef.current);
+      }
       
       setMap(mapInstance);
       setDirectionsRenderer(renderer);
@@ -491,6 +499,11 @@ export function OptimizedMapView({
     setRoutePolylines([]);
     setMap(null);
     setDirectionsRenderer(null);
+    
+    // Clean up touch optimizations
+    if (mapRef.current) {
+      MapTouchUtils.cleanupMapTouch(mapRef.current);
+    }
   };
 
   if (error) {
@@ -529,7 +542,7 @@ export function OptimizedMapView({
       </AnimatePresence>
 
       {/* Map Container */}
-      <div ref={mapRef} className="h-full w-full" />
+      <div ref={mapRef} className="h-full w-full map-container" />
 
       {/* Map Legend */}
       <div className="absolute top-4 left-4 z-10 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-700/50 p-4">

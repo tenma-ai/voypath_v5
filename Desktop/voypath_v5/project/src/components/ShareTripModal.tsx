@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import PremiumModal from './PremiumModal';
+import PremiumService from '../services/PremiumService';
 
 interface ShareTripModalProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   const isPremium = user?.isPremium || false;
 
@@ -361,10 +364,24 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
           )}
 
           {!isPremium && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-sm text-blue-800">
-                🎁 Upgrade to Premium for password protection and expiry control!
-              </p>
+            <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-lg">👑</span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-amber-800 mb-1">Unlock Premium Features</h4>
+                  <p className="text-sm text-amber-700 mb-3">
+                    Get password protection, expiry control, usage limits, and more!
+                  </p>
+                  <button
+                    onClick={() => setShowPremiumModal(true)}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    Upgrade to Premium
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -455,6 +472,19 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
           )}
         </div>
       </div>
+      
+      {/* Premium Modal */}
+      <PremiumModal
+        isOpen={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+        onUpgrade={async () => {
+          setShowPremiumModal(false);
+          const result = await PremiumService.upgradeToPremium();
+          if (!result.success && result.error) {
+            setError(result.error);
+          }
+        }}
+      />
     </div>
   );
 }
