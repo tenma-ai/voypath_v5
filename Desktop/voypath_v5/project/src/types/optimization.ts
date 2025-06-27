@@ -59,6 +59,7 @@ export interface Place {
   scheduled_date?: string;
   scheduled_time_start?: string;
   scheduled_time_end?: string;
+  status?: 'scheduled' | 'unscheduled' | 'pending';
   visit_date?: string;
   preferred_time_slots?: string[];
   transport_mode?: string;
@@ -99,6 +100,17 @@ export interface Place {
   // タイムスタンプ
   created_at?: string;
   updated_at?: string;
+  
+  // Member preferences for voting/rating
+  member_preferences?: MemberPreference[];
+}
+
+export interface MemberPreference {
+  member_id: string;
+  member_name?: string;
+  wish_level: number;
+  notes?: string;
+  created_at?: string;
 }
 
 export interface User {

@@ -1,0 +1,44 @@
+/* Voypath Custom Styles - Keep Original Dark Theme */
+:root {
+  /* Voypath Accent Colors */
+  --voypath-primary: #0ea5e9;
+  --voypath-primary-hover: #0284c7;
+  --voypath-secondary: #3b82f6;
+  --voypath-success: #22c55e;
+  --voypath-warning: #f59e0b;
+}
+
+/* Update buttons */
+a[data-framer-name*="Button"],
+.framer-1yvmtw8,
+.framer-1xd6uv3 {
+  background-color: var(--voypath-primary) !important;
+  color: white !important;
+  border: none !important;
+}
+
+a[data-framer-name*="Button"]:hover,
+.framer-1yvmtw8:hover,
+.framer-1xd6uv3:hover {
+  background-color: var(--voypath-primary-hover) !important;
+}
+
+/* Feature cards */
+.framer-Jlq9N,
+.framer-1ugtmw5,
+.framer-k0mrok {
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Hide dark mode decorative elements */
+.framer-1n0g16m svg,
+.framer-15iqjx7 svg {
+  display: none !important;
+}
+
+/* Auth redirect script */
+#auth-script {
+  display: none;
+}

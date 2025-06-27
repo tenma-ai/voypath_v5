@@ -13,12 +13,14 @@ import { GooglePlace } from '../services/PlaceSearchService';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface PlaceSearchToDetailProps {
+  tripId?: string;
   onCancel?: () => void;
   onComplete?: () => void;
+  onPlaceAdded?: () => void;
   className?: string;
 }
 
-export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: PlaceSearchToDetailProps) {
+export function PlaceSearchToDetail({ tripId, onCancel, onComplete, onPlaceAdded, className = "" }: PlaceSearchToDetailProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentTrip, user, canAddPlace, getUserPlaceCount } = useStore();
@@ -157,15 +159,19 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
             `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photo.photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
           ) : [],
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          // Set initial status as pending until optimized
+          status: 'pending'
         };
         
-        // Add to store
+        // Add to store with deduplication handling
         await addPlace(newPlace);
         console.log('Place added successfully:', newPlace);
       }
       
-      if (onComplete) {
+      if (onPlaceAdded) {
+        onPlaceAdded();
+      } else if (onComplete) {
         onComplete();
       } else {
         navigate('/my-trip/my-places');
@@ -416,7 +422,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
                       <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       <span className="relative z-10 flex items-center justify-center space-x-2">
                         <Plus className="w-5 h-5" />
-                        <span>{isSubmitting ? (isEditMode ? 'Saving...' : 'Adding...') : (isEditMode ? 'Save Changes' : 'Add to Trip')}</span>
+                        <span>{isSubmitting ? (isEditMode ? 'Saving...' : 'Adding...') : (isEditMode ? 'Save Changes' : 'Add')}</span>
                       </span>
                     </motion.button>
                   </div>

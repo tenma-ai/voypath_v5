@@ -23,6 +23,7 @@ import {
   Globe
 } from 'lucide-react';
 import type { OptimizedPlace, MemberPreference } from '../types/optimization';
+import { PlaceStatusIndicator, PlaceStatusActions, type PlaceStatus } from './PlaceStatusIndicator';
 
 interface PlaceDetailCardProps {
   place: OptimizedPlace;
@@ -38,8 +39,12 @@ interface PlaceDetailCardProps {
   orderNumber?: number;
   isExpanded?: boolean;
   onToggleExpanded?: () => void;
+  onToggleExpand?: () => void; // Alternative prop name for compatibility
   onPlaceSelect?: (place: OptimizedPlace) => void;
   onMemberInteraction?: (memberId: string, action: string) => void;
+  onStatusChange?: (placeId: string, newStatus: PlaceStatus) => void;
+  showMemberInfo?: boolean; // Show member preferences and voting
+  showStatusActions?: boolean; // Show status change actions
   className?: string;
 }
 
@@ -53,12 +58,22 @@ export default function PlaceDetailCard({
   orderNumber,
   isExpanded = false,
   onToggleExpanded,
+  onToggleExpand, // Alternative prop name
   onPlaceSelect,
   onMemberInteraction,
+  onStatusChange,
+  showMemberInfo = true,
+  showStatusActions = true,
   className = ''
 }: PlaceDetailCardProps) {
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
+
+  // Handle both onToggleExpanded and onToggleExpand for compatibility
+  const handleToggleExpand = () => {
+    if (onToggleExpanded) onToggleExpanded();
+    if (onToggleExpand) onToggleExpand();
+  };
 
   const formatTime = (timeString?: string): string => {
     if (!timeString) return '';
@@ -99,6 +114,19 @@ export default function PlaceDetailCard({
     );
 
     return memberColors[highestPref.member_id] || '#3b82f6';
+  };
+
+  const getPlaceStatus = (): PlaceStatus => {
+    // Determine status based on place data
+    if (place.scheduled) return 'scheduled';
+    if (place.status) return place.status as PlaceStatus;
+    return 'unscheduled';
+  };
+
+  const handleStatusChange = (newStatus: PlaceStatus) => {
+    if (onStatusChange && place.id) {
+      onStatusChange(place.id, newStatus);
+    }
   };
 
   const handleMemberClick = (memberId: string) => {
@@ -278,7 +306,19 @@ export default function PlaceDetailCard({
       {renderPhotos()}
 
       {/* Member Preferences */}
-      {renderMemberPreferences()}
+      {showMemberInfo && renderMemberPreferences()}
+
+      {/* Status Actions */}
+      {showStatusActions && onStatusChange && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium text-gray-700">Status</h4>
+          <PlaceStatusActions
+            currentStatus={getPlaceStatus()}
+            onStatusChange={handleStatusChange}
+            className="flex-wrap"
+          />
+        </div>
+      )}
     </div>
   );
 
@@ -305,9 +345,16 @@ export default function PlaceDetailCard({
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h3 className="text-lg font-semibold text-gray-900 truncate">
-                  {place.name}
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                    {place.name}
+                  </h3>
+                  <PlaceStatusIndicator 
+                    status={getPlaceStatus()} 
+                    size="sm"
+                    className="ml-2 flex-shrink-0"
+                  />
+                </div>
                 <div className="flex items-center gap-2 mt-1">
                   {getPlaceRating() > 0 && (
                     <div className="flex items-center gap-1">
@@ -361,11 +408,11 @@ export default function PlaceDetailCard({
           </div>
 
           {/* Expand Button */}
-          {onToggleExpanded && (
+          {(onToggleExpanded || onToggleExpand) && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onToggleExpanded();
+                handleToggleExpand();
               }}
               className="ml-2 p-1 rounded-full hover:bg-gray-200 transition-colors"
             >
