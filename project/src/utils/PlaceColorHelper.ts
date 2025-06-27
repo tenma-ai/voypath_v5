@@ -1,5 +1,6 @@
 // 場所の色表示ロジック共通ヘルパー
-import { getColorOrFallback, FALLBACK_COLORS, debugColorIssue } from './ColorFallbackUtils';
+import { getColorOrFallback, debugColorIssue } from './ColorFallbackUtils';
+import { MemberColorService } from '../services/MemberColorService';
 
 export interface MemberContribution {
   userId: string;
@@ -153,7 +154,7 @@ function getPlaceContributors(place: any, members: any[], memberColors?: Record<
 function getDefaultMemberColor(userId: string): string {
   // ユーザーIDに基づいて一貫した色を選択
   const hash = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return FALLBACK_COLORS[hash % FALLBACK_COLORS.length];
+  return MemberColorService.getColorByIndex(hash % 20).hex;
 }
 
 /**
