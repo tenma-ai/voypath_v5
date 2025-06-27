@@ -323,7 +323,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             const { user } = get();
             if (user) {
               const fallbackColorMap: Record<string, string> = {};
-              fallbackColorMap[user.id] = MemberColorService.getColorByIndex(0).hex;
+              const fallbackColor = MemberColorService.getColorByIndex(1);
+              fallbackColorMap[user.id] = fallbackColor?.hex || '#0077BE';
               console.log('🎨 [Store] Using fallback color for current user:', fallbackColorMap);
               set({ memberColors: fallbackColorMap, tripMembers: [] });
             } else {
@@ -341,7 +342,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             const { user } = get();
             if (user) {
               const fallbackColorMap: Record<string, string> = {};
-              fallbackColorMap[user.id] = MemberColorService.getColorByIndex(0).hex;
+              const fallbackColor = MemberColorService.getColorByIndex(1);
+              fallbackColorMap[user.id] = fallbackColor?.hex || '#0077BE';
               console.log('🎨 [Store] Using fallback color for current user (no members):', fallbackColorMap);
               set({ memberColors: fallbackColorMap, tripMembers: [] });
             } else {
@@ -389,7 +391,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             const existingColor = colorMapping[member.user_id];
             if (!existingColor || existingColor === '#000000' || existingColor === 'undefined' || existingColor === '') {
               console.warn(`🎨 [Store] Using fallback color for member ${member.user_id}`);
-              finalColorMapping[member.user_id] = MemberColorService.getColorByIndex(index).hex;
+              const fallbackColor = MemberColorService.getColorByIndex(index + 1) || MemberColorService.getColorByIndex(1);
+              finalColorMapping[member.user_id] = fallbackColor?.hex || '#0077BE';
             } else {
               finalColorMapping[member.user_id] = existingColor;
             }
@@ -414,7 +417,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             membersData.forEach((member, index) => {
               const fixedColor = fixedColors[member.user_id];
               if (!fixedColor || fixedColor === '#000000' || fixedColor === 'undefined' || fixedColor === '') {
-                finalFixedColors[member.user_id] = MemberColorService.getColorByIndex(index).hex;
+                const fallbackColor = MemberColorService.getColorByIndex(index + 1) || MemberColorService.getColorByIndex(1);
+                finalFixedColors[member.user_id] = fallbackColor?.hex || '#0077BE';
               } else {
                 finalFixedColors[member.user_id] = fixedColor;
               }

@@ -500,7 +500,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       lng: Number(place.longitude) 
     });
     infoWindow.open(map);
-  }, [map, infoWindow, loadPlaceImage]);
+  }, [map, infoWindow]);
 
   // Handle route click
   const handleRouteClick = useCallback((fromPlace: any, toPlace: any, event: google.maps.PolyMouseEvent) => {
