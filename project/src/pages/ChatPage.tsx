@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Paperclip, Smile, MapPin, Calendar, Image as ImageIcon, Heart, ThumbsUp, Laugh, MoreVertical, Check, CheckCheck, X, Clock } from 'lucide-react';
+import { Send, Paperclip, Smile, MapPin, Calendar, Image as ImageIcon, Heart, ThumbsUp, Laugh, MoreVertical, Check, CheckCheck, X, Clock, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
@@ -583,19 +583,51 @@ export function ChatPage() {
     e.target.value = '';
   };
 
-  // 既読状態のヘルパー関数
+  // 既読状態のヘルパー関数（改善版：全てのメッセージに対応）
   const getReadStatus = (message: ChatMessage) => {
-    if (message.user_id !== user?.id) return null;
-    
     const readCount = message.reads?.length || 0;
     const tripMemberCount = currentTrip?.memberCount || 1;
+    const isOwn = message.user_id === user?.id;
     
-    if (readCount >= tripMemberCount - 1) { // 自分以外全員が既読
-      return 'all-read';
-    } else if (readCount > 0) {
-      return 'some-read';
+    // 自分のメッセージの場合：自分以外のメンバーの既読数を確認
+    if (isOwn) {
+      if (readCount >= tripMemberCount - 1) {
+        return 'all-read';
+      } else if (readCount > 0) {
+        return 'some-read';
+      }
+      return 'unread';
     }
-    return 'unread';
+    
+    // 他人のメッセージの場合：自分が読んだかどうかを確認
+    const hasCurrentUserRead = message.reads?.some(read => read.user_id === user?.id);
+    if (hasCurrentUserRead) {
+      return 'read-by-me';
+    }
+    return 'unread-by-me';
+  };
+  
+  // 既読情報の詳細を取得する関数
+  const getReadInfo = (message: ChatMessage) => {
+    const readCount = message.reads?.length || 0;
+    const tripMemberCount = currentTrip?.memberCount || 1;
+    const isOwn = message.user_id === user?.id;
+    
+    if (isOwn) {
+      return {
+        readCount,
+        totalMembers: tripMemberCount - 1, // 自分を除く
+        hasUnread: readCount < tripMemberCount - 1
+      };
+    } else {
+      const hasCurrentUserRead = message.reads?.some(read => read.user_id === user?.id);
+      return {
+        readCount,
+        totalMembers: tripMemberCount,
+        hasCurrentUserRead,
+        otherReadCount: hasCurrentUserRead ? readCount : readCount
+      };
+    }
   };
 
   return (
@@ -759,53 +791,81 @@ export function ChatPage() {
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       
-                      {/* Read status for own messages */}
-                      {isOwn && readStatus && (
+                      {/* Enhanced read status for all messages */}
+                      {readStatus && (
                         <div className="flex items-center">
-                          {readStatus === 'all-read' ? (
-                            <CheckCheck className="w-3 h-3 text-blue-500" title="Read by everyone" />
-                          ) : readStatus === 'some-read' ? (
-                            <CheckCheck className="w-3 h-3 text-slate-400" title="Read by some" />
+                          {isOwn ? (
+                            // Own messages: show delivery/read status
+                            readStatus === 'all-read' ? (
+                              <CheckCheck className="w-3 h-3 text-blue-500" title="Read by everyone" />
+                            ) : readStatus === 'some-read' ? (
+                              <CheckCheck className="w-3 h-3 text-slate-400" title="Read by some" />
+                            ) : (
+                              <Check className="w-3 h-3 text-slate-400" title="Sent" />
+                            )
                           ) : (
-                            <Check className="w-3 h-3 text-slate-400" title="Sent" />
+                            // Others' messages: show if current user has read
+                            readStatus === 'read-by-me' ? (
+                              <Eye className="w-3 h-3 text-blue-500" title="You have read this" />
+                            ) : (
+                              <EyeOff className="w-3 h-3 text-slate-400" title="Unread" />
+                            )
                           )}
                         </div>
                       )}
                     </div>
                     
-                    {/* Read indicators below message (only for own messages) */}
-                    {isOwn && msg.reads && msg.reads.length > 0 && (
-                      <div className="flex items-center space-x-1 mt-1 justify-end relative">
-                        <button
-                          onClick={() => setShowReadDetails(showReadDetails === msg.id ? null : msg.id)}
-                          className="flex items-center space-x-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded px-1 py-0.5 transition-colors"
-                        >
-                          {msg.reads.slice(0, 3).map((read) => {
-                            const memberColor = memberColors[read.user_id] || '#6B7280';
-                            return (
-                              <div 
-                                key={read.id}
-                                className="w-3 h-3 rounded-full border border-white"
-                                style={{ backgroundColor: memberColor }}
-                              />
-                            );
-                          })}
-                          {msg.reads.length > 3 && (
-                            <span className="text-xs text-slate-400 ml-1">+{msg.reads.length - 3}</span>
-                          )}
-                        </button>
-
-                        {/* Read details modal */}
-                        <AnimatePresence>
-                          {showReadDetails === msg.id && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                              className="absolute bottom-full right-0 mb-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 min-w-64 max-w-sm z-50"
-                              data-read-details
+                    {/* Enhanced read indicators for all messages */}
+                    {msg.reads && msg.reads.length > 0 && (
+                      (() => {
+                        const readInfo = getReadInfo(msg);
+                        return isOwn ? (
+                          // Own messages: show who has read
+                          <div className="flex items-center space-x-1 mt-1 justify-end relative">
+                            <button
+                              onClick={() => setShowReadDetails(showReadDetails === msg.id ? null : msg.id)}
+                              className="flex items-center space-x-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded px-1 py-0.5 transition-colors"
                             >
-                              <div className="p-4">
+                              {msg.reads.slice(0, 3).map((read) => {
+                                const memberColor = memberColors[read.user_id] || '#6B7280';
+                                return (
+                                  <div 
+                                    key={read.id}
+                                    className="w-3 h-3 rounded-full border border-white"
+                                    style={{ backgroundColor: memberColor }}
+                                  />
+                                );
+                              })}
+                              {msg.reads.length > 3 && (
+                                <span className="text-xs text-slate-400 ml-1">+{msg.reads.length - 3}</span>
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          // Other messages: show read count if available
+                          readInfo.readCount > 0 && (
+                            <div className="flex items-center space-x-1 mt-1 justify-start">
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                                Read by {readInfo.readCount} {readInfo.readCount === 1 ? 'person' : 'people'}
+                              </span>
+                            </div>
+                          )
+                        );
+                      })()
+                    )}
+
+                    {/* Read details modal */}
+                    {isOwn && (
+                      <AnimatePresence>
+                        {showReadDetails === msg.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                            className="absolute bottom-full right-0 mb-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 min-w-64 max-w-sm z-50"
+                            data-read-details
+                          >
+                            <div className="p-4">
                                 <div className="flex items-center justify-between mb-3">
                                   <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 flex items-center">
                                     <Clock className="w-4 h-4 mr-2" />
@@ -853,11 +913,10 @@ export function ChatPage() {
                                       );
                                     })}
                                 </div>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     )}
                   </div>
                 </div>

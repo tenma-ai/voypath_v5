@@ -7,6 +7,7 @@ import { OptimizationLoadingOverlay } from './OptimizationLoadingOverlay';
 import { OptimizationSuccessOverlay } from './OptimizationSuccessOverlay';
 import { AnimatePresence } from 'framer-motion';
 import { getColorOrFallback } from '../utils/ColorFallbackUtils';
+import { pixabayService } from '../services/PixabayService';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -20,6 +21,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
   const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
+  const [placeImages, setPlaceImages] = useState<Map<string, string>>(new Map());
   const { currentTrip, memberColors, tripMembers, hasUserOptimized, isOptimizing, showOptimizationSuccess, setShowOptimizationSuccess } = useStore();
 
   // Load Google Maps API
@@ -498,7 +500,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       lng: Number(place.longitude) 
     });
     infoWindow.open(map);
-  }, [map, infoWindow, tripMembers]);
+  }, [map, infoWindow, loadPlaceImage]);
 
   // Handle route click
   const handleRouteClick = useCallback((fromPlace: any, toPlace: any, event: google.maps.PolyMouseEvent) => {
