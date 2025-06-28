@@ -396,20 +396,6 @@ export function MyPlacesPage() {
         </button>
       </div>
 
-
-      {/* Add Place Quick Action */}
-      {activeTab === 'my' && (
-        <div className="flex justify-center">
-          <Link
-            to="/add-place"
-            className="inline-flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-600 text-white rounded-xl hover:from-primary-600 hover:to-secondary-700 transition-all transform hover:scale-105 shadow-lg"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="font-semibold">Add New Place</span>
-          </Link>
-        </div>
-      )}
-
       {/* Places Grid/List */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
