@@ -17,7 +17,7 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
   className = '',
   size = 'medium'
 }) => {
-  const [imageUrl, setImageUrl] = useState<string | null>(fallbackUrl || null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
@@ -29,25 +29,36 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
       try {
         setIsLoading(true);
         setHasError(false);
+        setShowFallback(false);
         
         const url = await pixabayService.getPlacePhoto(placeName);
         
-        if (isMounted) {
+        if (isMounted && url && url.trim() !== '') {
           setImageUrl(url);
+          setIsLoading(false);
+        } else {
+          // No valid URL from Pixabay, try fallback
+          if (isMounted) {
+            if (fallbackUrl && fallbackUrl.trim() !== '' && !fallbackUrl.includes('/api/placeholder')) {
+              setImageUrl(fallbackUrl);
+              setIsLoading(false);
+            } else {
+              setShowFallback(true);
+              setImageUrl(null);
+              setIsLoading(false);
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading place image:', error);
         if (isMounted) {
           setHasError(true);
-          if (fallbackUrl) {
+          if (fallbackUrl && fallbackUrl.trim() !== '' && !fallbackUrl.includes('/api/placeholder')) {
             setImageUrl(fallbackUrl);
           } else {
             setShowFallback(true);
             setImageUrl(null);
           }
-        }
-      } finally {
-        if (isMounted) {
           setIsLoading(false);
         }
       }
@@ -57,8 +68,11 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
     if (placeName && placeName.trim() && !placeName.includes('/api/placeholder')) {
       loadImage();
     } else {
+      // No valid place name, use fallback immediately
       setIsLoading(false);
-      if (!fallbackUrl) {
+      if (fallbackUrl && fallbackUrl.trim() !== '' && !fallbackUrl.includes('/api/placeholder')) {
+        setImageUrl(fallbackUrl);
+      } else {
         setShowFallback(true);
       }
     }
@@ -71,7 +85,8 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
   const handleImageError = () => {
     if (!hasError) {
       setHasError(true);
-      if (fallbackUrl && fallbackUrl.trim() !== '') {
+      // If current image failed, try fallback or show placeholder
+      if (fallbackUrl && fallbackUrl.trim() !== '' && !fallbackUrl.includes('/api/placeholder') && imageUrl !== fallbackUrl) {
         setImageUrl(fallbackUrl);
       } else {
         setShowFallback(true);
@@ -86,12 +101,15 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
 
   // Show fallback placeholder if no image is available
   if (showFallback || ((!imageUrl || imageUrl.trim() === '') && !isLoading)) {
+    const displayName = placeName && placeName.trim() ? placeName : 'Place';
+    const truncatedName = displayName.length > 20 ? displayName.slice(0, 20) + '...' : displayName;
+    
     return (
-      <div className={`relative ${className} bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center`}>
-        <div className="text-center">
-          <MapPin className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-500 mb-2" />
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            {placeName ? placeName.slice(0, 20) + (placeName.length > 20 ? '...' : '') : 'Place'}
+      <div className={`relative ${className} bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center overflow-hidden`}>
+        <div className="text-center p-2">
+          <MapPin className="w-6 h-6 mx-auto text-slate-400 dark:text-slate-500 mb-1" />
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-tight">
+            {truncatedName}
           </div>
         </div>
       </div>

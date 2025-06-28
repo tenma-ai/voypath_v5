@@ -4,8 +4,6 @@ import { useStore } from '../store/useStore';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { PlaceImage } from '../components/PlaceImage';
-import { DateUtils } from '../utils/DateUtils';
-import { PlaceDateUtils } from '../utils/PlaceDateUtils';
 
 export function MyPlacesPage() {
   const navigate = useNavigate();
@@ -22,11 +20,6 @@ export function MyPlacesPage() {
     notes: ''
   });
   const { places, currentTrip, trips, initializeFromDatabase, updatePlace, deletePlace, hasUserOptimized, tripMembers, user, memberColors } = useStore();
-
-  // Use centralized place date logic
-  const getPlaceDisplayDate = (place: any) => {
-    return PlaceDateUtils.getPlaceDisplayDate(place, currentTrip);
-  };
 
   // Check if deadline has passed
   const isDeadlinePassed = () => {
@@ -156,11 +149,8 @@ export function MyPlacesPage() {
     
     if (priorityDiff !== 0) return priorityDiff;
     
-    // Within same status, sort by visit order using calculated dates
-    const dateA = getPlaceDisplayDate(a);
-    const dateB = getPlaceDisplayDate(b);
-    
-    return dateA.getTime() - dateB.getTime();
+    // Within same status, sort by name alphabetically
+    return a.name.localeCompare(b.name);
   });
 
   const categoryColors = {
@@ -468,13 +458,8 @@ export function MyPlacesPage() {
                     
                     <div className="p-3 h-2/5 flex flex-col justify-between">
                       <div>
-                        {/* Date and Place Name */}
+                        {/* Place Name */}
                         <div className="mb-2">
-                          {PlaceDateUtils.getPlaceDisplayDate(place, currentTrip) && (
-                            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                              {PlaceDateUtils.formatPlaceDate(place, currentTrip, 'No date set')}
-                            </div>
-                          )}
                           <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm line-clamp-2">
                             {place.name}
                           </h3>
@@ -511,15 +496,6 @@ export function MyPlacesPage() {
                     style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                   >
                     <div className="space-y-3">
-                      {/* Visit Time */}
-                      {PlaceDateUtils.getPlaceDisplayDate(place, currentTrip) && (
-                        <div>
-                          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Visit Time</div>
-                          <div className="text-sm text-slate-900 dark:text-slate-100">
-                            {PlaceDateUtils.formatPlaceDate(place, currentTrip, 'No date set')}
-                          </div>
-                        </div>
-                      )}
                       
                       {/* Added by (Trip Places only) */}
                       {activeTab === 'trip' && (
