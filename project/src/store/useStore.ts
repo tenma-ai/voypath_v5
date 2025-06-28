@@ -969,7 +969,8 @@ export const useStore = create<StoreState>()((set, get) => ({
               id, name, category, place_type, source, wish_level, stay_duration_minutes,
               latitude, longitude, is_selected_for_optimization, 
               normalized_wish_level, selection_round, trip_id, user_id, created_at,
-              scheduled, scheduled_date, scheduled_time_start, scheduled_time_end
+              scheduled, scheduled_date, scheduled_time_start, scheduled_time_end,
+              day, visit_date
             `)
             .eq('trip_id', targetTripId)
             .order('created_at', { ascending: true });
@@ -993,6 +994,11 @@ export const useStore = create<StoreState>()((set, get) => ({
               priceLevel: 2,
               scheduled: place.is_selected_for_optimization || false,
               scheduledDate: place.scheduled_date ? new Date(place.scheduled_date).toLocaleDateString() : undefined,
+              scheduled_date: place.scheduled_date,
+              day: place.day,
+              visitDate: place.visit_date,
+              visit_date: place.visit_date,
+              created_at: place.created_at,
               tripId: place.trip_id,
               trip_id: place.trip_id,
               userId: place.user_id,

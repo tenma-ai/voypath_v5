@@ -25,7 +25,7 @@ export interface Place {
 export class PlaceDateUtils {
   /**
    * Get the display date for a place with proper fallback hierarchy
-   * Priority: scheduled_date > day calculation > trip start > created_at > null
+   * Priority: scheduled_date > day calculation > visit_date > created_at > null
    */
   static getPlaceDisplayDate(place: Place, currentTrip?: Trip): Date | null {
     // 1. Use scheduled date if available (from optimization results)
@@ -55,15 +55,7 @@ export class PlaceDateUtils {
       }
     }
     
-    // 4. Fall back to trip start date
-    if (currentTrip) {
-      const tripStartDate = DateUtils.getTripStartDate(currentTrip);
-      if (tripStartDate) {
-        return tripStartDate;
-      }
-    }
-    
-    // 5. Use place creation date if available
+    // 4. Use place creation date if available
     if (place.created_at) {
       try {
         return new Date(place.created_at);
@@ -72,7 +64,7 @@ export class PlaceDateUtils {
       }
     }
     
-    // 6. Return null instead of current date - let UI handle gracefully
+    // 5. Return null instead of trip start date or current date - let UI handle gracefully
     return null;
   }
 
