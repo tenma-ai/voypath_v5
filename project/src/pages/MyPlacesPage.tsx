@@ -718,7 +718,7 @@ export function MyPlacesPage() {
                       <span>Stay: {place.stayDuration}h</span>
                     </div>
                     <div className="flex items-center">
-                      <span>{'$'.repeat(place.priceLevel)}</span>
+                      <span>Price Level: {place.priceLevel}</span>
                     </div>
                   </div>
                 </div>

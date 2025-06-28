@@ -11,6 +11,22 @@ import { PremiumBadge } from '../components/PremiumBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 
+// Extract place name from address (remove country, state details)
+const extractPlaceName = (address: string): string => {
+  if (!address) return '';
+  
+  // Split by comma and take the first 1-2 parts (city, possibly region)
+  const parts = address.split(',').map(part => part.trim());
+  
+  // For most addresses, the first part is the main location name
+  // If there are multiple parts, take first 2 to include city + region if needed
+  if (parts.length >= 2) {
+    return parts.slice(0, 2).join(', ');
+  }
+  
+  return parts[0] || address;
+};
+
 export function HomePage() {
   const navigate = useNavigate();
   const { user, trips, currentTrip, deleteTrip, canCreateTrip, setCurrentTrip, loadPlacesFromAPI } = useStore();
@@ -406,15 +422,15 @@ export function HomePage() {
                         {/* Content */}
                         <div className="relative z-10">
                           <div className="flex items-start justify-between mb-2 sm:mb-3">
-                            <div className="flex-1 min-w-0 pr-8 sm:pr-12">
+                            <div className="flex-1 min-w-0 pr-2 sm:pr-3">
                               <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mb-1 sm:mb-2 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight">
-                                {trip.name || `${trip.departureLocation} Trip`}
+                                {trip.name || `${extractPlaceName(trip.departureLocation)} Trip`}
                               </h3>
                               <p className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm line-clamp-2 leading-relaxed">
-                                {trip.description || `Trip starting from ${trip.departureLocation}`}
+                                {trip.description || `Trip starting from ${extractPlaceName(trip.departureLocation)}`}
                               </p>
                             </div>
-                            <div className="flex space-x-1">
+                            <div className="flex space-x-0.5 sm:space-x-1 flex-shrink-0">
                               {/* Edit Trip Button - Opens CreateTripModal in edit mode */}
                               <motion.button
                                 onClick={async (e) => {
@@ -423,12 +439,12 @@ export function HomePage() {
                                   setEditTripData(trip);
                                   setShowCreateModal(true);
                                 }}
-                                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                                 title="Edit Trip"
                               >
-                                <Edit className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                                <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
                               </motion.button>
                               
                               {/* Settings Button - Opens TripSettingsModal */}
@@ -441,12 +457,12 @@ export function HomePage() {
                                   await setCurrentTrip(trip);
                                   setShowTripSettingsModal(true);
                                 }}
-                                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                                 title="Trip Settings"
                               >
-                                <Settings className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                                <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
                               </motion.button>
                               <motion.button
                                 onClick={async (e) => {
@@ -460,11 +476,11 @@ export function HomePage() {
                                     }
                                   }
                                 }}
-                                className="p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                               >
-                                <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
+                                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-500 hover:text-red-600" />
                               </motion.button>
                             </div>
                           </div>
@@ -474,14 +490,14 @@ export function HomePage() {
                               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
                                 <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-primary-600 dark:text-primary-400" />
                               </div>
-                              <span className="font-medium truncate">From: {trip.departureLocation}</span>
+                              <span className="font-medium truncate">From: {extractPlaceName(trip.departureLocation)}</span>
                             </div>
                             {trip.destination && (
                               <div className="flex items-center text-slate-600 dark:text-slate-400 text-xs sm:text-sm">
                                 <div className="w-6 h-6 sm:w-8 sm:h-8 bg-secondary-100 dark:bg-secondary-900/30 rounded-xl flex items-center justify-center mr-2 sm:mr-3 flex-shrink-0">
                                   <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-secondary-600 dark:text-secondary-400" />
                                 </div>
-                                <span className="font-medium truncate">To: {trip.destination}</span>
+                                <span className="font-medium truncate">To: {extractPlaceName(trip.destination)}</span>
                               </div>
                             )}
                             {trip.startDate && trip.endDate && (

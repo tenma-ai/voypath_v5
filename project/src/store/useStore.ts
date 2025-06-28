@@ -193,8 +193,9 @@ export const useStore = create<StoreState>()((set, get) => ({
               
               // Reset hasUserOptimized when switching to a different trip
               // This ensures places appear as pending until user explicitly optimizes
+              // But will be set back to true if optimization results are found
               set({ hasUserOptimized: false });
-              console.log(`🔄 Reset hasUserOptimized to false for new trip`);
+              console.log(`🔄 Reset hasUserOptimized to false for new trip (will be restored if optimization results exist)`);
               
               await get().loadMemberColorsForTrip(trip.id); // Load colors first
               await get().loadPlacesFromDatabase(trip.id);
@@ -206,7 +207,10 @@ export const useStore = create<StoreState>()((set, get) => ({
               await get().loadMemberColorsForTrip(trip.id);
               // Preserve optimization results if staying on same trip
               if (currentOptimizationResult) {
-                set({ optimizationResult: currentOptimizationResult });
+                set({ 
+                  optimizationResult: currentOptimizationResult,
+                  hasUserOptimized: true // Preserve the optimization state
+                });
               }
             }
             console.log(`🔄 Current trip set to: ${trip.name} (${trip.id})`);
@@ -1030,7 +1034,10 @@ export const useStore = create<StoreState>()((set, get) => ({
           // Restore optimization results even if initialization fails
           if (existingOptimizationResult) {
             console.log('🔄 Restoring optimization result after initialization error');
-            set({ optimizationResult: existingOptimizationResult });
+            set({ 
+              optimizationResult: existingOptimizationResult,
+              hasUserOptimized: true // Restore the optimization state as well
+            });
           }
         }
       },
@@ -1357,11 +1364,12 @@ export const useStore = create<StoreState>()((set, get) => ({
             console.log('🔍 [useStore] Converted daily_schedules:', optimizationResult.optimization.daily_schedules);
 
             set({ 
-              optimizationResult: optimizationResult
-              // Note: Do NOT set hasUserOptimized to true when loading existing optimization
-              // hasUserOptimized should only be true when user explicitly clicks the Optimize button
+              optimizationResult: optimizationResult,
+              // Set hasUserOptimized to true when we have valid optimization results
+              // This ensures the UI displays the optimization even after page reload
+              hasUserOptimized: true
             });
-            console.log(`✅ Loaded optimization result for trip ${tripId} (hasUserOptimized remains unchanged)`);
+            console.log(`✅ Loaded optimization result for trip ${tripId} - setting hasUserOptimized to true`);
           } else {
             // No results found in database, preserve existing if available
             console.log('No optimization results found in database');

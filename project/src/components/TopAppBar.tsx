@@ -107,7 +107,7 @@ function TopAppBar() {
 
   // Close menus when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Element;
       
       if (showProfileMenu && !target.closest('.profile-menu-container')) {
@@ -119,11 +119,16 @@ function TopAppBar() {
       }
     };
 
+    // Handle both mouse and touch events for better mobile support
     document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, [showProfileMenu, showVoypathMenu]);
 
-  const handleProfileMenuToggle = (e: React.MouseEvent) => {
+  const handleProfileMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setShowProfileMenu(!showProfileMenu);
@@ -611,6 +616,7 @@ function TopAppBar() {
                 <div className="relative profile-menu-container" style={{ zIndex: 10000 }}>
                   <motion.button
                     onClick={handleProfileMenuToggle}
+                    onTouchStart={handleProfileMenuToggle}
                     className="relative group"
                     whileHover={{ scale: 1.05, y: -1 }}
                     whileTap={{ scale: 0.95 }}

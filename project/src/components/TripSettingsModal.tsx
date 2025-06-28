@@ -197,7 +197,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
-        <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+        <Dialog open={isOpen} onClose={onClose} className="relative z-[9999]">
           <motion.div 
             className="fixed inset-0 bg-black/40 backdrop-blur-sm" 
             initial={{ opacity: 0 }}
