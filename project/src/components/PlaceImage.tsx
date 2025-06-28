@@ -69,14 +69,11 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
   }, [placeName, fallbackUrl]);
 
   const handleImageError = () => {
-    console.log('🖼️ Image error for place:', placeName, 'fallbackUrl:', fallbackUrl);
     if (!hasError) {
       setHasError(true);
-      if (fallbackUrl) {
-        console.log('🖼️ Using fallbackUrl:', fallbackUrl);
+      if (fallbackUrl && fallbackUrl.trim() !== '') {
         setImageUrl(fallbackUrl);
       } else {
-        console.log('🖼️ No fallbackUrl, showing placeholder for:', placeName);
         setShowFallback(true);
         setImageUrl(null);
       }
