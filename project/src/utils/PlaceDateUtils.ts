@@ -25,7 +25,7 @@ export interface Place {
 export class PlaceDateUtils {
   /**
    * Get the display date for a place with proper fallback hierarchy
-   * Priority: scheduled_date > day calculation > visit_date > created_at > null
+   * Priority: scheduled_date > created_at > null
    */
   static getPlaceDisplayDate(place: Place, currentTrip?: Trip): Date | null {
     // 1. Use scheduled date if available (from optimization results)
@@ -45,33 +45,7 @@ export class PlaceDateUtils {
       }
     }
     
-    // 2. Calculate from day number if trip has start date
-    if (place.day && currentTrip) {
-      try {
-        return DateUtils.calculateTripDate(currentTrip, place.day);
-      } catch (error) {
-        console.warn('Failed to calculate trip date for place:', place.id, error);
-      }
-    }
-    
-    // 3. Use visit_date if explicitly set
-    if (place.visit_date) {
-      try {
-        return new Date(place.visit_date);
-      } catch (error) {
-        console.warn('Invalid visit_date for place:', place.id, error);
-      }
-    }
-    
-    if (place.visitDate) {
-      try {
-        return new Date(place.visitDate);
-      } catch (error) {
-        console.warn('Invalid visitDate for place:', place.id, error);
-      }
-    }
-    
-    // 4. Use place creation date if available
+    // 2. Use place creation date as fallback for unscheduled places
     if (place.created_at) {
       try {
         return new Date(place.created_at);
@@ -80,7 +54,7 @@ export class PlaceDateUtils {
       }
     }
     
-    // 5. Return null - UI will show "No date set"
+    // 3. Return null - UI will show "No date set"
     return null;
   }
 

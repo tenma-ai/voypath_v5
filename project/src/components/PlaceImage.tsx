@@ -33,7 +33,7 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
         
         const url = await pixabayService.getPlacePhoto(placeName);
         
-        if (isMounted && url && url.trim() !== '') {
+        if (isMounted && url && url.trim() !== '' && !url.includes('/api/placeholder')) {
           setImageUrl(url);
           setIsLoading(false);
         } else {
@@ -43,6 +43,7 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
               setImageUrl(fallbackUrl);
               setIsLoading(false);
             } else {
+              // Show placeholder for places without images
               setShowFallback(true);
               setImageUrl(null);
               setIsLoading(false);
