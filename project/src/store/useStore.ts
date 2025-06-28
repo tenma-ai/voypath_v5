@@ -1044,8 +1044,13 @@ export const useStore = create<StoreState>()((set, get) => ({
 
       // API Integration
       createTripWithAPI: async (tripData: TripCreateData): Promise<Trip> => {
-        const { user } = get();
+        const { user, canCreateTrip } = get();
         if (!user) throw new Error('User not authenticated');
+        
+        // Double-check trip creation limits
+        if (!canCreateTrip()) {
+          throw new Error('You have reached the trip limit for your current plan. Please upgrade to Premium to create more trips.');
+        }
 
         try {
           console.log('Creating trip in Supabase database');

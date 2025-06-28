@@ -36,7 +36,7 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
     end: null
   });
 
-  const { createTripWithAPI, updateTrip } = useStore();
+  const { createTripWithAPI, updateTrip, canCreateTrip } = useStore();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -86,6 +86,12 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
     const departureLocation = selectedDeparture?.formatted_address || formData.departureLocation;
     if (!departureLocation.trim()) {
       alert('Departure location is required');
+      return;
+    }
+    
+    // Check trip creation limits for new trips
+    if (!editMode && !canCreateTrip()) {
+      alert('You have reached the trip limit for your current plan. Please upgrade to Premium to create more trips.');
       return;
     }
     
