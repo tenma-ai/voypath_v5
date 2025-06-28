@@ -207,7 +207,7 @@ export class PlaceDuplicateService {
         return false;
       }
 
-      // Log: '🔀 [PlaceDuplicateService] Merging places:', places.map(p => p.name));
+      // Merging places
 
       // Keep the recommended merge place, update it with merged data
       const keepPlace = places.find(p => p.id === recommendedMerge.id) || places[0];

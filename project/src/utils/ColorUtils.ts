@@ -84,17 +84,5 @@ export function getSystemPlaceColor(): string {
  * Debug function to log color state
  */
 export function debugColorState(context: string): void {
-  const { memberColors, tripMembers, currentTrip } = useStore.getState();
-  
-  // Log: `🔍 [ColorUtils] Debug - ${context}:`, {
-    tripId: currentTrip?.id,
-    tripName: currentTrip?.name,
-    memberColors,
-    tripMembers: tripMembers.map(m => ({
-      userId: m.user_id,
-      name: m.name,
-      colorIndex: m.assigned_color_index,
-      assignedColor: memberColors[m.user_id]
-    }))
-  });
+  // Debug function for color state analysis
 }

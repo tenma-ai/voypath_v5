@@ -156,7 +156,7 @@ export class HybridDataManager {
       try {
         await this.saveToPrimaryStorage(item.data, session)
         syncedItems.push(item.id)
-        // Log: 'Synced item:', item.id)
+        // Item synced
       } catch (error) {
         // Warning: 'Failed to sync item:', item.id, error)
         // Keep in queue for next sync attempt

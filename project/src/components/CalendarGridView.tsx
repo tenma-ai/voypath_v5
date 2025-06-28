@@ -57,7 +57,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
         const scheduleDate = DateUtils.calculateTripDate(currentTrip, daySchedule.day || (dayIndex + 1));
         const dateKey = scheduleDate.toDateString();
         
-        // Log: `🔍 [CalendarGridView] Day ${daySchedule.day || (dayIndex + 1)} -> ${dateKey}`);
+        // Processing day schedule
         
         // Filter to show only trip places, excluding system places except departure/arrival
         const validPlaces = daySchedule.scheduled_places.filter((place: any) => {
@@ -157,11 +157,6 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
   };
 
   const getPlaceColor = (place: CalendarPlace) => {
-    // Log: `🔍 [CalendarGridView] Getting color for place: ${place.name}`, {
-      contributors: place.contributors,
-      memberColors: memberColors
-    });
-    
     // Use centralized color utility for consistency
     const colorResult = getPlaceColorUtil({
       ...place,
@@ -184,13 +179,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
     }
   };
 
-  // Debug current state
-  // Log: '🔍 [CalendarGridView] Render state:', {
-    monthScheduleKeys: Object.keys(monthSchedule),
-    monthScheduleSize: Object.keys(monthSchedule).length,
-    memberColorsSize: Object.keys(memberColors).length,
-    optimizationResultExists: !!optimizationResult
-  });
+  // Debug current state handled
 
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-4 overflow-y-auto">
@@ -263,7 +252,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
             
             // Debug log for days with places
             if (dayPlaces.length > 0) {
-              // Log: `🔍 [CalendarGridView] Day ${day.getDate()} (${dateKey}) has ${dayPlaces.length} places:`, dayPlaces);
+              // Processing day places
             }
 
             return (

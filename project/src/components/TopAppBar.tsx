@@ -384,7 +384,7 @@ function TopAppBar() {
                               parent.appendChild(fallback);
                             }
                           }}
-                          onLoad={() => // Log: 'Logo loaded successfully')}
+                          onLoad={() => {}}
                         />
                       </motion.div>
                       <motion.div
@@ -439,7 +439,7 @@ function TopAppBar() {
                                     // Error occurred
                                     e.currentTarget.style.display = 'none';
                                   }}
-                                  onLoad={() => // Log: 'Menu logo loaded successfully')}
+                                  onLoad={() => {}}
                                 />
                               </div>
                               <div>

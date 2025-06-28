@@ -151,22 +151,17 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
                 disableDefaultUI: true,
               }}
             >
-              {// Log: '🔍 [MapViewModal] Rendering map with', places.length, 'places')}
               
               {/* Test marker */}
               <Marker 
                 position={{ lat: 35.6812, lng: 139.7671 }} 
                 title="Tokyo Test Marker"
-                onClick={() => // Log: 'Test marker clicked')}
+                onClick={() => {}}
               />
               
               {/* Place markers */}
               {places.map((place, index) => {
-                // Log: `🔍 [MapViewModal] Place ${index}:`, {
-                  name: place.place_name || place.name,
-                  lat: place.latitude,
-                  lng: place.longitude,
-                  hasCoords: !!(place.latitude && place.longitude)
+                // Processing place data
                 });
                 
                 if (!place.latitude || !place.longitude) {
@@ -183,7 +178,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
                     }}
                     title={`${index + 1}. ${place.place_name || place.name}`}
                     label={`${index + 1}`}
-                    onClick={() => // Log: 'Place clicked:', place.place_name || place.name)}
+                    onClick={() => {}}
                   />
                 );
               })}

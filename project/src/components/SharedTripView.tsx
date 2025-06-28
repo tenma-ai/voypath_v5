@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 
 // Inline Auth Form Component
-function AuthForm({ onSuccess }: { onSuccess: (user: any) => void }) {
+function AuthForm({ onSuccess, shareToken }: { onSuccess: (user: any) => void; shareToken?: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -212,17 +212,8 @@ export function SharedTripView() {
   const navigate = useNavigate();
   const { user, setCurrentTrip, loadTripsFromDatabase } = useStore();
   
-  // Debug user state on component mount
   useEffect(() => {
-    // Log: '🔐 SharedTripView user state on mount:', {
-      user: user ? {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        isGuest: user.isGuest
-      } : null,
-      hasUser: !!user
-    });
+    // Component mount effect for user state
   }, [user]);
   const [shareData, setShareData] = useState<SharedTripData | null>(null);
   const [isPasswordRequired, setIsPasswordRequired] = useState(false);
@@ -231,14 +222,6 @@ export function SharedTripView() {
   const [error, setError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Log: '🚀 SharedTripView render state:', {
-    shareToken,
-    isLoading,
-    error,
-    hasShareData: !!shareData,
-    isPasswordRequired,
-    isRedirecting
-  });
 
   useEffect(() => {
     // Check for pending share token from localStorage (for new user signup flow)
@@ -278,7 +261,7 @@ export function SharedTripView() {
         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       };
       
-      // Log: '📤 Request headers:', Object.keys(headers));
+      // Request headers prepared
       
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
         method: 'POST',
@@ -309,7 +292,7 @@ export function SharedTripView() {
         const data = await response.json();
         
         // Log message
-        // Log: '🔑 Permissions object:', JSON.stringify(data.permissions, null, 2));
+        // Permissions loaded
         
         if (data.requiresPassword) {
           setIsPasswordRequired(true);
@@ -320,16 +303,6 @@ export function SharedTripView() {
         setShareData(data);
         setIsPasswordRequired(false);
         
-        // Debug logging for redirect conditions
-        // Log: '🔍 SharedTripView redirect check:', {
-          hasUser: !!user,
-          userId: user?.id,
-          hasTrip: !!data.trip,
-          tripId: data.trip?.id,
-          hasPermissions: !!data.permissions,
-          canJoinAsMember: data.permissions?.can_join_as_member,
-          allConditionsMet: !!(user && data.trip && data.permissions?.can_join_as_member)
-        });
         
         // If user is authenticated and can join as member, redirect to actual trip page
         if (user && data.trip && data.permissions?.can_join_as_member) {
@@ -449,7 +422,7 @@ export function SharedTripView() {
 
       if (error) {
         if (error.message.includes('duplicate')) {
-          // Log: '✅ User is already a member (duplicate key)');
+          // User is already a member
           return true;
         }
         // Error occurred
@@ -687,6 +660,7 @@ export function SharedTripView() {
 
             {/* Inline Auth Component */}
             <AuthForm 
+              shareToken={shareToken}
               onSuccess={async (user) => {
                 try {
                   // Store trip info for pending join

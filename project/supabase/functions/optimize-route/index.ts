@@ -18,18 +18,18 @@ function calculateDistance(point1, point2) {
 }
 // 移動手段の判定（改善版）
 function determineTransportMode(distance, fromAirport = false, toAirport = false) {
-  // Log: `🚗 Distance: ${distance.toFixed(1)}km, fromAirport: ${fromAirport}, toAirport: ${toAirport}`);
+  // Distance calculation for transport mode determination
   // 距離ベースの判定を優先（空港であっても近距離は車を使用）
   if (distance <= 2) {
-    // Log: '  🚶 Walking (short distance)');
+    // Walking for short distances
     return 'walking';
   }
   if (distance <= 500) {
-    // Log: '  🚗 Car (medium distance)');
+    // Car for medium distances
     return 'car';
   }
   // 長距離の場合のみ飛行機を使用
-  // Log: '  ✈️ Flight (long distance)');
+  // Flight for long distances
   return 'flight';
 }
 // 移動時間の計算（改善版）
@@ -66,7 +66,6 @@ function calculateTravelTime(distance, mode) {
 }
 // 希望度の正規化（必須機能）
 function normalizePreferences(places) {
-  // Log message
   // ユーザーごとにグループ化
   const userGroups = new Map();
   places.forEach((place)=>{
@@ -83,13 +82,12 @@ function normalizePreferences(places) {
     userPlaces.forEach((place)=>{
       place.normalized_wish_level = place.wish_level / avgWish;
     });
-    // Log: `User ${userId}: ${userPlaces.length} places, avg wish: ${avgWish.toFixed(2)}`);
+    // User preference normalization completed
   });
   return places;
 }
 // 場所の絞り込み（公平性考慮）
 function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
-  // Log message
   const systemPlaces = places.filter((p)=>p.place_type === 'departure' || p.place_type === 'destination');
   const visitPlaces = places.filter((p)=>p.place_type === 'visit');
   
@@ -109,11 +107,9 @@ function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
     const timeBasedMaxPlaces = Math.floor(totalAvailableMinutes / avgTimePerPlace);
     effectiveMaxPlaces = Math.min(maxPlaces, timeBasedMaxPlaces);
     
-    // Log message
   }
   
   if (visitPlaces.length <= effectiveMaxPlaces - systemPlaces.length) {
-    // Log message
     return places;
   }
   
@@ -145,15 +141,10 @@ function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
     round++;
   }
   
-  // Log fairness statistics
+  // Calculate fairness statistics
   const userSelections = new Map();
   selectedVisitPlaces.forEach(place => {
     userSelections.set(place.user_id, (userSelections.get(place.user_id) || 0) + 1);
-  });
-  // Log message
-  // Log message
-  userSelections.forEach((count, userId) => {
-    // Log message
   });
   
   return [
@@ -182,7 +173,7 @@ function removeDuplicatePlaces(places) {
       uniquePlacesMap.set(placeKey, groupPlaces[0]);
     } else {
       // Multiple places at same location - merge them
-      // Log message
+      // Multiple places at same location - merge them
       
       // Find place with longest stay duration
       const longestStay = groupPlaces.reduce((max, place) => 

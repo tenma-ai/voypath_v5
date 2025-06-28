@@ -43,7 +43,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
     const { supabase } = await import('../lib/supabase');
     const { data: { session }, error } = await supabase.auth.getSession();
     
-    // Log: '🔐 Session debug:', {
+    // Session debug
       hasSession: !!session,
       hasUser: !!session?.user,
       hasAccessToken: !!session?.access_token,
@@ -58,7 +58,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
     // Test token validation by making a simple authenticated request
     try {
       const testResponse = await supabase.auth.getUser();
-      // Log: '🔍 Token validation test:', {
+      // Token validation test
         success: !testResponse.error,
         user: testResponse.data?.user?.email,
         error: testResponse.error?.message
@@ -77,7 +77,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
       'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
     };
 
-    // Log: '📡 Headers being sent:', Object.keys(headers));
+    // Headers being sent
     
     return headers;
   };
@@ -128,7 +128,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
       }
       
       const headers = await getAuthHeaders();
-      // Log: 'Headers prepared:', Object.keys(headers));
+      // Headers prepared
       
       const permissions = shareType === 'external_view' ? {
         can_view_places: true,
@@ -176,7 +176,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
       });
 
       // Log message
-      // Log: 'Response headers:', Object.fromEntries(response.headers.entries()));
+      // Response headers
 
       if (response.ok) {
         const newShare = await response.json();

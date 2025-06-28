@@ -66,7 +66,7 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
     // Log message
     // Log message
     // Log message
-    // Log: '🔍 [ListViewModal] Is array:', Array.isArray(dailySchedules));
+    // Checking array type
     
     // Safety check for required properties
     if (!result?.optimization || !dailySchedules || !Array.isArray(dailySchedules)) {
@@ -97,7 +97,7 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
       };
       
       totalPlaces += (schedule.scheduled_places || []).length;
-      // Log: '🔍 [ListViewModal] Assigned to day', dayKey, ':', (schedule.scheduled_places || []).length, 'places');
+      // Assigning places to day
     });
 
     return {

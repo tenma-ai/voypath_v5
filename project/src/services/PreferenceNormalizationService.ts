@@ -48,7 +48,7 @@ export class PreferenceNormalizationService {
     forceRefresh: boolean = false
   ): Promise<NormalizationResult> {
     try {
-      // Log: `Starting preference normalization for trip ${tripId} (force refresh: ${forceRefresh})`);
+      // Starting preference normalization
 
       const response = await supabase.functions.invoke('normalize-preferences', {
         body: {

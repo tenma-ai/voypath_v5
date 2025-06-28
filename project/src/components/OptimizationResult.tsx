@@ -82,7 +82,7 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
     // Log message
     // Log message
     // Log message
-    // Log: '🔍 [OptimizationResult] Is array:', Array.isArray(dailySchedules));
+    // Checking array type
     
     // Safety check for required properties
     if (!result?.optimization || !dailySchedules || !Array.isArray(dailySchedules)) {

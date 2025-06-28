@@ -82,7 +82,7 @@ export class PlaceSearchService {
         );
 
         // Prepare search request with proper location handling
-        // Log: '🔍 Preparing search request for:', request.inputValue.trim());
+        // Preparing search request
         const searchRequest: any = {
           query: request.inputValue.trim(),
           language: request.language,

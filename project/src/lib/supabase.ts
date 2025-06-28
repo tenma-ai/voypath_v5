@@ -40,22 +40,22 @@ export const ensureAuthenticated = async () => {
     // Try to get existing session first
     const session = await getSession()
     if (session && session.user) {
-      // Log: 'Found existing Supabase session for user:', session.user.id)
+      // Found existing Supabase session
       return session.user
     }
 
     // For development, try to get an authenticated session
-    // Log: 'No session found, need to authenticate...')
+    // No session found
     
     // In development mode, show a simple auth prompt
     if (import.meta.env.DEV) {
-      // Log: 'Development mode: Please sign up or sign in through the UI')
+      // Development mode
       // Return null to trigger UI authentication flow
       return null
     }
 
     // Fallback to development user
-    // Log: 'Using development user for testing...')
+    // Using development user
     const devUserId = '2600c340-0ecd-4166-860f-ac4798888344' // Real authenticated user
     
     return {
@@ -237,7 +237,7 @@ export const signOut = async () => {
 // Direct Supabase database insertion for places
 export const addPlaceToDatabase = async (placeData: any) => {
   try {
-    // Log: 'Adding place to Supabase:', placeData)
+    // Adding place to Supabase
     
     // Get current user - check session first, then fallback to dev user
     let user;
@@ -307,7 +307,7 @@ export const addPlaceToDatabase = async (placeData: any) => {
       throw error
     }
     
-    // Log: 'Place successfully saved to Supabase:', data)
+    // Place saved successfully
     return { place: data }
     
   } catch (error) {
@@ -355,7 +355,7 @@ export const subscribeToRealtime = (
           filter: `trip_id=eq.${tripId}`
         },
         (payload) => {
-          // Log: `Realtime ${table} change for trip ${tripId}:`, payload)
+          // Realtime change received
           callback?.(payload)
         }
       )
@@ -370,14 +370,14 @@ export const subscribeToRealtime = (
           table: table
         },
         (payload) => {
-          // Log: `Realtime ${table} change:`, payload)
+          // Realtime change received
           callback?.(payload)
         }
       )
   }
 
   channel.subscribe((status) => {
-    // Log: `Realtime channel status for ${channelKey}:`, status)
+    // Realtime channel status changed
   })
 
   realtimeChannels.set(channelKey, channel)
@@ -391,14 +391,14 @@ export const unsubscribeFromRealtime = (table: string, tripId?: string) => {
   if (channel) {
     supabase.removeChannel(channel)
     realtimeChannels.delete(channelKey)
-    // Log: `Unsubscribed from realtime channel: ${channelKey}`)
+    // Unsubscribed from realtime channel
   }
 }
 
 export const unsubscribeAllRealtime = () => {
   realtimeChannels.forEach((channel, key) => {
     supabase.removeChannel(channel)
-    // Log: `Unsubscribed from realtime channel: ${key}`)
+    // Unsubscribed from realtime channel
   })
   realtimeChannels.clear()
 }
@@ -420,10 +420,10 @@ export const callSupabaseFunction = async (functionName: string, data: any, meth
         headers['Authorization'] = `Bearer ${session.access_token}`
       } else {
         // For development, we can proceed with just the anon key
-        // Log: 'No session token available, using anon key only')
+        // No session token available
       }
     } catch (error) {
-      // Log: 'Session check failed, proceeding with anon key:', error)
+      // Session check failed
     }
 
     // For development, add user context to the request

@@ -61,12 +61,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
   
   // Debug logging
   useEffect(() => {
-    // Log: 'OptimizeRouteButton Debug:', {
-      tripId,
-      placesCount: places.length,
-      tripPlacesCount: tripPlaces.length,
-      hasPlaces,
-      currentUser: !!currentUser,
+    // Debug state logging
       isOptimizing,
       isReady
     });

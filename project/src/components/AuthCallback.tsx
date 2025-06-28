@@ -9,7 +9,7 @@ export function AuthCallback() {
     const handleAuthCallback = async () => {
       try {
         // Log message
-        // Log: '🔄 URL params:', new URLSearchParams(window.location.search).toString());
+        // Processing URL params
         
         // Check for error in URL params
         const urlParams = new URLSearchParams(window.location.search);

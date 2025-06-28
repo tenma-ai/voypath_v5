@@ -15,7 +15,7 @@ export const searchPlacesWithFallback = async (request: PlaceSearchRequest): Pro
     // Primary: Google Maps API
     // Log message
     const result = await PlaceSearchService.searchPlaces(request);
-    // Log: `✅ Primary search completed in ${Date.now() - startTime}ms with ${result.length} results`);
+    // Primary search completed
     return result;
   } catch (error) {
     lastError = error as Error;
@@ -52,7 +52,7 @@ export const searchPlacesWithFallback = async (request: PlaceSearchRequest): Pro
       
       if (response.ok) {
         const data = await response.json();
-        // Log: `✅ Secondary search completed in ${Date.now() - startTime}ms`);
+        // Secondary search completed
         
         // Convert Google Places API response to our format
         if (data.results && Array.isArray(data.results)) {
