@@ -446,7 +446,12 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           ${place.duration_minutes || place.stay_duration_minutes ? `
             <div style="margin-bottom: 8px;">
               <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Stay Duration</p>
-              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${formatDuration(place.duration_minutes || place.stay_duration_minutes)}</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${(() => {
+                const durationValue = place.duration_minutes || place.stay_duration_minutes;
+                // If the value is very large (likely in seconds), convert to minutes
+                const minutes = durationValue > 1440 ? Math.floor(durationValue / 60) : durationValue;
+                return formatDuration(minutes);
+              })()}</p>
             </div>
           ` : ''}
         </div>
@@ -484,7 +489,12 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           ${place.duration_minutes || place.stay_duration_minutes ? `
             <div style="margin-bottom: 8px;">
               <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Stay Duration</p>
-              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${formatDuration(place.duration_minutes || place.stay_duration_minutes)}</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${(() => {
+                const durationValue = place.duration_minutes || place.stay_duration_minutes;
+                // If the value is very large (likely in seconds), convert to minutes
+                const minutes = durationValue > 1440 ? Math.floor(durationValue / 60) : durationValue;
+                return formatDuration(minutes);
+              })()}</p>
             </div>
           ` : ''}
           
@@ -619,6 +629,16 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
             <div style="margin-bottom: 8px;">
               <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Duration</p>
               <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${formatDuration(duration)}</p>
+            </div>
+          ` : ''}
+          
+          ${fromPlace.departure_time || toPlace.arrival_time ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Travel Times</p>
+              <div style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">
+                ${fromPlace.departure_time ? `<div>Departure: ${DateUtils.formatDateTime(new Date(fromPlace.departure_time), { includeWeekday: false, includeDate: true, includeTime: true })}</div>` : ''}
+                ${toPlace.arrival_time ? `<div>Arrival: ${DateUtils.formatDateTime(new Date(toPlace.arrival_time), { includeWeekday: false, includeDate: true, includeTime: true })}</div>` : ''}
+              </div>
             </div>
           ` : ''}
           
