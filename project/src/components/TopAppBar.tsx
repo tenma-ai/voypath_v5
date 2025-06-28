@@ -135,7 +135,7 @@ function TopAppBar() {
     };
   }, [showProfileMenu, showVoypathMenu]);
 
-  const handleProfileMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleProfileMenuToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -145,15 +145,8 @@ function TopAppBar() {
       timestamp: Date.now()
     });
     
-    // Use setTimeout to ensure state change is processed
-    setTimeout(() => {
-      setShowProfileMenu(prev => {
-        const newState = !prev;
-        console.log('🎯 Profile menu state changing:', prev, '->', newState);
-        return newState;
-      });
-      setShowVoypathMenu(false);
-    }, 0);
+    setShowProfileMenu(!showProfileMenu);
+    setShowVoypathMenu(false);
   };
 
   const handleVoypathMenuToggle = (e: React.MouseEvent) => {
@@ -652,17 +645,12 @@ function TopAppBar() {
 
               {/* Profile Menu */}
               {user && (
-                <div className="relative profile-menu-container" style={{ zIndex: 19997 }}>
+                <div className="relative profile-menu-container" style={{ zIndex: 10000 }}>
                   <motion.button
                     onClick={handleProfileMenuToggle}
-                    onTouchStart={handleProfileMenuToggle}
                     className="relative group"
                     whileHover={{ scale: 1.05, y: -1 }}
                     whileTap={{ scale: 0.95 }}
-                    style={{ 
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent'
-                    }}
                   >
                     <div 
                       className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shadow-medium hover:shadow-glow transition-all duration-300 relative overflow-hidden"
@@ -686,34 +674,19 @@ function TopAppBar() {
                   </motion.button>
 
                   {/* Profile Menu Dropdown */}
-                  <AnimatePresence mode="wait">
+                  <AnimatePresence>
                     {showProfileMenu && (
-                      <div key="profile-menu" className="profile-menu-portal">
+                      <>
                         {/* Backdrop */}
-                        <motion.div 
-                          className="fixed inset-0 bg-black/10 backdrop-blur-sm" 
-                          onClick={() => {
-                            console.log('🎯 Profile menu backdrop clicked');
-                            setShowProfileMenu(false);
-                          }} 
-                          style={{ zIndex: 19998 }}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                        />
+                        <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="fixed right-1 sm:right-4 top-14 w-[calc(100vw-0.5rem)] sm:w-72 max-h-[80vh] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
-                          style={{ 
-                            zIndex: 19999,
-                            maxWidth: 'calc(100vw - 0.5rem)',
-                            minWidth: '280px'
-                          }}
+                          className="fixed right-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden opacity-100"
+                          style={{ zIndex: 10001 }}
                           variants={menuVariants}
                           initial="hidden"
                           animate="visible"
                           exit="hidden"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           {/* User Info */}
                           <motion.div 
@@ -833,7 +806,7 @@ function TopAppBar() {
                             )}
                           </div>
                         </motion.div>
-                      </div>
+                      </>
                     )}
                   </AnimatePresence>
                 </div>
