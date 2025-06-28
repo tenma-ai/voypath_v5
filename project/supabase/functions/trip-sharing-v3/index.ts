@@ -139,7 +139,7 @@ async function handleCreateShareLink(requestData: CreateShareLinkRequest, supaba
       JSON.stringify({ 
         success: true,
         shareToken: existingShares[0].share_token,
-        shareUrl: `https://voypath.app/shared/${existingShares[0].share_token}`,
+        shareUrl: `https://voypath-site.com/shared/${existingShares[0].share_token}`,
         message: 'Using existing share link'
       }),
       {
@@ -181,7 +181,7 @@ async function handleCreateShareLink(requestData: CreateShareLinkRequest, supaba
     JSON.stringify({ 
       success: true,
       shareToken: shareToken,
-      shareUrl: `https://voypath.app/shared/${shareToken}`,
+      shareUrl: `https://voypath-site.com/shared/${shareToken}`,
       share: shareData,
       message: 'Share link created successfully'
     }),

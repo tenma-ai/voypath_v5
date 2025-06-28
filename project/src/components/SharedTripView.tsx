@@ -871,7 +871,7 @@ export function SharedTripView() {
             <div className="ml-2 font-bold text-indigo-600">Voypath</div>
           </div>
           <p className="text-gray-400 text-xs mt-2">
-            Create your own amazing trip plans at voypath.app
+            Create your own amazing trip plans at voypath-site.com
           </p>
         </div>
       </div>

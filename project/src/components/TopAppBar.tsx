@@ -250,11 +250,11 @@ function TopAppBar() {
     switch (action) {
       case 'features':
         // Open features page in new tab (external)
-        window.open('https://voypath-app.com', '_blank', 'noopener,noreferrer');
+        window.open('https://voypath-site.com/', '_blank', 'noopener,noreferrer');
         break;
       case 'privacy':
         // Open privacy policy in new tab (external)
-        window.open('https://voypath-app.com', '_blank', 'noopener,noreferrer');
+        window.open('https://voypath-site.com/', '_blank', 'noopener,noreferrer');
         break;
       case 'pricing':
         // Show premium modal (existing functionality)
