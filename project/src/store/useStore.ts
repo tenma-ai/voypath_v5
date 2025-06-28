@@ -743,6 +743,13 @@ export const useStore = create<StoreState>()((set, get) => ({
         const isPremium = user.isPremium && (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
         const userTrips = trips.filter(trip => trip.ownerId === user.id);
         
+        console.log('🔍 Trip creation check:', {
+          isPremium,
+          userTripsCount: userTrips.length,
+          limit: LIMITS.FREE.TRIPS,
+          canCreate: isPremium || userTrips.length < LIMITS.FREE.TRIPS
+        });
+        
         return isPremium || userTrips.length < LIMITS.FREE.TRIPS;
       },
 
@@ -835,16 +842,28 @@ export const useStore = create<StoreState>()((set, get) => ({
             return;
           }
 
-          // Combine owned and member trips
+          // Combine owned and member trips with deduplication
+          const tripIds = new Set();
           const allTrips = [
             ...(ownedTrips || []),
             ...(memberTrips?.map(mt => mt.trips) || [])
-          ];
+          ].filter(trip => {
+            if (tripIds.has(trip.id)) {
+              return false;
+            }
+            tripIds.add(trip.id);
+            return true;
+          });
+
+          const userOwnedTrips = allTrips.filter(trip => trip.owner_id === user.id);
+          const userMemberTrips = allTrips.filter(trip => trip.owner_id !== user.id);
 
           console.log('📊 Loaded trips:', {
             ownedTrips: ownedTrips?.length || 0,
             memberTrips: memberTrips?.length || 0,
-            totalTrips: allTrips.length
+            totalTrips: allTrips.length,
+            userOwnedCount: userOwnedTrips.length,
+            userMemberCount: userMemberTrips.length
           });
 
           // Sort by created_at descending and limit to 20
