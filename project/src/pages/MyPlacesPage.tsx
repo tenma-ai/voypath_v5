@@ -44,6 +44,32 @@ export function MyPlacesPage() {
     }
   };
 
+  // Check if current user can edit/delete a place
+  const canUserEditPlace = (place: any) => {
+    if (!user || !currentTrip) return false;
+    
+    // For "My Places" tab, users can always edit their own places
+    if (activeTab === 'my') return true;
+    
+    // For "Trip Places" tab, check permissions
+    if (activeTab === 'trip') {
+      // Trip owner can edit any place
+      if (currentTrip.ownerId === user.id) return true;
+      
+      // Users can edit their own places
+      if (place.user_id === user.id || place.userId === user.id) return true;
+      
+      // Check if user is an admin or has edit permissions
+      const userMember = tripMembers.find(m => m.user_id === user.id);
+      if (userMember) {
+        if (userMember.role === 'admin') return true;
+        if (userMember.can_edit_places === true) return true;
+      }
+    }
+    
+    return false;
+  };
+
   // Load data from database on component mount and when currentTrip changes
   useEffect(() => {
     const loadPlacesForCurrentTrip = async () => {
@@ -466,26 +492,28 @@ export function MyPlacesPage() {
                       </div>
                       
                       {/* Edit/Delete Actions */}
-                      <div className="flex justify-end space-x-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditPlace(place);
-                          }}
-                          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          <Edit className="w-3 h-3 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePlace(place.id, place.name);
-                          }}
-                          className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                        >
-                          <Trash2 className="w-3 h-3 text-red-500 hover:text-red-600" />
-                        </button>
-                      </div>
+                      {canUserEditPlace(place) && (
+                        <div className="flex justify-end space-x-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditPlace(place);
+                            }}
+                            className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            <Edit className="w-3 h-3 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePlace(place.id, place.name);
+                            }}
+                            className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-500 hover:text-red-600" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   
@@ -603,26 +631,28 @@ export function MyPlacesPage() {
                           </div>
                         );
                       })()}
-                      <div className="flex space-x-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditPlace(place);
-                          }}
-                          className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          <Edit className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePlace(place.id, place.name);
-                          }}
-                          className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
-                        </button>
-                      </div>
+                      {canUserEditPlace(place) && (
+                        <div className="flex space-x-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditPlace(place);
+                            }}
+                            className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            <Edit className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePlace(place.id, place.name);
+                            }}
+                            className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center space-x-4 mt-2 text-xs text-slate-500 dark:text-slate-400">

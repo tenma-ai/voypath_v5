@@ -429,6 +429,15 @@ export function SharedTripView() {
         return false;
       }
       
+      // Auto-assign color to new member
+      try {
+        const { MemberColorService } = await import('../services/MemberColorService');
+        await MemberColorService.assignColorToMember(tripId, userId);
+      } catch (colorError) {
+        // Color assignment failed, but trip join succeeded
+        console.warn('Failed to assign color to new member:', colorError);
+      }
+      
       // Log message
       return true;
     } catch (error) {

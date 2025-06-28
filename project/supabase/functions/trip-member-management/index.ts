@@ -463,6 +463,33 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
   const newMember = newMembers[0];
   // Log message
 
+  // Auto-assign color to new member
+  try {
+    // Find the next available color index
+    const { data: existingMembers } = await supabase
+      .from('trip_members')
+      .select('assigned_color_index')
+      .eq('trip_id', invitation.trip_id)
+      .not('assigned_color_index', 'is', null);
+
+    const usedColorIndices = new Set(existingMembers?.map(m => m.assigned_color_index) || []);
+    let nextColorIndex = 1;
+    while (usedColorIndices.has(nextColorIndex) && nextColorIndex <= 20) {
+      nextColorIndex++;
+    }
+
+    if (nextColorIndex <= 20) {
+      await supabase
+        .from('trip_members')
+        .update({ assigned_color_index: nextColorIndex })
+        .eq('trip_id', invitation.trip_id)
+        .eq('user_id', userId);
+    }
+  } catch (colorError) {
+    // Color assignment failed, but trip join succeeded
+    console.warn('Failed to assign color to new member:', colorError);
+  }
+
   // ユーザー情報を取得
   const { data: userDataArray } = await supabase
     .from('users')

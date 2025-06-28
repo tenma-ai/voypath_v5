@@ -410,6 +410,12 @@ export class MemberColorService {
         }
       });
 
+      // Check for members without assigned colors
+      const membersWithoutColors = members.filter(member => !member.assigned_color_index);
+      if (membersWithoutColors.length > 0) {
+        issues.push(`${membersWithoutColors.length} members need color assignment: ${membersWithoutColors.map(m => m.user_id).join(', ')}`);
+      }
+
       // Check if member count exceeds color limit
       if (members.length > 20) {
         issues.push(`Trip has ${members.length} members but only 20 colors available`);

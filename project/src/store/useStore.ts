@@ -104,7 +104,7 @@ interface StoreState {
 
   // Member Colors - Centralized color management
   memberColors: Record<string, string>;
-  tripMembers: Array<{ user_id: string; name: string; email: string; assigned_color_index?: number }>;
+  tripMembers: Array<{ user_id: string; name: string; email: string; assigned_color_index?: number; role?: 'admin' | 'member'; can_edit_places?: boolean }>;
   loadMemberColorsForTrip: (tripId: string) => Promise<void>;
 
   // UI State
@@ -292,7 +292,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           // Load trip members first
           const { data: membersData, error: membersError } = await supabase
             .from('trip_members')
-            .select('user_id, role, assigned_color_index')
+            .select('user_id, role, assigned_color_index, can_edit_places')
             .eq('trip_id', tripId);
 
 
@@ -348,7 +348,9 @@ export const useStore = create<StoreState>()((set, get) => ({
               user_id: member.user_id,
               name: userData?.name || userData?.email || 'Unknown User',
               email: userData?.email || '',
-              assigned_color_index: member.assigned_color_index
+              assigned_color_index: member.assigned_color_index,
+              role: member.role,
+              can_edit_places: member.can_edit_places
             };
           });
 
@@ -1102,6 +1104,15 @@ export const useStore = create<StoreState>()((set, get) => ({
           if (memberError) {
             // Failed to add trip member
             throw memberError;
+          }
+
+          // Auto-assign color to trip owner
+          try {
+            const { MemberColorService } = await import('../services/MemberColorService');
+            await MemberColorService.assignColorToMember(savedTrip.id, user.id);
+          } catch (colorError) {
+            // Color assignment failed, but trip creation succeeded
+            console.warn('Failed to assign color to trip owner:', colorError);
           }
 
           // Convert to frontend format
