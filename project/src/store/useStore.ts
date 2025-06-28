@@ -133,6 +133,7 @@ interface StoreState {
 
   // Premium functions
   canCreateTrip: () => boolean;
+  canJoinTrip: () => boolean;
   canAddMember: (tripId: string) => boolean;
   canAddPlace: (userId: string, tripId?: string) => boolean;
   getUserPlaceCount: (userId: string, tripId?: string) => number;
@@ -741,16 +742,33 @@ export const useStore = create<StoreState>()((set, get) => ({
         if (!user) return false;
         
         const isPremium = user.isPremium && (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
-        const userTrips = trips.filter(trip => trip.ownerId === user.id);
+        const totalUserTrips = trips.length; // All trips (owned + member)
         
         console.log('🔍 Trip creation check:', {
           isPremium,
-          userTripsCount: userTrips.length,
+          totalUserTrips: totalUserTrips,
           limit: LIMITS.FREE.TRIPS,
-          canCreate: isPremium || userTrips.length < LIMITS.FREE.TRIPS
+          canCreate: isPremium || totalUserTrips < LIMITS.FREE.TRIPS
         });
         
-        return isPremium || userTrips.length < LIMITS.FREE.TRIPS;
+        return isPremium || totalUserTrips < LIMITS.FREE.TRIPS;
+      },
+
+      canJoinTrip: () => {
+        const { user, trips } = get();
+        if (!user) return false;
+        
+        const isPremium = user.isPremium && (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
+        const totalUserTrips = trips.length; // All trips (owned + member)
+        
+        console.log('🔍 Trip join check:', {
+          isPremium,
+          totalUserTrips: totalUserTrips,
+          limit: LIMITS.FREE.TRIPS,
+          canJoin: isPremium || totalUserTrips < LIMITS.FREE.TRIPS
+        });
+        
+        return isPremium || totalUserTrips < LIMITS.FREE.TRIPS;
       },
 
       canAddMember: (tripId: string) => {

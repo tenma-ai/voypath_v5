@@ -30,7 +30,7 @@ const extractPlaceName = (address: string): string => {
 
 export function HomePage() {
   const navigate = useNavigate();
-  const { user, trips, currentTrip, deleteTrip, canCreateTrip, setCurrentTrip, loadPlacesFromAPI } = useStore();
+  const { user, trips, currentTrip, deleteTrip, canCreateTrip, canJoinTrip, setCurrentTrip, loadPlacesFromAPI } = useStore();
   
   // Calculate user's owned trips count for limit display  
   const userOwnedTrips = user ? trips.filter(trip => trip.ownerId === user.id) : [];
@@ -251,10 +251,21 @@ export function HomePage() {
       {/* Action Buttons */}
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4">
         <motion.button
-          onClick={() => setShowJoinModal(true)}
-          className="group relative flex-1 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-2 border-slate-200/50 dark:border-slate-700/50 rounded-3xl p-3 sm:p-6 hover:border-primary-300/50 dark:hover:border-primary-600/50 transition-all duration-300 overflow-hidden"
-          whileHover={{ scale: 1.02, y: -2 }}
-          whileTap={{ scale: 0.98 }}
+          onClick={() => {
+            if (!canJoinTrip()) {
+              setPremiumFeature('trips');
+              setShowPremiumModal(true);
+            } else {
+              setShowJoinModal(true);
+            }
+          }}
+          className={`group relative flex-1 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-2 border-slate-200/50 dark:border-slate-700/50 rounded-3xl p-3 sm:p-6 transition-all duration-300 overflow-hidden ${
+            canJoinTrip() 
+              ? 'hover:border-primary-300/50 dark:hover:border-primary-600/50' 
+              : 'opacity-60 cursor-not-allowed'
+          }`}
+          whileHover={canJoinTrip() ? { scale: 1.02, y: -2 } : {}}
+          whileTap={canJoinTrip() ? { scale: 0.98 } : {}}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-primary-50/50 to-secondary-50/50 dark:from-primary-900/20 dark:to-secondary-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           <div className="relative z-10 flex items-center justify-center space-x-3 text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100">
@@ -262,6 +273,7 @@ export function HomePage() {
               <Globe className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
             <span className="font-semibold text-sm sm:text-base">Join Trip</span>
+            {!canJoinTrip() && <Crown className="w-5 h-5 text-yellow-300 fill-current" />}
           </div>
         </motion.button>
 
@@ -288,16 +300,9 @@ export function HomePage() {
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your Trips</h2>
           <div className="flex items-center space-x-3">
             {!isPremium && (
-              <>
-                <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
-                  {userOwnedTrips.length}/3 owned
-                </span>
-                {totalUserTrips > userOwnedTrips.length && (
-                  <span className="text-xs text-slate-500 dark:text-slate-400 bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-full">
-                    +{totalUserTrips - userOwnedTrips.length} joined
-                  </span>
-                )}
-              </>
+              <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
+                {totalUserTrips}/3 trips
+              </span>
             )}
             {isPremium && trips.length > 0 && (
               <span className="text-sm text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">

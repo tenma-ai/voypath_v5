@@ -14,12 +14,19 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
   const [joinCode, setJoinCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { initializeFromDatabase } = useStore();
+  const { initializeFromDatabase, canJoinTrip } = useStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsJoining(true);
     setError(null);
+    
+    // Check trip limit before attempting to join
+    if (!canJoinTrip()) {
+      setError('You have reached the maximum limit of 3 trips for your current plan. Please upgrade to Premium to join more trips.');
+      setIsJoining(false);
+      return;
+    }
     
     try {
       console.log('🚀 Attempting to join trip with code:', joinCode);
