@@ -541,16 +541,6 @@ export function MyPlacesPage() {
                         </div>
                       </div>
                       
-                      {/* Place Type */}
-                      <div>
-                        <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Type</div>
-                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 ${
-                          categoryColors[place.category as keyof typeof categoryColors] || 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {place.category}
-                        </span>
-                      </div>
-                      
                       {/* Duration */}
                       <div>
                         <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Duration</div>
@@ -596,15 +586,8 @@ export function MyPlacesPage() {
                       <h3 className="font-semibold text-slate-900 dark:text-slate-100">
                         {place.name}
                       </h3>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          categoryColors[place.category as keyof typeof categoryColors] || 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {place.category}
-                        </span>
-                        <div className="flex items-center space-x-1">
-                          {renderStars(place.wish_level || place.wishLevel || 0)}
-                        </div>
+                      <div className="flex items-center space-x-1 mt-1">
+                        {renderStars(place.wish_level || place.wishLevel || 0)}
                       </div>
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
                         {place.address}
