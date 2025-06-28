@@ -326,118 +326,171 @@ export function MyPlacesPage() {
         </motion.div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-            {currentTrip.name || `${currentTrip.departureLocation} Trip`} - Places
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {activeTab === 'trip' ? 'All team places' : 'My places'} • {filteredPlaces.length} total
-          </p>
+      {/* Enhanced Header with Status Summary */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {currentTrip.name || `${currentTrip.departureLocation} Trip`}
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+              {activeTab === 'trip' ? 'All team places' : 'My places'} • {filteredPlaces.length} total
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-lg transition-colors ${
+                viewMode === 'grid'
+                  ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                  : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              title="Grid View"
+            >
+              <Grid3X3 className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-lg transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                  : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              title="List View"
+            >
+              <List className="w-5 h-5" />
+            </button>
+          </div>
         </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`p-2 rounded-lg transition-colors ${
-              viewMode === 'grid'
-                ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Grid3X3 className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-2 rounded-lg transition-colors ${
-              viewMode === 'list'
-                ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <List className="w-5 h-5" />
-          </button>
-        </div>
+        
+        {/* Status Summary Cards */}
+        {activeTab === 'my' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            {[
+              { 
+                key: 'scheduled', 
+                label: 'Scheduled', 
+                count: displayPlaces.filter(p => getPlaceStatus(p) === 'scheduled').length,
+                icon: CheckCircle,
+                color: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+              },
+              { 
+                key: 'pending', 
+                label: 'Pending', 
+                count: displayPlaces.filter(p => getPlaceStatus(p) === 'pending').length,
+                icon: HelpCircle,
+                color: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'
+              },
+              { 
+                key: 'unscheduled', 
+                label: 'Unscheduled', 
+                count: displayPlaces.filter(p => getPlaceStatus(p) === 'unscheduled').length,
+                icon: Clock,
+                color: 'bg-slate-50 dark:bg-slate-900/20 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+              },
+              { 
+                key: 'all', 
+                label: 'Total', 
+                count: displayPlaces.length,
+                icon: Star,
+                color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+              }
+            ].map(({ key, label, count, icon: Icon, color }) => (
+              <div
+                key={key}
+                className={`p-4 rounded-lg border-2 transition-all duration-200 hover:scale-105 cursor-pointer ${
+                  filter === key ? 'ring-2 ring-primary-500 ring-offset-2' : ''
+                } ${color}`}
+                onClick={() => setFilter(key)}
+              >
+                <div className="flex items-center justify-between">
+                  <Icon className="w-5 h-5" />
+                  <span className="text-2xl font-bold">{count}</span>
+                </div>
+                <p className="text-sm font-medium mt-1">{label}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Tab Navigation */}
+      {/* Enhanced Tab Navigation */}
       <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
         <button
           onClick={() => setActiveTab('trip')}
-          className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`flex-1 flex items-center justify-center space-x-3 px-6 py-3 rounded-lg text-sm font-medium transition-all ${
             activeTab === 'trip'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-lg transform scale-105'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
           }`}
         >
-          <Users className="w-4 h-4" />
-          <span>Trip Places ({allTripPlaces.filter(p => {
-            const isSystemTransport = p.place_type === 'departure' || p.place_type === 'destination' || p.category === 'transportation' || p.source === 'system';
-            return !isSystemTransport && (p.scheduled || p.is_selected_for_optimization);
-          }).length})</span>
+          <Users className="w-5 h-5" />
+          <div className="text-left">
+            <div className="font-semibold">Trip Places</div>
+            <div className="text-xs opacity-75">{allTripPlaces.filter(p => {
+              const isSystemTransport = p.place_type === 'departure' || p.place_type === 'destination' || p.category === 'transportation' || p.source === 'system';
+              return !isSystemTransport && (p.scheduled || p.is_selected_for_optimization);
+            }).length} scheduled</div>
+          </div>
         </button>
         <button
           onClick={() => setActiveTab('my')}
-          className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`flex-1 flex items-center justify-center space-x-3 px-6 py-3 rounded-lg text-sm font-medium transition-all ${
             activeTab === 'my'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-lg transform scale-105'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
           }`}
         >
-          <Star className="w-4 h-4" />
-          <span>My Places ({myTripPlaces.filter(p => {
-            const isSystemTransport = p.place_type === 'departure' || p.place_type === 'destination' || p.category === 'transportation' || p.source === 'system';
-            return !isSystemTransport;
-          }).length})</span>
+          <Star className="w-5 h-5" />
+          <div className="text-left">
+            <div className="font-semibold">My Places</div>
+            <div className="text-xs opacity-75">{myTripPlaces.filter(p => {
+              const isSystemTransport = p.place_type === 'departure' || p.place_type === 'destination' || p.category === 'transportation' || p.source === 'system';
+              return !isSystemTransport;
+            }).length} total</div>
+          </div>
         </button>
       </div>
 
-      {/* Status Filters - Only show for My Places tab */}
+      {/* Action Bar for Trip Places Tab */}
+      {activeTab === 'trip' && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-blue-900 dark:text-blue-100">Team Places Overview</h3>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                Showing all places that have been scheduled in the team trip optimization
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                {allTripPlaces.filter(p => {
+                  const isSystemTransport = p.place_type === 'departure' || p.place_type === 'destination' || p.category === 'transportation' || p.source === 'system';
+                  return !isSystemTransport && (p.scheduled || p.is_selected_for_optimization);
+                }).length} scheduled
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Place Quick Action */}
       {activeTab === 'my' && (
-        <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
-          {[
-            { key: 'all', label: 'All', count: displayPlaces.length, icon: null },
-            { 
-              key: 'scheduled', 
-              label: 'Scheduled', 
-              count: displayPlaces.filter(p => getPlaceStatus(p) === 'scheduled').length,
-              icon: CheckCircle,
-              color: 'text-green-600'
-            },
-            { 
-              key: 'pending', 
-              label: 'Pending', 
-              count: displayPlaces.filter(p => getPlaceStatus(p) === 'pending').length,
-              icon: HelpCircle,
-              color: 'text-yellow-600'
-            },
-            { 
-              key: 'unscheduled', 
-              label: 'Unscheduled', 
-              count: displayPlaces.filter(p => getPlaceStatus(p) === 'unscheduled').length,
-              icon: Clock,
-              color: 'text-slate-600'
-            },
-          ].map(({ key, label, count, icon: Icon, color }) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`flex-shrink-0 flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                filter === key
-                  ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {Icon && <Icon className={`w-4 h-4 ${filter === key ? '' : color || ''}`} />}
-              <span>{label} ({count})</span>
-            </button>
-          ))}
+        <div className="flex justify-center">
+          <Link
+            to="/add-place"
+            className="inline-flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-600 text-white rounded-xl hover:from-primary-600 hover:to-secondary-700 transition-all transform hover:scale-105 shadow-lg"
+          >
+            <Plus className="w-5 h-5" />
+            <span className="font-semibold">Add New Place</span>
+          </Link>
         </div>
       )}
 
       {/* Places Grid/List */}
       {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {filteredPlaces.map((place, index) => {
             const isFlipped = flippedCards.has(place.id);
             const status = getPlaceStatus(place);

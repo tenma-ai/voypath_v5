@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { Calendar, Clock, MapPin, List, Grid3X3, Car, UserRound } from 'lucide-react';
+import { Calendar, Clock, MapPin, List, Grid3X3 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getPlaceColor } from '../utils/ColorUtils';
 import { DateUtils } from '../utils/DateUtils';
@@ -52,9 +52,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     }
   };
 
-  // Extract places from optimization result
+  // Extract places from optimization result with consistent date formatting
   const formatOptimizationResult = (result: any) => {
-    if (!hasUserOptimized || !result?.optimization?.daily_schedules) {
+    if (!hasUserOptimized || !result?.optimization?.daily_schedules || !currentTrip) {
       return { schedulesByDay: {} };
     }
 
@@ -62,10 +62,19 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     
     result.optimization.daily_schedules.forEach((schedule: any) => {
       const dayKey = `day-${schedule.day}`;
+      // Use consistent date calculation
+      const actualDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
+      
       schedulesByDay[dayKey] = {
         day: schedule.day,
-        date: schedule.date,
-        places: schedule.scheduled_places || []
+        date: DateUtils.formatForStorage(actualDate).split('T')[0], // YYYY-MM-DD format
+        actualDate: actualDate,
+        places: (schedule.scheduled_places || []).filter((place: any) => {
+          // Filter out transport and system places
+          const isTransport = place.place_type === 'transport' || place.category === 'transport';
+          const isSystemPlace = place.place_type === 'departure' || place.place_type === 'destination';
+          return !isTransport && !isSystemPlace;
+        })
       };
     });
 
@@ -88,6 +97,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     });
   };
 
+  // Use consistent date formatting across calendar views
   const formatDate = (date: Date) => {
     return DateUtils.formatCalendarDate(date);
   };
@@ -188,21 +198,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     if (modeLower.includes('flight') || modeLower.includes('plane') || modeLower.includes('air')) {
       return { 
         color: '#2563EB', 
-        svg: (
-          <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 16v-2l-8-5V3.5A1.5 1.5 0 0 0 11.5 2v0A1.5 1.5 0 0 0 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-          </svg>
-        )
+        icon: <img src="/icons8-plane-24.png" className="w-3 h-3" alt="Flight" />
       };
     } else if (modeLower.includes('car') || modeLower.includes('drive') || modeLower.includes('taxi')) {
       return { 
         color: '#92400E', 
-        svg: <Car className="w-3 h-3" style={{ color: '#92400E' }} />
+        icon: <img src="/icons8-car-24.png" className="w-3 h-3" alt="Car" />
       };
     } else {
       return { 
         color: '#6B7280', 
-        svg: <UserRound className="w-3 h-3" style={{ color: '#6B7280' }} />
+        icon: <img src="/icons8-walking-50.png" className="w-3 h-3" alt="Walking" />
       };
     }
   };
@@ -295,7 +301,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                       {/* Transport info */}
                       <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700 flex items-center space-x-2 text-xs shadow-sm">
                         <div style={{ color: transportInfo.color }}>
-                          {transportInfo.svg}
+                          {transportInfo.icon}
                         </div>
                         <span className="text-gray-600 dark:text-gray-400">
                           {formatDuration(duration)}
@@ -311,7 +317,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
               {/* Day Header */}
               <div className="bg-blue-50 px-3 py-1.5 sm:py-2 border-b border-gray-200">
                 <h3 className="text-xs sm:text-sm font-semibold text-blue-900">
-                  Day {dayData.day} - {formatDate(calculateActualDate(dayData.day))}
+                  Day {dayData.day} - {formatDate(dayData.actualDate || calculateActualDate(dayData.day))}
                 </h3>
               </div>
               
@@ -374,7 +380,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                             {/* Transport info */}
                             <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 flex items-center space-x-1 text-xs">
                               <div style={{ color: transportInfo.color }}>
-                                {transportInfo.svg}
+                                {transportInfo.icon}
                               </div>
                               <span className="text-gray-600 dark:text-gray-400">
                                 {formatDuration(duration)}

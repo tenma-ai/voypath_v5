@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
-import { X, Wand2, MapPin, AlertCircle, CheckCircle, Car } from 'lucide-react';
+import { X, Wand2, MapPin, AlertCircle, CheckCircle } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TripOptimizationService, OptimizationProgress } from '../services/TripOptimizationService';
@@ -417,7 +417,7 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
             {/* Transportation */}
             <div>
               <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-3 flex items-center">
-                <Car className="w-4 h-4 mr-2" />
+                <img src="/icons8-car-24.png" className="w-4 h-4 mr-2" alt="Car" />
                 Preferred Transportation
               </h3>
               <select

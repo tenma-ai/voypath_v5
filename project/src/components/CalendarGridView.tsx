@@ -28,12 +28,12 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
   // Use centralized member colors from store
   console.log('🎨 [CalendarGridView] Using centralized colors:', memberColors);
 
-  // Process optimization result to create month schedule
+  // Process optimization result to create month schedule with consistent date formatting
   useEffect(() => {
     console.log('🔍 [CalendarGridView] Processing optimization result:', optimizationResult);
     
-    if (!optimizationResult?.optimization?.daily_schedules) {
-      console.log('🔍 [CalendarGridView] No daily schedules found');
+    if (!optimizationResult?.optimization?.daily_schedules || !currentTrip) {
+      console.log('🔍 [CalendarGridView] No daily schedules or trip found');
       setMonthSchedule({});
       return;
     }
@@ -44,25 +44,30 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
       console.log(`🔍 [CalendarGridView] Processing day ${dayIndex}:`, daySchedule);
       
       if (daySchedule.scheduled_places && Array.isArray(daySchedule.scheduled_places)) {
-        // Use trip start date and day number for consistent date calculation
-        const scheduleDate = daySchedule.date 
-          ? new Date(daySchedule.date)
-          : DateUtils.calculateTripDate(currentTrip, daySchedule.day || (dayIndex + 1));
-        
+        // Use consistent date calculation based on trip start date and day number
+        const scheduleDate = DateUtils.calculateTripDate(currentTrip, daySchedule.day || (dayIndex + 1));
         const dateKey = scheduleDate.toDateString();
-        console.log(`🔍 [CalendarGridView] Date key for day ${dayIndex}: ${dateKey}`);
         
-        schedule[dateKey] = daySchedule.scheduled_places.map((place: any, placeIndex: number) => {
+        console.log(`🔍 [CalendarGridView] Day ${daySchedule.day || (dayIndex + 1)} -> ${dateKey}`);
+        
+        // Filter out transport-only places and system places
+        const validPlaces = daySchedule.scheduled_places.filter((place: any) => {
+          const isTransport = place.place_type === 'transport' || place.category === 'transport';
+          const isSystemPlace = place.place_type === 'departure' || place.place_type === 'destination';
+          return !isTransport && !isSystemPlace;
+        });
+        
+        schedule[dateKey] = validPlaces.map((place: any, placeIndex: number) => {
           console.log(`🔍 [CalendarGridView] Processing place ${placeIndex}:`, {
             name: place.place_name || place.name,
-            time: place.scheduled_time_start || place.arrival_time,
+            time: place.arrival_time || place.scheduled_time_start,
             member_contribution: place.member_contribution
           });
           
           return {
-            id: place.id || `place-${dayIndex}-${placeIndex}`,
+            id: place.id || `place-${daySchedule.day || (dayIndex + 1)}-${placeIndex}`,
             name: place.place_name || place.name || 'Unknown Place',
-            time: place.scheduled_time_start || place.arrival_time || `${8 + placeIndex}:00`,
+            time: place.arrival_time || place.scheduled_time_start || `${8 + placeIndex}:00`,
             duration: place.stay_duration_minutes || 120,
             category: place.category || 'attraction',
             contributors: place.member_contribution || []
@@ -75,7 +80,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
 
     console.log('🔍 [CalendarGridView] Final schedule:', schedule);
     setMonthSchedule(schedule);
-  }, [optimizationResult]);
+  }, [optimizationResult, currentTrip]);
 
   // Initialize calendar to start from trip start date instead of today
   useEffect(() => {
@@ -145,45 +150,25 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
       memberColors: memberColors
     });
     
-    // Check if departure/arrival place
-    const placeName = place.name.toLowerCase();
-    if (placeName.includes('departure') || placeName.includes('return')) {
-      console.log(`🔍 [CalendarGridView] ${place.name} is departure/arrival - using black`);
-      return '#000000';
-    }
-
-    // Process contributors array
-    let contributors = place.contributors;
+    // Use centralized color utility for consistency
+    const colorResult = getPlaceColorUtil({
+      ...place,
+      place_name: place.name,
+      member_contribution: place.contributors
+    });
     
-    // Handle different contributor formats
-    if (contributors && Array.isArray(contributors)) {
-      console.log(`🔍 [CalendarGridView] Contributors array:`, contributors);
-    } else if (contributors && typeof contributors === 'object') {
-      // Single contributor object
-      contributors = [contributors];
-      console.log(`🔍 [CalendarGridView] Single contributor converted to array:`, contributors);
+    console.log(`🔍 [CalendarGridView] Color result from utility:`, colorResult);
+    
+    // Return the background color for calendar grid
+    if (colorResult.type === 'single') {
+      return colorResult.background;
+    } else if (colorResult.type === 'gold') {
+      return '#FFD700';
+    } else if (colorResult.type === 'gradient') {
+      // For calendar grid, use the first contributor's color
+      return colorResult.contributors[0]?.color || '#9CA3AF';
     } else {
-      contributors = [];
-      console.log(`🔍 [CalendarGridView] No valid contributors found`);
-    }
-
-    if (!contributors || contributors.length === 0) {
-      console.log(`🔍 [CalendarGridView] No contributors - using gray`);
-      return '#9CA3AF'; // Gray for no contributors
-    } else if (contributors.length === 1) {
-      const userId = contributors[0].user_id || contributors[0].userId;
-      const color = memberColors[userId] || '#3B82F6';
-      console.log(`🔍 [CalendarGridView] Single contributor (${userId}) - using color ${color}`);
-      return color;
-    } else if (contributors.length >= 5) {
-      console.log(`🔍 [CalendarGridView] 5+ contributors - using gold`);
-      return '#FFD700'; // Gold for 5+ contributors
-    } else {
-      // Multiple contributors - use first contributor's color for now
-      const userId = contributors[0].user_id || contributors[0].userId;
-      const color = memberColors[userId] || '#3B82F6';
-      console.log(`🔍 [CalendarGridView] Multiple contributors (${contributors.length}) - using first contributor's color ${color}`);
-      return color;
+      return colorResult.background || '#9CA3AF';
     }
   };
 
@@ -273,13 +258,14 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
             return (
               <div
                 key={day.toISOString()}
-                className={`h-20 border-r border-b border-slate-200 dark:border-slate-700 p-1 overflow-y-auto ${
+                className={`min-h-[80px] h-auto border-r border-b border-slate-200 dark:border-slate-700 p-1 overflow-y-auto ${
                   isToday 
                     ? 'bg-blue-50 dark:bg-blue-900/20' 
                     : isCurrentMonth 
                       ? 'bg-white dark:bg-slate-800'
                       : 'bg-slate-50/50 dark:bg-slate-800/30'
                 }`}
+                style={{ minHeight: '80px' }}
               >
                 {/* Date Number */}
                 <div className={`text-xs font-medium mb-0.5 ${
@@ -293,39 +279,46 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
                 </div>
 
                 {/* Places for this day */}
-                <div className="space-y-0.5">
-                  {dayPlaces.slice(0, 3).map((place, placeIndex) => {
+                <div className="space-y-0.5 flex-1">
+                  {dayPlaces.slice(0, 4).map((place, placeIndex) => {
                     const placeColor = getPlaceColor(place);
                     const timeDisplay = place.time ? place.time.slice(0, 5) : '';
                     
                     return (
                       <div
                         key={place.id}
-                        className="text-xs p-1 rounded border-l-2 cursor-pointer hover:shadow-sm transition-all duration-200"
+                        className="text-xs p-1 rounded border-l-2 cursor-pointer hover:shadow-sm transition-all duration-200 relative"
                         style={{ 
                           borderLeftColor: placeColor,
                           backgroundColor: `${placeColor}15`,
                           borderLeftWidth: '3px'
                         }}
-                        title={`${place.name}${place.time ? ` at ${place.time}` : ''}`}
+                        title={`${place.name}${place.time ? ` at ${place.time}` : ''}${place.duration ? ` (${Math.round(place.duration/60)}h)` : ''}`}
                         onClick={() => setSelectedPlace(place)}
                       >
                         <div className="font-medium text-slate-900 dark:text-slate-100 truncate leading-tight" style={{ fontSize: '9px' }}>
                           {place.name}
                         </div>
-                        {timeDisplay && (
-                          <div className="text-slate-600 dark:text-slate-400 truncate" style={{ fontSize: '8px' }}>
-                            {timeDisplay}
-                          </div>
-                        )}
+                        <div className="flex justify-between items-center mt-0.5">
+                          {timeDisplay && (
+                            <div className="text-slate-600 dark:text-slate-400 truncate" style={{ fontSize: '8px' }}>
+                              {timeDisplay}
+                            </div>
+                          )}
+                          {place.duration && (
+                            <div className="text-slate-500 dark:text-slate-400" style={{ fontSize: '7px' }}>
+                              {Math.round(place.duration/60)}h
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                   
-                  {/* Show "more" indicator if there are more than 3 places */}
-                  {dayPlaces.length > 3 && (
+                  {/* Show "more" indicator if there are more than 4 places */}
+                  {dayPlaces.length > 4 && (
                     <div className="text-slate-500 dark:text-slate-400 px-1 py-0.5 text-center" style={{ fontSize: '8px' }}>
-                      +{dayPlaces.length - 3} more
+                      +{dayPlaces.length - 4} more
                     </div>
                   )}
                 </div>

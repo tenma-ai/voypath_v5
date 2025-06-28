@@ -4,6 +4,7 @@ import { ArrowLeft, Settings, Sun, Moon, User, LogOut, Edit, Crown, Sparkles, Ma
 import { useStore } from '../store/useStore';
 import { PremiumBadge } from './PremiumBadge';
 import { PremiumModal } from './PremiumModal';
+import { InfoModal } from './InfoModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { MemberColorService } from '../services/MemberColorService';
@@ -60,6 +61,7 @@ function TopAppBar() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showVoypathMenu, setShowVoypathMenu] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [userColor, setUserColor] = useState<string | null>(null);
   
@@ -211,26 +213,26 @@ function TopAppBar() {
     setShowVoypathMenu(false);
     
     switch (action) {
-      case 'about':
-        console.log('Opening About Us...');
-        break;
       case 'features':
-        console.log('Opening Features...');
-        break;
-      case 'pricing':
-        setShowPremiumModal(true);
-        break;
-      case 'help':
-        console.log('Opening Help Center with FAQs and contact options (email/phone)...');
-        break;
-      case 'feedback':
-        console.log('Opening feedback form...');
+        // Open features page in new tab (external)
+        window.open('https://voypath-site.com/features', '_blank', 'noopener,noreferrer');
         break;
       case 'privacy':
-        console.log('Opening Privacy Policy...');
+        // Open privacy policy in new tab (external)
+        window.open('https://voypath-site.com/privacy', '_blank', 'noopener,noreferrer');
         break;
+      case 'pricing':
+        // Show premium modal (existing functionality)
+        setShowPremiumModal(true);
+        break;
+      case 'about':
+      case 'help':
+      case 'feedback':
       case 'terms':
-        console.log('Opening Terms of Service...');
+      case 'contact':
+      case 'blog':
+        // Show in-app popup
+        setShowInfoModal(action);
         break;
       default:
         break;
@@ -416,6 +418,7 @@ function TopAppBar() {
                               { key: 'about', icon: Info, label: 'About Us', description: 'Our story and mission' },
                               { key: 'features', icon: Zap, label: 'Features', description: 'What makes us special' },
                               { key: 'pricing', icon: Crown, label: 'Pricing', description: 'Plans and pricing' },
+                              { key: 'blog', icon: Globe, label: 'Blog', description: 'Travel tips and updates' },
                             ].map((item, index) => (
                               <motion.button
                                 key={item.key}
@@ -481,6 +484,25 @@ function TopAppBar() {
                                 </div>
                               </div>
                             </motion.button>
+                            <motion.button
+                              onClick={() => handleVoypathAction('contact')}
+                              className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden rounded-xl"
+                              variants={itemVariants}
+                              custom={7}
+                              whileHover={{ x: 4 }}
+                            >
+                              <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 transition-colors duration-300 relative z-10">
+                                <Phone className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-300" />
+                              </div>
+                              <div className="flex-1 relative z-10">
+                                <span className="text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 font-medium transition-colors duration-300 text-sm">
+                                  Contact Us
+                                </span>
+                                <div className="text-xs text-slate-500 dark:text-slate-400">
+                                  Get in touch directly
+                                </div>
+                              </div>
+                            </motion.button>
                           </div>
 
                           {/* Legal Section */}
@@ -495,7 +517,7 @@ function TopAppBar() {
                                 onClick={() => handleVoypathAction(item.key)}
                                 className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden rounded-xl"
                                 variants={itemVariants}
-                                custom={index + 7}
+                                custom={index + 8}
                                 whileHover={{ x: 4 }}
                               >
                                 <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors duration-300 relative z-10">
@@ -791,6 +813,15 @@ function TopAppBar() {
         isOpen={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
       />
+
+      {/* Info Modal */}
+      {showInfoModal && (
+        <InfoModal 
+          isOpen={!!showInfoModal} 
+          onClose={() => setShowInfoModal(null)}
+          type={showInfoModal}
+        />
+      )}
     </>
   );
 }

@@ -6,7 +6,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MapPin, 
-  Car, 
   Users, 
   ChevronDown, 
   ChevronUp,
@@ -36,6 +35,17 @@ interface TimelineEvent {
   color: string;
   details: Record<string, unknown>;
 }
+
+const getTransportIcon = (mode: string) => {
+  const modeLower = mode.toLowerCase();
+  if (modeLower.includes('flight') || modeLower.includes('plane') || modeLower.includes('air')) {
+    return <img src="/icons8-plane-24.png" className="w-4 h-4" alt="Flight" />;
+  } else if (modeLower.includes('car') || modeLower.includes('drive') || modeLower.includes('taxi')) {
+    return <img src="/icons8-car-24.png" className="w-4 h-4" alt="Car" />;
+  } else {
+    return <img src="/icons8-walking-50.png" className="w-4 h-4" alt="Walking" />;
+  }
+};
 
 export default function DetailedScheduleTimelineView({
   optimizedTrip,
@@ -94,7 +104,7 @@ export default function DetailedScheduleTimelineView({
             travelSegment,
             title: `Travel to ${daySchedule.places[index + 1].name}`,
             subtitle: `${formatDuration(travelSegment.duration)} by ${travelSegment.mode}`,
-            icon: <Car className="w-4 h-4" />,
+            icon: getTransportIcon(travelSegment.mode),
             color: '#6b7280',
             details: {
               distance: travelSegment.distance,
