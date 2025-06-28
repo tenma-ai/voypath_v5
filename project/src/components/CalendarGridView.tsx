@@ -20,10 +20,13 @@ interface CalendarPlace {
 }
 
 const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const { currentTrip, memberColors, tripMembers } = useStore();
+  const [currentDate, setCurrentDate] = useState(() => {
+    // Initialize with trip start date if available, otherwise current date
+    return DateUtils.getTripStartDate(currentTrip) || new Date();
+  });
   const [monthSchedule, setMonthSchedule] = useState<Record<string, CalendarPlace[]>>({});
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
-  const { currentTrip, memberColors, tripMembers } = useStore();
 
   // Use centralized member colors from store
   console.log('🎨 [CalendarGridView] Using centralized colors:', memberColors);

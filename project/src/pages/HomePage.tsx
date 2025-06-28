@@ -289,7 +289,7 @@ export function HomePage() {
                 {userOwnedTrips.length}/3 trips
               </span>
             )}
-            {trips.length > 0 && (
+            {isPremium && trips.length > 0 && (
               <span className="text-sm text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
                 {trips.length} trip{trips.length !== 1 ? 's' : ''}
               </span>

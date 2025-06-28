@@ -34,7 +34,12 @@ export function MyPlacesPage() {
       return DateUtils.calculateTripDate(currentTrip, place.day);
     }
     
-    // Fallback to created_at date
+    // If trip has start date, use it as fallback instead of current date
+    if (currentTrip?.startDate || currentTrip?.start_date) {
+      return DateUtils.getTripStartDate(currentTrip) || new Date(place.created_at || Date.now());
+    }
+    
+    // Final fallback to created_at date
     return place.created_at ? new Date(place.created_at) : new Date();
   };
 

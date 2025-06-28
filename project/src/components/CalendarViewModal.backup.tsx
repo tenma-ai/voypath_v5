@@ -9,6 +9,8 @@ import {
   ChevronRight,
   X
 } from 'lucide-react';
+import { useStore } from '../store/useStore';
+import { DateUtils } from '../utils/DateUtils';
 
 const transportColors = {
   walking: '#FCD34D', // Yellow
@@ -23,7 +25,11 @@ interface CalendarViewModalProps {
 }
 
 export function CalendarViewModal({ result, onClose }: CalendarViewModalProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const { currentTrip } = useStore();
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    // Initialize with trip start date if available, otherwise current date
+    return DateUtils.getTripStartDate(currentTrip) || new Date();
+  });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Extract daily schedules from optimization result
@@ -41,12 +47,14 @@ export function CalendarViewModal({ result, onClose }: CalendarViewModalProps) {
       if (schedule.date) {
         map.set(schedule.date, schedule);
       } else {
-        // Generate dates based on day number (starting from today)
-        const today = new Date();
-        const scheduleDate = new Date(today);
-        scheduleDate.setDate(today.getDate() + (schedule.day - 1));
-        const dateString = scheduleDate.toISOString().split('T')[0];
-        map.set(dateString, schedule);
+        // Generate dates based on day number (starting from trip start date)
+        try {
+          const scheduleDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
+          const dateString = scheduleDate.toISOString().split('T')[0];
+          map.set(dateString, schedule);
+        } catch (error) {
+          console.warn('Could not calculate trip date for day', schedule.day, error);
+        }
       }
     });
     return map;
