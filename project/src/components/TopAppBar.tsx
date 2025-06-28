@@ -221,11 +221,11 @@ function TopAppBar() {
     switch (action) {
       case 'features':
         // Open features page in new tab (external)
-        window.open('https://voypath-site.com/features', '_blank', 'noopener,noreferrer');
+        window.open('https://voypath-app.com', '_blank', 'noopener,noreferrer');
         break;
       case 'privacy':
         // Open privacy policy in new tab (external)
-        window.open('https://voypath-site.com/privacy', '_blank', 'noopener,noreferrer');
+        window.open('https://voypath-app.com', '_blank', 'noopener,noreferrer');
         break;
       case 'pricing':
         // Show premium modal (existing functionality)
@@ -236,7 +236,6 @@ function TopAppBar() {
       case 'feedback':
       case 'terms':
       case 'contact':
-      case 'blog':
         // Show in-app popup
         setShowInfoModal(action);
         break;
@@ -424,7 +423,6 @@ function TopAppBar() {
                               { key: 'about', icon: Info, label: 'About Us', description: 'Our story and mission' },
                               { key: 'features', icon: Zap, label: 'Features', description: 'What makes us special' },
                               { key: 'pricing', icon: Crown, label: 'Pricing', description: 'Plans and pricing' },
-                              { key: 'blog', icon: Globe, label: 'Blog', description: 'Travel tips and updates' },
                             ].map((item, index) => (
                               <motion.button
                                 key={item.key}

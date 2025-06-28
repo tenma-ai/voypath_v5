@@ -1,6 +1,6 @@
 import React from 'react';
 import { Dialog } from '@headlessui/react';
-import { X, Info, HelpCircle, MessageCircle, FileText, Phone, Globe, Heart, Mail, MapPin, Clock, Users } from 'lucide-react';
+import { X, Info, HelpCircle, MessageCircle, FileText, Phone, Heart, Mail, MapPin, Clock, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface InfoModalProps {
@@ -306,66 +306,6 @@ const getModalContent = (type: string) => {
         )
       };
 
-    case 'blog':
-      return {
-        title: 'Travel Blog',
-        icon: Globe,
-        content: (
-          <div className="space-y-6">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                <Globe className="w-8 h-8 text-orange-600" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Travel Tips & Updates</h3>
-              <p className="text-slate-600 dark:text-slate-400">Discover travel insights, destination guides, and platform updates</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">10 Tips for Planning Perfect Group Trips</h4>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                  Learn how to coordinate with multiple travelers and create itineraries everyone will love.
-                </p>
-                <div className="flex items-center space-x-2 text-xs text-slate-500">
-                  <span>January 15, 2024</span>
-                  <span>•</span>
-                  <span>5 min read</span>
-                </div>
-              </div>
-
-              <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">New Feature: Real-time Collaboration</h4>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                  See changes from your travel companions in real-time as you plan together.
-                </p>
-                <div className="flex items-center space-x-2 text-xs text-slate-500">
-                  <span>January 10, 2024</span>
-                  <span>•</span>
-                  <span>3 min read</span>
-                </div>
-              </div>
-
-              <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">Best Destinations for 2024</h4>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                  Our curated list of must-visit destinations this year, with insider tips and recommendations.
-                </p>
-                <div className="flex items-center space-x-2 text-xs text-slate-500">
-                  <span>January 5, 2024</span>
-                  <span>•</span>
-                  <span>8 min read</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="text-center">
-              <button className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors">
-                View All Articles
-              </button>
-            </div>
-          </div>
-        )
-      };
 
     default:
       return {
