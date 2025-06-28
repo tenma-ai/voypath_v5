@@ -146,10 +146,6 @@ class PixabayService {
       cleaned = 'paris city france';
     } else if (cleaned.toLowerCase().includes('los angeles') || cleaned.toLowerCase().includes('la')) {
       cleaned = 'los angeles california';
-    } else if (cleaned.toLowerCase().includes('wulingyuan')) {
-      cleaned = 'zhangjiajie national forest park china';
-    } else if (cleaned.toLowerCase().includes('zhangjiajie')) {
-      cleaned = 'zhangjiajie national forest park china';
     }
 
     console.log(`Extracted location name: "${placeName}" -> "${cleaned}"`);
