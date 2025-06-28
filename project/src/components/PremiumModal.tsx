@@ -145,9 +145,6 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose }) =
                       <span className="text-lg text-slate-600 dark:text-slate-400">
                         /{STRIPE_PRICES.PREMIUM_YEARLY.displayInterval}
                       </span>
-                      <div className="text-sm text-green-600 dark:text-green-400 font-medium">
-                        Save 20% yearly
-                      </div>
                     </div>
                   </div>
                   {TAX_CONFIG.automaticTax && (

@@ -22,7 +22,6 @@ export function PremiumCheckout({ onClose }: PremiumCheckoutProps) {
       name: 'Yearly Plan',
       price: STRIPE_PRICES.PREMIUM_YEARLY,
       popular: true,
-      savings: 'Save 58%',
       description: 'Best value for serious travelers',
       features: [
         'Unlimited trips and places',
@@ -142,11 +141,6 @@ export function PremiumCheckout({ onClose }: PremiumCheckoutProps) {
                   /{plan.price.displayInterval}
                 </span>
               </div>
-              {plan.savings && (
-                <div className="inline-block bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-1 rounded-full text-sm font-semibold">
-                  {plan.savings}
-                </div>
-              )}
               <p className="text-slate-600 dark:text-slate-400 mt-2">
                 {plan.description}
               </p>

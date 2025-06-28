@@ -1,7 +1,156 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog } from '@headlessui/react';
-import { X, Info, HelpCircle, MessageCircle, FileText, Phone, Heart, Mail, MapPin, Clock, Users } from 'lucide-react';
+import { X, Info, HelpCircle, MessageCircle, FileText, Phone, Heart, Mail, MapPin, Clock, Users, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { supabase } from '../lib/supabase';
+import { useStore } from '../store/useStore';
+
+// Feedback Form Component
+const FeedbackForm = () => {
+  const { user } = useStore();
+  const [formData, setFormData] = useState({
+    type: 'General Feedback',
+    message: '',
+    email: user?.email || ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.message.trim()) {
+      setErrorMessage('Please enter your message');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+    
+    try {
+      const { error } = await supabase
+        .from('feedback')
+        .insert({
+          user_id: user?.id || null,
+          feedback_type: formData.type,
+          message: formData.message.trim(),
+          email: formData.email.trim() || null,
+          created_at: new Date().toISOString()
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      setSubmitStatus('success');
+      setFormData({ type: 'General Feedback', message: '', email: user?.email || '' });
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      setSubmitStatus('error');
+      setErrorMessage('Failed to submit feedback. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (submitStatus === 'success') {
+    return (
+      <motion.div 
+        className="text-center py-8"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full mx-auto mb-4 flex items-center justify-center">
+          <CheckCircle className="w-8 h-8 text-green-600" />
+        </div>
+        <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Thank you!</h3>
+        <p className="text-slate-600 dark:text-slate-400 mb-6">
+          Your feedback has been sent successfully. We appreciate your input!
+        </p>
+        <button
+          onClick={() => setSubmitStatus('idle')}
+          className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+        >
+          Send Another
+        </button>
+      </motion.div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          Feedback Type
+        </label>
+        <select 
+          value={formData.type}
+          onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+        >
+          <option>Bug Report</option>
+          <option>Feature Request</option>
+          <option>General Feedback</option>
+          <option>Compliment</option>
+        </select>
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          Your Message
+        </label>
+        <textarea 
+          value={formData.message}
+          onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+          rows={4}
+          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+          placeholder="Tell us what's on your mind..."
+          required
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+          Email (optional)
+        </label>
+        <input 
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+          placeholder="your.email@example.com"
+        />
+      </div>
+      
+      {errorMessage && (
+        <div className="flex items-center space-x-2 text-red-600 dark:text-red-400 text-sm">
+          <AlertCircle className="w-4 h-4" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+      
+      <button 
+        type="submit"
+        disabled={isSubmitting || !formData.message.trim()}
+        className="w-full px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+      >
+        {isSubmitting ? (
+          <>
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span>Sending...</span>
+          </>
+        ) : (
+          <>
+            <Send className="w-4 h-4" />
+            <span>Send Feedback</span>
+          </>
+        )}
+      </button>
+    </form>
+  );
+};
 
 interface InfoModalProps {
   isOpen: boolean;
@@ -83,7 +232,7 @@ const getModalContent = (type: string) => {
             <div className="space-y-4">
               <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Frequently Asked Questions</h4>
               
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-80 overflow-y-auto">
                 <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
                   <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">How does the trip optimization work?</summary>
                   <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
@@ -105,6 +254,90 @@ const getModalContent = (type: string) => {
                     Go to the Share page and use the invitation code or share link to invite team members to collaborate on your trip.
                   </div>
                 </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">What's the difference between scheduled and pending places?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Scheduled places have been confirmed in your optimized itinerary with specific dates and times. Pending places are under consideration but haven't been included in the final schedule yet.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">How do member colors work?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Each trip member gets assigned a unique color that appears throughout the app - in place cards, chat messages, and read receipts. This helps you quickly identify who contributed what.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">Can I change the trip dates after creating it?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Yes! Go to the trip settings to modify your departure date, arrival date, and duration. The optimization will automatically adjust to your new dates.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">What happens if I miss the add-place deadline?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    After the deadline, new places can't be added to maintain fairness. However, the trip creator can extend the deadline or adjust it in trip settings if needed.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">How does the fairness optimization work?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Our algorithm balances each member's preferences to ensure everyone gets a fair representation of their desired places in the final itinerary, considering wish levels and member priorities.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">Can I use Voypath offline?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Basic viewing is available offline, but adding places, optimization, and real-time collaboration require an internet connection. Premium users get enhanced offline access.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">How do I delete a trip?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Go to trip settings and scroll to the bottom to find the delete option. Only trip creators can delete trips. This action is permanent and cannot be undone.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">What transportation modes are supported?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Voypath supports walking, public transport, car/taxi, and flight options. You can set your preferred transportation mode in the optimization settings.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">How do I change my account settings?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Click on your profile icon in the top-right corner and select "Profile" to access your account settings, including name, email, and notification preferences.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">What's included in Voypath Premium?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Premium includes unlimited trips, advanced optimization features, priority support, offline access, premium themes, and early access to new features for $9.00/year.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">How do I export my trip data?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Premium users can export trip data in various formats from the trip settings menu. This includes itineraries, place lists, and schedule information.
+                  </div>
+                </details>
+
+                <details className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                  <summary className="font-medium cursor-pointer text-slate-900 dark:text-slate-100">Is my data secure and private?</summary>
+                  <div className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                    Yes! We use industry-standard encryption and secure servers. Your trip data is private to your group members only, and we never share personal information with third parties.
+                  </div>
+                </details>
               </div>
 
               <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
@@ -112,11 +345,7 @@ const getModalContent = (type: string) => {
                 <div className="space-y-2">
                   <div className="flex items-center space-x-3 text-sm">
                     <Mail className="w-4 h-4 text-slate-500" />
-                    <span className="text-slate-600 dark:text-slate-400">support@voypath.com</span>
-                  </div>
-                  <div className="flex items-center space-x-3 text-sm">
-                    <Phone className="w-4 h-4 text-slate-500" />
-                    <span className="text-slate-600 dark:text-slate-400">+1 (555) 123-4567</span>
+                    <span className="text-slate-600 dark:text-slate-400">voypath@gmail.com</span>
                   </div>
                 </div>
               </div>
@@ -139,48 +368,7 @@ const getModalContent = (type: string) => {
               <p className="text-slate-600 dark:text-slate-400">Help us improve Voypath by sharing your thoughts and suggestions</p>
             </div>
 
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Feedback Type
-                </label>
-                <select className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">
-                  <option>Bug Report</option>
-                  <option>Feature Request</option>
-                  <option>General Feedback</option>
-                  <option>Compliment</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Your Message
-                </label>
-                <textarea 
-                  rows={4}
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                  placeholder="Tell us what's on your mind..."
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Email (optional)
-                </label>
-                <input 
-                  type="email"
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                  placeholder="your.email@example.com"
-                />
-              </div>
-              
-              <button 
-                type="submit"
-                className="w-full px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
-              >
-                Send Feedback
-              </button>
-            </form>
+            <FeedbackForm />
           </div>
         )
       };
@@ -232,7 +420,7 @@ const getModalContent = (type: string) => {
 
               <h4 className="text-md font-semibold mb-3">6. Contact Information</h4>
               <p>
-                If you have any questions about these Terms of Service, please contact us at legal@voypath.com
+                If you have any questions about these Terms of Service, please contact us at voypath@gmail.com
               </p>
             </div>
           </div>
@@ -262,46 +450,13 @@ const getModalContent = (type: string) => {
                 <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
                   Get help with technical issues or general questions
                 </p>
-                <a href="mailto:support@voypath.com" className="text-blue-600 dark:text-blue-400 text-sm font-medium">
-                  support@voypath.com
+                <a href="mailto:voypath@gmail.com" className="text-blue-600 dark:text-blue-400 text-sm font-medium">
+                  voypath@gmail.com
                 </a>
               </div>
 
-              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                <div className="flex items-center space-x-3 mb-2">
-                  <Phone className="w-5 h-5 text-green-600" />
-                  <h4 className="font-semibold text-green-900 dark:text-green-100">Phone Support</h4>
-                </div>
-                <p className="text-sm text-green-700 dark:text-green-300 mb-2">
-                  Mon-Fri, 9AM-6PM PST
-                </p>
-                <a href="tel:+15551234567" className="text-green-600 dark:text-green-400 text-sm font-medium">
-                  +1 (555) 123-4567
-                </a>
-              </div>
-
-              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
-                <div className="flex items-center space-x-3 mb-2">
-                  <MessageCircle className="w-5 h-5 text-purple-600" />
-                  <h4 className="font-semibold text-purple-900 dark:text-purple-100">Live Chat</h4>
-                </div>
-                <p className="text-sm text-purple-700 dark:text-purple-300 mb-2">
-                  Available during business hours
-                </p>
-                <button className="text-purple-600 dark:text-purple-400 text-sm font-medium">
-                  Start Chat
-                </button>
-              </div>
             </div>
 
-            <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-              <h4 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">Office Location</h4>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                123 Travel Street<br />
-                San Francisco, CA 94102<br />
-                United States
-              </p>
-            </div>
           </div>
         )
       };

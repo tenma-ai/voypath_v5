@@ -10,6 +10,7 @@ import { TripSettingsModal } from '../components/TripSettingsModal';
 import { PremiumBadge } from '../components/PremiumBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { DateUtils } from '../utils/DateUtils';
 
 // Extract place name from address (remove country, state details)
 const extractPlaceName = (address: string): string => {
@@ -625,7 +626,7 @@ export function HomePage() {
                           repeat: Infinity,
                         }}
                       >
-                        $9.99/year
+                        $9.00/year
                       </motion.span>
                     </div>
                   </div>
