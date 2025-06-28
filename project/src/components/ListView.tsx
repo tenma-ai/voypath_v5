@@ -313,7 +313,7 @@ export function ListView() {
         scheduleDays.push({
           date: date.toISOString().split('T')[0],
           day: `Day ${dayIndex + 1}`,
-          dayName: date.toLocaleDateString('en-US', { weekday: 'long' }),
+          dayName: DateUtils.formatCalendarDate(date),
           events
         });
       });

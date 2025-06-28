@@ -82,11 +82,7 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
 
         days.push({
           date: dateStr,
-          displayDate: currentDate.toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            month: 'short', 
-            day: 'numeric' 
-          }),
+          displayDate: DateUtils.formatCalendarDate(currentDate),
           places: placesWithTiming,
           totalDuration,
           totalCost,
