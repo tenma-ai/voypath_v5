@@ -470,7 +470,7 @@ export function MyPlacesPage() {
                         <div className="mb-2">
                           {(place.scheduled_date || place.scheduledDate) && (
                             <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                              {DateUtils.formatCompactDate(new Date(place.scheduled_date || place.scheduledDate))}
+                              {DateUtils.formatCalendarDate(new Date(place.scheduled_date || place.scheduledDate))}
                             </div>
                           )}
                           <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm line-clamp-2">
@@ -514,7 +514,7 @@ export function MyPlacesPage() {
                         <div>
                           <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Visit Time</div>
                           <div className="text-sm text-slate-900 dark:text-slate-100">
-                            {DateUtils.formatDateTime(new Date(place.scheduled_date || place.scheduledDate))}
+                            {DateUtils.formatCalendarDate(new Date(place.scheduled_date || place.scheduledDate))}
                           </div>
                         </div>
                       )}
