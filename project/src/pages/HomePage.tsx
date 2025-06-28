@@ -32,8 +32,11 @@ export function HomePage() {
   const navigate = useNavigate();
   const { user, trips, currentTrip, deleteTrip, canCreateTrip, setCurrentTrip, loadPlacesFromAPI } = useStore();
   
-  // Calculate user's owned trips count for limit display
+  // Calculate user's owned trips count for limit display  
   const userOwnedTrips = user ? trips.filter(trip => trip.ownerId === user.id) : [];
+  
+  // Calculate total trips count (owned + member) for display
+  const totalUserTrips = trips.length;
   
   // Debug: Log all trips data
   React.useEffect(() => {
@@ -53,7 +56,7 @@ export function HomePage() {
   const [userStats, setUserStats] = useState({
     placesVisited: 0,
     routesOptimized: 0,
-    tripsPlanned: userOwnedTrips.length
+    tripsPlanned: totalUserTrips
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
@@ -133,7 +136,7 @@ export function HomePage() {
         setUserStats({
           placesVisited: placesCount || 0,
           routesOptimized: optimizationCount || 0,
-          tripsPlanned: userOwnedTrips.length
+          tripsPlanned: totalUserTrips
         });
       } catch (error) {
         console.error('Failed to load user stats:', error);
@@ -143,7 +146,7 @@ export function HomePage() {
     };
     
     loadUserStats();
-  }, [user, userOwnedTrips.length]);
+  }, [user, totalUserTrips]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -285,9 +288,16 @@ export function HomePage() {
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your Trips</h2>
           <div className="flex items-center space-x-3">
             {!isPremium && (
-              <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
-                {userOwnedTrips.length}/3 trips
-              </span>
+              <>
+                <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
+                  {userOwnedTrips.length}/3 owned
+                </span>
+                {totalUserTrips > userOwnedTrips.length && (
+                  <span className="text-xs text-slate-500 dark:text-slate-400 bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-full">
+                    +{totalUserTrips - userOwnedTrips.length} joined
+                  </span>
+                )}
+              </>
             )}
             {isPremium && trips.length > 0 && (
               <span className="text-sm text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
