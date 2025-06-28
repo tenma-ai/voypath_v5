@@ -133,6 +133,12 @@ function TopAppBar() {
   const handleProfileMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Prevent double triggering on mobile devices
+    if (e.type === 'touchstart') {
+      e.preventDefault();
+    }
+    
     setShowProfileMenu(!showProfileMenu);
     setShowVoypathMenu(false);
   };
@@ -638,10 +644,10 @@ function TopAppBar() {
                 <div className="relative profile-menu-container" style={{ zIndex: 10000 }}>
                   <motion.button
                     onClick={handleProfileMenuToggle}
-                    onTouchStart={handleProfileMenuToggle}
                     className="relative group"
                     whileHover={{ scale: 1.05, y: -1 }}
                     whileTap={{ scale: 0.95 }}
+                    style={{ touchAction: 'manipulation' }}
                   >
                     <div 
                       className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shadow-medium hover:shadow-glow transition-all duration-300 relative overflow-hidden"
@@ -669,11 +675,11 @@ function TopAppBar() {
                     {showProfileMenu && (
                       <>
                         {/* Backdrop */}
-                        <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10000 }} />
+                        <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10001 }} />
                         
                         <motion.div 
                           className="fixed right-2 sm:right-4 top-14 sm:top-16 w-[calc(100vw-1rem)] sm:w-72 max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-2rem)] max-h-[calc(100vh-4rem)] sm:max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
-                          style={{ zIndex: 10001 }}
+                          style={{ zIndex: 10002 }}
                           variants={menuVariants}
                           initial="hidden"
                           animate="visible"

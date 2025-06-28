@@ -8,6 +8,7 @@ import { OptimizationSuccessOverlay } from './OptimizationSuccessOverlay';
 import { AnimatePresence } from 'framer-motion';
 import { getColorOrFallback } from '../utils/ColorFallbackUtils';
 import { pixabayService } from '../services/PixabayService';
+import { DateUtils } from '../utils/DateUtils';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -403,23 +404,32 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     // Format travel info - removed since travel_to_next doesn't exist
     let travelInfo = '';
 
-    // Format duration
-    const formatDuration = (minutes: number) => {
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      return hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
-    };
+    // Format duration using centralized utility
+    const formatDuration = DateUtils.formatDuration;
 
-    // Format wish level with stars
+    // Format wish level with stars (removed from display per requirements)
     const wishStars = place.wish_level ? '⭐'.repeat(place.wish_level) : '';
 
-    // Format dates if available
+    // Format dates and times with departure/arrival info for movement/transport places
     let dateInfo = '';
+    let arrivalDepartureInfo = '';
+    
     if (place.arrival_time && place.departure_time) {
       dateInfo = `${place.arrival_time} - ${place.departure_time}`;
+      arrivalDepartureInfo = `Arrival: ${place.arrival_time}, Departure: ${place.departure_time}`;
+    } else if (place.arrival_time) {
+      arrivalDepartureInfo = `Arrival: ${place.arrival_time}`;
+    } else if (place.departure_time) {
+      arrivalDepartureInfo = `Departure: ${place.departure_time}`;
     } else if (scheduleInfo) {
       dateInfo = scheduleInfo;
     }
+    
+    // Check if this is a movement/transport place
+    const isTransportPlace = place.place_type === 'airport' || 
+      place.transport_mode || 
+      place.name?.toLowerCase().includes('airport') || 
+      place.place_name?.toLowerCase().includes('airport');
 
     // Check if system place
     const isSystemPlace = place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport';
@@ -456,17 +466,18 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
             <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${userInfo || 'Unknown'}</p>
           </div>
           
-          ${place.wish_level ? `
-            <div style="margin-bottom: 8px;">
-              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Priority</p>
-              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${wishStars} (${place.wish_level}/5)</p>
-            </div>
-          ` : ''}
           
           ${dateInfo ? `
             <div style="margin-bottom: 8px;">
               <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Schedule</p>
               <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${dateInfo}</p>
+            </div>
+          ` : ''}
+          
+          ${isTransportPlace && arrivalDepartureInfo ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Transport Times</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${arrivalDepartureInfo}</p>
             </div>
           ` : ''}
           
@@ -550,12 +561,8 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     // Duration is already set above
     const distance = 0; // Distance is not provided by the edge function
 
-    // Format duration
-    const formatDuration = (minutes: number) => {
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      return hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
-    };
+    // Format duration using centralized utility
+    const formatDuration = DateUtils.formatDuration;
 
     // Get transport icon image and color
     const getTransportIconInfo = (mode: string) => {
@@ -622,9 +629,6 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
             </div>
           ` : ''}
           
-          <div style="background: #fef3c7; padding: 10px; border-radius: 6px; margin-top: 8px;">
-            <p style="margin: 0; font-size: 11px; color: #92400e; font-style: italic; line-height: 1.3;">💡 Click on place markers to see detailed information</p>
-          </div>
         </div>
       </div>
     `;

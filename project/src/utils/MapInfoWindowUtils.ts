@@ -2,6 +2,8 @@
  * Utility functions for generating enhanced InfoWindow content for MapView
  */
 
+import { DateUtils } from './DateUtils';
+
 export interface PlaceInfoWindowData {
   placeName: string;
   imageUrl: string;
@@ -9,13 +11,15 @@ export interface PlaceInfoWindowData {
   address?: string;
   userInfo: string;
   userColor: string;
-  wishLevel: number;
   dateInfo?: string;
   travelInfo?: string;
   duration?: number;
   notes?: string;
   website?: string;
   placeId: string;
+  arrivalTime?: string;
+  departureTime?: string;
+  isTransport?: boolean;
 }
 
 export class MapInfoWindowUtils {
@@ -30,22 +34,18 @@ export class MapInfoWindowUtils {
       address,
       userInfo,
       userColor,
-      wishLevel,
       dateInfo,
       travelInfo,
       duration,
       notes,
       website,
-      placeId
+      placeId,
+      arrivalTime,
+      departureTime,
+      isTransport
     } = data;
-
-    const wishStars = '⭐'.repeat(Math.min(wishLevel, 5));
     
-    const formatDuration = (minutes: number) => {
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      return hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
-    };
+    const formatDuration = DateUtils.formatDuration;
 
     return `
       <div style="padding: 0; min-width: 320px; max-width: 380px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); font-family: system-ui, -apple-system, sans-serif;">
@@ -54,11 +54,6 @@ export class MapInfoWindowUtils {
           <div style="position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.7); border-radius: 6px; padding: 4px 8px;">
             <span style="color: white; font-size: 12px; font-weight: 600;">${category || 'Place'}</span>
           </div>
-          ${wishLevel > 0 ? `
-            <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(255, 255, 255, 0.9); border-radius: 6px; padding: 4px 8px;">
-              <span style="color: #1f2937; font-size: 12px; font-weight: 600;">${wishStars}</span>
-            </div>
-          ` : ''}
         </div>
         
         <!-- Content -->
@@ -93,6 +88,15 @@ export class MapInfoWindowUtils {
               </div>
             ` : ''}
           </div>
+          
+          ${(isTransport && (arrivalTime || departureTime)) ? `
+            <div style="margin-bottom: 12px; padding: 8px; background: #f0f9ff; border-radius: 6px; border-left: 3px solid #3b82f6;">
+              <p style="margin: 0; font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Transport Times</p>
+              <p style="margin: 2px 0 0 0; font-size: 13px; color: #1f2937; font-weight: 500;">
+                ${arrivalTime ? `Arrival: ${arrivalTime}` : ''}${(arrivalTime && departureTime) ? ', ' : ''}${departureTime ? `Departure: ${departureTime}` : ''}
+              </p>
+            </div>
+          ` : ''}
           
           ${travelInfo ? `
             <div style="margin-bottom: 12px; padding: 8px; background: #f0f9ff; border-radius: 6px; border-left: 3px solid #3b82f6;">

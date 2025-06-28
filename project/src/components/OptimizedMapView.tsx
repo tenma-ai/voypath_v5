@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Route, AlertCircle, Loader, Clock, MapPin, Navigation, Eye, EyeOff, Filter } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Place, DetailedSchedule, OptimizedTrip, OptimizedPlace } from '../types/optimization';
+import { DateUtils } from '../utils/DateUtils';
 
 interface OptimizedMapViewProps {
   optimizationResult?: DetailedSchedule;
@@ -289,12 +290,7 @@ export function OptimizedMapView({
             <strong style="color: #374151;">Category:</strong> ${place.category}
           </p>
           <p style="margin: 0 0 6px 0; color: #6b7280; font-size: 14px;">
-            <strong style="color: #374151;">Wish Level:</strong> 
-            <span style="color: #f59e0b;">${'★'.repeat(place.wish_level)}${'☆'.repeat(5 - place.wish_level)}</span>
-            (${place.wish_level}/5)
-          </p>
-          <p style="margin: 0 0 6px 0; color: #6b7280; font-size: 14px;">
-            <strong style="color: #374151;">Stay Duration:</strong> ${Math.floor(place.stay_duration_minutes / 60)}h ${place.stay_duration_minutes % 60}m
+            <strong style="color: #374151;">Stay Duration:</strong> ${DateUtils.formatDuration(place.stay_duration_minutes)}
           </p>
           ${place.rating ? `
             <p style="margin: 0 0 6px 0; color: #6b7280; font-size: 14px;">

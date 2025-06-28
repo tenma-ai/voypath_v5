@@ -50,11 +50,18 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
         
         console.log(`🔍 [CalendarGridView] Day ${daySchedule.day || (dayIndex + 1)} -> ${dateKey}`);
         
-        // Filter out transport-only places and system places
+        // Filter to show only trip places, excluding system places except departure/arrival
         const validPlaces = daySchedule.scheduled_places.filter((place: any) => {
           const isTransport = place.place_type === 'transport' || place.category === 'transport';
-          const isSystemPlace = place.place_type === 'departure' || place.place_type === 'destination';
-          return !isTransport && !isSystemPlace;
+          const isDepartureOrArrival = place.place_type === 'departure' || place.place_type === 'destination';
+          const isAirport = place.place_type === 'airport' || place.category === 'airport';
+          
+          // Keep departure/arrival as exceptions, filter out transport and other system places like airports
+          if (isDepartureOrArrival) return true;
+          if (isTransport) return false;
+          if (isAirport) return false;
+          
+          return true; // Show all regular trip places
         });
         
         schedule[dateKey] = validPlaces.map((place: any, placeIndex: number) => {
@@ -229,7 +236,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
       </div>
 
       {/* Calendar Grid */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-soft border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-soft border border-slate-200/50 dark:border-slate-700/50 overflow-hidden max-h-[600px]">
         {/* Day Headers */}
         <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-700">
           {dayNames.map((dayName) => (
@@ -258,14 +265,13 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-[80px] h-auto border-r border-b border-slate-200 dark:border-slate-700 p-1 overflow-y-auto ${
+                className={`aspect-square border-r border-b border-slate-200 dark:border-slate-700 p-1 overflow-y-auto ${
                   isToday 
                     ? 'bg-blue-50 dark:bg-blue-900/20' 
                     : isCurrentMonth 
                       ? 'bg-white dark:bg-slate-800'
                       : 'bg-slate-50/50 dark:bg-slate-800/30'
                 }`}
-                style={{ minHeight: '80px' }}
               >
                 {/* Date Number */}
                 <div className={`text-xs font-medium mb-0.5 ${

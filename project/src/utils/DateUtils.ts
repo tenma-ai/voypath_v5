@@ -153,6 +153,55 @@ export class DateUtils {
   }
 
   /**
+   * Format date with time for detailed displays
+   */
+  static formatDateTime(date: Date, options: DateFormatOptions = {}): string {
+    const {
+      locale = this.DEFAULT_LOCALE,
+      includeYear = false,
+      includeWeekday = true,
+      timeZone = this.DEFAULT_TIMEZONE
+    } = options;
+
+    const formatOptions: Intl.DateTimeFormatOptions = {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone
+    };
+
+    if (includeYear) {
+      formatOptions.year = 'numeric';
+    }
+
+    if (includeWeekday) {
+      formatOptions.weekday = 'short';
+    }
+
+    try {
+      return date.toLocaleDateString(locale, formatOptions);
+    } catch {
+      return date.toLocaleDateString(this.DEFAULT_LOCALE, formatOptions);
+    }
+  }
+
+  /**
+   * Format standard date with weekday (unified format across app)
+   */
+  static formatStandardDate(date: Date): string {
+    return this.formatCalendarDate(date);
+  }
+
+  /**
+   * Format compact date without weekday for space-constrained areas
+   */
+  static formatCompactDate(date: Date): string {
+    return this.formatMobileDate(date);
+  }
+
+
+  /**
    * Get the day number for a given date within a trip
    */
   static getTripDayNumber(trip: TripDate, date: Date): number {
@@ -269,5 +318,46 @@ export class DateUtils {
    */
   static subtractDays(date: Date, days: number): Date {
     return this.addDays(date, -days);
+  }
+
+  /**
+   * Format duration in minutes to a human-readable string
+   * Shows months/days/hours/minutes but excludes seconds for better UX
+   */
+  static formatDuration(minutes: number): string {
+    if (minutes < 1) return '0m';
+    
+    const totalMinutes = Math.floor(minutes);
+    const months = Math.floor(totalMinutes / (30 * 24 * 60));
+    const days = Math.floor((totalMinutes % (30 * 24 * 60)) / (24 * 60));
+    const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const mins = totalMinutes % 60;
+    
+    const parts = [];
+    if (months > 0) parts.push(`${months} month${months > 1 ? 's' : ''}`);
+    if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (mins > 0) parts.push(`${mins}m`);
+    
+    return parts.join(' ');
+  }
+
+  /**
+   * Format duration in a compact form for space-constrained UI
+   */
+  static formatDurationCompact(minutes: number): string {
+    if (minutes < 1) return '0m';
+    
+    const totalMinutes = Math.floor(minutes);
+    const months = Math.floor(totalMinutes / (30 * 24 * 60));
+    const days = Math.floor((totalMinutes % (30 * 24 * 60)) / (24 * 60));
+    const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const mins = totalMinutes % 60;
+    
+    // Show only the most significant unit for compact display
+    if (months > 0) return `${months}mo`;
+    if (days > 0) return `${days}d`;
+    if (hours > 0) return `${hours}h`;
+    return `${mins}m`;
   }
 }

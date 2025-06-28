@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { PlaceImage } from '../components/PlaceImage';
+import { DateUtils } from '../utils/DateUtils';
 
 export function MyPlacesPage() {
   const navigate = useNavigate();
@@ -363,55 +364,6 @@ export function MyPlacesPage() {
           </div>
         </div>
         
-        {/* Status Summary Cards */}
-        {activeTab === 'my' && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            {[
-              { 
-                key: 'scheduled', 
-                label: 'Scheduled', 
-                count: displayPlaces.filter(p => getPlaceStatus(p) === 'scheduled').length,
-                icon: CheckCircle,
-                color: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
-              },
-              { 
-                key: 'pending', 
-                label: 'Pending', 
-                count: displayPlaces.filter(p => getPlaceStatus(p) === 'pending').length,
-                icon: HelpCircle,
-                color: 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800'
-              },
-              { 
-                key: 'unscheduled', 
-                label: 'Unscheduled', 
-                count: displayPlaces.filter(p => getPlaceStatus(p) === 'unscheduled').length,
-                icon: Clock,
-                color: 'bg-slate-50 dark:bg-slate-900/20 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-              },
-              { 
-                key: 'all', 
-                label: 'Total', 
-                count: displayPlaces.length,
-                icon: Star,
-                color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
-              }
-            ].map(({ key, label, count, icon: Icon, color }) => (
-              <div
-                key={key}
-                className={`p-4 rounded-lg border-2 transition-all duration-200 hover:scale-105 cursor-pointer ${
-                  filter === key ? 'ring-2 ring-primary-500 ring-offset-2' : ''
-                } ${color}`}
-                onClick={() => setFilter(key)}
-              >
-                <div className="flex items-center justify-between">
-                  <Icon className="w-5 h-5" />
-                  <span className="text-2xl font-bold">{count}</span>
-                </div>
-                <p className="text-sm font-medium mt-1">{label}</p>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Enhanced Tab Navigation */}
@@ -427,10 +379,6 @@ export function MyPlacesPage() {
           <Users className="w-5 h-5" />
           <div className="text-left">
             <div className="font-semibold">Trip Places</div>
-            <div className="text-xs opacity-75">{allTripPlaces.filter(p => {
-              const isSystemTransport = p.place_type === 'departure' || p.place_type === 'destination' || p.category === 'transportation' || p.source === 'system';
-              return !isSystemTransport && (p.scheduled || p.is_selected_for_optimization);
-            }).length} scheduled</div>
           </div>
         </button>
         <button
@@ -444,36 +392,10 @@ export function MyPlacesPage() {
           <Star className="w-5 h-5" />
           <div className="text-left">
             <div className="font-semibold">My Places</div>
-            <div className="text-xs opacity-75">{myTripPlaces.filter(p => {
-              const isSystemTransport = p.place_type === 'departure' || p.place_type === 'destination' || p.category === 'transportation' || p.source === 'system';
-              return !isSystemTransport;
-            }).length} total</div>
           </div>
         </button>
       </div>
 
-      {/* Action Bar for Trip Places Tab */}
-      {activeTab === 'trip' && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-blue-900 dark:text-blue-100">Team Places Overview</h3>
-              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                Showing all places that have been scheduled in the team trip optimization
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                {allTripPlaces.filter(p => {
-                  const isSystemTransport = p.place_type === 'departure' || p.place_type === 'destination' || p.category === 'transportation' || p.source === 'system';
-                  return !isSystemTransport && (p.scheduled || p.is_selected_for_optimization);
-                }).length} scheduled
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Add Place Quick Action */}
       {activeTab === 'my' && (
@@ -518,7 +440,7 @@ export function MyPlacesPage() {
                     <div className="relative h-3/5">
                       <PlaceImage
                         placeName={place.name}
-                        fallbackUrl={place.image_url || place.image || '/api/placeholder/400/300'}
+                        fallbackUrl={place.image_url || place.image}
                         alt={place.name}
                         className="w-full h-full object-cover"
                       />
@@ -562,10 +484,7 @@ export function MyPlacesPage() {
                         <div className="mb-2">
                           {(place.scheduled_date || place.scheduledDate) && (
                             <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                              {new Date(place.scheduled_date || place.scheduledDate).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric'
-                              })}
+                              {DateUtils.formatCompactDate(new Date(place.scheduled_date || place.scheduledDate))}
                             </div>
                           )}
                           <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm line-clamp-2">
@@ -609,12 +528,7 @@ export function MyPlacesPage() {
                         <div>
                           <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Visit Time</div>
                           <div className="text-sm text-slate-900 dark:text-slate-100">
-                            {new Date(place.scheduled_date || place.scheduledDate).toLocaleString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
+                            {DateUtils.formatDateTime(new Date(place.scheduled_date || place.scheduledDate))}
                           </div>
                         </div>
                       )}

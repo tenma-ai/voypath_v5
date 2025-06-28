@@ -54,10 +54,7 @@ export function HomePage() {
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
+    return DateUtils.formatCompactDate(new Date(dateStr));
   };
 
   const formatDateRange = (startDate: string, endDate: string) => {
@@ -82,12 +79,7 @@ export function HomePage() {
     const isExpired = date < now;
     
     return {
-      text: date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+      text: DateUtils.formatDateTime(date),
       isExpired
     };
   };

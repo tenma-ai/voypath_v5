@@ -70,10 +70,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
         date: DateUtils.formatForStorage(actualDate).split('T')[0], // YYYY-MM-DD format
         actualDate: actualDate,
         places: (schedule.scheduled_places || []).filter((place: any) => {
-          // Filter out transport and system places
+          // Filter to show only trip places, excluding system places except departure/arrival
           const isTransport = place.place_type === 'transport' || place.category === 'transport';
-          const isSystemPlace = place.place_type === 'departure' || place.place_type === 'destination';
-          return !isTransport && !isSystemPlace;
+          const isDepartureOrArrival = place.place_type === 'departure' || place.place_type === 'destination';
+          const isAirport = place.place_type === 'airport' || place.category === 'airport';
+          
+          // Keep departure/arrival as exceptions, filter out transport and other system places like airports
+          if (isDepartureOrArrival) return true;
+          if (isTransport) return false;
+          if (isAirport) return false;
+          
+          return true; // Show all regular trip places
         })
       };
     });

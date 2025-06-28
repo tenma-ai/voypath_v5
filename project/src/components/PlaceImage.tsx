@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { pixabayService } from '../services/PixabayService';
+import { MapPin } from 'lucide-react';
 
 interface PlaceImageProps {
   placeName: string;
@@ -11,14 +12,15 @@ interface PlaceImageProps {
 
 export const PlaceImage: React.FC<PlaceImageProps> = ({
   placeName,
-  fallbackUrl = '/api/placeholder/400/300',
+  fallbackUrl,
   alt,
   className = '',
   size = 'medium'
 }) => {
-  const [imageUrl, setImageUrl] = useState<string>(fallbackUrl);
+  const [imageUrl, setImageUrl] = useState<string | null>(fallbackUrl || null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -37,7 +39,12 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
         console.error('Error loading place image:', error);
         if (isMounted) {
           setHasError(true);
-          setImageUrl(fallbackUrl);
+          if (fallbackUrl) {
+            setImageUrl(fallbackUrl);
+          } else {
+            setShowFallback(true);
+            setImageUrl(null);
+          }
         }
       } finally {
         if (isMounted) {
@@ -46,11 +53,14 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
       }
     };
 
-    // Only load from Pexels if we have a valid place name
+    // Only load from Pixabay if we have a valid place name
     if (placeName && placeName.trim() && !placeName.includes('/api/placeholder')) {
       loadImage();
     } else {
       setIsLoading(false);
+      if (!fallbackUrl) {
+        setShowFallback(true);
+      }
     }
 
     return () => {
@@ -61,7 +71,12 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
   const handleImageError = () => {
     if (!hasError) {
       setHasError(true);
-      setImageUrl(fallbackUrl);
+      if (fallbackUrl) {
+        setImageUrl(fallbackUrl);
+      } else {
+        setShowFallback(true);
+        setImageUrl(null);
+      }
     }
   };
 
@@ -69,19 +84,35 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
     setIsLoading(false);
   };
 
+  // Show fallback placeholder if no image is available
+  if (showFallback || (!imageUrl && !isLoading)) {
+    return (
+      <div className={`relative ${className} bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center`}>
+        <div className="text-center">
+          <MapPin className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-500 mb-2" />
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+            {placeName ? placeName.slice(0, 20) + (placeName.length > 20 ? '...' : '') : 'Place'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`relative ${className}`}>
       {isLoading && (
-        <div className={`absolute inset-0 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-inherit ${className}`} />
+        <div className={`absolute inset-0 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-inherit`} />
       )}
-      <img
-        src={imageUrl}
-        alt={alt || placeName}
-        className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
-        onError={handleImageError}
-        onLoad={handleImageLoad}
-        loading="lazy"
-      />
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          alt={alt || placeName}
+          className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+          onError={handleImageError}
+          onLoad={handleImageLoad}
+          loading="lazy"
+        />
+      )}
     </div>
   );
 };
