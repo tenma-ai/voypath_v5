@@ -35,7 +35,6 @@ export function SharePage() {
   const loadExistingShareData = async () => {
     if (!currentTrip) return;
 
-    console.log('📋 Loading existing share data for trip:', currentTrip.id);
     
     // First try to load existing invitation code
     const existingCodes = await getExistingInvitationCodes();
@@ -48,24 +47,19 @@ export function SharePage() {
       );
       
       if (activeCode) {
-        console.log('✅ Using existing invitation code:', activeCode.code);
         setJoinCode(activeCode.code);
       } else {
-        console.log('⚠️ No active invitation codes found, generating new one');
         await generateInvitationCode();
       }
     } else {
-      console.log('⚠️ No invitation codes found, generating new one');
       await generateInvitationCode();
     }
 
     // Then try to load existing share link
     const existingShareToken = await getExistingShareLink();
     if (existingShareToken) {
-      console.log('✅ Using existing share link token:', existingShareToken);
       setShareLink(`${window.location.origin}/shared/${existingShareToken}`);
     } else {
-      console.log('⚠️ No share link found, generating new one');
       await generateShareLink();
     }
   };
@@ -80,7 +74,6 @@ export function SharePage() {
         throw new Error('User not authenticated');
       }
 
-      console.log('🔑 Generating invitation code for trip:', currentTrip.id);
       
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/create-invitation', {
         method: 'POST',
@@ -99,20 +92,17 @@ export function SharePage() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Invitation code generated:', data.invitation.code);
         setJoinCode(data.invitation.code);
       } else {
         const errorData = await response.json();
-        console.error('❌ Failed to generate invitation code:', errorData);
-        // Fallback to existing code if generation fails
+        // Failed to generate invitation code - fallback to existing code if generation fails
         const existingCodes = await getExistingInvitationCodes();
         if (existingCodes.length > 0) {
           setJoinCode(existingCodes[0].code);
         }
       }
     } catch (error) {
-      console.error('❌ Error generating invitation code:', error);
-      // Try to get existing codes as fallback
+      // Error generating invitation code - try to get existing codes as fallback
       const existingCodes = await getExistingInvitationCodes();
       if (existingCodes.length > 0) {
         setJoinCode(existingCodes[0].code);
@@ -127,7 +117,6 @@ export function SharePage() {
     
     setGeneratingLink(true);
     try {
-      console.log('🔗 Generating share link for trip:', currentTrip.id);
       
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
         method: 'POST',
@@ -149,11 +138,9 @@ export function SharePage() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Share link generated:', data.shareToken);
         setShareLink(`${window.location.origin}/shared/${data.shareToken}`);
       } else {
-        console.error('❌ Failed to generate share link');
-        // Try to get existing share link
+        // Failed to generate share link - try to get existing share link
         const existingLink = await getExistingShareLink();
         if (existingLink) {
           setShareLink(`${window.location.origin}/shared/${existingLink}`);
@@ -162,7 +149,7 @@ export function SharePage() {
         }
       }
     } catch (error) {
-      console.error('❌ Error generating share link:', error);
+      // Error generating share link
       setShareLink(`${window.location.origin}/trip/${currentTrip.id}`);
     } finally {
       setGeneratingLink(false);
@@ -181,14 +168,13 @@ export function SharePage() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Error getting existing invitation codes:', error);
+        // Error getting existing invitation codes
         return [];
       }
 
-      console.log(`📋 Found ${data?.length || 0} invitation codes for trip`);
       return data || [];
     } catch (error) {
-      console.error('❌ Error getting existing invitation codes:', error);
+      // Error getting existing invitation codes
     }
     return [];
   };
@@ -205,7 +191,7 @@ export function SharePage() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Error getting existing share link:', error);
+        // Error getting existing share link
         return null;
       }
 
@@ -217,7 +203,6 @@ export function SharePage() {
       );
 
       if (validShare) {
-        console.log('✅ Found valid existing share link:', validShare.share_token);
         return validShare.share_token;
       }
 
@@ -229,13 +214,11 @@ export function SharePage() {
       );
 
       if (collaborateShare) {
-        console.log('✅ Found valid collaborate share link:', collaborateShare.share_token);
         return collaborateShare.share_token;
       }
 
-      console.log('⚠️ No valid share links found');
     } catch (error) {
-      console.error('❌ Error getting existing share link:', error);
+      // Error getting existing share link
     }
     return null;
   };
@@ -251,12 +234,11 @@ export function SharePage() {
         .eq('trip_id', currentTrip.id);
 
       if (membersError) {
-        console.error('❌ SharePage: Error loading trip members:', membersError);
+        // Error loading trip members
         return;
       }
 
       if (!memberIds || memberIds.length === 0) {
-        console.log('ℹ️ SharePage: No members found for trip:', currentTrip.id);
         setMembers([]);
         return;
       }
@@ -269,13 +251,12 @@ export function SharePage() {
         .in('id', userIds);
 
       if (usersError) {
-        console.error('❌ SharePage: Error loading users:', usersError);
+        // Error loading users
         return;
       }
 
       // Load member colors
       const colorMapping = await MemberColorService.getSimpleColorMapping(currentTrip.id);
-      console.log('🎨 SharePage: Color mapping:', colorMapping);
 
       // Combine the data
       const data = memberIds.map(member => {
@@ -290,7 +271,7 @@ export function SharePage() {
         const memberColor = colorMapping[member.user_id] || '#0077BE'; // Fallback color
         // Check if users data exists before accessing properties
         if (!member.users) {
-          console.warn('⚠️ SharePage: No user data found for member:', member.user_id);
+          // No user data found for member
           return null;
         }
         return {
@@ -303,11 +284,9 @@ export function SharePage() {
         };
       }).filter(Boolean) || []; // Filter out null values
 
-      console.log('✅ SharePage: Formatted members data with colors:', membersData);
-      console.log(`✅ SharePage: Setting ${membersData.length} members`);
       setMembers(membersData);
     } catch (error) {
-      console.error('❌ Failed to load trip members:', error);
+      // Failed to load trip members
     } finally {
       setLoading(false);
     }
@@ -451,7 +430,6 @@ export function SharePage() {
             <div>
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
                 Members ({members.length})
-                {console.log('🔍 SharePage render: members count:', members.length)}
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 People who have joined this trip

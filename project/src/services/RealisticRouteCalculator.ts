@@ -208,7 +208,7 @@ export class RealisticRouteCalculator {
       
       return response.region || null;
     } catch (error) {
-      console.warn('Geographic lookup service failed, using fallback:', error);
+      // Warning occurred
       
       // Fallback to database query
       const { data: regions, error: dbError } = await supabase
@@ -216,7 +216,7 @@ export class RealisticRouteCalculator {
         .select('*');
 
       if (dbError || !regions) {
-        console.error('Failed to fetch geographic regions:', dbError);
+        // Error occurred
         // Final fallback to hardcoded regions
         let closestRegion: GeographicRegion | null = null;
         let minDistance = Infinity;

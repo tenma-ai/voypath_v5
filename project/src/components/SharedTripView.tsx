@@ -30,7 +30,7 @@ function AuthForm({ onSuccess }: { onSuccess: (user: any) => void }) {
         
         if (error) throw error;
         if (data.user) {
-          console.log('✅ User signed in:', data.user.id);
+          // Log message
           onSuccess(data.user);
         }
       } else {
@@ -52,7 +52,7 @@ function AuthForm({ onSuccess }: { onSuccess: (user: any) => void }) {
           throw error;
         }
         if (data.user) {
-          console.log('✅ User signed up:', data.user.id);
+          // Log message
           onSuccess(data.user);
         }
       }
@@ -214,7 +214,7 @@ export function SharedTripView() {
   
   // Debug user state on component mount
   useEffect(() => {
-    console.log('🔐 SharedTripView user state on mount:', {
+    // Log: '🔐 SharedTripView user state on mount:', {
       user: user ? {
         id: user.id,
         name: user.name,
@@ -231,7 +231,7 @@ export function SharedTripView() {
   const [error, setError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  console.log('🚀 SharedTripView render state:', {
+  // Log: '🚀 SharedTripView render state:', {
     shareToken,
     isLoading,
     error,
@@ -261,7 +261,7 @@ export function SharedTripView() {
     setError(null);
 
     try {
-      console.log('🔍 Loading shared trip with token:', shareToken);
+      // Log message
       
       const requestBody = {
         action: 'get_shared_trip',
@@ -269,8 +269,8 @@ export function SharedTripView() {
         password: passwordInput || password
       };
       
-      console.log('📤 Request body:', requestBody);
-      console.log('🔑 ANON_KEY present:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      // Log message
+      // Log message
       
       const headers = {
         'Content-Type': 'application/json',
@@ -278,7 +278,7 @@ export function SharedTripView() {
         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       };
       
-      console.log('📤 Request headers:', Object.keys(headers));
+      // Log: '📤 Request headers:', Object.keys(headers));
       
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
         method: 'POST',
@@ -286,30 +286,30 @@ export function SharedTripView() {
         body: JSON.stringify(requestBody),
       });
       
-      console.log('📥 Response status:', response.status);
+      // Log message
       
       if (!response.ok) {
         try {
           const errorText = await response.text();
-          console.log('❌ Error response text:', errorText);
+          // Log message
           
           // Try to parse as JSON for more details
           try {
             const errorJson = JSON.parse(errorText);
-            console.log('❌ Error response JSON:', errorJson);
+            // Log message
           } catch (parseError) {
-            console.log('❌ Could not parse error as JSON');
+            // Log message
           }
         } catch (readError) {
-          console.log('❌ Could not read error response:', readError);
+          // Log message
         }
       }
 
       if (response.ok) {
         const data = await response.json();
         
-        console.log('📨 Full trip-sharing-v3 response:', data);
-        console.log('🔑 Permissions object:', JSON.stringify(data.permissions, null, 2));
+        // Log message
+        // Log: '🔑 Permissions object:', JSON.stringify(data.permissions, null, 2));
         
         if (data.requiresPassword) {
           setIsPasswordRequired(true);
@@ -321,7 +321,7 @@ export function SharedTripView() {
         setIsPasswordRequired(false);
         
         // Debug logging for redirect conditions
-        console.log('🔍 SharedTripView redirect check:', {
+        // Log: '🔍 SharedTripView redirect check:', {
           hasUser: !!user,
           userId: user?.id,
           hasTrip: !!data.trip,
@@ -333,15 +333,15 @@ export function SharedTripView() {
         
         // If user is authenticated and can join as member, redirect to actual trip page
         if (user && data.trip && data.permissions?.can_join_as_member) {
-          console.log('✅ All conditions met, redirecting to trip page');
+          // Log message
           setIsRedirecting(true);
           await redirectToTripPage(data.trip);
           return;
         } else if (user && data.trip) {
           // User is authenticated but cannot join as member (view-only)
-          console.log('⚠️ User authenticated but view-only permissions');
+          // Log message
         } else {
-          console.log('❌ Redirect conditions not met, staying on shared view');
+          // Log message
         }
       } else {
         const errorData = await response.json();
@@ -356,13 +356,13 @@ export function SharedTripView() {
 
   const redirectToTripPage = async (trip: any) => {
     try {
-      console.log('🔄 Redirecting to trip page:', trip.name);
+      // Log message
       
       // First, add user as member to the trip via share link join
       const joinSuccess = await joinTripViaShareLink(trip.id);
       
       if (!joinSuccess) {
-        console.error('❌ Failed to join trip, aborting redirect');
+        // Error occurred
         setError('Failed to join trip. Please try again.');
         setIsRedirecting(false);
         return;
@@ -390,11 +390,11 @@ export function SharedTripView() {
       await setCurrentTrip(tripObj);
       
       // Navigate to trip detail page
-      console.log('✅ Navigating to trip page:', trip.id);
+      // Log message
       navigate(`/trip/${trip.id}`);
       
     } catch (error) {
-      console.error('❌ Failed to redirect to trip page:', error);
+      // Error occurred
       setError('Failed to access trip. Please try joining manually.');
       setIsRedirecting(false);
     }
@@ -403,17 +403,17 @@ export function SharedTripView() {
 
   const joinTripViaShareLink = async (tripId: string): Promise<boolean> => {
     try {
-      console.log('🔗 Joining trip via share link:', tripId);
+      // Log message
       
       // Get current session for auth token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        console.error('❌ No session found');
+        // Error occurred
         return false;
       }
 
       const userId = session.user.id;
-      console.log('👤 Current user ID:', userId);
+      // Log message
 
       // Check if user is already a member
       try {
@@ -425,11 +425,11 @@ export function SharedTripView() {
           .single();
         
         if (existingMember && !checkError) {
-          console.log('✅ User is already a trip member');
+          // Log message
           return true;
         }
       } catch (error) {
-        console.log('⚠️ User is not a member yet, proceeding to add');
+        // Log message
       }
 
       // Add user as member with proper permissions based on share type
@@ -449,17 +449,17 @@ export function SharedTripView() {
 
       if (error) {
         if (error.message.includes('duplicate')) {
-          console.log('✅ User is already a member (duplicate key)');
+          // Log: '✅ User is already a member (duplicate key)');
           return true;
         }
-        console.error('❌ Error adding user to trip:', error);
+        // Error occurred
         return false;
       }
       
-      console.log('✅ User added as trip member:', newMember);
+      // Log message
       return true;
     } catch (error) {
-      console.error('❌ Failed to join trip via share link:', error);
+      // Error occurred
       return false;
     }
   };
@@ -696,7 +696,7 @@ export function SharedTripView() {
                     tripName: shareData.trip.name
                   };
                   
-                  console.log('🔗 Processing immediate trip join after auth:', pendingTrip);
+                  // Log message
                   
                   // Wait a bit for auth state to stabilize
                   await new Promise(resolve => setTimeout(resolve, 1000));
@@ -704,14 +704,14 @@ export function SharedTripView() {
                   // Get current session
                   const { data: { session } } = await supabase.auth.getSession();
                   if (!session) {
-                    console.error('No session found after auth');
+                    // Error occurred
                     // Store share token in localStorage for retry after page reload
                     localStorage.setItem('pendingShareToken', shareToken || '');
                     window.location.reload();
                     return;
                   }
 
-                  console.log('✅ Session found, user ID:', session.user.id);
+                  // Log message
 
                   // Add user as trip member with proper permissions
                   const { data: newMember, error } = await supabase
@@ -730,13 +730,13 @@ export function SharedTripView() {
 
                   if (error) {
                     if (!error.message.includes('duplicate')) {
-                      console.error('Failed to add user to trip:', error);
+                      // Error occurred
                       localStorage.setItem('pendingShareToken', shareToken || '');
                       window.location.reload();
                       return;
                     }
                   } else {
-                    console.log('✅ User added as trip member:', newMember);
+                    // Log message
                   }
 
                   // Store share token and reload to properly initialize the app
@@ -744,7 +744,7 @@ export function SharedTripView() {
                   window.location.reload();
                   
                 } catch (error) {
-                  console.error('Error processing immediate trip join:', error);
+                  // Error occurred
                   // Store share token and reload
                   localStorage.setItem('pendingShareToken', shareToken || '');
                   window.location.reload();

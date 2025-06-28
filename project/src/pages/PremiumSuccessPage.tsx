@@ -22,7 +22,7 @@ export const PremiumSuccessPage: React.FC = () => {
           setLoading(false);
         }, 2000);
       } catch (error) {
-        console.error('Failed to refresh user status:', error);
+        // Error occurred
         setLoading(false);
       }
     };

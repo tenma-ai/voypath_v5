@@ -57,14 +57,14 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
         setError('Some optimization services are unavailable. Please try again later.');
       }
     } catch (error) {
-      console.error('Connectivity check failed:', error);
+      // Error occurred
       setError('Unable to connect to optimization services.');
     }
   };
 
   const checkExistingOptimization = async () => {
     if (!tripId) {
-      console.log('No trip ID provided, skipping optimization status check');
+      // Log message
       return;
     }
     
@@ -99,7 +99,7 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
         setProgressSubscription(() => unsubscribe);
       }
     } catch (error) {
-      console.error('Error checking existing optimization:', error);
+      // Error occurred
     }
   };
 
@@ -126,7 +126,7 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
       return;
     }
 
-    console.log('🔍 [OptimizationModal] Starting optimization trigger - setting hasUserOptimized to true');
+    // Log message
     setHasUserOptimized(true);
     
     setIsOptimizing(true);
@@ -148,7 +148,7 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
             tripId,
             currentUser.id,
             progressUpdate
-          ).catch(console.error);
+          ).catch(() => {});
 
           if (progressUpdate.stage === 'complete') {
             setIsOptimizing(false);
@@ -176,7 +176,7 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
             tripId,
             currentUser.id,
             progress
-          ).catch(console.error);
+          ).catch(() => {});
         }
       );
 
@@ -227,7 +227,7 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
           tripId,
           currentUser.id,
           errorProgress
-        ).catch(console.error);
+        ).catch(() => {});
       }
       
       setIsOptimizing(false);

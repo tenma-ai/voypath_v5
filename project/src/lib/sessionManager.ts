@@ -35,7 +35,7 @@ export class SessionManager {
     try {
       await this.saveSessionToServer(session)
     } catch (error) {
-      console.warn('Failed to save session to server, using local storage:', error)
+      // Warning: 'Failed to save session to server, using local storage:', error)
     }
 
     // Always save locally for offline access
@@ -56,7 +56,7 @@ export class SessionManager {
         return serverSession
       }
     } catch (error) {
-      console.warn('Failed to get session from server, using local storage:', error)
+      // Warning: 'Failed to get session from server, using local storage:', error)
     }
 
     // Fallback to local storage
@@ -85,7 +85,7 @@ export class SessionManager {
     try {
       await this.saveSessionToServer(session)
     } catch (error) {
-      console.warn('Failed to update session on server:', error)
+      // Warning: 'Failed to update session on server:', error)
     }
     
     this.saveSessionLocally(session)
@@ -101,7 +101,7 @@ export class SessionManager {
       try {
         await this.deleteSessionFromServer(session.sessionId)
       } catch (error) {
-        console.warn('Failed to delete session from server:', error)
+        // Warning: 'Failed to delete session from server:', error)
       }
     }
 
@@ -144,7 +144,7 @@ export class SessionManager {
         fingerprint.canvas = canvas.toDataURL()
       }
     } catch (error) {
-      console.warn('Canvas fingerprinting failed:', error)
+      // Warning: 'Canvas fingerprinting failed:', error)
     }
 
     const fingerprintString = JSON.stringify(fingerprint)
@@ -213,7 +213,7 @@ export class SessionManager {
         metadata: data.metadata
       }
     } catch (error) {
-      console.warn('Failed to fetch session from server:', error)
+      // Warning: 'Failed to fetch session from server:', error)
       return null
     }
   }
@@ -241,7 +241,7 @@ export class SessionManager {
     try {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(session))
     } catch (error) {
-      console.warn('Failed to save session to local storage:', error)
+      // Warning: 'Failed to save session to local storage:', error)
     }
   }
 
@@ -255,7 +255,7 @@ export class SessionManager {
         return JSON.parse(stored) as ScalableSession
       }
     } catch (error) {
-      console.warn('Failed to get session from local storage:', error)
+      // Warning: 'Failed to get session from local storage:', error)
     }
     return null
   }

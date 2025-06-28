@@ -100,8 +100,8 @@ serve(async (req)=>{
     if (!requestData.trip_id || !requestData.places || !requestData.members) {
       return createErrorResponse('trip_id, places, and members are required', 400);
     }
-    console.log(`🔄 Starting preference normalization for trip ${requestData.trip_id}`);
-    console.log(`📊 Processing ${requestData.places.length} places from ${requestData.members.length} members`);
+    // Log message
+    // Log message
     const normalizedPlaces = normalizePreferences(requestData.places, requestData.members, requestData.settings);
     // 結果をデータベースに保存
     await supabaseClient.from('trip_optimization_results').upsert({
@@ -112,7 +112,7 @@ serve(async (req)=>{
       },
       created_at: new Date().toISOString()
     });
-    console.log(`✅ Preferences normalized: ${normalizedPlaces.length} places processed`);
+    // Log message
     return createSuccessResponse({
       normalized_places: normalizedPlaces,
       normalization_stats: {
@@ -122,7 +122,7 @@ serve(async (req)=>{
       }
     });
   } catch (error) {
-    console.error('❌ Normalization error:', error);
+    // Error occurred
     return createErrorResponse(error.message);
   }
 });

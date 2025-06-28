@@ -105,7 +105,7 @@ serve(async (req) => {
         );
     }
   } catch (error) {
-    console.error('Trip Management Error:', error);
+    // Error occurred
     return new Response(
       JSON.stringify({ error: error.message }),
       {
@@ -188,7 +188,7 @@ async function handleCreateTrip(req: Request, supabase: any, userId: string) {
       .eq('id', tripId);
 
     if (updateError) {
-      console.warn('Failed to update trip settings:', updateError.message);
+      // Warning occurred
     }
   }
 

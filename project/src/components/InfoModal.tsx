@@ -46,7 +46,7 @@ const FeedbackForm = () => {
       setSubmitStatus('success');
       setFormData({ type: 'General Feedback', message: '', email: user?.email || '' });
     } catch (error) {
-      console.error('Error submitting feedback:', error);
+      // Error occurred
       setSubmitStatus('error');
       setErrorMessage('Failed to submit feedback. Please try again.');
     } finally {

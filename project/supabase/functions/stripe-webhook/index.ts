@@ -30,7 +30,7 @@ serve(async (request) => {
       cryptoProvider
     )
 
-    console.log(`🔔 Webhook received: ${event.type}`)
+    // Log: `🔔 Webhook received: ${event.type}`)
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -52,7 +52,7 @@ serve(async (request) => {
             })
             .eq('id', userId)
 
-          console.log(`✅ User ${userId} upgraded to premium`)
+          // Log: `✅ User ${userId} upgraded to premium`)
         }
         break
       }
@@ -81,7 +81,7 @@ serve(async (request) => {
             })
             .eq('id', user.id)
 
-          console.log(`✅ User ${user.id} subscription updated: ${subscription.status}`)
+          // Log: `✅ User ${user.id} subscription updated: ${subscription.status}`)
         }
         break
       }
@@ -107,7 +107,7 @@ serve(async (request) => {
             })
             .eq('id', user.id)
 
-          console.log(`✅ User ${user.id} subscription cancelled`)
+          // Log: `✅ User ${user.id} subscription cancelled`)
         }
         break
       }
@@ -124,14 +124,14 @@ serve(async (request) => {
           .single()
 
         if (user) {
-          console.log(`❌ Payment failed for user ${user.id}`)
+          // Log: `❌ Payment failed for user ${user.id}`)
           // Here you could send an email notification or take other actions
         }
         break
       }
 
       default:
-        console.log(`🤷‍♀️ Unhandled event type: ${event.type}`)
+        // Log: `🤷‍♀️ Unhandled event type: ${event.type}`)
     }
 
     return new Response(JSON.stringify({ received: true }), {
@@ -139,7 +139,7 @@ serve(async (request) => {
       status: 200,
     })
   } catch (err) {
-    console.error(`❌ Error processing webhook: ${err.message}`)
+    // Error: `❌ Error processing webhook: ${err.message}`)
     return new Response(`Webhook Error: ${err.message}`, { status: 400 })
   }
 })

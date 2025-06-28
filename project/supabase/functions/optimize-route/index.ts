@@ -18,18 +18,18 @@ function calculateDistance(point1, point2) {
 }
 // 移動手段の判定（改善版）
 function determineTransportMode(distance, fromAirport = false, toAirport = false) {
-  console.log(`🚗 Distance: ${distance.toFixed(1)}km, fromAirport: ${fromAirport}, toAirport: ${toAirport}`);
+  // Log: `🚗 Distance: ${distance.toFixed(1)}km, fromAirport: ${fromAirport}, toAirport: ${toAirport}`);
   // 距離ベースの判定を優先（空港であっても近距離は車を使用）
   if (distance <= 2) {
-    console.log('  🚶 Walking (short distance)');
+    // Log: '  🚶 Walking (short distance)');
     return 'walking';
   }
   if (distance <= 500) {
-    console.log('  🚗 Car (medium distance)');
+    // Log: '  🚗 Car (medium distance)');
     return 'car';
   }
   // 長距離の場合のみ飛行機を使用
-  console.log('  ✈️ Flight (long distance)');
+  // Log: '  ✈️ Flight (long distance)');
   return 'flight';
 }
 // 移動時間の計算（改善版）
@@ -66,7 +66,7 @@ function calculateTravelTime(distance, mode) {
 }
 // 希望度の正規化（必須機能）
 function normalizePreferences(places) {
-  console.log('🔄 Normalizing preferences');
+  // Log message
   // ユーザーごとにグループ化
   const userGroups = new Map();
   places.forEach((place)=>{
@@ -83,13 +83,13 @@ function normalizePreferences(places) {
     userPlaces.forEach((place)=>{
       place.normalized_wish_level = place.wish_level / avgWish;
     });
-    console.log(`User ${userId}: ${userPlaces.length} places, avg wish: ${avgWish.toFixed(2)}`);
+    // Log: `User ${userId}: ${userPlaces.length} places, avg wish: ${avgWish.toFixed(2)}`);
   });
   return places;
 }
 // 場所の絞り込み（公平性考慮）
 function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
-  console.log('🔄 Filtering places by fairness');
+  // Log message
   const systemPlaces = places.filter((p)=>p.place_type === 'departure' || p.place_type === 'destination');
   const visitPlaces = places.filter((p)=>p.place_type === 'visit');
   
@@ -109,11 +109,11 @@ function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
     const timeBasedMaxPlaces = Math.floor(totalAvailableMinutes / avgTimePerPlace);
     effectiveMaxPlaces = Math.min(maxPlaces, timeBasedMaxPlaces);
     
-    console.log(`📅 Available days: ${availableDays}, max places by time: ${timeBasedMaxPlaces}, effective max: ${effectiveMaxPlaces}`);
+    // Log message
   }
   
   if (visitPlaces.length <= effectiveMaxPlaces - systemPlaces.length) {
-    console.log('✅ All places fit within limit');
+    // Log message
     return places;
   }
   
@@ -150,10 +150,10 @@ function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
   selectedVisitPlaces.forEach(place => {
     userSelections.set(place.user_id, (userSelections.get(place.user_id) || 0) + 1);
   });
-  console.log(`✅ Selected ${selectedVisitPlaces.length} visit places in ${round} rounds`);
-  console.log(`📊 Fairness distribution:`);
+  // Log message
+  // Log message
   userSelections.forEach((count, userId) => {
-    console.log(`   User ${userId}: ${count} places selected`);
+    // Log message
   });
   
   return [
@@ -182,7 +182,7 @@ function removeDuplicatePlaces(places) {
       uniquePlacesMap.set(placeKey, groupPlaces[0]);
     } else {
       // Multiple places at same location - merge them
-      console.log(`🔄 Merging ${groupPlaces.length} duplicate places: ${groupPlaces[0].name}`);
+      // Log message
       
       // Find place with longest stay duration
       const longestStay = groupPlaces.reduce((max, place) => 
@@ -241,7 +241,7 @@ function blendColors(hexColors) {
 }
 // 空港検出・挿入（シンプル版）
 async function insertAirportsIfNeeded(supabase, places) {
-  console.log('🔄 Checking for airport insertions needed');
+  // Log message
   const newRoute = [];
   for(let i = 0; i < places.length; i++){
     const currentPlace = places[i];
@@ -258,7 +258,7 @@ async function insertAirportsIfNeeded(supabase, places) {
       ]);
       const transportMode = determineTransportMode(distance, currentPlace.is_airport, nextPlace.is_airport);
       if (transportMode === 'flight') {
-        console.log(`✈️ Flight needed: ${currentPlace.name} → ${nextPlace.name} (${distance.toFixed(1)}km)`);
+        // Log: `✈️ Flight needed: ${currentPlace.name} → ${nextPlace.name} (${distance.toFixed(1)}km)`);
         // 出発空港を追加（現在地が空港でない場合）
         if (!currentPlace.is_airport) {
           const depAirport = await findNearestAirport(supabase, currentPlace.latitude, currentPlace.longitude);
@@ -277,7 +277,7 @@ async function insertAirportsIfNeeded(supabase, places) {
               airport_code: depAirport.iata_code
             };
             newRoute.push(depAirportPlace);
-            console.log(`🛫 Inserted departure airport: ${depAirportPlace.name}`);
+            // Log message
           }
         }
         // 到着空港を追加（次の場所が空港でない場合）
@@ -298,13 +298,13 @@ async function insertAirportsIfNeeded(supabase, places) {
               airport_code: arrAirport.iata_code
             };
             newRoute.push(arrAirportPlace);
-            console.log(`🛬 Inserted arrival airport: ${arrAirportPlace.name}`);
+            // Log message
           }
         }
       }
     }
   }
-  console.log(`✅ Route with airports: ${newRoute.map((p)=>p.name).join(' → ')}`);
+  // Log: `✅ Route with airports: ${newRoute.map((p)=>p.name).join(' → ')}`);
   return newRoute;
 }
 // 国際空港判定関数
@@ -440,18 +440,18 @@ function isInternationalAirport(airport) {
 // OpenFlights データを使用した最寄り空港検索
 async function findNearestAirport(supabase, lat, lng) {
   try {
-    console.log(`🔍 Searching nearest airport for coordinates: ${lat}, ${lng}`);
+    // Log message
     // OpenFlights データベースから空港データを取得
     const airportsData = await fetchOpenFlightsData();
     if (!airportsData || airportsData.length === 0) {
-      console.log('⚠️ Failed to fetch OpenFlights data, using fallback airports');
+      // Log message
       return await findNearestAirportFallback(lat, lng);
     }
     // 商用国際空港のみをフィルタ（厳格な条件）
     const commercialAirports = airportsData.filter((airport)=>airport.iata && airport.iata !== '\\N' && airport.iata.length === 3 && Math.abs(airport.latitude) > 0 && Math.abs(airport.longitude) > 0 && // 国際空港のフィルタリング条件
       isInternationalAirport(airport));
     if (commercialAirports.length === 0) {
-      console.log('⚠️ No commercial airports found, using fallback');
+      // Log message
       return await findNearestAirportFallback(lat, lng);
     }
     // 最寄りの空港を検索
@@ -476,7 +476,7 @@ async function findNearestAirport(supabase, lat, lng) {
         nearest = airport;
       }
     }
-    console.log(`🛫 Found nearest airport: ${nearest.name} (${nearest.iata}) - Distance: ${minDistance.toFixed(1)}km`);
+    // Log: `🛫 Found nearest airport: ${nearest.name} (${nearest.iata}) - Distance: ${minDistance.toFixed(1)}km`);
     return {
       iata_code: nearest.iata,
       airport_name: nearest.name,
@@ -486,14 +486,14 @@ async function findNearestAirport(supabase, lat, lng) {
       commercial_service: true
     };
   } catch (error) {
-    console.error('❌ Airport search error:', error);
+    // Error occurred
     return await findNearestAirportFallback(lat, lng);
   }
 }
 // OpenFlights データの取得
 async function fetchOpenFlightsData() {
   try {
-    console.log('📥 Fetching OpenFlights airport data...');
+    // Log message
     const response = await fetch('https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat');
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -520,16 +520,16 @@ async function fetchOpenFlightsData() {
         }
       }
     }
-    console.log(`✅ Loaded ${airports.length} airports from OpenFlights`);
+    // Log message
     return airports;
   } catch (error) {
-    console.error('❌ Failed to fetch OpenFlights data:', error);
+    // Error occurred
     return [];
   }
 }
 // フォールバック用の主要空港検索
 async function findNearestAirportFallback(lat, lng) {
-  console.log('🔄 Using fallback airport database');
+  // Log message
   const majorAirports = [
     {
       iata_code: 'NRT',
@@ -609,7 +609,7 @@ async function findNearestAirportFallback(lat, lng) {
       nearest = airport;
     }
   }
-  console.log(`🛫 Fallback: Selected ${nearest.airport_name} (${nearest.iata_code}) - Distance: ${minDistance.toFixed(1)}km`);
+  // Log: `🛫 Fallback: Selected ${nearest.airport_name} (${nearest.iata_code}) - Distance: ${minDistance.toFixed(1)}km`);
   return {
     ...nearest,
     commercial_service: true
@@ -617,20 +617,20 @@ async function findNearestAirportFallback(lat, lng) {
 }
 // シンプルなTSP（最短距離貪欲法）
 function optimizeRouteOrder(places) {
-  console.log('🔄 Optimizing route order with simple TSP');
-  console.log(`  Input places: ${places.map((p)=>`${p.name}(${p.place_type})`).join(', ')}`);
+  // Log message
+  // Log: `  Input places: ${places.map((p)=>`${p.name}(${p.place_type})`).join(', ')}`);
   if (places.length <= 2) return places;
   const departure = places.find((p)=>p.place_type === 'departure');
   const destination = places.find((p)=>p.place_type === 'destination');
   const others = places.filter((p)=>p.place_type !== 'departure' && p.place_type !== 'destination');
-  console.log(`  Departure: ${departure?.name || 'NONE'}`);
-  console.log(`  Destination: ${destination?.name || 'NONE'}`);
-  console.log(`  Others: ${others.map((p)=>p.name).join(', ')}`);
+  // Log message
+  // Log message
+  // Log: `  Others: ${others.map((p)=>p.name).join(', ')}`);
   const route = [];
   // 出発地を最初に
   if (departure) {
     route.push(departure);
-    console.log(`  Added departure: ${departure.name}`);
+    // Log message
   }
   // 貪欲法で中間地点を最適化
   const remaining = [
@@ -667,8 +667,8 @@ function optimizeRouteOrder(places) {
   if (destination) {
     const depName = departure?.name || '';
     const destName = destination.name || '';
-    console.log(`  Processing destination: ${destName}`);
-    console.log(`  Departure name: ${depName}`);
+    // Log message
+    // Log message
     // 往復判定：名前に明確に「same as departure」が含まれる場合のみ往復として扱う
     const isExplicitRoundTrip = destName.toLowerCase().includes('same as departure');
     if (isExplicitRoundTrip && departure) {
@@ -680,21 +680,21 @@ function optimizeRouteOrder(places) {
         place_type: 'destination'
       };
       route.push(returnPlace);
-      console.log(`  Added return destination: ${returnPlace.name}`);
+      // Log message
     } else {
       // 通常の目的地として追加
       route.push(destination);
-      console.log(`  Added destination: ${destination.name}`);
+      // Log message
     }
   } else {
-    console.log(`  No destination found!`);
+    // Log message
   }
-  console.log(`✅ Route optimized: ${route.map((p)=>p.name).join(' → ')}`);
+  // Log: `✅ Route optimized: ${route.map((p)=>p.name).join(' → ')}`);
   return route;
 }
 // 移動時間・移動手段の計算
 function calculateRouteDetails(places) {
-  console.log('🔄 Calculating route details');
+  // Log message
   const route = [
     ...places
   ];
@@ -712,13 +712,13 @@ function calculateRouteDetails(places) {
     const travelTime = calculateTravelTime(distance, transportMode);
     curr.transport_mode = transportMode;
     curr.travel_time_from_previous = travelTime;
-    console.log(`${prev.name} → ${curr.name}: ${distance.toFixed(1)}km, ${transportMode}, ${travelTime}min`);
+    // Log: `${prev.name} → ${curr.name}: ${distance.toFixed(1)}km, ${transportMode}, ${travelTime}min`);
   }
   return route;
 }
 // 日別スケジュール分割
 function createDailySchedule(places, tripStartDate = null, availableDays = null) {
-  console.log('🔄 Creating daily schedule');
+  // Log message
   const maxDailyHours = 10; // 1日最大10時間（より現実的に調整）
   const maxDailyMinutes = maxDailyHours * 60;
   const schedules = [];
@@ -733,7 +733,7 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
     
     // Check if we've exceeded available days
     if (availableDays !== null && currentDay > availableDays) {
-      console.log(`⚠️ Reached trip duration limit (${availableDays} days). Stopping schedule.`);
+      // Log: `⚠️ Reached trip duration limit (${availableDays} days). Stopping schedule.`);
       break;
     }
     
@@ -755,7 +755,7 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
     
     // Check again if we've exceeded available days after creating a new day
     if (availableDays !== null && currentDay > availableDays) {
-      console.log(`⚠️ Reached trip duration limit (${availableDays} days). Stopping schedule.`);
+      // Log: `⚠️ Reached trip duration limit (${availableDays} days). Stopping schedule.`);
       break;
     }
     
@@ -779,7 +779,7 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
   if (currentPlaces.length > 0 && (availableDays === null || currentDay <= availableDays)) {
     schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
   }
-  console.log(`✅ Created ${schedules.length} daily schedules (limit was ${availableDays || 'none'} days)`);
+  // Log: `✅ Created ${schedules.length} daily schedules (limit was ${availableDays || 'none'} days)`);
   return schedules;
 }
 function createDaySchedule(day, places, tripStartDate = null) {
@@ -816,7 +816,7 @@ function formatTime(minutes) {
 }
 // 最適化結果の検証
 function validateOptimizationResult(places, schedules) {
-  console.log('🔍 Validating optimization result');
+  // Log message
   const issues = [];
   // 1. 重複チェック
   const placeNames = places.map((p)=>p.name);
@@ -850,10 +850,7 @@ function validateOptimizationResult(places, schedules) {
     issues.push('Too many flight days - schedule may be unrealistic');
   }
   const isValid = issues.length === 0;
-  console.log(`✅ Validation result: ${isValid ? 'VALID' : 'ISSUES FOUND'}`);
-  if (!isValid) {
-    issues.forEach((issue)=>console.log(`  ⚠️ ${issue}`));
-  }
+  // Schedule validation complete
   return {
     isValid,
     issues
@@ -887,7 +884,7 @@ function calculateOptimizationScore(places, schedules) {
   const feasibility = validation.isValid ? 1.0 : Math.max(0.1, 1.0 - validation.issues.length * 0.2);
   // スコア計算（実現可能性を重視）
   const totalScore = (efficiency * 0.3 + avgNormalizedWish * 0.2 + fairness * 0.2 + feasibility * 0.3) * 100;
-  console.log(`📊 Score calculation: efficiency=${efficiency.toFixed(2)}, wish=${avgNormalizedWish.toFixed(2)}, fairness=${fairness.toFixed(2)}, feasibility=${feasibility.toFixed(2)}, total=${totalScore.toFixed(1)}%`);
+  // Log: `📊 Score calculation: efficiency=${efficiency.toFixed(2)}, wish=${avgNormalizedWish.toFixed(2)}, fairness=${fairness.toFixed(2)}, feasibility=${feasibility.toFixed(2)}, total=${totalScore.toFixed(1)}%`);
   return {
     total_score: Math.round(Math.max(0, Math.min(100, totalScore))),
     fairness_score: Math.round(Math.max(0, Math.min(100, fairness * 100))),
@@ -912,12 +909,12 @@ Deno.serve(async (req)=>{
   }
   const startTime = Date.now();
   try {
-    console.log('🚀 Starting simplified route optimization');
+    // Log message
     const { trip_id, member_id, user_places, constraints } = await req.json();
     if (!trip_id || !member_id) {
       throw new Error('Missing trip_id or member_id');
     }
-    console.log(`📍 Processing ${user_places?.length || 0} places for trip ${trip_id}`);
+    // Log message
     const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
     
     // Get trip details including dates
@@ -938,7 +935,7 @@ Deno.serve(async (req)=>{
       const endDate = new Date(tripData.end_date);
       availableDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
     }
-    console.log(`📅 Trip duration: ${availableDays} days`);
+    // Log message
     
     // データベースから場所を取得（user_placesが提供されていない場合）
     let places = user_places;
@@ -949,30 +946,30 @@ Deno.serve(async (req)=>{
     }
     
     // Remove duplicates and merge places at the same location
-    console.log(`🔄 Checking for duplicate places among ${places.length} places`);
+    // Log message
     places = removeDuplicatePlaces(places);
-    console.log(`✅ After deduplication: ${places.length} unique places`);
+    // Log message
     if (places.length === 0) {
       throw new Error('No places found for optimization');
     }
-    console.log(`📊 Input: ${places.length} places`);
+    // Log message
     // デバッグ: 入力データの詳細をログ出力
     places.forEach((place, index)=>{
-      console.log(`  Place ${index + 1}: ${place.name} (type: ${place.place_type}, stay: ${place.stay_duration_minutes}min, lat: ${place.latitude}, lng: ${place.longitude})`);
+      // Log: `  Place ${index + 1}: ${place.name} (type: ${place.place_type}, stay: ${place.stay_duration_minutes}min, lat: ${place.latitude}, lng: ${place.longitude})`);
     });
     // 1. 滞在時間の正規化と確認（stay_duration_minutesが適切に設定されているか）
-    console.log('🔄 Ensuring proper stay durations for all places');
+    // Log message
     places.forEach((place, index)=>{
       // 空港の場合は120分に固定、それ以外はユーザー設定値を使用
       if (place.place_type === 'airport' || place.category === 'airport') {
         place.stay_duration_minutes = 120;
-        console.log(`  Airport ${place.name}: Set to 120 minutes`);
+        // Log message
       } else if (!place.stay_duration_minutes || place.stay_duration_minutes <= 0) {
         // stay_duration_minutesが設定されていない場合のデフォルト値
         place.stay_duration_minutes = 60; // 1時間デフォルト
-        console.log(`  ${place.name}: No duration set, defaulting to 60 minutes`);
+        // Log message
       } else {
-        console.log(`  ${place.name}: Using configured duration of ${place.stay_duration_minutes} minutes`);
+        // Log message
       }
     });
     // 2. 希望度の正規化（必須機能）
@@ -983,7 +980,7 @@ Deno.serve(async (req)=>{
     // 4. 出発地・目的地の固定（必須機能）
     const departure = filteredPlaces.find((p)=>p.place_type === 'departure');
     const destination = filteredPlaces.find((p)=>p.place_type === 'destination');
-    console.log(`🏁 Departure: ${departure?.name || 'None'}, Destination: ${destination?.name || 'None'}`);
+    // Log message
     // 5. ルート最適化（TSP）- 基本的な場所のみで実行
     const optimizedRoute = optimizeRouteOrder(filteredPlaces);
     // 6. 最適化されたルートに長距離移動用の空港を挿入
@@ -997,7 +994,7 @@ Deno.serve(async (req)=>{
     const executionTime = Date.now() - startTime;
     
     // Update places in database to mark which were selected
-    console.log('📝 Updating place selection status in database...');
+    // Log message
     const selectedPlaceIds = new Set(routeWithDetails.map(p => p.id));
     const allPlaceIds = places.map(p => p.id);
     
@@ -1012,7 +1009,7 @@ Deno.serve(async (req)=>{
         .in('id', Array.from(selectedPlaceIds));
       
       if (updateSelectedError) {
-        console.error('❌ Failed to update selected places:', updateSelectedError);
+        // Error occurred
       }
     }
     
@@ -1028,7 +1025,7 @@ Deno.serve(async (req)=>{
         .in('id', unselectedIds);
       
       if (updateUnselectedError) {
-        console.error('❌ Failed to update unselected places:', updateUnselectedError);
+        // Error occurred
       }
     }
     
@@ -1041,13 +1038,13 @@ Deno.serve(async (req)=>{
           .eq('id', place.id);
         
         if (roundError) {
-          console.error(`❌ Failed to update selection round for place ${place.id}:`, roundError);
+          // Error occurred
         }
       }
     }
     
     // 10. 結果保存
-    console.log('💾 Saving optimization result to database...');
+    // Log message
     const { data: savedResult, error: saveError } = await supabase.from('optimization_results').insert({
       trip_id,
       created_by: member_id,
@@ -1061,12 +1058,12 @@ Deno.serve(async (req)=>{
       algorithm_version: 'simplified-v1'
     }).select();
     if (saveError) {
-      console.error('❌ Failed to save optimization result:', saveError);
+      // Error occurred
     // 保存に失敗してもレスポンスは返す（一時的なメモリ結果として）
     } else {
-      console.log('✅ Optimization result saved successfully:', savedResult?.[0]?.id);
+      // Log message
     }
-    console.log(`✅ Optimization completed in ${executionTime}ms`);
+    // Log message
     return new Response(JSON.stringify({
       success: true,
       optimization: {
@@ -1088,7 +1085,7 @@ Deno.serve(async (req)=>{
       status: 200
     });
   } catch (error) {
-    console.error('❌ Optimization failed:', error);
+    // Error occurred
     return new Response(JSON.stringify({
       success: false,
       error: error.message,

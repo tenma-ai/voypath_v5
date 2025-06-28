@@ -39,7 +39,7 @@ export class OptimizationSettingsService {
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Failed to get optimization settings:', error);
+        // Error occurred
         throw new Error(`Settings fetch failed: ${error.message}`);
       }
 
@@ -51,7 +51,7 @@ export class OptimizationSettingsService {
       // Convert database format to service format
       return OptimizationSettingsService.dbToSettings(data);
     } catch (error) {
-      console.error('Error getting optimization settings:', error);
+      // Error occurred
       return OptimizationSettingsService.DEFAULT_SETTINGS;
     }
   }
@@ -86,13 +86,13 @@ export class OptimizationSettingsService {
         .single();
 
       if (error) {
-        console.error('Failed to update optimization settings:', error);
+        // Error occurred
         throw new Error(`Settings update failed: ${error.message}`);
       }
 
       return OptimizationSettingsService.dbToSettings(data);
     } catch (error) {
-      console.error('Error updating optimization settings:', error);
+      // Error occurred
       throw error;
     }
   }
@@ -114,11 +114,11 @@ export class OptimizationSettingsService {
         .eq('trip_id', tripId);
 
       if (error) {
-        console.error('Failed to delete optimization settings:', error);
+        // Error occurred
         throw new Error(`Settings deletion failed: ${error.message}`);
       }
     } catch (error) {
-      console.error('Error deleting optimization settings:', error);
+      // Error occurred
       throw error;
     }
   }
@@ -230,7 +230,7 @@ export class OptimizationSettingsService {
         .in('trip_id', tripIds);
 
       if (error) {
-        console.error('Failed to get bulk optimization settings:', error);
+        // Error occurred
         throw new Error(`Bulk settings fetch failed: ${error.message}`);
       }
 
@@ -252,7 +252,7 @@ export class OptimizationSettingsService {
 
       return result;
     } catch (error) {
-      console.error('Error getting bulk optimization settings:', error);
+      // Error occurred
       // Return defaults for all trips on error
       const result: Record<string, OptimizationSettings> = {};
       tripIds.forEach(tripId => {

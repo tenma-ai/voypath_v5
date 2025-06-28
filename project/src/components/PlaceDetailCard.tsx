@@ -80,6 +80,7 @@ export default function PlaceDetailCard({
     return `${mins}m`;
   };
 
+
   const getPlaceRating = (): number => {
     if (place.rating) return place.rating;
     if (place.member_preferences && place.member_preferences.length > 0) {

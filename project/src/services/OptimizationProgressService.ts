@@ -52,7 +52,7 @@ export class OptimizationProgressService {
         .single();
 
       if (error) {
-        console.error('Failed to update optimization progress:', error);
+        // Error occurred
         throw new Error(`Progress update failed: ${error.message}`);
       }
 
@@ -67,7 +67,7 @@ export class OptimizationProgressService {
       
       return progress;
     } catch (error) {
-      console.error('Error updating optimization progress:', error);
+      // Error occurred
       throw error;
     }
   }
@@ -83,13 +83,13 @@ export class OptimizationProgressService {
         .single();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Failed to get optimization progress:', error);
+        // Error occurred
         throw new Error(`Progress fetch failed: ${error.message}`);
       }
 
       return data as OptimizationProgress | null;
     } catch (error) {
-      console.error('Error getting optimization progress:', error);
+      // Error occurred
       return null;
     }
   }
@@ -104,13 +104,13 @@ export class OptimizationProgressService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Failed to get trip progress:', error);
+        // Error occurred
         throw new Error(`Trip progress fetch failed: ${error.message}`);
       }
 
       return data as OptimizationProgress[];
     } catch (error) {
-      console.error('Error getting trip progress:', error);
+      // Error occurred
       return [];
     }
   }
@@ -138,7 +138,7 @@ export class OptimizationProgressService {
           filter: `trip_id=eq.${tripId}`
         },
         (payload) => {
-          console.log('Optimization progress change:', payload);
+          // Log message
           if (payload.new) {
             const progress = payload.new as OptimizationProgress;
             OptimizationProgressService.notifyListeners(tripId, progress);
@@ -174,7 +174,7 @@ export class OptimizationProgressService {
         try {
           callback(progress);
         } catch (error) {
-          console.error('Error in progress listener:', error);
+          // Error occurred
         }
       });
     }
@@ -193,13 +193,13 @@ export class OptimizationProgressService {
         .select('id');
 
       if (error) {
-        console.error('Failed to cleanup old progress:', error);
+        // Error occurred
         throw new Error(`Progress cleanup failed: ${error.message}`);
       }
 
       return data?.length || 0;
     } catch (error) {
-      console.error('Error cleaning up old progress:', error);
+      // Error occurred
       return 0;
     }
   }
@@ -374,16 +374,16 @@ export class OptimizationProgressService {
               callback(serviceProgress);
             }
           } catch (error) {
-            console.error('Error processing progress update:', error);
+            // Error occurred
           }
         }
       )
       .subscribe((status) => {
-        console.log(`Progress subscription status for trip ${tripId}:`, status);
+        // Log message
       });
 
     return () => {
-      console.log(`Unsubscribing from progress for trip ${tripId}`);
+      // Log message
       supabase.removeChannel(channel);
     };
   }
@@ -429,7 +429,7 @@ export class OptimizationProgressService {
         lastUpdated: data.updated_at
       };
     } catch (error) {
-      console.error('Error getting optimization status:', error);
+      // Error occurred
       return {
         isRunning: false,
         progress: 0,
@@ -487,7 +487,7 @@ export class OptimizationProgressService {
         averageExecutionTime: Math.round(averageExecutionTime)
       };
     } catch (error) {
-      console.error('Error getting progress statistics:', error);
+      // Error occurred
       return {
         activeOptimizations: 0,
         completedToday: 0,

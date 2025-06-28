@@ -43,7 +43,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
     const { supabase } = await import('../lib/supabase');
     const { data: { session }, error } = await supabase.auth.getSession();
     
-    console.log('🔐 Session debug:', {
+    // Log: '🔐 Session debug:', {
       hasSession: !!session,
       hasUser: !!session?.user,
       hasAccessToken: !!session?.access_token,
@@ -58,13 +58,13 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
     // Test token validation by making a simple authenticated request
     try {
       const testResponse = await supabase.auth.getUser();
-      console.log('🔍 Token validation test:', {
+      // Log: '🔍 Token validation test:', {
         success: !testResponse.error,
         user: testResponse.data?.user?.email,
         error: testResponse.error?.message
       });
     } catch (testError) {
-      console.error('🚨 Token validation failed:', testError);
+      // Error occurred
     }
     
     if (!session) {
@@ -77,7 +77,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
       'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
     };
 
-    console.log('📡 Headers being sent:', Object.keys(headers));
+    // Log: '📡 Headers being sent:', Object.keys(headers));
     
     return headers;
   };
@@ -110,7 +110,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         })));
       }
     } catch (error) {
-      console.error('Error loading shares:', error);
+      // Error occurred
     }
   };
 
@@ -119,8 +119,8 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
     setError(null);
 
     try {
-      console.log('Starting share link generation...');
-      console.log('Trip ID:', tripId);
+      // Log message
+      // Log message
       
       if (!tripId) {
         setError('No trip ID provided');
@@ -128,7 +128,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
       }
       
       const headers = await getAuthHeaders();
-      console.log('Headers prepared:', Object.keys(headers));
+      // Log: 'Headers prepared:', Object.keys(headers));
       
       const permissions = shareType === 'external_view' ? {
         can_view_places: true,
@@ -164,10 +164,10 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         maxUses: isPremium ? maxUses : null
       };
 
-      console.log('Request body:', requestBody);
-      console.log('Current user from store:', { id: user?.id, email: user?.email });
-      console.log('Current trip owner:', currentTrip?.ownerId);
-      console.log('User is trip owner:', user?.id === currentTrip?.ownerId);
+      // Log message
+      // Log message
+      // Log message
+      // Log message
 
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
         method: 'POST',
@@ -175,12 +175,12 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         body: JSON.stringify(requestBody),
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      // Log message
+      // Log: 'Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (response.ok) {
         const newShare = await response.json();
-        console.log('New share created:', newShare);
+        // Log message
         setShareLinks([newShare, ...shareLinks]);
         
         // Reset form
@@ -188,11 +188,11 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         setHasPassword(false);
         setExpiryDays(null);
         setMaxUses(null);
-        console.log('Share creation successful!');
+        // Log message
       } else {
         // Get both text and try to parse as JSON
         const responseText = await response.text();
-        console.error('Raw error response:', responseText);
+        // Error occurred
         
         let errorData;
         try {
@@ -201,7 +201,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
           errorData = { error: responseText || 'Network error' };
         }
         
-        console.error('Share creation failed:', {
+        // Error: 'Share creation failed:', {
           status: response.status,
           statusText: response.statusText,
           errorData,
@@ -210,7 +210,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         setError(errorData.error || errorData.message || `Failed to create share link (${response.status})`);
       }
     } catch (error) {
-      console.error('Exception during share creation:', error);
+      // Error occurred
       setError(error instanceof Error ? error.message : 'Failed to create share link');
     } finally {
       setIsLoading(false);
@@ -223,7 +223,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
       setCopiedToken(token);
       setTimeout(() => setCopiedToken(null), 2000);
     } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
+      // Error occurred
     }
   };
 
@@ -244,7 +244,7 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
         setShareLinks(shareLinks.filter(link => link.id !== shareId));
       }
     } catch (error) {
-      console.error('Error deleting share:', error);
+      // Error occurred
     }
   };
 

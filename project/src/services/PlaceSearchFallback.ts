@@ -9,18 +9,18 @@ export const searchPlacesWithFallback = async (request: PlaceSearchRequest): Pro
   const startTime = Date.now();
   let lastError: Error | null = null;
 
-  console.log('🔍 Starting place search with fallback for:', request.inputValue);
+  // Log message
 
   try {
     // Primary: Google Maps API
-    console.log('🎯 Attempting primary search with Google Maps API');
+    // Log message
     const result = await PlaceSearchService.searchPlaces(request);
-    console.log(`✅ Primary search completed in ${Date.now() - startTime}ms with ${result.length} results`);
+    // Log: `✅ Primary search completed in ${Date.now() - startTime}ms with ${result.length} results`);
     return result;
   } catch (error) {
     lastError = error as Error;
-    console.error('Google Maps API failed with error:', error);
-    console.error('Error details:', {
+    // Error occurred
+    // Error: 'Error details:', {
       message: lastError.message,
       stack: lastError.stack,
       name: lastError.name
@@ -28,7 +28,7 @@ export const searchPlacesWithFallback = async (request: PlaceSearchRequest): Pro
     
     try {
       // Secondary: Supabase Edge Function proxy
-      console.log('🔄 Attempting secondary search via Supabase proxy');
+      // Log message
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-places-proxy`, {
         method: 'POST',
         headers: { 
@@ -52,7 +52,7 @@ export const searchPlacesWithFallback = async (request: PlaceSearchRequest): Pro
       
       if (response.ok) {
         const data = await response.json();
-        console.log(`✅ Secondary search completed in ${Date.now() - startTime}ms`);
+        // Log: `✅ Secondary search completed in ${Date.now() - startTime}ms`);
         
         // Convert Google Places API response to our format
         if (data.results && Array.isArray(data.results)) {
@@ -78,30 +78,30 @@ export const searchPlacesWithFallback = async (request: PlaceSearchRequest): Pro
             opening_hours: place.opening_hours,
             vicinity: place.vicinity
           }));
-          console.log(`🎉 Converted ${convertedPlaces.length} places from proxy response`);
+          // Log message
           return convertedPlaces;
         }
         
         const fallbackPlaces = data.places || data.results || [];
-        console.log(`📍 Returning ${fallbackPlaces.length} places from proxy fallback`);
+        // Log message
         return fallbackPlaces;
       }
       throw new Error(`Proxy search failed: ${response.status} ${response.statusText}`);
     } catch (proxyError) {
-      console.warn('Proxy API failed, trying local fallback:', proxyError);
+      // Warning occurred
       
       try {
         // Tertiary: Local storage cache
         const cachedResults = getCachedSearchResults(request.inputValue);
         if (cachedResults && cachedResults.length > 0) {
-          console.log('Using cached search results');
+          // Log message
           return cachedResults;
         }
         
         // Always throw error instead of using mock data to force testing real APIs
         throw new Error('All fallback methods failed - forcing real API usage');
       } catch (fallbackError) {
-        console.error('All fallback methods failed:', fallbackError);
+        // Error occurred
         
         // Final fallback: return minimal results or empty array
         if (request.inputValue && request.inputValue.trim().length >= 2) {
@@ -135,7 +135,7 @@ const getCachedSearchResults = (query: string): GooglePlace[] | null => {
       }
     }
   } catch (error) {
-    console.warn('Failed to get cached search results:', error);
+    // Warning occurred
   }
   
   return null;
@@ -150,7 +150,7 @@ const setCachedSearchResults = (query: string, results: GooglePlace[]): void => 
     };
     localStorage.setItem(cacheKey, JSON.stringify(cacheData));
   } catch (error) {
-    console.warn('Failed to cache search results:', error);
+    // Warning occurred
   }
 };
 

@@ -13,12 +13,12 @@ export function StripeProvider({ children }: StripeProviderProps) {
   
   // Always disable Stripe in development to avoid message port errors
   if (isDevelopment) {
-    console.log('🚫 Stripe disabled in development mode');
+    // Log message
     return <>{children}</>;
   }
   
   if (!stripeKey) {
-    console.warn('⚠️ Stripe publishable key not found in production');
+    // Warning occurred
     return <>{children}</>;
   }
 

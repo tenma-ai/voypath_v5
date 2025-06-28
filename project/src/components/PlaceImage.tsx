@@ -51,7 +51,7 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
           }
         }
       } catch (error) {
-        console.error('Error loading place image:', error);
+        // Error occurred
         if (isMounted) {
           setHasError(true);
           if (fallbackUrl && fallbackUrl.trim() !== '' && !fallbackUrl.includes('/api/placeholder')) {

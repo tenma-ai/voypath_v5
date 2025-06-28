@@ -171,9 +171,6 @@ export const useStore = create<StoreState>()((set, get) => ({
         // Only reset hasUserOptimized when actually switching to a different trip
         const isNewTrip = currentTripId !== trip.id;
         const newHasUserOptimized = isNewTrip ? false : currentHasUserOptimized;
-        
-        console.log(`🎯 [setCurrentTrip] Trip: ${trip.name}, isNewTrip: ${isNewTrip}, currentHasUserOptimized: ${currentHasUserOptimized}, newHasUserOptimized: ${newHasUserOptimized}`);
-        
         set({ 
           currentTrip: trip, 
           hasUserOptimized: newHasUserOptimized,
@@ -189,22 +186,16 @@ export const useStore = create<StoreState>()((set, get) => ({
           try {
             // Only reload data if switching to a different trip
             if (currentTripId !== trip.id) {
-              console.log(`🔄 Switching to trip: ${trip.name}`);
-              console.log(`🎨 [Store] About to load colors for trip: ${trip.id}`);
-              
               // Reset hasUserOptimized when switching to a different trip
               // This ensures places appear as pending until user explicitly optimizes
               // But will be set back to true if optimization results are found
               set({ hasUserOptimized: false });
-              console.log(`🔄 Reset hasUserOptimized to false for new trip (will be restored if optimization results exist)`);
               
               await get().loadMemberColorsForTrip(trip.id); // Load colors first
               await get().loadPlacesFromDatabase(trip.id);
               await get().loadOptimizationResult(trip.id);
             } else {
-              console.log(`✅ Already on trip: ${trip.name}, preserving optimization results`);
               // Still reload colors to ensure consistency
-              console.log(`🎨 [Store] Reloading colors for current trip: ${trip.id}`);
               await get().loadMemberColorsForTrip(trip.id);
               // Preserve optimization results if staying on same trip
               if (currentOptimizationResult) {
@@ -214,14 +205,8 @@ export const useStore = create<StoreState>()((set, get) => ({
                 });
               }
             }
-            console.log(`🔄 Current trip set to: ${trip.name} (${trip.id})`);
-            
-            // Debug: Check the state after loading
-            const { memberColors, tripMembers } = get();
-            console.log(`🎨 [Store] After loading - memberColors:`, memberColors);
-            console.log(`🎨 [Store] After loading - tripMembers:`, tripMembers);
           } catch (error) {
-            console.error('Failed to load data for new trip:', error);
+            // Failed to load data for new trip
           }
         }
       },
@@ -248,7 +233,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             .eq('id', id);
 
           if (error) {
-            console.error('Failed to update trip in database:', error);
+            // Failed to update trip in database
             throw error;
           }
 
@@ -263,9 +248,8 @@ export const useStore = create<StoreState>()((set, get) => ({
               : state.currentTrip,
           }));
 
-          console.log('✅ Trip updated successfully');
         } catch (error) {
-          console.error('Failed to update trip:', error);
+          // Failed to update trip
           throw error;
         }
       },
@@ -278,7 +262,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             .eq('id', id);
 
           if (error) {
-            console.error('Failed to delete trip from database:', error);
+            // Failed to delete trip from database
             throw error;
           }
 
@@ -289,9 +273,8 @@ export const useStore = create<StoreState>()((set, get) => ({
             currentTrip: state.currentTrip?.id === id ? null : state.currentTrip,
           }));
 
-          console.log('✅ Trip deleted successfully');
         } catch (error) {
-          console.error('Failed to delete trip:', error);
+          // Failed to delete trip
           throw error;
         }
       },
@@ -306,23 +289,15 @@ export const useStore = create<StoreState>()((set, get) => ({
         const { MemberColorService } = await import('../services/MemberColorService');
 
         try {
-          console.log('🎨 [Store] ===== STARTING loadMemberColorsForTrip =====');
-          console.log('🎨 [Store] Loading member colors and data for trip:', tripId);
-          
           // Load trip members first
-          console.log('🎨 [Store] Querying trip_members table...');
           const { data: membersData, error: membersError } = await supabase
             .from('trip_members')
             .select('user_id, role, assigned_color_index')
             .eq('trip_id', tripId);
 
-          console.log('🎨 [Store] Trip members query result:', { membersData, membersError });
 
           if (membersError) {
-            console.error('🎨 [Store] Error loading trip members:', membersError);
-            console.error('🎨 [Store] Error code:', membersError.code);
-            console.error('🎨 [Store] Error message:', membersError.message);
-            console.error('🎨 [Store] Error details:', membersError.details);
+            // Error loading trip members
             
             // Try to use fallback colors for current user at least
             const { user } = get();
@@ -330,7 +305,6 @@ export const useStore = create<StoreState>()((set, get) => ({
               const fallbackColorMap: Record<string, string> = {};
               const fallbackColor = MemberColorService.getColorByIndex(1);
               fallbackColorMap[user.id] = fallbackColor?.hex || '#0077BE';
-              console.log('🎨 [Store] Using fallback color for current user:', fallbackColorMap);
               set({ memberColors: fallbackColorMap, tripMembers: [] });
             } else {
               set({ memberColors: {}, tripMembers: [] });
@@ -340,8 +314,6 @@ export const useStore = create<StoreState>()((set, get) => ({
 
           // If no members found, set empty state and return
           if (!membersData || membersData.length === 0) {
-            console.log('🎨 [Store] No members found for trip:', tripId);
-            console.log('🎨 [Store] This trip may not have any members in trip_members table');
             
             // Try to use fallback colors for current user at least
             const { user } = get();
@@ -349,7 +321,6 @@ export const useStore = create<StoreState>()((set, get) => ({
               const fallbackColorMap: Record<string, string> = {};
               const fallbackColor = MemberColorService.getColorByIndex(1);
               fallbackColorMap[user.id] = fallbackColor?.hex || '#0077BE';
-              console.log('🎨 [Store] Using fallback color for current user (no members):', fallbackColorMap);
               set({ memberColors: fallbackColorMap, tripMembers: [] });
             } else {
               set({ memberColors: {}, tripMembers: [] });
@@ -358,17 +329,15 @@ export const useStore = create<StoreState>()((set, get) => ({
           }
 
           // Load user data for each member
-          console.log('🎨 [Store] Loading user data for members...');
           const userIds = membersData.map(m => m.user_id);
           const { data: usersData, error: usersError } = await supabase
             .from('users')
             .select('id, name, email')
             .in('id', userIds);
 
-          console.log('🎨 [Store] Users query result:', { usersData, usersError });
 
           if (usersError) {
-            console.error('🎨 [Store] Error loading users:', usersError);
+            // Error loading users
             // Continue with members data only, without user details
           }
 
@@ -383,19 +352,14 @@ export const useStore = create<StoreState>()((set, get) => ({
             };
           });
 
-          console.log('🎨 [Store] Formatted members:', formattedMembers);
-
           // Load member colors using MemberColorService
-          console.log('🎨 [Store] Loading colors via MemberColorService...');
           const colorMapping = await (await import('../services/MemberColorService')).MemberColorService.getSimpleColorMapping(tripId);
-          console.log('🎨 [Store] Raw color mapping:', colorMapping);
           
           // Apply fallback colors if any are missing or invalid
           const finalColorMapping: Record<string, string> = {};
           membersData.forEach((member, index) => {
             const existingColor = colorMapping[member.user_id];
             if (!existingColor || existingColor === '#000000' || existingColor === 'undefined' || existingColor === '') {
-              console.warn(`🎨 [Store] Using fallback color for member ${member.user_id}`);
               const fallbackColor = MemberColorService.getColorByIndex(index + 1) || MemberColorService.getColorByIndex(1);
               finalColorMapping[member.user_id] = fallbackColor?.hex || '#0077BE';
             } else {
@@ -403,15 +367,10 @@ export const useStore = create<StoreState>()((set, get) => ({
             }
           });
           
-          console.log('🎨 [Store] Final color mapping with fallbacks:', finalColorMapping);
-          
           // Validate color assignment and fix any issues
-          console.log('🎨 [Store] Validating color assignments...');
           const validation = await (await import('../services/MemberColorService')).MemberColorService.validateColorAssignment(tripId);
-          console.log('🎨 [Store] Validation result:', validation);
           
           if (!validation.valid) {
-            console.warn('🎨 [Store] Color assignment issues detected, fixing...', validation.issues);
             await (await import('../services/MemberColorService')).MemberColorService.fixDuplicateColors(tripId);
             await (await import('../services/MemberColorService')).MemberColorService.autoAssignMissingColors(tripId);
             // Reload colors after fixing
@@ -429,31 +388,19 @@ export const useStore = create<StoreState>()((set, get) => ({
               }
             });
             
-            console.log('🎨 [Store] Setting fixed colors with fallbacks to store:', finalFixedColors);
             set({ memberColors: finalFixedColors, tripMembers: formattedMembers });
-            console.log('🎨 [Store] Fixed and loaded colors:', finalFixedColors);
           } else {
-            console.log('🎨 [Store] Setting colors with fallbacks to store:', finalColorMapping);
             set({ memberColors: finalColorMapping, tripMembers: formattedMembers });
-            console.log('🎨 [Store] Loaded colors (no issues):', finalColorMapping);
           }
 
-          console.log('🎨 [Store] Trip members loaded:', formattedMembers);
-          console.log('🎨 [Store] ===== FINISHED loadMemberColorsForTrip =====');
-          
-          // Verify the state was set correctly
-          const { memberColors: finalColors, tripMembers: finalMembers } = get();
-          console.log('🎨 [Store] Final state verification:', { finalColors, finalMembers });
         } catch (error) {
-          console.error('🎨 [Store] Failed to load member colors:', error);
-          console.error('🎨 [Store] Error details:', error);
+          // Failed to load member colors
           
           // Apply emergency fallback colors
           const { user } = get();
           if (user) {
             const emergencyColorMap: Record<string, string> = {};
             emergencyColorMap[user.id] = MemberColorService.getColorByIndex(0).hex;
-            console.log('🎨 [Store] Using emergency fallback color for current user:', emergencyColorMap);
             set({ memberColors: emergencyColorMap, tripMembers: [] });
           } else {
             set({ memberColors: {}, tripMembers: [] });
@@ -483,7 +430,6 @@ export const useStore = create<StoreState>()((set, get) => ({
             });
 
             if (duplicates.length > 0) {
-              console.log('🔍 [Store] Found potential duplicates:', duplicates);
               
               if (options?.autoMerge) {
                 // Auto-merge with existing place (take highest values)
@@ -499,7 +445,6 @@ export const useStore = create<StoreState>()((set, get) => ({
 
                 // Update existing place instead of creating new one
                 await get().updatePlace(existingPlace.id, mergedData);
-                console.log('✅ [Store] Auto-merged with existing place');
                 return { merged: true, existingPlace, duplicates };
               } else {
                 // Return duplicates for UI handling
@@ -507,7 +452,7 @@ export const useStore = create<StoreState>()((set, get) => ({
               }
             }
           } catch (error) {
-            console.warn('Duplicate check failed, proceeding with place addition:', error);
+            // Duplicate check failed, proceeding with place addition
           }
         }
 
@@ -554,7 +499,6 @@ export const useStore = create<StoreState>()((set, get) => ({
           };
 
           const result = await addPlaceToDatabase(placeData);
-          console.log('✅ Place saved to database:', result);
           
           // Reload places for current trip to ensure consistency
           await get().loadPlacesFromDatabase(currentTrip.id);
@@ -562,7 +506,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           return { success: true, place: result.place };
           
         } catch (error) {
-          console.error('Failed to save place to database:', error);
+          // Failed to save place to database
           throw error;
         }
       },
@@ -592,13 +536,12 @@ export const useStore = create<StoreState>()((set, get) => ({
             .eq('id', id);
 
           if (error) {
-            console.error('Failed to update place in database:', error);
+            // Failed to update place in database
             // Could implement rollback here if needed
           } else {
-            console.log('✅ Place updated in database successfully');
           }
         } catch (error) {
-          console.error('Failed to update place:', error);
+          // Failed to update place
         }
       },
       deletePlace: async (id) => {
@@ -617,12 +560,11 @@ export const useStore = create<StoreState>()((set, get) => ({
             .eq('id', id);
 
           if (error) {
-            console.error('Failed to delete place from database:', error);
+            // Failed to delete place from database
           } else {
-            console.log('✅ Place deleted from database successfully');
           }
         } catch (error) {
-          console.error('Failed to delete place:', error);
+          // Failed to delete place
         }
       },
 
@@ -639,7 +581,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           const { PlaceDuplicateService } = await import('../services/PlaceDuplicateService');
           return await PlaceDuplicateService.findAllDuplicatesInTrip(targetTripId);
         } catch (error) {
-          console.error('Failed to find duplicates:', error);
+          // Failed to find duplicates
           return [];
         }
       },
@@ -659,7 +601,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           
           return success;
         } catch (error) {
-          console.error('Failed to merge duplicate group:', error);
+          // Failed to merge duplicate group
           return false;
         }
       },
@@ -681,7 +623,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           
           return mergedCount;
         } catch (error) {
-          console.error('Failed to auto-merge duplicates:', error);
+          // Failed to auto-merge duplicates
           return 0;
         }
       },
@@ -703,7 +645,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           const { PlaceDuplicateService } = await import('../services/PlaceDuplicateService');
           return await PlaceDuplicateService.getDuplicateSummary(targetTripId);
         } catch (error) {
-          console.error('Failed to get duplicate summary:', error);
+          // Failed to get duplicate summary
           return {
             totalDuplicateGroups: 0,
             totalDuplicatePlaces: 0,
@@ -725,14 +667,12 @@ export const useStore = create<StoreState>()((set, get) => ({
       // User-initiated optimization control
       hasUserOptimized: false,
       setHasUserOptimized: (value) => {
-        console.log(`🎯 [setHasUserOptimized] Setting hasUserOptimized to: ${value}`);
         set({ hasUserOptimized: value });
       },
       
       // Success animation control - only triggers once per optimization
       showOptimizationSuccess: false,
       setShowOptimizationSuccess: (value) => {
-        console.log(`🎉 [setShowOptimizationSuccess] Setting showOptimizationSuccess to: ${value}`);
         set({ showOptimizationSuccess: value });
       },
 
@@ -744,12 +684,6 @@ export const useStore = create<StoreState>()((set, get) => ({
         const isPremium = user.isPremium && (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
         const totalUserTrips = trips.length; // All trips (owned + member)
         
-        console.log('🔍 Trip creation check:', {
-          isPremium,
-          totalUserTrips: totalUserTrips,
-          limit: LIMITS.FREE.TRIPS,
-          canCreate: isPremium || totalUserTrips < LIMITS.FREE.TRIPS
-        });
         
         return isPremium || totalUserTrips < LIMITS.FREE.TRIPS;
       },
@@ -761,12 +695,6 @@ export const useStore = create<StoreState>()((set, get) => ({
         const isPremium = user.isPremium && (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
         const totalUserTrips = trips.length; // All trips (owned + member)
         
-        console.log('🔍 Trip join check:', {
-          isPremium,
-          totalUserTrips: totalUserTrips,
-          limit: LIMITS.FREE.TRIPS,
-          canJoin: isPremium || totalUserTrips < LIMITS.FREE.TRIPS
-        });
         
         return isPremium || totalUserTrips < LIMITS.FREE.TRIPS;
       },
@@ -822,12 +750,11 @@ export const useStore = create<StoreState>()((set, get) => ({
         try {
           const { user } = get();
           if (!user) {
-            console.log('No user found, skipping trips loading');
+            // No user found, skipping trips loading
             return;
           }
 
           // Load trips where user is owner or member
-          console.log('🔍 Loading trips for user:', user.id);
           
           // First, get trips where user is owner
           const { data: ownedTrips, error: ownedError } = await supabase
@@ -839,7 +766,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             .eq('owner_id', user.id);
 
           if (ownedError) {
-            console.error('Failed to load owned trips:', ownedError);
+            // Failed to load owned trips
             return;
           }
 
@@ -856,7 +783,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             .neq('trips.owner_id', user.id); // Exclude trips where user is owner (to avoid duplicates)
 
           if (memberError) {
-            console.error('Failed to load member trips:', memberError);
+            // Failed to load member trips
             return;
           }
 
@@ -876,13 +803,6 @@ export const useStore = create<StoreState>()((set, get) => ({
           const userOwnedTrips = allTrips.filter(trip => trip.owner_id === user.id);
           const userMemberTrips = allTrips.filter(trip => trip.owner_id !== user.id);
 
-          console.log('📊 Loaded trips:', {
-            ownedTrips: ownedTrips?.length || 0,
-            memberTrips: memberTrips?.length || 0,
-            totalTrips: allTrips.length,
-            userOwnedCount: userOwnedTrips.length,
-            userMemberCount: userMemberTrips.length
-          });
 
           // Sort by created_at descending and limit to 20
           const tripsData = allTrips
@@ -904,7 +824,6 @@ export const useStore = create<StoreState>()((set, get) => ({
             }));
             
             set({ trips });
-            console.log(`✅ Loaded ${trips.length} trips from database`);
             
             // Try to restore the previously selected trip or use the one from the URL
             const currentPath = window.location.pathname;
@@ -914,11 +833,9 @@ export const useStore = create<StoreState>()((set, get) => ({
               // If we have a trip ID in the URL, use that
               const tripFromUrl = trips.find(t => t.id === tripIdFromUrl);
               if (tripFromUrl) {
-                console.log('🔄 [LoadTrips] Restoring trip from URL:', tripFromUrl.name);
                 await get().setCurrentTrip(tripFromUrl);
               } else if (!get().currentTrip && trips.length > 0) {
                 // URL trip not found, fall back to first trip
-                console.log('🎨 [LoadTrips] URL trip not found, setting first trip as current...');
                 await get().setCurrentTrip(trips[0]);
               }
             } else if (!get().currentTrip) {
@@ -927,22 +844,19 @@ export const useStore = create<StoreState>()((set, get) => ({
               if (storedTripId) {
                 const storedTrip = trips.find(t => t.id === storedTripId);
                 if (storedTrip) {
-                  console.log('🔄 [LoadTrips] Restoring trip from localStorage:', storedTrip.name);
                   await get().setCurrentTrip(storedTrip);
                 } else if (trips.length > 0) {
                   // Stored trip not found, fall back to first trip
-                  console.log('🎨 [LoadTrips] Stored trip not found, setting first trip as current...');
                   await get().setCurrentTrip(trips[0]);
                 }
               } else if (trips.length > 0) {
                 // No stored trip, use first trip
-                console.log('🎨 [LoadTrips] No stored trip, setting first trip as current...');
                 await get().setCurrentTrip(trips[0]);
               }
             }
           }
         } catch (error) {
-          console.error('Failed to load trips from database:', error);
+          // Failed to load trips from database
         }
       },
 
@@ -950,14 +864,13 @@ export const useStore = create<StoreState>()((set, get) => ({
         try {
           const { user, currentTrip } = get();
           if (!user) {
-            console.log('No user found, skipping places loading');
+            // No user found, skipping places loading
             return;
           }
 
           // Use current trip if no tripId specified
           const targetTripId = tripId || currentTrip?.id;
           if (!targetTripId) {
-            console.log('⚠️ No trip ID specified, cannot load places');
             set({ places: [] }); // Clear places if no trip selected
             return;
           }
@@ -975,7 +888,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             .order('created_at', { ascending: true });
 
           if (error) {
-            console.error('Failed to load places from database:', error);
+            // Failed to load places from database
             return;
           }
           
@@ -1010,27 +923,17 @@ export const useStore = create<StoreState>()((set, get) => ({
             }));
             
             set({ places: dbPlaces });
-            console.log(`✅ Loaded ${dbPlaces.length} places from database${targetTripId ? ` for trip ${targetTripId}` : ''}`);
-            
-            // Debug: Log places for current trip
-            if (targetTripId) {
-              const tripPlaces = dbPlaces.filter(p => p.trip_id === targetTripId);
-              console.log(`📍 Places for current trip (${targetTripId}):`, tripPlaces.length);
-            }
             
             // Create system places if they don't exist (only once per trip load)
             // Only create system places if this is the first load for this trip
             const systemPlacesExist = dbPlaces.some(p => p.place_type === 'departure' || p.place_type === 'destination');
             if (targetTripId && !get().isCreatingSystemPlaces && !systemPlacesExist) {
-              console.log('🔧 No system places found, creating them for trip:', targetTripId);
               const { createSystemPlaces } = get();
               await createSystemPlaces(targetTripId);
-            } else if (systemPlacesExist) {
-              console.log('✅ System places already exist for trip:', targetTripId);
             }
           }
         } catch (error) {
-          console.error('Failed to load places from database:', error);
+          // Failed to load places from database
         }
       },
 
@@ -1039,7 +942,6 @@ export const useStore = create<StoreState>()((set, get) => ({
         
         // Preserve existing optimization results during initialization
         const existingOptimizationResult = optimizationResult;
-        console.log('🔒 Preserving optimization result during initialization:', !!existingOptimizationResult);
         
         try {
           await loadTripsFromDatabase();
@@ -1047,10 +949,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           // Only refresh data if we don't have optimization results
           const { currentTrip } = get();
           if (currentTrip) {
-            console.log(`🔄 Initializing data for trip: ${currentTrip.name}`);
-            
             // Load member colors first for consistent color display
-            console.log('🎨 [InitDB] Loading member colors during initialization...');
             await get().loadMemberColorsForTrip(currentTrip.id);
             
             // Load places data
@@ -1058,21 +957,12 @@ export const useStore = create<StoreState>()((set, get) => ({
             
             // Load optimization results from database
             // The loadOptimizationResult function will preserve existing results if no new ones are found
-            console.log('📊 Checking for optimization results in database');
             await get().loadOptimizationResult(currentTrip.id);
-            
-            // Check if optimization result was preserved
-            const { optimizationResult: finalResult } = get();
-            console.log(`✅ Initialized app with data for trip: ${currentTrip.name}`);
-            console.log('📊 Final optimization result status:', !!finalResult);
-          } else {
-            console.log('🔄 Initialized app with trips data (no current trip selected)');
           }
         } catch (error) {
-          console.error('Failed to initialize from database:', error);
+          // Failed to initialize from database
           // Restore optimization results even if initialization fails
           if (existingOptimizationResult) {
-            console.log('🔄 Restoring optimization result after initialization error');
             set({ 
               optimizationResult: existingOptimizationResult,
               hasUserOptimized: true // Restore the optimization state as well
@@ -1092,14 +982,14 @@ export const useStore = create<StoreState>()((set, get) => ({
         }
 
         try {
-          console.log('Creating trip in Supabase database');
-          console.log('Current user from store:', user);
+          // Creating trip in Supabase database
+          // Current user from store
           
           // Check current authentication status
           const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-          console.log('Current authenticated user:', currentUser);
+          // Current authenticated user
           if (authError) {
-            console.error('Auth error:', authError);
+            // Auth error
             throw new Error('Authentication required');
           }
           if (!currentUser) {
@@ -1143,7 +1033,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             }, { onConflict: 'id' });
 
           if (userError) {
-            console.error('Failed to ensure user exists:', userError);
+            // Failed to ensure user exists
             throw userError;
           }
 
@@ -1180,9 +1070,9 @@ export const useStore = create<StoreState>()((set, get) => ({
               // UUID conflict, generate new one and retry
               attempts++;
               createdTrip.id = generateUUID();
-              console.log(`Trip ID conflict, retrying with new ID: ${createdTrip.id} (attempt ${attempts})`);
+              // Trip ID conflict, retrying with new ID
             } else {
-              console.error('Failed to save trip to database:', error);
+              // Failed to save trip to database
               throw error;
             }
           }
@@ -1191,7 +1081,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             throw new Error('Failed to create trip after multiple attempts');
           }
 
-          console.log('Trip created successfully in database:', savedTrip);
+          // Trip created successfully in database
 
           // User already added at the beginning of the function
 
@@ -1210,7 +1100,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             });
 
           if (memberError) {
-            console.error('Failed to add trip member:', memberError);
+            // Failed to add trip member
             throw memberError;
           }
 
@@ -1236,7 +1126,7 @@ export const useStore = create<StoreState>()((set, get) => ({
 
           return newTrip;
         } catch (error) {
-          console.error('Failed to create trip:', error);
+          // Failed to create trip
           throw error;
         }
       },
@@ -1260,7 +1150,6 @@ export const useStore = create<StoreState>()((set, get) => ({
               preferred_transport: 'car'
             },
             (progress) => {
-              console.log('Optimization progress:', progress);
             }
           );
 
@@ -1271,13 +1160,12 @@ export const useStore = create<StoreState>()((set, get) => ({
             // Refresh places data to get updated schedules
             await get().loadPlacesFromDatabase(tripId);
             
-            console.log('Optimization completed successfully:', result);
           } else {
             throw new Error('Optimization failed to return valid results');
           }
           
         } catch (error) {
-          console.error('Failed to optimize trip:', error);
+          // Failed to optimize trip
           throw error;
         } finally {
           set({ isOptimizing: false });
@@ -1293,7 +1181,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             .eq('trip_id', tripId);
 
           if (error) {
-            console.error('Failed to load places from API:', error);
+            // Failed to load places from API
             return;
           }
 
@@ -1343,16 +1231,14 @@ export const useStore = create<StoreState>()((set, get) => ({
             ]
           }));
 
-          console.log(`Loaded ${formattedPlaces.length} places from database for trip ${tripId}`);
           
         } catch (error) {
-          console.error('Failed to load places from API:', error);
+          // Failed to load places from API
         }
       },
 
       loadOptimizationResult: async (tripId: string): Promise<void> => {
         try {
-          console.log('🔍 Loading optimization results for trip:', tripId);
           
           // Get current optimization result to preserve if needed
           const { optimizationResult: currentOptimizationResult } = get();
@@ -1370,8 +1256,6 @@ export const useStore = create<StoreState>()((set, get) => ({
 
           if (error) {
             // If table doesn't exist or query fails, preserve existing result
-            console.warn('Optimization results table not found or query failed:', error.message);
-            console.log('Preserving existing optimization result:', currentOptimizationResult);
             // Don't overwrite with null if we have existing results
             if (!currentOptimizationResult) {
               set({ optimizationResult: null });
@@ -1380,9 +1264,6 @@ export const useStore = create<StoreState>()((set, get) => ({
           }
 
           if (result) {
-            console.log('🔍 [useStore] Raw database result:', result);
-            console.log('🔍 [useStore] optimized_route:', result.optimized_route);
-            console.log('🔍 [useStore] daily_schedules:', result.optimized_route?.daily_schedules);
             
             // Convert database result to OptimizationResult format
             // optimized_route is an array of daily schedules directly
@@ -1404,8 +1285,6 @@ export const useStore = create<StoreState>()((set, get) => ({
               message: 'Optimization loaded from database'
             };
 
-            console.log('🔍 [useStore] Converted optimizationResult:', optimizationResult);
-            console.log('🔍 [useStore] Converted daily_schedules:', optimizationResult.optimization.daily_schedules);
 
             set({ 
               optimizationResult: optimizationResult,
@@ -1413,25 +1292,19 @@ export const useStore = create<StoreState>()((set, get) => ({
               // This ensures the UI displays the optimization even after page reload
               hasUserOptimized: true
             });
-            console.log(`✅ Loaded optimization result for trip ${tripId} - setting hasUserOptimized to true`);
           } else {
             // No results found in database, preserve existing if available
-            console.log('No optimization results found in database');
             if (!currentOptimizationResult) {
               set({ optimizationResult: null });
-            } else {
-              console.log('Preserving existing optimization result');
             }
           }
           
         } catch (error) {
-          console.error('Failed to load optimization result:', error);
+          // Failed to load optimization result
           // Preserve existing result on error
           const { optimizationResult: currentResult } = get();
           if (!currentResult) {
             set({ optimizationResult: null });
-          } else {
-            console.log('Preserving existing optimization result after error');
           }
         }
       },
@@ -1440,7 +1313,6 @@ export const useStore = create<StoreState>()((set, get) => ({
         try {
           const { isCreatingSystemPlaces } = get();
           if (isCreatingSystemPlaces) {
-            console.log('⚠️ System places creation already in progress for trip', tripId);
             return;
           }
           
@@ -1457,7 +1329,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             .single();
 
           if (tripError || !trip) {
-            console.error('Failed to get trip for system places:', tripError);
+            // Failed to get trip for system places
             return;
           }
 
@@ -1468,19 +1340,11 @@ export const useStore = create<StoreState>()((set, get) => ({
             .eq('trip_id', tripId)
             .or('place_type.in.(departure,destination),category.in.(transportation,departure_point,destination_point),source.eq.system');
 
-          console.log('🗑️ Checking existing system places for trip:', tripId);
-          console.log('🗑️ Existing system places:', existingSystemPlaces);
-          console.log('🗑️ System places error:', systemPlacesError);
-          console.log('🗑️ Trip departure_location:', trip.departure_location);
-          console.log('🗑️ Trip destination:', trip.destination);
 
           // Only recreate system places if they don't exist or are incomplete
           if (existingSystemPlaces && existingSystemPlaces.length > 0) {
-            console.log('✅ System places already exist for trip', tripId, '- skipping creation');
             return; // Don't recreate if they already exist
           }
-          
-          console.log('🔧 Creating new system places for trip:', tripId);
 
           const systemPlaces = [];
 
@@ -1543,16 +1407,15 @@ export const useStore = create<StoreState>()((set, get) => ({
               .insert(systemPlaces);
 
             if (insertError) {
-              console.error('Failed to create system places:', insertError);
+              // Failed to create system places
             } else {
-              console.log(`Created ${systemPlaces.length} system places for trip ${tripId}`);
               // Reload places to include the new system places
               await get().loadPlacesFromAPI(tripId);
             }
           }
           
         } catch (error) {
-          console.error('Failed to create system places:', error);
+          // Failed to create system places
         } finally {
           set({ isCreatingSystemPlaces: false });
         }
@@ -1567,7 +1430,6 @@ export const useStore = create<StoreState>()((set, get) => ({
           }
 
           const pendingTrip = JSON.parse(pendingTripData);
-          console.log('🔗 Processing pending trip join:', pendingTrip);
 
           // Clear pending trip data
           localStorage.removeItem('voypath_pending_trip');
@@ -1575,14 +1437,14 @@ export const useStore = create<StoreState>()((set, get) => ({
           // Get current user
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) {
-            console.error('No authenticated user found for pending trip join');
+            // No authenticated user found for pending trip join
             return;
           }
 
           // Get current session for auth token
           const { data: { session } } = await supabase.auth.getSession();
           if (!session) {
-            console.error('No session found for pending trip join');
+            // No session found for pending trip join
             return;
           }
 
@@ -1596,7 +1458,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             });
 
             if (memberResponse.ok) {
-              console.log('✅ User already a member of pending trip');
+              // User already a member
             } else {
               // Add user as trip member directly
               const { error } = await supabase
@@ -1609,14 +1471,11 @@ export const useStore = create<StoreState>()((set, get) => ({
                 });
 
               if (error && !error.message.includes('duplicate')) {
-                console.error('Failed to add user to trip:', error);
+                // Failed to add user to trip
                 throw error;
-              } else {
-                console.log('✅ User added as trip member');
               }
             }
           } catch (memberError) {
-            console.log('Adding user as trip member...');
             // Add user as trip member directly
             const { error } = await supabase
               .from('trip_members')
@@ -1628,9 +1487,7 @@ export const useStore = create<StoreState>()((set, get) => ({
               });
 
             if (error && !error.message.includes('duplicate')) {
-              console.error('Failed to add user to trip:', error);
-            } else {
-              console.log('✅ User added as trip member');
+              // Failed to add user to trip
             }
           }
 
@@ -1641,7 +1498,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           window.location.href = `/trip/${pendingTrip.tripId}`;
 
         } catch (error) {
-          console.error('Error processing pending trip join:', error);
+          // Error processing pending trip join
         }
       },
     }));

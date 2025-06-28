@@ -78,26 +78,6 @@ export function ListView() {
   }, [places, currentTrip?.id]);
   
   // Colors and trip members are now loaded centrally via store
-  // Debug logging for centralized colors
-  useEffect(() => {
-    if (currentTrip?.id && memberColors && Object.keys(memberColors).length > 0) {
-      console.log('🎨 [ListView] Using centralized member colors:', memberColors);
-      console.log('🎨 [ListView] Using centralized trip members:', tripMembers);
-      
-      // Find tenmakomine@gmail.com's color for debugging
-      const tenmakomieMember = tripMembers.find(member => member.user?.email === 'tenmakomine@gmail.com');
-      if (tenmakomieMember) {
-        const tenmakomiColor = memberColors[tenmakomieMember.user_id];
-        console.log('🎯 [ListView] tenmakomine@gmail.com color:', {
-          userId: tenmakomieMember.user_id,
-          email: tenmakomieMember.user?.email,
-          name: tenmakomieMember.user?.name,
-          assignedColor: tenmakomiColor,
-          colorIndex: tenmakomieMember.assigned_color_index
-        });
-      }
-    }
-  }, [currentTrip?.id, memberColors, tripMembers]);
 
 
   // Get member display info for a place
@@ -110,15 +90,6 @@ export function ListView() {
     }));
 
     const colorResult = calculatePlaceColor(place, members, memberColors);
-    
-    console.log('🎨 Place color calculation:', {
-      placeId: place.id,
-      placeName: place.name,
-      placeUserId: place.user_id || place.userId,
-      memberColors,
-      members,
-      colorResult
-    });
     
     return {
       contributors: colorResult.contributors,
@@ -140,66 +111,7 @@ export function ListView() {
     ), [tripPlaces]
   );
   
-  console.log('ListView Debug:', {
-    timestamp: new Date().toISOString(),
-    currentTripId: currentTrip?.id,
-    totalPlaces: tripPlaces.length,
-    systemPlaces: systemPlaces.length,
-    userPlaces: userPlaces.length,
-    systemPlaceTypes: systemPlaces.map(p => ({ name: p.name, type: p.place_type })),
-    placesWithOptimization: tripPlaces.filter(place => place.is_selected_for_optimization).length,
-    optimizationResult: !!optimizationResult,
-    hasDaily: !!optimizationResult?.optimization?.daily_schedules,
-    dailyCount: optimizationResult?.optimization?.daily_schedules?.length || 0,
-    allPlaceDetails: tripPlaces.map(p => ({ 
-      name: p.name, 
-      type: p.place_type, 
-      isSelected: p.is_selected_for_optimization,
-      trip_id: p.trip_id,
-      id: p.id,
-      // Include all optimization-related fields
-      is_selected_for_optimization: p.is_selected_for_optimization,
-      scheduled: p.scheduled
-    })),
-    scheduleLenth: schedule.length,
-    selectedScheduleEvents: selectedSchedule?.events?.length || 0,
-    // Add details about places from store
-    allStorePlaces: places.length,
-    storePlacesForTrip: places.filter(p => p.trip_id === currentTrip?.id || p.tripId === currentTrip?.id).length,
-    // CRITICAL: Log full optimization result structure
-    optimizationResultStructure: optimizationResult ? {
-      hasOptimization: !!optimizationResult.optimization,
-      hasDailySchedules: !!optimizationResult.optimization?.daily_schedules,
-      dailySchedulesCount: optimizationResult.optimization?.daily_schedules?.length || 0,
-      totalPlacesInAllDays: optimizationResult.optimization?.daily_schedules?.reduce((total, day) => 
-        total + (day.scheduled_places?.length || 0), 0) || 0,
-      dailyBreakdown: optimizationResult.optimization?.daily_schedules?.map((day, index) => ({
-        dayIndex: index,
-        dayNumber: day.day || index + 1,
-        placesCount: day.scheduled_places?.length || 0,
-        placeNames: day.scheduled_places?.map(sp => sp.place?.name || sp.name) || []
-      })) || []
-    } : null
-  });
 
-  // Log detailed daily schedules for debugging
-  if (optimizationResult?.optimization?.daily_schedules) {
-    console.log('📅 ListView: Detailed daily schedules analysis:');
-    optimizationResult.optimization.daily_schedules.forEach((daySchedule, dayIndex) => {
-      console.log(`  Day ${dayIndex + 1}:`, {
-        date: daySchedule.date,
-        scheduledPlacesCount: daySchedule.scheduled_places?.length || 0,
-        scheduledPlaces: daySchedule.scheduled_places?.map(sp => ({
-          id: sp.place?.id || sp.id,
-          name: sp.place?.name || sp.name,
-          arrivalTime: sp.arrival_time,
-          departureTime: sp.departure_time,
-          transportMode: sp.transport_mode,
-          order: sp.order_in_day
-        })) || []
-      });
-    });
-  }
 
   // Display schedule from optimization results ONLY
   const schedule = useMemo(() => {
@@ -207,7 +119,6 @@ export function ListView() {
     
     // ONLY display results if user has optimized and we have optimization results with daily schedules
     if (hasUserOptimized && optimizationResult?.optimization?.daily_schedules?.length > 0) {
-      console.log('📅 ListView: Displaying optimization results with', optimizationResult.optimization.daily_schedules.length, 'days');
       
       const scheduleDays: DaySchedule[] = [];
       
@@ -236,13 +147,6 @@ export function ListView() {
           const place = scheduledPlace.place || scheduledPlace;
           const placeName = place.name || scheduledPlace.name || 'Unknown Place';
           const placeId = place.id || scheduledPlace.id || `place-${dayIndex}-${placeIndex}`;
-          
-          console.log(`📍 Processing scheduled place ${placeIndex + 1} on day ${dayIndex + 1}:`, {
-            scheduledPlace,
-            extractedPlace: place,
-            placeName,
-            placeId
-          });
           
           // Add travel time before each place (except first after departure)
           if (placeIndex > 0 || (dayIndex === 0 && placeIndex === 0 && departureLocation)) {
@@ -327,7 +231,6 @@ export function ListView() {
     }
     
     // NO optimization results - show message to optimize first
-    console.log('❌ ListView: No optimization results to display');
     return [];
   }, [currentTrip, optimizationResult, hasUserOptimized]);
 

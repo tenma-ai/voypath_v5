@@ -23,13 +23,13 @@ export class OptimizationKeepAliveService {
       return; // Already running
     }
 
-    console.log('🔥 Starting optimization keep-alive service');
+    // Log message
     
     // Initial ping (disabled in development to avoid errors)
     if (import.meta.env.PROD) {
       this.pingAllFunctions();
     } else {
-      console.log('⚠️ Keep-alive disabled in development mode');
+      // Log message
     }
     
     // Set up periodic pinging (disabled in development)
@@ -47,7 +47,7 @@ export class OptimizationKeepAliveService {
     if (this.keepAliveInterval) {
       clearInterval(this.keepAliveInterval);
       this.keepAliveInterval = null;
-      console.log('🔥 Stopped optimization keep-alive service');
+      // Log message
     }
   }
 
@@ -61,9 +61,9 @@ export class OptimizationKeepAliveService {
 
     try {
       await Promise.allSettled(promises);
-      console.log('🔥 Keep-alive ping completed for all functions');
+      // Log message
     } catch (error) {
-      console.warn('Keep-alive ping failed:', error);
+      // Warning occurred
     }
   }
 
@@ -81,12 +81,12 @@ export class OptimizationKeepAliveService {
       const responseTime = Date.now() - startTime;
       
       if (response.error) {
-        console.warn(`Keep-alive failed for ${functionName}:`, response.error);
+        // Warning occurred
       } else {
-        console.log(`🔥 ${functionName} keep-alive: ${responseTime}ms`);
+        // Log message
       }
     } catch (error) {
-      console.warn(`Keep-alive error for ${functionName}:`, error);
+      // Warning occurred
     }
   }
 
@@ -94,13 +94,13 @@ export class OptimizationKeepAliveService {
    * Manual warm-up before optimization (for critical operations)
    */
   static async warmUpForOptimization(): Promise<void> {
-    console.log('🔥 Warming up functions for optimization...');
+    // Log message
     
     const startTime = Date.now();
     await this.pingAllFunctions();
     const totalTime = Date.now() - startTime;
     
-    console.log(`🔥 Functions warmed up in ${totalTime}ms`);
+    // Log message
   }
 
   /**

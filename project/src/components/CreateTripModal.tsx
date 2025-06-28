@@ -140,7 +140,7 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
         navigate('/my-trip');
       }
     } catch (error) {
-      console.error('Failed to create trip:', error);
+      // Error occurred
       alert('Failed to create trip. Please try again.');
     } finally {
       setIsSubmitting(false);

@@ -63,7 +63,7 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
         setSuggestions(places);
         setShowSuggestions(places.length > 0);
       } catch (err) {
-        console.error('Place search error:', err);
+        // Error occurred
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         if (errorMessage.includes('API request denied') || errorMessage.includes('BillingNotEnabledMapError')) {
           setError('Google Maps API billing not enabled. Please enable billing or contact administrator.');

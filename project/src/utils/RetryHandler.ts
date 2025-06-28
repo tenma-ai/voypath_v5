@@ -56,7 +56,7 @@ export class RetryHandler {
           options.maxDelay
         );
         
-        console.warn(`${operationName} failed (attempt ${attempt + 1}/${options.maxRetries + 1}), retrying in ${delay}ms:`, enhancedError.message);
+        // Warning: `${operationName} failed (attempt ${attempt + 1}/${options.maxRetries + 1}), retrying in ${delay}ms:`, enhancedError.message);
         
         await this.delay(delay);
       }

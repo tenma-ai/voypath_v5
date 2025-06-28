@@ -115,7 +115,7 @@ export class MapInfoWindowUtils {
           <!-- Quick Actions -->
           <div style="display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
             <button 
-              onclick="if(window.parent && window.parent.handleEditPlace) window.parent.handleEditPlace('${placeId}'); else console.log('Edit place:', '${placeId}');" 
+              onclick="if(window.parent && window.parent.handleEditPlace) window.parent.handleEditPlace('${placeId}'); else // Log message" 
               style="flex: 1; padding: 8px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; transition: background-color 0.2s;"
               onmouseover="this.style.backgroundColor='#2563eb'"
               onmouseout="this.style.backgroundColor='#3b82f6'"
@@ -133,7 +133,7 @@ export class MapInfoWindowUtils {
               </button>
             ` : ''}
             <button 
-              onclick="if(window.parent && window.parent.handleRemovePlace) window.parent.handleRemovePlace('${placeId}'); else console.log('Remove place:', '${placeId}');" 
+              onclick="if(window.parent && window.parent.handleRemovePlace) window.parent.handleRemovePlace('${placeId}'); else // Log message" 
               style="padding: 8px 12px; background: #ef4444; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s;"
               onmouseover="this.style.backgroundColor='#dc2626'"
               onmouseout="this.style.backgroundColor='#ef4444'"

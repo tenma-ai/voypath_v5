@@ -48,7 +48,7 @@ export class PreferenceNormalizationService {
     forceRefresh: boolean = false
   ): Promise<NormalizationResult> {
     try {
-      console.log(`Starting preference normalization for trip ${tripId} (force refresh: ${forceRefresh})`);
+      // Log: `Starting preference normalization for trip ${tripId} (force refresh: ${forceRefresh})`);
 
       const response = await supabase.functions.invoke('normalize-preferences', {
         body: {
@@ -66,11 +66,11 @@ export class PreferenceNormalizationService {
         throw new Error(data.error || 'Normalization failed');
       }
 
-      console.log(`Normalization completed: ${data.cached ? 'cached' : 'fresh'} result`);
+      // Log message
       return data.result as NormalizationResult;
 
     } catch (error) {
-      console.error('Error in preference normalization:', error);
+      // Error occurred
       throw error;
     }
   }
@@ -91,13 +91,13 @@ export class PreferenceNormalizationService {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.warn('Error fetching cached normalization:', error);
+        // Warning occurred
         return null;
       }
 
       return data?.result as NormalizationResult || null;
     } catch (error) {
-      console.warn('Error accessing normalization cache:', error);
+      // Warning occurred
       return null;
     }
   }

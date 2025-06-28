@@ -29,24 +29,24 @@ interface MemberUpdateRequest {
 }
 
 serve(async (req) => {
-  console.log('=== TRIP MEMBER MANAGEMENT FUNCTION START ===');
-  console.log('URL:', req.url);
-  console.log('Method:', req.method);
-  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+  // Log message
+  // Log message
+  // Log message
+  // Log: 'Headers:', Object.fromEntries(req.headers.entries()));
   
   // CORS対応
   if (req.method === 'OPTIONS') {
-    console.log('✅ CORS preflight request handled');
+    // Log message
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     // 認証ヘッダー取得（大文字小文字両方対応）
     const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
-    console.log('🔐 Auth header received:', authHeader ? 'Present' : 'Missing');
+    // Log message
     
     if (!authHeader) {
-      console.log('❌ No authorization header found');
+      // Log message
       return new Response(
         JSON.stringify({ error: 'Authorization header is required' }),
         {
@@ -84,17 +84,17 @@ serve(async (req) => {
     );
 
     // 認証確認
-    console.log('🔍 Attempting to get user from auth header...');
+    // Log message
     const {
       data: { user },
       error: userError,
     } = await supabaseClient.auth.getUser();
 
-    console.log('👤 User data:', user ? `Found user: ${user.id}` : 'No user found');
-    console.log('❌ User error:', userError ? userError.message : 'No error');
+    // Log message
+    // Log message
 
     if (userError || !user) {
-      console.log('❌ Authentication failed:', userError?.message || 'No user');
+      // Log message
       return new Response(
         JSON.stringify({ 
           error: 'Unauthorized',
@@ -111,9 +111,9 @@ serve(async (req) => {
     const method = req.method;
     const pathSegments = url.pathname.split('/').filter(Boolean);
 
-    console.log('🛣️ URL pathname:', url.pathname);
-    console.log('📁 Path segments:', pathSegments);
-    console.log('👤 Authenticated user ID:', user.id);
+    // Log message
+    // Log message
+    // Log message
 
     // ルーティング
     switch (method) {
@@ -163,10 +163,10 @@ serve(async (req) => {
         );
     }
   } catch (error) {
-    console.error('❌ Trip Member Management Error:', error);
-    console.error('❌ Error stack:', error.stack);
-    console.error('❌ Request URL:', req.url);
-    console.error('❌ Request method:', req.method);
+    // Error occurred
+    // Error occurred
+    // Error occurred
+    // Error occurred
     
     return new Response(
       JSON.stringify({ 
@@ -275,38 +275,38 @@ async function handleCreateInvitation(req: Request, supabase: any, userId: strin
 }
 
 async function handleJoinTrip(req: Request, supabase: any, userId: string) {
-  console.log('🎯 handleJoinTrip called for user:', userId);
+  // Log message
   
   // Debug Supabase configuration
-  console.log('🔧 Supabase URL:', Deno.env.get('SUPABASE_URL'));
-  console.log('🔧 Service Role Key exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
-  console.log('🔧 Service Role Key length:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.length);
-  console.log('🔧 Service Role Key first 10 chars:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.substring(0, 10));
+  // Log: '🔧 Supabase URL:', Deno.env.get('SUPABASE_URL'));
+  // Log: '🔧 Service Role Key exists:', !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+  // Log: '🔧 Service Role Key length:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.length);
+  // Log: '🔧 Service Role Key first 10 chars:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.substring(0, 10));
   
   const requestData: InvitationJoinRequest = await req.json();
-  console.log('📝 Request data:', JSON.stringify(requestData));
+  // Log: '📝 Request data:', JSON.stringify(requestData));
   
   if (!requestData.invitation_code) {
-    console.log('❌ No invitation code provided');
+    // Log message
     throw new Error('Invitation code is required');
   }
 
   // 招待コード検証
   const inviteCode = requestData.invitation_code.toUpperCase();
-  console.log('🔍 Searching for invitation code:', inviteCode);
-  console.log('📊 Querying invitation_codes table...');
+  // Log message
+  // Log message
   
   // Test direct SQL query to bypass any potential RLS issues
-  console.log('🔧 Testing with direct SQL query...');
+  // Log message
   const { data: sqlResult, error: sqlError } = await supabase.rpc('get_invitation_code_direct', {
     p_code: inviteCode
   }).single();
   
   if (sqlError) {
-    console.log('❌ SQL RPC error:', sqlError);
+    // Log message
     // If RPC doesn't exist, continue with regular query
   } else {
-    console.log('✅ SQL RPC result:', sqlResult);
+    // Log message
   }
   
   // First, let's check all invitation codes to debug
@@ -315,8 +315,8 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
     .select('code, is_active, trip_id')
     .limit(20);
   
-  console.log('📋 All invitation codes (first 20):', allCodes);
-  console.log('❌ All codes error:', allError);
+  // Log: '📋 All invitation codes (first 20):', allCodes);
+  // Log message
   
   // Now search for the specific code
   const { data: invitations, error: invitationError } = await supabase
@@ -326,25 +326,21 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
     .eq('is_active', true)
     .limit(1);
   
-  console.log('📊 Full query result:', {
-    invitations: invitations,
-    error: invitationError,
-    searchedCode: inviteCode
-  });
+  // Full query result obtained
 
-  console.log('📋 Invitation search result:', invitations?.length ? `Found ${invitations.length} records` : 'Not found');
-  console.log('❌ Invitation error:', invitationError?.message || 'No error');
+  // Log message
+  // Log message
 
   // If the regular query fails, use the RPC function
   let invitation = null;
   if (invitationError || !invitations || invitations.length === 0) {
-    console.log('⚠️ Regular query failed, trying RPC function...');
+    // Log message
     
     if (sqlResult && !sqlError) {
-      console.log('✅ Using RPC function result');
+      // Log message
       invitation = sqlResult;
     } else {
-      console.log('❌ Both regular query and RPC failed');
+      // Log message
       return new Response(
         JSON.stringify({ 
           error: 'Invalid or expired invitation code',
@@ -359,10 +355,10 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
   } else {
     invitation = invitations[0];
   }
-  console.log('✅ Found invitation:', invitation.id);
+  // Log message
 
   // トリップ情報を取得
-  console.log('🎯 Fetching trip info for:', invitation.trip_id);
+  // Log message
   const { data: trips, error: tripError } = await supabase
     .from('trips')
     .select('id, name, max_members, total_members')
@@ -370,7 +366,7 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
     .limit(1);
 
   if (tripError || !trips || trips.length === 0) {
-    console.log('❌ Trip not found:', tripError?.message);
+    // Log message
     return new Response(
       JSON.stringify({ 
         error: 'Associated trip not found',
@@ -384,7 +380,7 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
   }
 
   const trip = trips[0];
-  console.log('✅ Found trip:', trip.name);
+  // Log message
 
   // invitation オブジェクトに trip 情報を追加
   invitation.trip = trip;
@@ -412,7 +408,7 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
   }
 
   // 既存メンバーチェック
-  console.log('👤 Checking if user is already a member...');
+  // Log message
   const { data: existingMembers } = await supabase
     .from('trip_members')
     .select('user_id')
@@ -421,7 +417,7 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
     .limit(1);
 
   if (existingMembers && existingMembers.length > 0) {
-    console.log('❌ User is already a member of this trip');
+    // Log message
     return new Response(
       JSON.stringify({ error: 'You are already a member of this trip' }),
       {
@@ -443,7 +439,7 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
   }
 
   // メンバー追加
-  console.log('👥 Adding user as member to trip:', invitation.trip_id);
+  // Log message
   const { data: newMembers, error: memberError } = await supabase
     .from('trip_members')
     .insert({
@@ -460,12 +456,12 @@ async function handleJoinTrip(req: Request, supabase: any, userId: string) {
     .select('*');
 
   if (memberError || !newMembers || newMembers.length === 0) {
-    console.log('❌ Failed to add member:', memberError?.message);
+    // Log message
     throw new Error(`Failed to join trip: ${memberError?.message || 'Unknown error'}`);
   }
 
   const newMember = newMembers[0];
-  console.log('✅ Successfully added member:', newMember.user_id);
+  // Log message
 
   // ユーザー情報を取得
   const { data: userDataArray } = await supabase

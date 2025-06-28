@@ -97,7 +97,7 @@ export class GooglePlacesService {
           }
         }
       } catch (proxyError) {
-        console.warn('Proxy API failed, using fallback:', proxyError);
+        // Warning occurred
       }
 
       // Fallback: Use direct Google Maps API with JavaScript
@@ -109,7 +109,7 @@ export class GooglePlacesService {
       // Final fallback: Return empty array
       return [];
     } catch (error) {
-      console.error('Error searching places:', error);
+      // Error occurred
       return [];
     }
   }
@@ -122,7 +122,7 @@ export class GooglePlacesService {
       const { loadGoogleMapsAPI } = await import('../lib/googleMaps');
       return await loadGoogleMapsAPI();
     } catch (error) {
-      console.warn('Failed to load Google Maps API:', error);
+      // Warning occurred
       return null;
     }
   }
@@ -221,7 +221,7 @@ export class GooglePlacesService {
 
       return data.results || [];
     } catch (error) {
-      console.error('Error searching nearby places:', error);
+      // Error occurred
       throw error;
     }
   }
@@ -279,7 +279,7 @@ export class GooglePlacesService {
 
       return data.result || null;
     } catch (error) {
-      console.error('Error getting place details:', error);
+      // Error occurred
       throw error;
     }
   }
@@ -355,7 +355,7 @@ export class GooglePlacesService {
         place_id: result.place_id,
       };
     } catch (error) {
-      console.error('Error geocoding address:', error);
+      // Error occurred
       throw error;
     }
   }
@@ -408,7 +408,7 @@ export class GooglePlacesService {
         address_components: result.address_components,
       };
     } catch (error) {
-      console.error('Error reverse geocoding:', error);
+      // Error occurred
       throw error;
     }
   }

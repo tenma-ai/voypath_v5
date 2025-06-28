@@ -111,9 +111,9 @@ class GoogleMapsAPILoader {
   private async sendUsageTracking(data: UsageTrackingData): Promise<void> {
     try {
       // This will be connected to Supabase later
-      console.log('API Usage:', data);
+      // Log message
     } catch (error) {
-      console.warn('Failed to track API usage:', error);
+      // Warning occurred
     }
   }
 

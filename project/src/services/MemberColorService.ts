@@ -99,7 +99,7 @@ export class MemberColorService {
 
       return this.COLORS[availableIndex - 1];
     } catch (error) {
-      console.error('Error assigning color to member:', error);
+      // Error assigning color to member
       throw error;
     }
   }
@@ -122,7 +122,7 @@ export class MemberColorService {
 
       return this.COLORS[member.assigned_color_index - 1];
     } catch (error) {
-      console.error('Error getting member color:', error);
+      // Error getting member color
       return null;
     }
   }
@@ -142,7 +142,7 @@ export class MemberColorService {
 
       return this.COLORS.filter(color => !usedIndices.has(color.id));
     } catch (error) {
-      console.error('Error getting available colors:', error);
+      // Error getting available colors
       return [];
     }
   }
@@ -168,7 +168,7 @@ export class MemberColorService {
         assignedAt: new Date(member.color_assigned_at)
       }));
     } catch (error) {
-      console.error('Error getting trip member colors:', error);
+      // Error getting trip member colors
       return [];
     }
   }
@@ -189,7 +189,7 @@ export class MemberColorService {
 
       return !error;
     } catch (error) {
-      console.error('Error recycling member color:', error);
+      // Error recycling member color
       return false;
     }
   }
@@ -221,12 +221,9 @@ export class MemberColorService {
         mapping[assignment.userId] = assignment.color.hex;
       });
       
-      console.log('🎨 [MemberColorService] Color mapping for trip', tripId, ':', mapping);
-      console.log('🎨 [MemberColorService] Assignments:', assignments);
-      
       return mapping;
     } catch (error) {
-      console.error('Error getting simple color mapping:', error);
+      // Error getting simple color mapping
       return {};
     }
   }
@@ -249,13 +246,13 @@ export class MemberColorService {
         try {
           await this.assignColorToMember(tripId, member.user_id);
         } catch (error) {
-          console.error(`Failed to assign color to member ${member.user_id}:`, error);
+          // Failed to assign color to member
         }
       }
 
       return true;
     } catch (error) {
-      console.error('Error auto-assigning colors:', error);
+      // Error auto-assigning colors
       return false;
     }
   }
@@ -270,8 +267,6 @@ export class MemberColorService {
       if (validation.valid) {
         return true; // No issues to fix
       }
-
-      console.log('🔧 Fixing duplicate color assignments for trip:', tripId);
 
       // Reset all color assignments and reassign from scratch
       const { error: resetError } = await supabase
@@ -299,14 +294,13 @@ export class MemberColorService {
         try {
           await this.assignColorToMember(tripId, member.user_id);
         } catch (error) {
-          console.error(`Failed to reassign color to member ${member.user_id}:`, error);
+          // Failed to reassign color to member
         }
       }
 
-      console.log('✅ Fixed duplicate color assignments');
       return true;
     } catch (error) {
-      console.error('Error fixing duplicate colors:', error);
+      // Error fixing duplicate colors
       return false;
     }
   }
@@ -428,7 +422,7 @@ export class MemberColorService {
         maxColors: 20
       };
     } catch (error) {
-      console.error('Error validating color assignment:', error);
+      // Error validating color assignment
       return {
         valid: false,
         issues: ['Validation failed due to database error'],

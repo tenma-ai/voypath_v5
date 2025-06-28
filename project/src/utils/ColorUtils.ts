@@ -23,14 +23,7 @@ export interface PlaceWithColorInfo {
 export function getPlaceColor(place: PlaceWithColorInfo): PlaceColorResult {
   const { memberColors, tripMembers } = useStore.getState();
   
-  // Log for debugging
-  console.log('🎨 [ColorUtils] Getting color for place:', {
-    placeName: place.name,
-    placeUserId: place.user_id || place.userId,
-    placeType: place.place_type,
-    availableColors: Object.keys(memberColors),
-    memberCount: tripMembers.length
-  });
+  // Getting color for place
 
   // Format members data for PlaceColorHelper
   const formattedMembers = tripMembers.map(member => ({
@@ -93,7 +86,7 @@ export function getSystemPlaceColor(): string {
 export function debugColorState(context: string): void {
   const { memberColors, tripMembers, currentTrip } = useStore.getState();
   
-  console.log(`🔍 [ColorUtils] Debug - ${context}:`, {
+  // Log: `🔍 [ColorUtils] Debug - ${context}:`, {
     tripId: currentTrip?.id,
     tripName: currentTrip?.name,
     memberColors,

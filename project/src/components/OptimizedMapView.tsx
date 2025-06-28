@@ -124,7 +124,7 @@ export function OptimizedMapView({
       setDirectionsRenderer(renderer);
       setIsLoading(false);
     } catch (error) {
-      console.error('Failed to initialize map:', error);
+      // Error occurred
       setError('Failed to load map. Please try again.');
       setIsLoading(false);
     }
@@ -162,7 +162,7 @@ export function OptimizedMapView({
         );
         newMarkers.push(marker);
         bounds.extend(new google.maps.LatLng(position.lat, position.lng));
-      }).catch(console.error);
+      }).catch(() => {});
     }
 
     // Add selected places
@@ -374,7 +374,7 @@ export function OptimizedMapView({
 
       setRoutePolylines(newPolylines);
     } catch (error) {
-      console.error('Error drawing route:', error);
+      // Error occurred
     }
   };
 

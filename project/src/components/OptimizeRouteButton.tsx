@@ -61,7 +61,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
   
   // Debug logging
   useEffect(() => {
-    console.log('OptimizeRouteButton Debug:', {
+    // Log: 'OptimizeRouteButton Debug:', {
       tripId,
       placesCount: places.length,
       tripPlacesCount: tripPlaces.length,
@@ -82,17 +82,17 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       const results = await TripOptimizationService.testConnectivity();
       setConnectivity(results);
     } catch (error) {
-      console.error('Connectivity check failed:', error);
+      // Error occurred
     }
   };
 
   const checkExistingOptimization = async () => {
     try {
       // Skip database checks in demo mode - just return no running optimization
-      console.log('Skipping optimization status check in demo mode');
+      // Log message
       return;
     } catch (error) {
-      console.error('Error checking existing optimization:', error);
+      // Error occurred
     }
   };
 
@@ -156,20 +156,20 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
     setProgress({ stage: 'collecting', progress: 0, message: 'Starting optimization...' });
     
     // Mark that user has explicitly initiated optimization
-    console.log('🎯 [OptimizeRouteButton] Setting hasUserOptimized to true');
+    // Log message
     setHasUserOptimized(true);
     
     // Force reload places from database before optimization
-    console.log('🔄 Reloading places from database before optimization');
+    // Log message
     try {
       await loadPlacesFromAPI(tripId);
-      console.log('✅ Places reloaded from database');
+      // Log message
     } catch (error) {
-      console.warn('⚠️ Could not reload places (continuing anyway):', error);
+      // Warning: '⚠️ Could not reload places (continuing anyway):', error);
     }
     
     // Clear any cached optimization results first
-    console.log('🗑️ Clearing cached optimization results before new optimization');
+    // Log message
     setOptimizationResult(null);
     
     // Also clear from database (best effort)
@@ -178,9 +178,9 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
         .from('optimization_results')
         .delete()
         .eq('trip_id', tripId);
-      console.log('✅ Cleared database optimization cache');
+      // Log message
     } catch (error) {
-      console.warn('⚠️ Could not clear database cache (continuing anyway):', error);
+      // Warning: '⚠️ Could not clear database cache (continuing anyway):', error);
     }
 
     try {
@@ -199,7 +199,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       );
 
       if (result.success && result.optimization_result) {
-        console.log('🎯 [OptimizeRouteButton] Optimization success! hasUserOptimized should be true');
+        // Log message
         setOptimizationResult(result.optimization_result);
         
         // Refresh places data to show updated schedule
@@ -228,7 +228,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       }, 2500);
 
     } catch (error) {
-      console.error('Optimization failed:', error);
+      // Error occurred
       setError(error instanceof Error ? error.message : 'Optimization failed');
       setIsOptimizing(false);
       setTimeout(() => {

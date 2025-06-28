@@ -58,7 +58,7 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
     const endDate = DateUtils.getTripEndDate(currentTrip);
     
     if (!startDate) {
-      console.warn('OptimizedTimelineView: No trip start date available');
+      // Warning occurred
       return [];
     }
     const days: TimelineDay[] = [];

@@ -92,7 +92,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
     setIsSubmitting(true);
     try {
       // Handle form submission
-      console.log('Submitting place:', selectedPlace, formData, 'Edit mode:', isEditMode);
+      // Log message
       
       // Generate proper UUID for place
       const generateUUID = () => {
@@ -122,7 +122,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
           stay_duration_minutes: formData.duration,
           updated_at: new Date().toISOString()
         });
-        console.log('Place updated successfully:', originalPlaceId);
+        // Log message
       } else {
         // Create new place object with proper structure
         const newPlace = {
@@ -167,7 +167,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
         
         // Add to store
         await addPlace(newPlace);
-        console.log('Place added successfully:', newPlace);
+        // Log message
       }
       
       if (onComplete) {
@@ -176,7 +176,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
         navigate('/my-trip/my-places');
       }
     } catch (error) {
-      console.error('Failed to add place:', error);
+      // Error occurred
       alert('Failed to add place. Please try again.');
     } finally {
       setIsSubmitting(false);

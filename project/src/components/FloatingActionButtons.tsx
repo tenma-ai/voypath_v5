@@ -37,7 +37,7 @@ export function FloatingActionButtons() {
     setOptimizationError(null);
 
     try {
-      console.log('🔍 [FloatingActionButtons] Starting optimization trigger - setting hasUserOptimized to true');
+      // Log message
       setHasUserOptimized(true);
       
       // Import TripOptimizationService dynamically
@@ -53,20 +53,20 @@ export function FloatingActionButtons() {
           preferred_transport: 'car'
         },
         (progress) => {
-          console.log('Optimization progress:', progress);
+          // Log message
         }
       );
 
       if (result.success && result.optimization) {
-        console.log('✅ Optimization successful!', result);
+        // Log message
         setOptimizationResult(result);
         setShowOptimizationSuccess(true); // Trigger success animation
       } else {
-        console.error('❌ Optimization failed:', result.error);
+        // Error occurred
         setOptimizationError(result.error || 'Optimization failed');
       }
     } catch (error) {
-      console.error('❌ Optimization error:', error);
+      // Error occurred
       setOptimizationError(error instanceof Error ? error.message : 'An error occurred during optimization');
     } finally {
       setIsOptimizing(false);

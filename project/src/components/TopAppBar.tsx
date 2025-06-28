@@ -62,7 +62,7 @@ function TopAppBar() {
   
   // Debug: Monitor profile menu state changes
   useEffect(() => {
-    console.log('🎯 Profile menu state changed:', showProfileMenu);
+    // Log message
   }, [showProfileMenu]);
   const [showVoypathMenu, setShowVoypathMenu] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
@@ -102,7 +102,7 @@ function TopAppBar() {
           setUserColor(assignedColor.hex);
         }
       } catch (error) {
-        console.error('Failed to load user color:', error);
+        // Error occurred
         // Fallback to deterministic color
         const fallbackColor = MemberColorService.getColorForOptimization(user.id, {});
         setUserColor(fallbackColor);
@@ -199,13 +199,13 @@ function TopAppBar() {
         navigate('/my-trip');
         break;
       case 'notifications':
-        console.log('Opening notifications...');
+        // Log message
         break;
       case 'help':
-        console.log('Opening help center...');
+        // Log message
         break;
       case 'feedback':
-        console.log('Opening feedback form...');
+        // Log message
         break;
       case 'upgrade':
         setShowPremiumModal(true);
@@ -220,14 +220,14 @@ function TopAppBar() {
 
   const handleLogout = async () => {
     try {
-      console.log('🔄 Logging out...');
+      // Log message
       
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error('❌ Logout error:', error);
+        // Error occurred
       } else {
-        console.log('✅ Successfully logged out');
+        // Log message
       }
       
       // Clear local storage
@@ -237,7 +237,7 @@ function TopAppBar() {
       window.location.reload();
       
     } catch (error) {
-      console.error('❌ Logout failed:', error);
+      // Error occurred
       // Fallback: clear storage and reload anyway
       localStorage.clear();
       window.location.reload();
@@ -373,7 +373,7 @@ function TopAppBar() {
                           alt="Voypath" 
                           className="w-5 h-5 object-contain filter drop-shadow-sm relative z-10"
                           onError={(e) => {
-                            console.error('Logo failed to load, trying fallback');
+                            // Error occurred
                             // Fallback: show a text logo
                             e.currentTarget.style.display = 'none';
                             const parent = e.currentTarget.parentElement;
@@ -384,7 +384,7 @@ function TopAppBar() {
                               parent.appendChild(fallback);
                             }
                           }}
-                          onLoad={() => console.log('Logo loaded successfully')}
+                          onLoad={() => // Log: 'Logo loaded successfully')}
                         />
                       </motion.div>
                       <motion.div
@@ -436,10 +436,10 @@ function TopAppBar() {
                                   alt="Voypath" 
                                   className="w-7 h-7 object-contain filter drop-shadow-sm"
                                   onError={(e) => {
-                                    console.error('Menu logo failed to load:', e);
+                                    // Error occurred
                                     e.currentTarget.style.display = 'none';
                                   }}
-                                  onLoad={() => console.log('Menu logo loaded successfully')}
+                                  onLoad={() => // Log: 'Menu logo loaded successfully')}
                                 />
                               </div>
                               <div>

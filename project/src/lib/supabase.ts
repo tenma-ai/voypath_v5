@@ -19,7 +19,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const getCurrentUser = async () => {
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error) {
-    console.error('Get user error:', error)
+    // Error: 'Get user error:', error)
     throw error
   }
   return user
@@ -28,7 +28,7 @@ export const getCurrentUser = async () => {
 export const getSession = async () => {
   const { data: { session }, error } = await supabase.auth.getSession()
   if (error) {
-    console.error('Get session error:', error)
+    // Error: 'Get session error:', error)
     throw error
   }
   return session
@@ -40,22 +40,22 @@ export const ensureAuthenticated = async () => {
     // Try to get existing session first
     const session = await getSession()
     if (session && session.user) {
-      console.log('Found existing Supabase session for user:', session.user.id)
+      // Log: 'Found existing Supabase session for user:', session.user.id)
       return session.user
     }
 
     // For development, try to get an authenticated session
-    console.log('No session found, need to authenticate...')
+    // Log: 'No session found, need to authenticate...')
     
     // In development mode, show a simple auth prompt
     if (import.meta.env.DEV) {
-      console.log('Development mode: Please sign up or sign in through the UI')
+      // Log: 'Development mode: Please sign up or sign in through the UI')
       // Return null to trigger UI authentication flow
       return null
     }
 
     // Fallback to development user
-    console.log('Using development user for testing...')
+    // Log: 'Using development user for testing...')
     const devUserId = '2600c340-0ecd-4166-860f-ac4798888344' // Real authenticated user
     
     return {
@@ -70,7 +70,7 @@ export const ensureAuthenticated = async () => {
     }
     
   } catch (error) {
-    console.error('Authentication error:', error)
+    // Error: 'Authentication error:', error)
     throw error
   }
 }
@@ -79,7 +79,7 @@ export const signInAnonymously = async () => {
   try {
     const { data, error } = await supabase.auth.signInAnonymously()
     if (error) {
-      console.warn('Anonymous sign in not available, using scalable session:', error)
+      // Warning: 'Anonymous sign in not available, using scalable session:', error)
       // Use scalable session management instead
       const { SessionManager } = await import('./sessionManager')
       const scalableSession = await SessionManager.createGuestSession()
@@ -94,7 +94,7 @@ export const signInAnonymously = async () => {
     
     return data
   } catch (error) {
-    console.warn('Anonymous authentication failed, using scalable session:', error)
+    // Warning: 'Anonymous authentication failed, using scalable session:', error)
     // Fallback to scalable session management
     const { SessionManager } = await import('./sessionManager')
     const scalableSession = await SessionManager.createGuestSession()
@@ -110,7 +110,7 @@ export const signInWithEmail = async (email: string, password: string) => {
   })
   
   if (error) {
-    console.error('Email sign in error:', error)
+    // Error: 'Email sign in error:', error)
     throw error
   }
   
@@ -129,7 +129,7 @@ export const signUpWithEmail = async (email: string, password: string, name: str
   })
   
   if (error) {
-    console.error('Email sign up error:', error)
+    // Error: 'Email sign up error:', error)
     throw error
   }
   
@@ -153,7 +153,7 @@ export const promoteGuestToUser = async (email: string, password: string, name: 
   })
   
   if (error) {
-    console.error('Guest promotion error:', error)
+    // Error: 'Guest promotion error:', error)
     throw error
   }
   
@@ -177,7 +177,7 @@ export const createOrUpdateUserProfile = async (authUser: any, additionalData?: 
     ...additionalData
   }
   
-  console.log('Creating/updating user profile:', profileData);
+  // Log message
   
   // Add timeout wrapper
   const timeoutPromise = new Promise((_, reject) => {
@@ -194,18 +194,18 @@ export const createOrUpdateUserProfile = async (authUser: any, additionalData?: 
     const { data, error } = await Promise.race([upsertPromise, timeoutPromise]) as any;
     
     if (error) {
-      console.error('User profile upsert error:', error);
+      // Error occurred
       throw error;
     }
     
-    console.log('User profile created/updated successfully:', data);
+    // Log message
     return data;
   } catch (error) {
-    console.error('User profile operation failed:', error);
+    // Error occurred
     
     // For timeout or other errors, try a simple update instead
     if (error instanceof Error && error.message.includes('timeout')) {
-      console.log('⚠️ Upsert timed out, trying simple update...');
+      // Log message
       try {
         const { data, error: updateError } = await supabase
           .from('users')
@@ -215,10 +215,10 @@ export const createOrUpdateUserProfile = async (authUser: any, additionalData?: 
           .single();
         
         if (updateError) throw updateError;
-        console.log('✅ Simple user update successful:', data);
+        // Log message
         return data;
       } catch (fallbackError) {
-        console.error('❌ Fallback update also failed:', fallbackError);
+        // Error occurred
       }
     }
     
@@ -229,7 +229,7 @@ export const createOrUpdateUserProfile = async (authUser: any, additionalData?: 
 export const signOut = async () => {
   const { error } = await supabase.auth.signOut()
   if (error) {
-    console.error('Sign out error:', error)
+    // Error: 'Sign out error:', error)
     throw error
   }
 }
@@ -237,7 +237,7 @@ export const signOut = async () => {
 // Direct Supabase database insertion for places
 export const addPlaceToDatabase = async (placeData: any) => {
   try {
-    console.log('Adding place to Supabase:', placeData)
+    // Log: 'Adding place to Supabase:', placeData)
     
     // Get current user - check session first, then fallback to dev user
     let user;
@@ -247,7 +247,7 @@ export const addPlaceToDatabase = async (placeData: any) => {
         user = session.user;
       }
     } catch (error) {
-      console.log('Session check error, using fallback:', error);
+      // Log message
     }
     
     // If no session, use the development user that was authenticated
@@ -258,7 +258,7 @@ export const addPlaceToDatabase = async (placeData: any) => {
         email: 'dev@voypath.com',
         user_metadata: { name: 'Development User' }
       };
-      console.log('Using authenticated dev user:', user.id);
+      // Log message
     }
     
     // Ensure required fields are present
@@ -303,15 +303,15 @@ export const addPlaceToDatabase = async (placeData: any) => {
       .single()
     
     if (error) {
-      console.error('Supabase insert error:', error)
+      // Error: 'Supabase insert error:', error)
       throw error
     }
     
-    console.log('Place successfully saved to Supabase:', data)
+    // Log: 'Place successfully saved to Supabase:', data)
     return { place: data }
     
   } catch (error) {
-    console.error('Failed to add place to Supabase:', error)
+    // Error: 'Failed to add place to Supabase:', error)
     throw error
   }
 }
@@ -329,11 +329,11 @@ export const subscribeToRealtime = (
 ) => {
   // Only allow realtime for specific tables
   if (!REALTIME_ENABLED_TABLES.includes(table)) {
-    console.log(`🚫 Realtime updates disabled for table: ${table}`);
+    // Log message
     return null as any;
   }
   
-  console.log(`✅ Realtime updates enabled for table: ${table}`);
+  // Log message
   
   const channelKey = `${table}_${tripId || 'all'}`
   
@@ -355,7 +355,7 @@ export const subscribeToRealtime = (
           filter: `trip_id=eq.${tripId}`
         },
         (payload) => {
-          console.log(`Realtime ${table} change for trip ${tripId}:`, payload)
+          // Log: `Realtime ${table} change for trip ${tripId}:`, payload)
           callback?.(payload)
         }
       )
@@ -370,14 +370,14 @@ export const subscribeToRealtime = (
           table: table
         },
         (payload) => {
-          console.log(`Realtime ${table} change:`, payload)
+          // Log: `Realtime ${table} change:`, payload)
           callback?.(payload)
         }
       )
   }
 
   channel.subscribe((status) => {
-    console.log(`Realtime channel status for ${channelKey}:`, status)
+    // Log: `Realtime channel status for ${channelKey}:`, status)
   })
 
   realtimeChannels.set(channelKey, channel)
@@ -391,14 +391,14 @@ export const unsubscribeFromRealtime = (table: string, tripId?: string) => {
   if (channel) {
     supabase.removeChannel(channel)
     realtimeChannels.delete(channelKey)
-    console.log(`Unsubscribed from realtime channel: ${channelKey}`)
+    // Log: `Unsubscribed from realtime channel: ${channelKey}`)
   }
 }
 
 export const unsubscribeAllRealtime = () => {
   realtimeChannels.forEach((channel, key) => {
     supabase.removeChannel(channel)
-    console.log(`Unsubscribed from realtime channel: ${key}`)
+    // Log: `Unsubscribed from realtime channel: ${key}`)
   })
   realtimeChannels.clear()
 }
@@ -420,10 +420,10 @@ export const callSupabaseFunction = async (functionName: string, data: any, meth
         headers['Authorization'] = `Bearer ${session.access_token}`
       } else {
         // For development, we can proceed with just the anon key
-        console.log('No session token available, using anon key only')
+        // Log: 'No session token available, using anon key only')
       }
     } catch (error) {
-      console.log('Session check failed, proceeding with anon key:', error)
+      // Log: 'Session check failed, proceeding with anon key:', error)
     }
 
     // For development, add user context to the request
@@ -445,13 +445,13 @@ export const callSupabaseFunction = async (functionName: string, data: any, meth
       const error = await response.json().catch(() => ({ 
         error: `HTTP ${response.status}: ${response.statusText}` 
       }))
-      console.error(`Edge function ${functionName} failed:`, error)
+      // Error: `Edge function ${functionName} failed:`, error)
       throw new Error(error.error || `HTTP ${response.status}`)
     }
 
     return response.json()
   } catch (error) {
-    console.error(`Supabase function ${functionName} call failed:`, error)
+    // Error: `Supabase function ${functionName} call failed:`, error)
     throw error
   }
 }

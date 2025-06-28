@@ -63,14 +63,14 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
     const dailySchedules = result?.optimization?.daily_schedules;
     
     // Debug logging
-    console.log('🔍 [ListViewModal] Formatting Edge Function result:', result);
-    console.log('🔍 [ListViewModal] Daily schedules:', dailySchedules);
-    console.log('🔍 [ListViewModal] Daily schedules type:', typeof dailySchedules);
-    console.log('🔍 [ListViewModal] Is array:', Array.isArray(dailySchedules));
+    // Log message
+    // Log message
+    // Log message
+    // Log: '🔍 [ListViewModal] Is array:', Array.isArray(dailySchedules));
     
     // Safety check for required properties
     if (!result?.optimization || !dailySchedules || !Array.isArray(dailySchedules)) {
-      console.error('❌ [ListViewModal] Invalid optimization result structure:', result);
+      // Error occurred
       return {
         schedulesByDay: {},
         totalStats: { places: 0, travelTime: 0, visitTime: 0, score: 0 },
@@ -83,9 +83,9 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
     let totalPlaces = 0;
     
     dailySchedules.forEach((schedule: any) => {
-      console.log('🔍 [ListViewModal] Processing schedule:', schedule);
-      console.log('🔍 [ListViewModal] Schedule scheduled_places:', schedule.scheduled_places);
-      console.log('🔍 [ListViewModal] Schedule scheduled_places length:', schedule.scheduled_places?.length);
+      // Log message
+      // Log message
+      // Log message
       
       const dayKey = `day-${schedule.day}`;
       schedulesByDay[dayKey] = {
@@ -97,7 +97,7 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
       };
       
       totalPlaces += (schedule.scheduled_places || []).length;
-      console.log('🔍 [ListViewModal] Assigned to day', dayKey, ':', (schedule.scheduled_places || []).length, 'places');
+      // Log: '🔍 [ListViewModal] Assigned to day', dayKey, ':', (schedule.scheduled_places || []).length, 'places');
     });
 
     return {

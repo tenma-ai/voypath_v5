@@ -142,10 +142,10 @@ serve(async (req)=>{
     if (!requestData.members || !Array.isArray(requestData.members)) {
       return createErrorResponse('Members array is required', 400);
     }
-    console.log(`🎯 Starting place selection: ${requestData.places.length} places, ${requestData.members.length} members`);
+    // Log message
     const maxPlaces = Math.min((requestData.preferences.duration_days || 3) * (requestData.preferences.max_places_per_day || 4), requestData.places.length);
     const selectedPlaces = selectOptimalPlaces(requestData.places, requestData.members, maxPlaces, requestData.preferences.fairness_weight || 0.6);
-    console.log(`✅ Selected ${selectedPlaces.length} places`);
+    // Log message
     return createSuccessResponse({
       selected_places: selectedPlaces,
       fairness_score: calculateFairness(selectedPlaces, requestData.members),
@@ -158,7 +158,7 @@ serve(async (req)=>{
       }, {})
     });
   } catch (error) {
-    console.error('❌ Place selection error:', error);
+    // Error occurred
     return createErrorResponse(error.message);
   }
 });

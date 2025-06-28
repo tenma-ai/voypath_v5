@@ -38,7 +38,7 @@ function App() {
           setIsAuthenticated(false);
         }
       } catch (error) {
-        console.error('❌ Auth check failed:', error);
+        // Auth check failed
         setIsAuthenticated(false);
       } finally {
         setIsCheckingAuth(false);
@@ -71,15 +71,12 @@ function App() {
   const handleAuthenticated = async (user: any) => {
     // Prevent multiple simultaneous authentication handling
     if (isHandlingAuth) {
-      console.log('⚠️ Authentication already in progress, skipping...');
       return;
     }
     
     setIsHandlingAuth(true);
     
     try {
-      console.log('🔄 Starting handleAuthenticated for user:', user.id);
-      
       // Set the authenticated user first
       setUser({
         id: user.id,
@@ -92,7 +89,6 @@ function App() {
 
       // Set authenticated state immediately
       setIsAuthenticated(true);
-      console.log('✅ User authenticated successfully');
 
       // Background tasks with timeout
       const backgroundTasks = async () => {
@@ -103,9 +99,8 @@ function App() {
             createOrUpdateUserProfile(user),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Profile update timeout')), 3000))
           ]);
-          console.log('✅ User profile updated');
         } catch (profileError) {
-          console.warn('⚠️ Failed to update user profile (continuing anyway):', profileError);
+          // Profile update failed, continue anyway
         }
 
         try {
@@ -114,9 +109,8 @@ function App() {
             initializeFromDatabase(),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Database load timeout')), 3000))
           ]);
-          console.log('✅ Database data loaded');
         } catch (dbError) {
-          console.warn('⚠️ Failed to load database data (continuing anyway):', dbError);
+          // Database load failed, continue anyway
         }
 
         try {
@@ -124,17 +118,15 @@ function App() {
           const { useStore } = await import('./store/useStore');
           await useStore.getState().handlePendingTripJoin();
         } catch (pendingTripError) {
-          console.warn('⚠️ Failed to process pending trip join:', pendingTripError);
+          // Pending trip join failed, continue anyway
         }
       };
 
       // Run background tasks without blocking UI
-      backgroundTasks().finally(() => {
-        console.log('✅ App initialization completed');
-      });
+      backgroundTasks();
       
     } catch (error) {
-      console.error('❌ Critical error in handleAuthenticated:', error);
+      // Critical error in handleAuthenticated
       setIsAuthenticated(false);
     } finally {
       setIsHandlingAuth(false);

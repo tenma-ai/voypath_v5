@@ -35,14 +35,14 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
 
   // Use centralized member colors from store
-  console.log('🎨 [CalendarGridView] Using centralized colors:', memberColors);
+  // Log message
 
   // Process optimization result to create month schedule with consistent date formatting
   useEffect(() => {
-    console.log('🔍 [CalendarGridView] Processing optimization result:', optimizationResult);
+    // Log message
     
     if (!optimizationResult?.optimization?.daily_schedules || !currentTrip) {
-      console.log('🔍 [CalendarGridView] No daily schedules or trip found');
+      // Log message
       setMonthSchedule({});
       return;
     }
@@ -50,14 +50,14 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
     const schedule: Record<string, CalendarPlace[]> = {};
     
     optimizationResult.optimization.daily_schedules.forEach((daySchedule: any, dayIndex: number) => {
-      console.log(`🔍 [CalendarGridView] Processing day ${dayIndex}:`, daySchedule);
+      // Log message
       
       if (daySchedule.scheduled_places && Array.isArray(daySchedule.scheduled_places)) {
         // Use consistent date calculation based on trip start date and day number
         const scheduleDate = DateUtils.calculateTripDate(currentTrip, daySchedule.day || (dayIndex + 1));
         const dateKey = scheduleDate.toDateString();
         
-        console.log(`🔍 [CalendarGridView] Day ${daySchedule.day || (dayIndex + 1)} -> ${dateKey}`);
+        // Log: `🔍 [CalendarGridView] Day ${daySchedule.day || (dayIndex + 1)} -> ${dateKey}`);
         
         // Filter to show only trip places, excluding system places except departure/arrival
         const validPlaces = daySchedule.scheduled_places.filter((place: any) => {
@@ -74,11 +74,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
         });
         
         schedule[dateKey] = validPlaces.map((place: any, placeIndex: number) => {
-          console.log(`🔍 [CalendarGridView] Processing place ${placeIndex}:`, {
-            name: place.place_name || place.name,
-            time: place.arrival_time || place.scheduled_time_start,
-            member_contribution: place.member_contribution
-          });
+          // Processing place for calendar grid
           
           return {
             id: place.id || `place-${daySchedule.day || (dayIndex + 1)}-${placeIndex}`,
@@ -90,11 +86,11 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
           };
         });
         
-        console.log(`🔍 [CalendarGridView] Created ${schedule[dateKey].length} places for ${dateKey}`);
+        // Log message
       }
     });
 
-    console.log('🔍 [CalendarGridView] Final schedule:', schedule);
+    // Log message
     setMonthSchedule(schedule);
   }, [optimizationResult, currentTrip]);
 
@@ -161,7 +157,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
   };
 
   const getPlaceColor = (place: CalendarPlace) => {
-    console.log(`🔍 [CalendarGridView] Getting color for place: ${place.name}`, {
+    // Log: `🔍 [CalendarGridView] Getting color for place: ${place.name}`, {
       contributors: place.contributors,
       memberColors: memberColors
     });
@@ -173,7 +169,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
       member_contribution: place.contributors
     });
     
-    console.log(`🔍 [CalendarGridView] Color result from utility:`, colorResult);
+    // Log message
     
     // Return the background color for calendar grid
     if (colorResult.type === 'single') {
@@ -189,7 +185,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
   };
 
   // Debug current state
-  console.log('🔍 [CalendarGridView] Render state:', {
+  // Log: '🔍 [CalendarGridView] Render state:', {
     monthScheduleKeys: Object.keys(monthSchedule),
     monthScheduleSize: Object.keys(monthSchedule).length,
     memberColorsSize: Object.keys(memberColors).length,
@@ -267,7 +263,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
             
             // Debug log for days with places
             if (dayPlaces.length > 0) {
-              console.log(`🔍 [CalendarGridView] Day ${day.getDate()} (${dateKey}) has ${dayPlaces.length} places:`, dayPlaces);
+              // Log: `🔍 [CalendarGridView] Day ${day.getDate()} (${dateKey}) has ${dayPlaces.length} places:`, dayPlaces);
             }
 
             return (

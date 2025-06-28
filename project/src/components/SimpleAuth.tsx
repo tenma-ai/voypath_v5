@@ -31,7 +31,7 @@ export function SimpleAuth({ onAuthenticated }: SimpleAuthProps) {
         
         if (error) throw error;
         if (data.user) {
-          console.log('✅ User signed in:', data.user.id);
+          // Log message
           onAuthenticated(data.user);
         }
       } else {
@@ -54,12 +54,12 @@ export function SimpleAuth({ onAuthenticated }: SimpleAuthProps) {
           throw error;
         }
         if (data.user) {
-          console.log('✅ User signed up:', data.user.id);
+          // Log message
           
           // For development, proceed immediately with sign up
           // In production, user would need to confirm email
           if (import.meta.env.DEV) {
-            console.log('🔧 Development mode: proceeding without email confirmation');
+            // Log message
             onAuthenticated(data.user);
           } else {
             // In production, show message about email confirmation

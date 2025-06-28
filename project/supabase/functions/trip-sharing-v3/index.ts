@@ -31,13 +31,13 @@ interface GetSharedTripRequest {
 }
 
 serve(async (req) => {
-  console.log('=== TRIP SHARING V3 FUNCTION START ===');
-  console.log('URL:', req.url);
-  console.log('Method:', req.method);
+  // Log message
+  // Log message
+  // Log message
   
   // CORS対応
   if (req.method === 'OPTIONS') {
-    console.log('✅ CORS preflight request handled');
+    // Log message
     return new Response('ok', { headers: corsHeaders });
   }
 
@@ -65,7 +65,7 @@ serve(async (req) => {
     }
 
     const requestData = await req.json();
-    console.log('📝 Request data:', JSON.stringify(requestData, null, 2));
+    // Log: '📝 Request data:', JSON.stringify(requestData, null, 2));
 
     switch (requestData.action) {
       case 'create_share_link':
@@ -82,8 +82,8 @@ serve(async (req) => {
         );
     }
   } catch (error) {
-    console.error('❌ Trip Sharing V3 Error:', error);
-    console.error('❌ Error stack:', error.stack);
+    // Error occurred
+    // Error occurred
     
     return new Response(
       JSON.stringify({ 
@@ -99,7 +99,7 @@ serve(async (req) => {
 });
 
 async function handleCreateShareLink(requestData: CreateShareLinkRequest, supabase: any) {
-  console.log('🔗 Creating share link for trip:', requestData.trip_id);
+  // Log message
 
   // トリップの存在確認
   const { data: trip, error: tripError } = await supabase
@@ -109,7 +109,7 @@ async function handleCreateShareLink(requestData: CreateShareLinkRequest, supaba
     .single();
 
   if (tripError || !trip) {
-    console.log('❌ Trip not found:', requestData.trip_id);
+    // Log message
     return new Response(
       JSON.stringify({ error: 'Trip not found' }),
       {
@@ -134,7 +134,7 @@ async function handleCreateShareLink(requestData: CreateShareLinkRequest, supaba
     .limit(1);
 
   if (existingShares && existingShares.length > 0) {
-    console.log('✅ Using existing share link:', existingShares[0].share_token);
+    // Log message
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -165,7 +165,7 @@ async function handleCreateShareLink(requestData: CreateShareLinkRequest, supaba
     .single();
 
   if (shareError) {
-    console.error('❌ Failed to create share link:', shareError);
+    // Error occurred
     return new Response(
       JSON.stringify({ error: 'Failed to create share link' }),
       {
@@ -175,7 +175,7 @@ async function handleCreateShareLink(requestData: CreateShareLinkRequest, supaba
     );
   }
 
-  console.log('✅ Share link created successfully:', shareToken);
+  // Log message
 
   return new Response(
     JSON.stringify({ 
@@ -193,11 +193,11 @@ async function handleCreateShareLink(requestData: CreateShareLinkRequest, supaba
 }
 
 async function handleGetSharedTrip(requestData: GetSharedTripRequest, supabase: any) {
-  console.log('🔍 Getting shared trip for token:', requestData.shareToken);
-  console.log('📊 Full request data:', JSON.stringify(requestData));
+  // Log message
+  // Log: '📊 Full request data:', JSON.stringify(requestData));
 
   // 共有リンクの検索
-  console.log('🔍 Searching trip_shares table...');
+  // Log message
   const { data: shareData, error: shareError } = await supabase
     .from('trip_shares')
     .select('*')
@@ -205,14 +205,10 @@ async function handleGetSharedTrip(requestData: GetSharedTripRequest, supabase: 
     .eq('is_active', true)
     .single();
   
-  console.log('📊 Query result:', { 
-    found: !!shareData, 
-    error: shareError?.message,
-    shareData: shareData ? 'Found share data' : 'No data'
-  });
+  // Query result obtained
 
   if (shareError || !shareData) {
-    console.log('❌ Share link not found:', requestData.shareToken);
+    // Log message
     return new Response(
       JSON.stringify({ error: 'Share link not found or expired' }),
       {
@@ -224,7 +220,7 @@ async function handleGetSharedTrip(requestData: GetSharedTripRequest, supabase: 
 
   // 有効期限チェック
   if (shareData.expires_at && new Date(shareData.expires_at) < new Date()) {
-    console.log('❌ Share link expired:', requestData.shareToken);
+    // Log message
     return new Response(
       JSON.stringify({ error: 'Share link has expired' }),
       {
@@ -236,7 +232,7 @@ async function handleGetSharedTrip(requestData: GetSharedTripRequest, supabase: 
 
   // パスワードチェック
   if (shareData.password_hash && !requestData.password) {
-    console.log('🔒 Password required for share link:', requestData.shareToken);
+    // Log message
     return new Response(
       JSON.stringify({ 
         requiresPassword: true,
@@ -252,7 +248,7 @@ async function handleGetSharedTrip(requestData: GetSharedTripRequest, supabase: 
   if (shareData.password_hash && requestData.password) {
     const isPasswordValid = await verifyPassword(requestData.password, shareData.password_hash);
     if (!isPasswordValid) {
-      console.log('❌ Invalid password for share link:', requestData.shareToken);
+      // Log message
       return new Response(
         JSON.stringify({ error: 'Invalid password' }),
         {
@@ -271,7 +267,7 @@ async function handleGetSharedTrip(requestData: GetSharedTripRequest, supabase: 
     .single();
 
   if (tripError || !trip) {
-    console.log('❌ Trip not found for share:', shareData.trip_id);
+    // Log message
     return new Response(
       JSON.stringify({ error: 'Associated trip not found' }),
       {
@@ -289,7 +285,7 @@ async function handleGetSharedTrip(requestData: GetSharedTripRequest, supabase: 
     .order('created_at');
 
   if (placesError) {
-    console.warn('⚠️ Failed to load places for shared trip:', placesError);
+    // Warning occurred
   }
 
   const result = {
@@ -303,7 +299,7 @@ async function handleGetSharedTrip(requestData: GetSharedTripRequest, supabase: 
     createdAt: shareData.created_at
   };
 
-  console.log('✅ Shared trip data retrieved successfully');
+  // Log message
 
   return new Response(
     JSON.stringify(result),

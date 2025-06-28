@@ -88,7 +88,7 @@ class AirportDetectionService {
       const result = await this.detectAirports(latitude, longitude, options);
       return result.hasAirport;
     } catch (error) {
-      console.warn('Airport detection failed:', error);
+      // Warning occurred
       return false; // Safe fallback for optimization algorithms
     }
   }
@@ -128,7 +128,7 @@ class AirportDetectionService {
 
       return data.result;
     } catch (error) {
-      console.error('Airport detection error:', error);
+      // Error occurred
       
       // Return safe fallback result
       return {
@@ -178,7 +178,7 @@ class AirportDetectionService {
 
       return data.result;
     } catch (error) {
-      console.error('Batch airport detection error:', error);
+      // Error occurred
       
       // Return safe fallback result
       return {
@@ -269,7 +269,7 @@ class AirportDetectionService {
         flightDistance
       };
     } catch (error) {
-      console.error('Flight connection check failed:', error);
+      // Error occurred
       return {
         canConnect: false,
         fromAirport: null,

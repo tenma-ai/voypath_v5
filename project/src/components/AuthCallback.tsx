@@ -8,8 +8,8 @@ export function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        console.log('🔄 Auth callback started, URL:', window.location.href);
-        console.log('🔄 URL params:', new URLSearchParams(window.location.search).toString());
+        // Log message
+        // Log: '🔄 URL params:', new URLSearchParams(window.location.search).toString());
         
         // Check for error in URL params
         const urlParams = new URLSearchParams(window.location.search);
@@ -17,39 +17,39 @@ export function AuthCallback() {
         const errorDescription = urlParams.get('error_description');
         
         if (authError) {
-          console.error('❌ OAuth error in URL:', authError, errorDescription);
+          // Error occurred
           navigate('/?error=' + encodeURIComponent(`OAuth Error: ${authError} - ${errorDescription}`));
           return;
         }
         
         const { data, error } = await supabase.auth.getSession();
-        console.log('🔄 Session data:', data);
+        // Log message
         
         if (error) {
-          console.error('❌ Auth callback error:', error);
+          // Error occurred
           navigate('/?error=' + encodeURIComponent(error.message));
           return;
         }
 
         if (data.session && data.session.user) {
-          console.log('✅ Auth callback successful:', data.session.user.id);
-          console.log('✅ Provider:', data.session.user.app_metadata?.provider);
+          // Log message
+          // Log message
           
           // Check for pending share token
           const pendingShareToken = localStorage.getItem('pendingShareToken');
           if (pendingShareToken) {
-            console.log('🔗 Found pending share token, redirecting to shared trip:', pendingShareToken);
+            // Log message
             navigate(`/shared/${pendingShareToken}`);
           } else {
             // The main App component will handle the authentication state change
             navigate('/');
           }
         } else {
-          console.log('❌ No session found in auth callback');
+          // Log message
           navigate('/');
         }
       } catch (error) {
-        console.error('❌ Auth callback error:', error);
+        // Error occurred
         navigate('/');
       }
     };

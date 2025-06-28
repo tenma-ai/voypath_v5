@@ -136,8 +136,6 @@ export class TripOptimizationService {
   ): Promise<OptimizationResult> {
     try {
       const optimizationSettings = { ...this.DEFAULT_SETTINGS, ...settings }
-      
-      console.log('🚀 Starting optimization for trip:', tripId)
 
       // Always use production Edge Functions (no demo mode)
 
@@ -191,11 +189,9 @@ export class TripOptimizationService {
         executionTimeMs: result.execution_time_ms
       })
       
-      console.log('✅ Optimization pipeline completed')
-      
       return result
     } catch (error) {
-      console.error('Full optimization error:', error)
+      // Optimization error occurred
       onProgress?.({ 
         stage: 'error', 
         progress: 0, 
@@ -211,8 +207,6 @@ export class TripOptimizationService {
    */
   static async normalizePreferences(tripId: string): Promise<NormalizationResult> {
     try {
-      // Normalizing preferences
-
       // Get places and members data for the trip
       const { data: places, error: placesError } = await supabase
         .from('places')
@@ -274,7 +268,7 @@ export class TripOptimizationService {
 
       return response as NormalizationResult
     } catch (error) {
-      console.error('Preference normalization error:', error)
+      // Preference normalization error occurred
       throw error
     }
   }
@@ -290,8 +284,6 @@ export class TripOptimizationService {
     } = {}
   ): Promise<PlaceSelectionResult> {
     try {
-      // Selecting optimal places
-
       // Get normalized places from database (from step 1)
       const { data: places, error: placesError } = await supabase
         .from('places')
@@ -382,7 +374,7 @@ export class TripOptimizationService {
 
       return response as PlaceSelectionResult
     } catch (error) {
-      console.error('Place selection error:', error)
+      // Place selection error occurred
       throw error
     }
   }
@@ -394,7 +386,6 @@ export class TripOptimizationService {
     tripId: string, 
     settings: OptimizationSettings = {}
   ): Promise<OptimizationResult> {
-    // Starting route optimization
     
     // Import supabase
     const { supabase } = await import('../lib/supabase');
@@ -468,18 +459,11 @@ export class TripOptimizationService {
       .eq('trip_id', tripId);
       
     if (freshPlacesError) {
-      console.error('Failed to fetch fresh places:', freshPlacesError);
+      // Failed to fetch fresh places
       throw new Error(`Failed to fetch fresh places: ${freshPlacesError.message}`);
     }
     
     const allTripPlaces = freshPlaces || [];
-    
-    console.log('📡 Calling route optimization API for trip:', tripId, '(' + (allTripPlaces?.length || 0) + ' places)');
-    
-    // Verify we have at least departure + user places
-    if (allTripPlaces?.length < 3) {
-      console.warn('⚠️ Expected at least 3 places (1 system + 2 user), but got:', allTripPlaces?.length);
-    }
 
     const result = await callSupabaseFunction('optimize-route', {
       trip_id: tripId,
@@ -494,8 +478,6 @@ export class TripOptimizationService {
       transport_mode: settings.preferred_transport || 'mixed'
     })
     
-    // Route optimization response received
-    
     if (!result.success) {
       throw new Error(result.error || 'Route optimization failed')
     }
@@ -506,8 +488,6 @@ export class TripOptimizationService {
       throw new Error('No optimization data returned from edge function');
     }
 
-    // Removed verbose data structure logging
-
     // Extract ALL places from daily schedules across ALL days
     let allOptimizedPlaces = [];
     
@@ -516,33 +496,19 @@ export class TripOptimizationService {
       for (const daySchedule of optimizationData.daily_schedules) {
         if (daySchedule.places && Array.isArray(daySchedule.places)) {
           allOptimizedPlaces.push(...daySchedule.places);
-          // Found places in day
         }
       }
-      // Total places from daily schedules
     } else if (optimizationData.optimized_route?.daily_schedules && Array.isArray(optimizationData.optimized_route.daily_schedules)) {
       // Fallback: check optimized_route structure
       for (const daySchedule of optimizationData.optimized_route.daily_schedules) {
         if (daySchedule.places && Array.isArray(daySchedule.places)) {
           allOptimizedPlaces.push(...daySchedule.places);
-          // Found places in day from optimized_route
         }
       }
-      // Total places from optimized_route
     } else if (optimizationData.places && Array.isArray(optimizationData.places)) {
       // Final fallback: direct places array
       allOptimizedPlaces = optimizationData.places;
-      // Found places in direct array
-    } else {
-      console.warn('❌ [TripOptimizationService] No places found in response. Available keys:', Object.keys(optimizationData));
-      console.warn('❌ [TripOptimizationService] Full response structure:');
-      console.warn('  - daily_schedules:', optimizationData.daily_schedules);
-      console.warn('  - optimized_route:', optimizationData.optimized_route);
-      console.warn('  - places:', optimizationData.places);
     }
-    
-    console.log('✅ Optimization completed:', allOptimizedPlaces.length, 'places');
-    // Place names list removed for brevity
 
     // Remove duplicates by ID while preserving order
     const uniquePlaces = [];
@@ -554,7 +520,6 @@ export class TripOptimizationService {
       }
     }
     
-    // Deduplication complete
     const optimizedPlaces = uniquePlaces;
 
     return {
@@ -611,7 +576,7 @@ export class TripOptimizationService {
       results.route = routeResponse.data?.message === 'pong'
 
     } catch (error) {
-      console.error('Connectivity test error:', error)
+      // Connectivity test error occurred
     }
 
     return results
@@ -632,7 +597,7 @@ export class TripOptimizationService {
         .single()
 
       if (error || !data) {
-        console.log('No optimization result found for trip:', tripId)
+        // No optimization result found
         return null
       }
 
@@ -645,7 +610,7 @@ export class TripOptimizationService {
         created_by: data.created_by
       }
     } catch (error) {
-      console.error('Error fetching optimization result:', error)
+      // Error fetching optimization result
       return null
     }
   }
@@ -813,14 +778,14 @@ export class TripOptimizationService {
       }
       
       if (isNaN(date.getTime())) {
-        console.warn(`Invalid time format: ${timeString}, using default 09:00:00`);
+        // Invalid time format, using default
         return '09:00:00';
       }
       
       // Return in HH:mm:ss format
       return date.toTimeString().slice(0, 8);
     } catch (error) {
-      console.warn(`Error parsing time: ${timeString}, using default 09:00:00`, error);
+      // Error parsing time, using default
       return '09:00:00';
     }
   }
@@ -830,8 +795,6 @@ export class TripOptimizationService {
    */
   static async updatePlacesWithSchedule(tripId: string, optimizedRoute: OptimizedRoute): Promise<void> {
     try {
-      // Updating places with optimization schedule
-      
       // First, reset all places to unscheduled
       await supabase
         .from('places')
@@ -848,7 +811,7 @@ export class TripOptimizationService {
 
       // Then update scheduled places from optimization result
       if (!optimizedRoute.daily_schedules || !Array.isArray(optimizedRoute.daily_schedules)) {
-        console.warn('⚠️ No valid daily schedules found, skipping updates')
+        // No valid daily schedules found
         return
       }
       
@@ -866,18 +829,14 @@ export class TripOptimizationService {
           const placeId = placeData.id || scheduledPlace.id;
           const placeName = placeData.name || scheduledPlace.name;
           
-          // Processing scheduled place
-          
           // Skip temporary/virtual places generated by optimization
           // These are computational artifacts for route calculation, not real user places
           if (placeId && (placeId.startsWith('airport_') || placeId.startsWith('return_') || placeId.startsWith('departure_'))) {
-            // Skipping virtual place
             continue;
           }
           
           // Skip places that are clearly airports by category but don't have real IDs
           if (placeData.category === 'airport' && placeData.place_type === 'airport' && !placeId.match(/^[a-f0-9-]{36}$/)) {
-            // Skipping generated airport place
             continue;
           }
           
@@ -929,17 +888,16 @@ export class TripOptimizationService {
               .eq('id', existingPlaces[0].id)
 
             if (error) {
-              console.warn(`Failed to update place ${placeName}:`, error.message)
+              // Failed to update place schedule
             }
           } else {
-            console.warn(`Place not found: ${placeName} (${placeId})`)
+            // Place not found in database
           }
         }
       }
       
-      console.log('✅ Schedule update completed')
     } catch (error) {
-      console.error('Error updating places with schedule:', error)
+      // Error updating places with schedule
       throw error
     }
   }

@@ -75,7 +75,7 @@ export const createCheckoutSession = async () => {
     const { sessionId, url } = await response.json();
     return { sessionId, url };
   } catch (error) {
-    console.error('Error creating checkout session:', error);
+    // Error occurred
     throw error;
   }
 };
@@ -100,7 +100,7 @@ export const createCustomerPortalSession = async () => {
     const { url } = await response.json();
     return url;
   } catch (error) {
-    console.error('Error creating portal session:', error);
+    // Error occurred
     throw error;
   }
 };
@@ -124,7 +124,7 @@ export const checkSubscriptionStatus = async () => {
 
     return await response.json();
   } catch (error) {
-    console.error('Error checking subscription status:', error);
+    // Error occurred
     throw error;
   }
 };

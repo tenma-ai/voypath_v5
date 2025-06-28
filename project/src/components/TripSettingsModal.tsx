@@ -32,19 +32,19 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
 
   // Load trip members when modal opens and currentTrip is available
   useEffect(() => {
-    console.log('🔄 TripSettingsModal useEffect triggered:', { isOpen, currentTripId: currentTrip?.id, currentTripName: currentTrip?.name });
+    // Log message
     if (isOpen && currentTrip?.id) {
-      console.log('🔄 TripSettingsModal: Loading members for trip:', currentTrip.name);
+      // Log message
       loadTripMembers();
     } else {
-      console.log('❌ TripSettingsModal: Not loading members. isOpen:', isOpen, 'currentTrip:', !!currentTrip);
+      // Log message
     }
   }, [isOpen, currentTrip?.id]);
 
   const loadTripMembers = async () => {
     if (!currentTrip?.id) return;
     
-    console.log('🔍 TripSettingsModal: Loading trip members for trip:', currentTrip.id);
+    // Log message
     setIsLoadingMembers(true);
     
     try {
@@ -55,12 +55,12 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
         .eq('trip_id', currentTrip.id);
 
       if (membersError) {
-        console.error('❌ TripSettingsModal: Error loading trip members:', membersError);
+        // Error occurred
         return;
       }
 
       if (!memberIds || memberIds.length === 0) {
-        console.log('ℹ️ TripSettingsModal: No members found for trip:', currentTrip.id);
+        // Log message
         setMembers([]);
         return;
       }
@@ -73,7 +73,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
         .in('id', userIds);
 
       if (usersError) {
-        console.error('❌ TripSettingsModal: Error loading users:', usersError);
+        // Error occurred
         return;
       }
 
@@ -86,13 +86,13 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
         };
       });
 
-      console.log('📊 TripSettingsModal: Combined members data:', membersData);
+      // Log message
 
       if (membersData && membersData.length > 0) {
         const formattedMembers: TripMember[] = membersData
           .filter((member: any) => {
             if (!member.users) {
-              console.warn('⚠️ TripSettingsModal: No user data found for member:', member.user_id);
+              // Warning occurred
               return false;
             }
             return true;
@@ -107,11 +107,11 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
             isOnline: Math.random() > 0.5 // Temporary random online status
           }));
         
-        console.log('✅ TripSettingsModal: Formatted members data:', formattedMembers);
+        // Log message
         setMembers(formattedMembers);
       }
     } catch (error) {
-      console.error('❌ TripSettingsModal: Error loading trip members:', error);
+      // Error occurred
     } finally {
       setIsLoadingMembers(false);
     }
@@ -142,7 +142,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
         .eq('user_id', memberId);
 
       if (error) {
-        console.error('Error updating member role:', error);
+        // Error occurred
         return;
       }
 
@@ -153,7 +153,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
         )
       );
     } catch (error) {
-      console.error('Error updating member role:', error);
+      // Error occurred
     }
   };
 
@@ -164,7 +164,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
       try {
         await updateTrip(currentTrip.id, { addPlaceDeadline: deadlineISO });
       } catch (error) {
-        console.error('Failed to update deadline:', error);
+        // Error occurred
       }
     }
   };
@@ -283,7 +283,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
                             <input
                               type="text"
                               value={currentTrip?.name || ''}
-                              onChange={(e) => currentTrip && updateTrip(currentTrip.id, { name: e.target.value }).catch(console.error)}
+                              onChange={(e) => currentTrip && updateTrip(currentTrip.id, { name: e.target.value }).catch(() => {})}
                               className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
                             />
                           </div>
@@ -293,7 +293,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
                             </label>
                             <textarea
                               value={currentTrip?.description || ''}
-                              onChange={(e) => currentTrip && updateTrip(currentTrip.id, { description: e.target.value }).catch(console.error)}
+                              onChange={(e) => currentTrip && updateTrip(currentTrip.id, { description: e.target.value }).catch(() => {})}
                               rows={3}
                               className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300 resize-none"
                             />

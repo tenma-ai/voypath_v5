@@ -29,7 +29,7 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
     }
     
     try {
-      console.log('🚀 Attempting to join trip with code:', joinCode);
+      // Log message
       
       // Get auth headers
       const { data: { session } } = await supabase.auth.getSession();
@@ -37,13 +37,13 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
         throw new Error('Please log in to join a trip');
       }
 
-      console.log('🔐 Session exists:', !!session);
-      console.log('🔑 Access token present:', !!session.access_token);
-      console.log('🔑 Access token length:', session.access_token?.length);
+      // Log message
+      // Log message
+      // Log message
 
       // Remove hyphens from the code if present
       const cleanCode = joinCode.replace(/-/g, '').toUpperCase();
-      console.log('🔑 Cleaned invitation code:', cleanCode);
+      // Log message
 
       // Call trip-member-management Edge Function
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/join-trip', {
@@ -58,19 +58,19 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
         }),
       });
 
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response headers:', response.headers);
+      // Log message
+      // Log message
 
       if (!response.ok) {
         let errorMessage = 'Failed to join trip';
         try {
           const errorData = await response.json();
-          console.log('❌ Error response data:', errorData);
+          // Log message
           errorMessage = errorData.error || errorData.message || errorMessage;
         } catch (parseError) {
-          console.log('❌ Could not parse error response:', parseError);
+          // Log message
           const errorText = await response.text();
-          console.log('❌ Error response text:', errorText);
+          // Log message
           if (errorText) errorMessage = errorText;
         }
         
@@ -89,7 +89,7 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
       }
 
       const data = await response.json();
-      console.log('✅ Successfully joined trip:', data);
+      // Log message
 
       // Refresh trips data from database
       await initializeFromDatabase();
@@ -98,7 +98,7 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
       onClose();
       setJoinCode('');
     } catch (error) {
-      console.error('❌ Failed to join trip:', error);
+      // Error occurred
       setError(error instanceof Error ? error.message : 'Failed to join trip');
     } finally {
       setIsJoining(false);

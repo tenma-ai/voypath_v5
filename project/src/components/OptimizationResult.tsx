@@ -79,14 +79,14 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
     const dailySchedules = result?.optimization?.daily_schedules;
     
     // Debug logging
-    console.log('🔍 [OptimizationResult] Formatting Edge Function result:', result);
-    console.log('🔍 [OptimizationResult] Daily schedules:', dailySchedules);
-    console.log('🔍 [OptimizationResult] Daily schedules type:', typeof dailySchedules);
-    console.log('🔍 [OptimizationResult] Is array:', Array.isArray(dailySchedules));
+    // Log message
+    // Log message
+    // Log message
+    // Log: '🔍 [OptimizationResult] Is array:', Array.isArray(dailySchedules));
     
     // Safety check for required properties
     if (!result?.optimization || !dailySchedules || !Array.isArray(dailySchedules)) {
-      console.error('❌ [OptimizationResult] Invalid optimization result structure:', result);
+      // Error occurred
       return {
         schedulesByDay: {},
         totalStats: { places: 0, travelTime: 0, visitTime: 0, score: 0 },
@@ -95,9 +95,9 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
     }
 
     const schedulesByDay = dailySchedules.reduce((acc, schedule) => {
-      console.log('🔍 [OptimizationResult] Processing schedule:', schedule);
-      console.log('🔍 [OptimizationResult] Schedule scheduled_places:', schedule.scheduled_places);
-      console.log('🔍 [OptimizationResult] Schedule scheduled_places length:', schedule.scheduled_places?.length);
+      // Log message
+      // Log message
+      // Log message
       
       const dayKey = schedule.day ? `day-${schedule.day}` : schedule.date || `day-${Object.keys(acc).length + 1}`;
       if (!acc[dayKey]) acc[dayKey] = [];
@@ -106,7 +106,7 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
       const schedulePlaces = schedule.scheduled_places || [];
       acc[dayKey] = schedulePlaces.sort((a, b) => (a.order_in_day || 0) - (b.order_in_day || 0));
       
-      console.log('🔍 [OptimizationResult] Assigned to day', dayKey, ':', acc[dayKey].length, 'places');
+      // Log message
       return acc;
     }, {} as Record<string, ScheduledPlace[]>);
 

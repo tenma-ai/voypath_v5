@@ -102,11 +102,11 @@ export class PlaceDuplicateService {
         }
       }
 
-      console.log('🔍 [PlaceDuplicateService] Found duplicates:', duplicates);
+      // Log message
       return duplicates;
 
     } catch (error) {
-      console.error('Error checking for duplicates:', error);
+      // Error occurred
       return [];
     }
   }
@@ -187,11 +187,11 @@ export class PlaceDuplicateService {
         }
       }
 
-      console.log('🔍 [PlaceDuplicateService] Found duplicate groups:', duplicateGroups);
+      // Log message
       return duplicateGroups;
 
     } catch (error) {
-      console.error('Error finding duplicates in trip:', error);
+      // Error occurred
       return [];
     }
   }
@@ -207,7 +207,7 @@ export class PlaceDuplicateService {
         return false;
       }
 
-      console.log('🔀 [PlaceDuplicateService] Merging places:', places.map(p => p.name));
+      // Log: '🔀 [PlaceDuplicateService] Merging places:', places.map(p => p.name));
 
       // Keep the recommended merge place, update it with merged data
       const keepPlace = places.find(p => p.id === recommendedMerge.id) || places[0];
@@ -238,11 +238,11 @@ export class PlaceDuplicateService {
         throw deleteError;
       }
 
-      console.log('✅ [PlaceDuplicateService] Successfully merged places');
+      // Log message
       return true;
 
     } catch (error) {
-      console.error('Error merging duplicate places:', error);
+      // Error occurred
       return false;
     }
   }
@@ -262,11 +262,11 @@ export class PlaceDuplicateService {
         }
       }
 
-      console.log(`✅ [PlaceDuplicateService] Auto-merged ${mergedCount} duplicate groups`);
+      // Log message
       return mergedCount;
 
     } catch (error) {
-      console.error('Error auto-merging duplicates:', error);
+      // Error occurred
       return 0;
     }
   }
@@ -428,7 +428,7 @@ export class PlaceDuplicateService {
         groups
       };
     } catch (error) {
-      console.error('Error getting duplicate summary:', error);
+      // Error occurred
       return {
         totalDuplicateGroups: 0,
         totalDuplicatePlaces: 0,

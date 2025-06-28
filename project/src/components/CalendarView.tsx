@@ -17,11 +17,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
 
   // Generate gradient style for multiple contributors using centralized color logic
   const getPlaceStyle = (place: any) => {
-    console.log('🎨 [CalendarView] Getting style for place:', place.place_name || place.name);
+    // Log message
     
     // Use centralized color utility
     const colorResult = getPlaceColor(place);
-    console.log('🎨 [CalendarView] Color result:', colorResult);
+    // Log message
     
     // Handle system places based on place type
     if (place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport') {
@@ -31,7 +31,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     // Convert to calendar view styling format
     if (colorResult.type === 'single') {
       const color = colorResult.background;
-      console.log('🎨 [CalendarView] Single color:', color);
+      // Log message
       return { borderLeftColor: color, backgroundColor: `${color}10` };
     } else if (colorResult.type === 'gold') {
       return { borderLeftColor: '#FFD700', backgroundColor: '#FFD70010' };
@@ -47,7 +47,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     } else {
       // Fallback to background color
       const color = colorResult.background || '#9CA3AF';
-      console.log('🎨 [CalendarView] Fallback color:', color);
+      // Log message
       return { borderLeftColor: color, backgroundColor: `${color}10` };
     }
   };

@@ -97,7 +97,7 @@ export function ChatPage() {
         await markMessagesAsRead(data.map(m => m.id));
       }
     } catch (error) {
-      console.error('❌ Failed to load messages:', error);
+      // Failed to load messages
     } finally {
       setLoading(false);
     }
@@ -165,7 +165,7 @@ export function ChatPage() {
       );
       
     } catch (error) {
-      console.error('❌ Failed to send message:', error);
+      // Failed to send message - restore optimistic message
       // エラー時：楽観的メッセージを削除し、入力を復元
       setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
       setMessage(messageContent);
@@ -223,7 +223,7 @@ export function ChatPage() {
       setMessages(prev => [...prev, { ...data, reactions: [], reads: [] }]);
       
     } catch (error) {
-      console.error('❌ Failed to upload image:', error);
+      // Failed to upload image
     } finally {
       setUploading(false);
     }
@@ -237,7 +237,7 @@ export function ChatPage() {
       // メッセージがこのトリップのものかチェック
       const message = messages.find(m => m.id === messageId);
       if (!message || message.trip_id !== currentTrip.id) {
-        console.error('❌ Message not found or not in current trip');
+        // Message not found or not in current trip
         return;
       }
 
@@ -351,7 +351,7 @@ export function ChatPage() {
 
       setShowEmojiPicker(null);
     } catch (error) {
-      console.error('❌ Failed to handle reaction:', error);
+      // Failed to handle reaction
     }
   };
 
@@ -371,7 +371,7 @@ export function ChatPage() {
 
       if (error) throw error;
     } catch (error) {
-      console.error('❌ Failed to mark messages as read:', error);
+      // Failed to mark messages as read
     }
   };
 
@@ -528,7 +528,7 @@ export function ChatPage() {
         setCurrentUserColor(assignedColor);
       }
     } catch (error) {
-      console.error('❌ Failed to load current user color:', error);
+      // Failed to load current user color
     }
   }, [currentTrip?.id, user?.id]);
 

@@ -28,7 +28,7 @@ class PixabayService {
   constructor() {
     this.apiKey = import.meta.env.VITE_PIXABAY_API_KEY || '';
     if (!this.apiKey) {
-      console.warn('VITE_PIXABAY_API_KEY is not set. Using placeholder images.');
+      // VITE_PIXABAY_API_KEY is not set. Using placeholder images.
     }
   }
 
@@ -51,7 +51,7 @@ class PixabayService {
   async searchPhoto(query: string, size: 'small' | 'medium' | 'large' = 'medium'): Promise<string> {
     // If no API key, return fallback immediately
     if (!this.apiKey) {
-      console.warn('Pixabay API key not available, using fallback image');
+      // Pixabay API key not available, using fallback image
       return this.getFallbackImage();
     }
 
@@ -63,18 +63,18 @@ class PixabayService {
         .toLowerCase();
 
       if (!cleanQuery) {
-        console.warn('Empty query after cleaning, using fallback image');
+        // Empty query after cleaning, using fallback image
         return this.getFallbackImage();
       }
 
       // Check cache first
       const cacheKey = `${cleanQuery}_${size}`;
       if (this.cache.has(cacheKey)) {
-        console.log(`Using cached image for: ${cleanQuery}`);
+        // Using cached image
         return this.cache.get(cacheKey)!;
       }
 
-      console.log(`Searching Pixabay for: "${cleanQuery}"`);
+      // Searching Pixabay for query
 
       // Use consistent parameters for reliable results
       const pageNumber = 1; // Always use first page
@@ -99,7 +99,7 @@ class PixabayService {
             imageUrl = photo.webformatURL;
         }
         
-        console.log(`Found ${data.hits.length} photos for "${cleanQuery}", selected first photo`);
+        // Found photos, selected first photo
         
         // Cache the result
         this.cache.set(cacheKey, imageUrl);
@@ -107,10 +107,10 @@ class PixabayService {
         return imageUrl;
       }
 
-      console.warn(`No photos found for query: "${cleanQuery}"`);
+      // No photos found for query
       return this.getFallbackImage();
     } catch (error) {
-      console.error('Error fetching photo from Pixabay:', error);
+      // Error fetching photo from Pixabay
       return this.getFallbackImage();
     }
   }
@@ -148,7 +148,7 @@ class PixabayService {
       cleaned = 'los angeles california';
     }
 
-    console.log(`Extracted location name: "${placeName}" -> "${cleaned}"`);
+    // Extracted location name
     return cleaned;
   }
 

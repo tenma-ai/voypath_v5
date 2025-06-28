@@ -17,17 +17,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   useEffect(() => {
     const loadMemberColors = async () => {
       if (!currentTrip?.id) {
-        console.log('🔍 [CalendarView] No current trip, skipping color load');
+        // Log message
         return;
       }
 
       try {
-        console.log('🔍 [CalendarView] Loading member colors for trip:', currentTrip.id);
+        // Log message
         const colorMapping = await MemberColorService.getSimpleColorMapping(currentTrip.id);
-        console.log('🔍 [CalendarView] Loaded member colors:', colorMapping);
+        // Log message
         setMemberColors(colorMapping);
       } catch (error) {
-        console.error('🔍 [CalendarView] Failed to load member colors:', error);
+        // Error occurred
         setMemberColors({});
       }
     };
@@ -52,7 +52,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                      placeNameLower.includes('arrival');
     
     if (isDeparture || isArrival) {
-      console.log(`🔍 [CalendarView] Place is departure/arrival: ${placeName}`);
+      // Log message
       return { borderLeftColor: '#000000', backgroundColor: '#00000010' };
     }
 
@@ -127,13 +127,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     // Get actual contributors for this place
     let contributors: any[] = [];
     
-    console.log(`🔍 [CalendarView] Place raw data:`, {
-      name: place.place_name || place.name,
-      memberContribution: place.member_contribution,
-      addedBy: place.added_by,
-      userId: place.user_id,
-      createdBy: place.created_by
-    });
+    // Getting place raw data for processing
 
     // First, try to get contributors from member_contribution field
     if (place.member_contribution) {
@@ -174,7 +168,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       };
     });
 
-    console.log(`🔍 [CalendarView] Final contributors:`, contributors);
+    // Log message
 
     const contributorCount = contributors.length;
     

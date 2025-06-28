@@ -54,7 +54,7 @@ export class PlaceSearchService {
       });
       PlaceSearchService.initialized = true;
     } catch (error) {
-      console.error('Failed to initialize Google Maps API:', error);
+      // Error occurred
       throw error;
     }
   }
@@ -82,14 +82,14 @@ export class PlaceSearchService {
         );
 
         // Prepare search request with proper location handling
-        console.log('🔍 Preparing search request for:', request.inputValue.trim());
+        // Log: '🔍 Preparing search request for:', request.inputValue.trim());
         const searchRequest: any = {
           query: request.inputValue.trim(),
           language: request.language,
           // Add fields to improve search accuracy
           fields: ['place_id', 'name', 'formatted_address', 'geometry', 'rating', 'user_ratings_total', 'types', 'photos']
         };
-        console.log('📝 Search request object:', searchRequest);
+        // Log message
 
         // Add location and radius if provided
         if (request.location) {
@@ -103,7 +103,7 @@ export class PlaceSearchService {
         }
 
         const timeout = setTimeout(() => {
-          console.warn('Places search timeout');
+          // Warning occurred
           resolve([]);
         }, 10000); // 10 second timeout
 
@@ -119,7 +119,7 @@ export class PlaceSearchService {
           } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
             resolve([]);
           } else {
-            console.warn(`Places search failed with status: ${status}`);
+            // Warning occurred
             // Try to provide fallback or reject depending on the error
             if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT) {
               reject(new Error('API quota exceeded'));
@@ -131,7 +131,7 @@ export class PlaceSearchService {
           }
         });
       } catch (error) {
-        console.error('Error in searchPlaces:', error);
+        // Error occurred
         reject(error);
       }
     });
@@ -170,12 +170,12 @@ export class PlaceSearchService {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     
     if (!apiKey) {
-      console.warn('Google Maps API key not found for photo URL generation');
+      // Warning occurred
       return '';
     }
     
     if (!photoReference) {
-      console.warn('Photo reference is required for photo URL generation');
+      // Warning occurred
       return '';
     }
     
@@ -216,7 +216,7 @@ export class PlaceSearchService {
         };
 
         const timeout = setTimeout(() => {
-          console.warn('Place details timeout');
+          // Warning occurred
           resolve(null);
         }, 10000);
 
@@ -227,12 +227,12 @@ export class PlaceSearchService {
             const googlePlace = PlaceSearchService.convertToGooglePlace(place);
             resolve(googlePlace);
           } else {
-            console.warn(`Place details failed with status: ${status}`);
+            // Warning occurred
             resolve(null);
           }
         });
       } catch (error) {
-        console.error('Error in getPlaceDetails:', error);
+        // Error occurred
         reject(error);
       }
     });

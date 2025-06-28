@@ -107,7 +107,7 @@ export default function OptimizationResultsVisualization({
 
   const handlePlaceSelect = (place: OptimizedPlace) => {
     setViewMode('details');
-    console.log('Selected place:', place);
+    // Log message
   };
 
   const handleCardExpansion = (placeId: string) => {

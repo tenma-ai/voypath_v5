@@ -33,7 +33,7 @@ export class PlaceDateUtils {
       try {
         return new Date(place.scheduled_date);
       } catch (error) {
-        console.warn('Invalid scheduled_date for place:', place.id, error);
+        // Warning occurred
       }
     }
     
@@ -41,7 +41,7 @@ export class PlaceDateUtils {
       try {
         return new Date(place.scheduledDate);
       } catch (error) {
-        console.warn('Invalid scheduledDate for place:', place.id, error);
+        // Warning occurred
       }
     }
     
@@ -50,7 +50,7 @@ export class PlaceDateUtils {
       try {
         return new Date(place.created_at);
       } catch (error) {
-        console.warn('Invalid created_at for place:', place.id, error);
+        // Warning occurred
       }
     }
     

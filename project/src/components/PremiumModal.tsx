@@ -61,7 +61,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose }) =
         throw new Error(stripeError.message);
       }
     } catch (err) {
-      console.error('Premium upgrade error:', err);
+      // Error occurred
       setError(err instanceof Error ? err.message : 'An error occurred during payment processing');
     } finally {
       setLoading(false);

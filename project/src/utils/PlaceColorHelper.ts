@@ -25,17 +25,11 @@ export interface PlaceColorResult {
  * @returns 色表示設定
  */
 export function calculatePlaceColor(place: any, members: any[] = [], memberColors?: Record<string, string>): PlaceColorResult {
-  console.log('🎨 [PlaceColorHelper] Calculating color for place:', {
-    placeName: place.name,
-    placeType: place.place_type,
-    userId: place.userId || place.user_id,
-    membersCount: members.length,
-    memberColors: memberColors
-  });
+  // Calculating color for place
 
   // システム場所（出発地・到着地・空港）の場合は特別な処理
   if (place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport') {
-    console.log('🎨 [PlaceColorHelper] System place, using gray color');
+    // Log message
     return {
       type: 'single',
       background: '#374151', // Gray-700 for system places
@@ -45,11 +39,11 @@ export function calculatePlaceColor(place: any, members: any[] = [], memberColor
 
   // 貢献者の取得
   const contributors = getPlaceContributors(place, members, memberColors);
-  console.log('🎨 [PlaceColorHelper] Contributors found:', contributors);
+  // Log message
   
   if (contributors.length === 0) {
     // 貢献者がいない場合はデフォルト色
-    console.log('🎨 [PlaceColorHelper] No contributors, using default gray');
+    // Log message
     return {
       type: 'single',
       background: '#6B7280', // Gray-500
@@ -59,7 +53,7 @@ export function calculatePlaceColor(place: any, members: any[] = [], memberColor
 
   if (contributors.length === 1) {
     // 1人の貢献者: 単色表示
-    console.log('🎨 [PlaceColorHelper] Single contributor, color:', contributors[0].color);
+    // Log message
     return {
       type: 'single',
       background: contributors[0].color,

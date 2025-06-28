@@ -85,17 +85,14 @@ export function TripDetailPage() {
       if (tripId) {
         // If trips are not loaded yet, try loading them
         if (trips.length === 0) {
-          console.log('🔄 TripDetailPage: No trips loaded yet, attempting to load...');
           await loadTripsFromDatabase();
           return; // Will re-run when trips update
         }
         
         const targetTrip = trips.find(t => t.id === tripId);
         if (targetTrip && (!currentTrip || currentTrip.id !== tripId)) {
-          console.log('🎯 TripDetailPage: Setting current trip from URL param:', tripId);
           await setCurrentTrip(targetTrip);
         } else if (!targetTrip) {
-          console.log('⚠️ TripDetailPage: Trip not found in user trips:', tripId);
           // Try loading trips again in case it was just added
           await loadTripsFromDatabase();
         }
@@ -117,7 +114,6 @@ export function TripDetailPage() {
   const loadTripMembers = async () => {
     if (!currentTrip?.id) return;
     
-    console.log('🔍 TripDetailPage: Loading trip members for trip:', currentTrip.id);
     setIsLoadingMembers(true);
     
     try {
@@ -128,12 +124,11 @@ export function TripDetailPage() {
         .eq('trip_id', currentTrip.id);
 
       if (membersError) {
-        console.error('❌ TripDetailPage: Error loading trip members:', membersError);
+        // Error loading trip members
         return;
       }
 
       if (!memberIds || memberIds.length === 0) {
-        console.log('ℹ️ TripDetailPage: No members found for trip:', currentTrip.id);
         setMembers([]);
         return;
       }
@@ -146,13 +141,12 @@ export function TripDetailPage() {
         .in('id', userIds);
 
       if (usersError) {
-        console.error('❌ TripDetailPage: Error loading users:', usersError);
+        // Error loading users
         return;
       }
 
       // Load member colors
       const colorMapping = await MemberColorService.getSimpleColorMapping(currentTrip.id);
-      console.log('🎨 TripDetailPage: Color mapping:', colorMapping);
       setMemberColors(colorMapping);
 
       // Combine the data
@@ -164,7 +158,6 @@ export function TripDetailPage() {
         };
       });
 
-      console.log('📊 TripDetailPage: Combined members data:', membersData);
 
       if (membersData && membersData.length > 0) {
         const formattedMembers: TripMember[] = membersData.map((member: any) => {
@@ -181,11 +174,10 @@ export function TripDetailPage() {
           };
         });
         
-        console.log('✅ TripDetailPage: Formatted members data with colors:', formattedMembers);
         setMembers(formattedMembers);
       }
     } catch (error) {
-      console.error('❌ TripDetailPage: Error loading trip members:', error);
+      // Error loading trip members
     } finally {
       setIsLoadingMembers(false);
     }
@@ -196,7 +188,6 @@ export function TripDetailPage() {
     if (tripId && trips.length > 0) {
       const trip = trips.find(t => t.id === tripId);
       if (trip && (!currentTrip || currentTrip.id !== tripId)) {
-        console.log('🔄 TripDetailPage: Setting current trip from route:', trip.name);
         setCurrentTrip(trip);
       }
     }
@@ -206,12 +197,11 @@ export function TripDetailPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        console.log('🔄 TripDetailPage: Loading fresh data from database...');
         if (currentTrip) {
           await loadPlacesFromDatabase(currentTrip.id);
         }
       } catch (error) {
-        console.error('Failed to load trip data:', error);
+        // Failed to load trip data
       }
     };
 
@@ -235,27 +225,6 @@ export function TripDetailPage() {
   );
   const hasPlaces = tripPlaces.length > 0;
   
-  // Debug logging
-  useEffect(() => {
-    console.log('TripDetailPage Debug:', {
-      tripId: currentTrip?.id,
-      tripName: currentTrip?.name,
-      totalPlaces: places.length,
-      tripPlacesCount: tripPlaces.length,
-      hasPlaces,
-      isOptimizing,
-      user: !!user,
-      hasOptimizationResult: !!optimizationResult,
-      optimizationResultStructure: optimizationResult ? {
-        success: optimizationResult.success,
-        hasOptimization: !!optimizationResult.optimization,
-        hasDailySchedules: !!optimizationResult.optimization?.daily_schedules,
-        dailySchedulesCount: Array.isArray(optimizationResult.optimization?.daily_schedules) 
-          ? optimizationResult.optimization.daily_schedules.length 
-          : 0
-      } : null
-    });
-  }, [currentTrip?.id, places.length, tripPlaces.length, hasPlaces, isOptimizing, user, optimizationResult]);
 
   // Use current trip - redirect to home if none selected
   if (!currentTrip) {
@@ -294,7 +263,6 @@ export function TripDetailPage() {
     setOptimizationError(null);
 
     try {
-      console.log('🔍 [TripDetailPage] Starting optimization trigger - setting hasUserOptimized to true');
       setHasUserOptimized(true);
       
       // Import TripOptimizationService dynamically
@@ -325,7 +293,7 @@ export function TripDetailPage() {
         throw new Error('Optimization failed to return valid results');
       }
     } catch (error) {
-      console.error('Optimization failed:', error);
+      // Optimization failed
       setOptimizationError(error instanceof Error ? error.message : 'Optimization failed');
     } finally {
       setIsOptimizing(false);
@@ -613,7 +581,6 @@ export function TripDetailPage() {
             activeView === 'map' ? 'opacity-100 z-20 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
           }`}
         >
-          {console.log('🔍 [TripDetailPage] Rendering MapView for trip:', currentTrip?.name, 'with optimization result:', !!optimizationResult)}
           <MapView optimizationResult={optimizationResult} />
         </div>
         

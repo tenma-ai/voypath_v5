@@ -140,7 +140,7 @@ export function MapViewModal({ result, onClose }: MapViewModalProps) {
           left: 50
         });
       } catch (error) {
-        console.error('Error fitting bounds:', error);
+        // Error occurred
         mapInstance.setCenter(getMapCenter());
         mapInstance.setZoom(12);
       }

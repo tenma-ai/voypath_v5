@@ -53,7 +53,7 @@ export function CalendarViewModal({ result, onClose }: CalendarViewModalProps) {
           const dateString = scheduleDate.toISOString().split('T')[0];
           map.set(dateString, schedule);
         } catch (error) {
-          console.warn('Could not calculate trip date for day', schedule.day, error);
+          // Warning occurred
         }
       }
     });

@@ -229,7 +229,7 @@ export class DetailedScheduleService {
       return comprehensiveSchedule;
 
     } catch (error) {
-      console.error('Schedule generation error:', error);
+      // Error occurred
       throw new Error(`Failed to generate schedule: ${error.message}`);
     }
   }
@@ -244,7 +244,7 @@ export class DetailedScheduleService {
       });
 
       if (error) {
-        console.warn('Failed to fetch member colors:', error);
+        // Warning occurred
         return {};
       }
 
@@ -260,7 +260,7 @@ export class DetailedScheduleService {
 
       return colorMap;
     } catch (error) {
-      console.warn('Error fetching member colors:', error);
+      // Warning occurred
       return {};
     }
   }
@@ -308,7 +308,7 @@ export class DetailedScheduleService {
 
       return data?.result;
     } catch (error) {
-      console.error('Route generation error:', error);
+      // Error occurred
       // Return fallback simple schedule
       return this.generateFallbackRoute(places);
     }
@@ -590,10 +590,10 @@ export class DetailedScheduleService {
         });
 
       if (error) {
-        console.error('Failed to save schedule to database:', error);
+        // Error occurred
       }
     } catch (error) {
-      console.error('Database save error:', error);
+      // Error occurred
     }
   }
 
@@ -873,7 +873,7 @@ export class DetailedScheduleService {
 
       return JSON.stringify(exportData, null, 2);
     } catch (error) {
-      console.error('JSON export error:', error);
+      // Error occurred
       throw new Error(`Failed to export schedule to JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -988,7 +988,7 @@ export class DetailedScheduleService {
       
       return icalContent.join('\r\n');
     } catch (error) {
-      console.error('iCal export error:', error);
+      // Error occurred
       throw new Error(`Failed to export schedule to iCal: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -1013,7 +1013,7 @@ export class DetailedScheduleService {
       
       return result;
     } catch (error) {
-      console.error('Schedule export error:', error);
+      // Error occurred
       throw error;
     }
   }
@@ -1119,7 +1119,7 @@ export class DetailedScheduleService {
         expiresAt
       };
     } catch (error) {
-      console.error('Share link generation error:', error);
+      // Error occurred
       throw new Error(`Failed to generate shareable link: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -1165,7 +1165,7 @@ export class DetailedScheduleService {
         accessCount: data.access_count + 1
       };
     } catch (error) {
-      console.error('Get shared schedule error:', error);
+      // Error occurred
       return null;
     }
   }
@@ -1288,7 +1288,7 @@ export class DetailedScheduleService {
           throw new Error('Unsupported sharing method');
       }
     } catch (error) {
-      console.error('Schedule sharing error:', error);
+      // Error occurred
       return {
         success: false,
         message: `Failed to share schedule: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -1331,7 +1331,7 @@ export class DetailedScheduleService {
         message: 'Comment added successfully'
       };
     } catch (error) {
-      console.error('Add comment error:', error);
+      // Error occurred
       return {
         success: false,
         message: `Failed to add comment: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -1367,7 +1367,7 @@ export class DetailedScheduleService {
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Get comments error:', error);
+        // Error occurred
         return [];
       }
       
@@ -1381,7 +1381,7 @@ export class DetailedScheduleService {
         createdAt: comment.created_at
       }));
     } catch (error) {
-      console.error('Get schedule comments error:', error);
+      // Error occurred
       return [];
     }
   }

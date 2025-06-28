@@ -75,7 +75,7 @@ class BusinessMetricsService {
         }
       })
     } catch (error) {
-      console.warn('Failed to initialize business metrics session:', error)
+      // Warning: 'Failed to initialize business metrics session:', error)
     }
   }
 
@@ -98,7 +98,7 @@ class BusinessMetricsService {
         .insert(metricData)
 
       if (error) {
-        console.error('Failed to record business metric:', error)
+        // Error: 'Failed to record business metric:', error)
         // Buffer the metric for retry
         this.featureUsageBuffer.push(metricData)
         return false
@@ -106,7 +106,7 @@ class BusinessMetricsService {
 
       return true
     } catch (error) {
-      console.error('Error recording business metric:', error)
+      // Error: 'Error recording business metric:', error)
       return false
     }
   }
@@ -191,7 +191,7 @@ class BusinessMetricsService {
       const { data, error } = await query
 
       if (error) {
-        console.error('Failed to fetch feature usage stats:', error)
+        // Error: 'Failed to fetch feature usage stats:', error)
         return []
       }
 
@@ -228,7 +228,7 @@ class BusinessMetricsService {
         last_used: stats.last_used
       }))
     } catch (error) {
-      console.error('Error fetching feature usage stats:', error)
+      // Error: 'Error fetching feature usage stats:', error)
       return []
     }
   }
@@ -256,7 +256,7 @@ class BusinessMetricsService {
       const { data, error } = await query
 
       if (error) {
-        console.error('Failed to fetch user engagement metrics:', error)
+        // Error: 'Failed to fetch user engagement metrics:', error)
         return []
       }
 
@@ -299,7 +299,7 @@ class BusinessMetricsService {
         engagement_score: this.calculateEngagementScore(metrics)
       }))
     } catch (error) {
-      console.error('Error fetching user engagement metrics:', error)
+      // Error: 'Error fetching user engagement metrics:', error)
       return []
     }
   }
@@ -347,7 +347,7 @@ class BusinessMetricsService {
 
       return this.calculateKPITrends(currentKPIs, previousKPIs)
     } catch (error) {
-      console.error('Error fetching business KPIs:', error)
+      // Error: 'Error fetching business KPIs:', error)
       return []
     }
   }
@@ -417,7 +417,7 @@ class BusinessMetricsService {
       // Flush any buffered metrics
       await this.flushBufferedMetrics()
     } catch (error) {
-      console.warn('Failed to end business metrics session:', error)
+      // Warning: 'Failed to end business metrics session:', error)
     }
   }
 
@@ -436,7 +436,7 @@ class BusinessMetricsService {
         this.featureUsageBuffer = []
       }
     } catch (error) {
-      console.error('Failed to flush buffered metrics:', error)
+      // Error: 'Failed to flush buffered metrics:', error)
     }
   }
 

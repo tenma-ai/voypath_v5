@@ -87,7 +87,7 @@ export class HybridDataManager {
       return { operations, success: true, place: primaryResult }
 
     } catch (primaryError) {
-      console.warn('Primary storage failed, using fallback strategy:', primaryError)
+      // Warning: 'Primary storage failed, using fallback strategy:', primaryError)
       
       // Strategy 3: Fallback to local storage
       try {
@@ -136,7 +136,7 @@ export class HybridDataManager {
       }
 
     } catch (error) {
-      console.warn('Primary/cache retrieval failed, using local storage:', error)
+      // Warning: 'Primary/cache retrieval failed, using local storage:', error)
     }
 
     // Strategy 3: Fallback to local storage
@@ -156,9 +156,9 @@ export class HybridDataManager {
       try {
         await this.saveToPrimaryStorage(item.data, session)
         syncedItems.push(item.id)
-        console.log('Synced item:', item.id)
+        // Log: 'Synced item:', item.id)
       } catch (error) {
-        console.warn('Failed to sync item:', item.id, error)
+        // Warning: 'Failed to sync item:', item.id, error)
         // Keep in queue for next sync attempt
       }
     }
@@ -238,7 +238,7 @@ export class HybridDataManager {
         }
       }
     } catch (error) {
-      console.warn('Cache retrieval failed:', error)
+      // Warning: 'Cache retrieval failed:', error)
     }
     return null
   }
@@ -251,7 +251,7 @@ export class HybridDataManager {
       }
       localStorage.setItem(`cache_places_${sessionId}`, JSON.stringify(cacheData))
     } catch (error) {
-      console.warn('Cache storage failed:', error)
+      // Warning: 'Cache storage failed:', error)
     }
   }
 
@@ -281,7 +281,7 @@ export class HybridDataManager {
         ) || []
       }
     } catch (error) {
-      console.warn('Local storage retrieval failed:', error)
+      // Warning: 'Local storage retrieval failed:', error)
     }
     return []
   }
@@ -308,7 +308,7 @@ export class HybridDataManager {
       const stored = localStorage.getItem(this.SYNC_QUEUE_KEY)
       return stored ? JSON.parse(stored) : []
     } catch (error) {
-      console.warn('Sync queue retrieval failed:', error)
+      // Warning: 'Sync queue retrieval failed:', error)
       return []
     }
   }
@@ -317,7 +317,7 @@ export class HybridDataManager {
     try {
       localStorage.setItem(this.SYNC_QUEUE_KEY, JSON.stringify(queue))
     } catch (error) {
-      console.warn('Sync queue storage failed:', error)
+      // Warning: 'Sync queue storage failed:', error)
     }
   }
 
@@ -375,7 +375,7 @@ export class HybridDataManager {
       return { success: true, migratedCount: guestPlaces.length }
 
     } catch (error) {
-      console.error('Migration failed:', error)
+      // Error: 'Migration failed:', error)
       return { success: false, migratedCount: 0 }
     }
   }
@@ -395,7 +395,7 @@ export class HybridDataManager {
         .is('migrated_to_user_id', null)
 
     } catch (error) {
-      console.error('Cleanup failed:', error)
+      // Error: 'Cleanup failed:', error)
     }
   }
 }

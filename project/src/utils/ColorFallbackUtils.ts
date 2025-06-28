@@ -21,7 +21,7 @@ export function getColorOrFallback(
       color === 'black' ||
       color.toLowerCase() === 'rgb(0, 0, 0)' ||
       color.toLowerCase() === 'rgba(0, 0, 0, 1)') {
-    console.warn(`🎨 Invalid color detected: "${color}", using fallback`);
+    // Warning occurred
     return MemberColorService.getColorByIndex(fallbackIndex).hex;
   }
   
@@ -39,7 +39,7 @@ export function getPlaceColorWithFallback(
   const userId = place.user_id || place.userId;
   
   if (!userId) {
-    console.warn('🎨 No user ID found for place:', place.name);
+    // Warning occurred
     return MemberColorService.getColorByIndex(0).hex; // Default to first fallback color
   }
   
@@ -56,14 +56,5 @@ export function debugColorIssue(
   memberColors: Record<string, string>,
   resolvedColor: string
 ): void {
-  console.group(`🎨 Color Debug: ${context}`);
-  console.log('Place:', {
-    id: place.id,
-    name: place.name,
-    user_id: place.user_id,
-    userId: place.userId,
-  });
-  console.log('Available member colors:', memberColors);
-  console.log('Resolved color:', resolvedColor);
-  console.groupEnd();
+  // Color debug information for place
 }

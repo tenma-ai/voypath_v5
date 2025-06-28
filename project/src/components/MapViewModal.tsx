@@ -44,19 +44,19 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
       }
     });
     
-    console.log('🔍 [MapViewModal] Extracted places:', places);
+    // Log message
     return places;
   }, [optimizationResult, hasUserOptimized]);
 
   const places = getAllPlaces();
 
   const onLoad = useCallback((map: google.maps.Map) => {
-    console.log('🔍 [MapViewModal] Map loaded successfully');
+    // Log message
     setMap(map);
   }, []);
 
   const onUnmount = useCallback(() => {
-    console.log('🔍 [MapViewModal] Map unmounted');
+    // Log message
     setMap(null);
   }, []);
 
@@ -151,18 +151,18 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
                 disableDefaultUI: true,
               }}
             >
-              {console.log('🔍 [MapViewModal] Rendering map with', places.length, 'places')}
+              {// Log: '🔍 [MapViewModal] Rendering map with', places.length, 'places')}
               
               {/* Test marker */}
               <Marker 
                 position={{ lat: 35.6812, lng: 139.7671 }} 
                 title="Tokyo Test Marker"
-                onClick={() => console.log('Test marker clicked')}
+                onClick={() => // Log: 'Test marker clicked')}
               />
               
               {/* Place markers */}
               {places.map((place, index) => {
-                console.log(`🔍 [MapViewModal] Place ${index}:`, {
+                // Log: `🔍 [MapViewModal] Place ${index}:`, {
                   name: place.place_name || place.name,
                   lat: place.latitude,
                   lng: place.longitude,
@@ -170,7 +170,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
                 });
                 
                 if (!place.latitude || !place.longitude) {
-                  console.log(`Skipping place ${index}: no coordinates`);
+                  // Log message
                   return null;
                 }
                 
@@ -183,7 +183,7 @@ const MapViewModal: React.FC<MapViewModalProps> = ({
                     }}
                     title={`${index + 1}. ${place.place_name || place.name}`}
                     label={`${index + 1}`}
-                    onClick={() => console.log('Place clicked:', place.place_name || place.name)}
+                    onClick={() => // Log: 'Place clicked:', place.place_name || place.name)}
                   />
                 );
               })}

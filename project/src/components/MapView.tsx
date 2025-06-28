@@ -42,10 +42,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
 
   // Extract places from optimization result
   const getAllPlaces = useCallback(() => {
-    console.log(`🗺️ [MapView] Trip: ${currentTrip?.name}, Has optimization: ${!!optimizationResult}, User optimized: ${hasUserOptimized}`);
+    // Log message
     
     if (!hasUserOptimized || !optimizationResult?.optimization?.daily_schedules) {
-      console.log('🗺️ [MapView] No user-initiated optimization data available');
+      // Log message
       return [];
     }
     
@@ -56,7 +56,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       }
     });
     
-    console.log(`🗺️ [MapView] Extracted ${places.length} places for display`);
+    // Log message
     return places;
   }, [optimizationResult, currentTrip?.name, hasUserOptimized]);
 
@@ -66,7 +66,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
 
   // Create custom marker icon based on place color using centralized color logic
   const createCustomMarkerIcon = (place: any, index: number, allPlaces: any[]) => {
-    console.log('🗺️ [MapView] Creating marker for place:', place.place_name || place.name);
+    // Log message
     
     // Check if Google Maps is loaded
     if (!isLoaded || typeof google === 'undefined') {
@@ -75,7 +75,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     
     // Use centralized color utility
     const colorResult = getPlaceColor(place);
-    console.log('🗺️ [MapView] Color result:', colorResult);
+    // Log message
     
     // Handle system places (departure/destination) based on place type
     if (place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport') {
@@ -105,7 +105,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       fillColor = getColorOrFallback(colorResult.background, index);
     }
 
-    console.log('🗺️ [MapView] Final marker color with fallback:', fillColor);
+    // Log message
 
     return {
       path: google.maps.SymbolPath.CIRCLE,
@@ -759,7 +759,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
               />
             );
           } catch (error) {
-            console.error(`🗺️ [MapView] Error creating marker for place ${index}:`, error);
+            // Error occurred
             return null;
           }
         })}

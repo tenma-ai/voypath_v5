@@ -38,11 +38,6 @@ export function HomePage() {
   // Calculate total trips count (owned + member) for display
   const totalUserTrips = trips.length;
   
-  // Debug: Log all trips data
-  React.useEffect(() => {
-    console.log('🏠 HomePage: All trips loaded:', trips.map(t => ({ id: t.id, name: t.name })));
-    console.log('🏠 HomePage: Current trip:', currentTrip ? { id: currentTrip.id, name: currentTrip.name } : 'none');
-  }, [trips, currentTrip]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
@@ -102,7 +97,6 @@ export function HomePage() {
 
   const handleStripePayment = () => {
     // Implement Stripe payment processing here
-    console.log('Redirecting to Stripe payment...');
     // In actual implementation, create Stripe checkout session and redirect
     // window.location.href = 'https://checkout.stripe.com/...';
     
@@ -139,7 +133,7 @@ export function HomePage() {
           tripsPlanned: totalUserTrips
         });
       } catch (error) {
-        console.error('Failed to load user stats:', error);
+        // Failed to load user stats
       } finally {
         setIsLoadingStats(false);
       }
@@ -378,22 +372,13 @@ export function HomePage() {
                         e.preventDefault();
                         setSelectingTripId(trip.id);
                         try {
-                          console.log('🔄 HomePage: User clicked to select trip:', {
-                            tripId: trip.id,
-                            tripName: trip.name,
-                            previousTrip: currentTrip?.id,
-                            clickedTripData: trip,
-                            allTripsCount: trips.length
-                          });
                           
                           // Use setCurrentTrip which now handles complete data clearing and reloading
                           await setCurrentTrip(trip);
                           
-                          console.log('✅ HomePage: Trip selection completed, navigating to /my-trip');
                           // Navigate after successful trip selection using React Router
                           navigate('/my-trip');
                         } catch (error) {
-                          console.error('❌ HomePage: Failed to select trip:', error);
                           alert('Failed to load trip data. Please try again.');
                         } finally {
                           setSelectingTripId(null);
