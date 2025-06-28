@@ -69,11 +69,14 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
   }, [placeName, fallbackUrl]);
 
   const handleImageError = () => {
+    console.log('🖼️ Image error for place:', placeName, 'fallbackUrl:', fallbackUrl);
     if (!hasError) {
       setHasError(true);
       if (fallbackUrl) {
+        console.log('🖼️ Using fallbackUrl:', fallbackUrl);
         setImageUrl(fallbackUrl);
       } else {
+        console.log('🖼️ No fallbackUrl, showing placeholder for:', placeName);
         setShowFallback(true);
         setImageUrl(null);
       }
@@ -85,7 +88,7 @@ export const PlaceImage: React.FC<PlaceImageProps> = ({
   };
 
   // Show fallback placeholder if no image is available
-  if (showFallback || (!imageUrl && !isLoading)) {
+  if (showFallback || ((!imageUrl || imageUrl.trim() === '') && !isLoading)) {
     return (
       <div className={`relative ${className} bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center`}>
         <div className="text-center">

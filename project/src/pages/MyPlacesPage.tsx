@@ -25,7 +25,24 @@ export function MyPlacesPage() {
 
   // Use centralized place date logic
   const getPlaceDisplayDate = (place: any) => {
-    return PlaceDateUtils.getPlaceDisplayDate(place, currentTrip);
+    console.log('🔍 getPlaceDisplayDate for place:', {
+      id: place.id,
+      name: place.name,
+      scheduled_date: place.scheduled_date,
+      scheduledDate: place.scheduledDate,
+      day: place.day,
+      visit_date: place.visit_date,
+      visitDate: place.visitDate,
+      created_at: place.created_at,
+      currentTrip: currentTrip ? {
+        id: currentTrip.id,
+        startDate: currentTrip.startDate,
+        start_date: currentTrip.start_date
+      } : null
+    });
+    const result = PlaceDateUtils.getPlaceDisplayDate(place, currentTrip);
+    console.log('🔍 getPlaceDisplayDate result:', result);
+    return result;
   };
 
   // Check if deadline has passed
@@ -470,11 +487,9 @@ export function MyPlacesPage() {
                       <div>
                         {/* Date and Place Name */}
                         <div className="mb-2">
-                          {(place.scheduled_date || place.scheduledDate || (place.day && currentTrip)) && (
-                            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                              {PlaceDateUtils.formatPlaceDate(place, currentTrip, 'No date set')}
-                            </div>
-                          )}
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                            {PlaceDateUtils.formatPlaceDate(place, currentTrip, 'No date set')}
+                          </div>
                           <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm line-clamp-2">
                             {place.name}
                           </h3>
@@ -512,14 +527,12 @@ export function MyPlacesPage() {
                   >
                     <div className="space-y-3">
                       {/* Visit Time */}
-                      {(place.scheduled_date || place.scheduledDate || (place.day && currentTrip)) && (
-                        <div>
-                          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Visit Time</div>
-                          <div className="text-sm text-slate-900 dark:text-slate-100">
-                            {PlaceDateUtils.formatPlaceDate(place, currentTrip, 'No date set')}
-                          </div>
+                      <div>
+                        <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Visit Time</div>
+                        <div className="text-sm text-slate-900 dark:text-slate-100">
+                          {PlaceDateUtils.formatPlaceDate(place, currentTrip, 'No date set')}
                         </div>
-                      )}
+                      </div>
                       
                       {/* Added by (Trip Places only) */}
                       {activeTab === 'trip' && (

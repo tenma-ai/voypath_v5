@@ -28,10 +28,21 @@ export class PlaceDateUtils {
    * Priority: scheduled_date > day calculation > visit_date > created_at > null
    */
   static getPlaceDisplayDate(place: Place, currentTrip?: Trip): Date | null {
+    console.log('🔍 getPlaceDisplayDate called for place:', place.id, {
+      scheduled_date: place.scheduled_date,
+      scheduledDate: place.scheduledDate,
+      day: place.day,
+      visit_date: place.visit_date,
+      visitDate: place.visitDate,
+      created_at: place.created_at
+    });
+    
     // 1. Use scheduled date if available (from optimization results)
     if (place.scheduled_date || place.scheduledDate) {
       try {
-        return new Date(place.scheduled_date || place.scheduledDate!);
+        const result = new Date(place.scheduled_date || place.scheduledDate!);
+        console.log('🔍 Using scheduled_date/scheduledDate:', result);
+        return result;
       } catch (error) {
         console.warn('Invalid scheduled_date for place:', place.id, error);
       }
@@ -40,7 +51,9 @@ export class PlaceDateUtils {
     // 2. Calculate from day number if trip has start date
     if (place.day && currentTrip) {
       try {
-        return DateUtils.calculateTripDate(currentTrip, place.day);
+        const result = DateUtils.calculateTripDate(currentTrip, place.day);
+        console.log('🔍 Using day calculation:', result);
+        return result;
       } catch (error) {
         console.warn('Failed to calculate trip date for place:', place.id, error);
       }
@@ -49,7 +62,9 @@ export class PlaceDateUtils {
     // 3. Use visit_date if explicitly set
     if (place.visit_date || place.visitDate) {
       try {
-        return new Date(place.visit_date || place.visitDate!);
+        const result = new Date(place.visit_date || place.visitDate!);
+        console.log('🔍 Using visit_date/visitDate:', result);
+        return result;
       } catch (error) {
         console.warn('Invalid visit_date for place:', place.id, error);
       }
@@ -58,13 +73,16 @@ export class PlaceDateUtils {
     // 4. Use place creation date if available
     if (place.created_at) {
       try {
-        return new Date(place.created_at);
+        const result = new Date(place.created_at);
+        console.log('🔍 Using created_at:', result);
+        return result;
       } catch (error) {
         console.warn('Invalid created_at for place:', place.id, error);
       }
     }
     
     // 5. Return null instead of trip start date or current date - let UI handle gracefully
+    console.log('🔍 Returning null for place:', place.id);
     return null;
   }
 
