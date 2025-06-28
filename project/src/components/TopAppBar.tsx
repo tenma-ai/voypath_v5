@@ -135,25 +135,56 @@ function TopAppBar() {
     };
   }, [showProfileMenu, showVoypathMenu]);
 
-  const handleProfileMenuToggle = (e: React.MouseEvent) => {
+  const handleProfileMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Prevent double-firing on touch devices
+    if (e.type === 'touchend' && e.nativeEvent instanceof TouchEvent) {
+      // TouchEvent handled, prevent the subsequent click event
+      e.preventDefault();
+    }
+    
+    // Skip if this is a click event on a touch device after touchend was already handled
+    if (e.type === 'click' && 'ontouchstart' in window && e.nativeEvent instanceof MouseEvent) {
+      const timeSinceLastToggle = Date.now() - (window as any).lastProfileToggle || 1000;
+      if (timeSinceLastToggle < 300) {
+        return; // Skip duplicate events
+      }
+    }
     
     console.log('🎯 Profile menu toggle clicked', { 
       type: e.type, 
       currentState: showProfileMenu,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      isMobile: 'ontouchstart' in window
     });
     
     setShowProfileMenu(!showProfileMenu);
     setShowVoypathMenu(false);
+    (window as any).lastProfileToggle = Date.now();
   };
 
-  const handleVoypathMenuToggle = (e: React.MouseEvent) => {
+  const handleVoypathMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Prevent double-firing on touch devices
+    if (e.type === 'touchend' && e.nativeEvent instanceof TouchEvent) {
+      e.preventDefault();
+    }
+    
+    // Skip if this is a click event on a touch device after touchend was already handled
+    if (e.type === 'click' && 'ontouchstart' in window && e.nativeEvent instanceof MouseEvent) {
+      const timeSinceLastToggle = Date.now() - (window as any).lastVoypathToggle || 1000;
+      if (timeSinceLastToggle < 300) {
+        return; // Skip duplicate events
+      }
+    }
+    
     setShowVoypathMenu(!showVoypathMenu);
     setShowProfileMenu(false);
+    (window as any).lastVoypathToggle = Date.now();
   };
 
   const handleMenuAction = (action: string) => {
@@ -330,7 +361,8 @@ function TopAppBar() {
                 <div className="relative voypath-menu-container" style={{ zIndex: 10000 }}>
                   <motion.button
                     onClick={handleVoypathMenuToggle}
-                    className="flex items-center space-x-2 group"
+                    onTouchEnd={handleVoypathMenuToggle}
+                    className="flex items-center space-x-2 group touch-manipulation"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.6, delay: 0.2 }}
@@ -385,8 +417,15 @@ function TopAppBar() {
                         <div className="fixed inset-0 bg-black/10" onClick={() => setShowVoypathMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="fixed left-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden opacity-100"
-                          style={{ zIndex: 10001 }}
+                          className="fixed left-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
+                          style={{ 
+                            zIndex: 10001,
+                            opacity: 1,
+                            pointerEvents: 'auto',
+                            transform: 'translateZ(0)', // Force GPU acceleration
+                            WebkitTransform: 'translateZ(0)',
+                            willChange: 'transform'
+                          }}
                           variants={menuVariants}
                           initial="hidden"
                           animate="visible"
@@ -648,7 +687,8 @@ function TopAppBar() {
                 <div className="relative profile-menu-container" style={{ zIndex: 10000 }}>
                   <motion.button
                     onClick={handleProfileMenuToggle}
-                    className="relative group"
+                    onTouchEnd={handleProfileMenuToggle}
+                    className="relative group touch-manipulation"
                     whileHover={{ scale: 1.05, y: -1 }}
                     whileTap={{ scale: 0.95 }}
                   >
@@ -681,8 +721,15 @@ function TopAppBar() {
                         <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="fixed right-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden opacity-100"
-                          style={{ zIndex: 10001 }}
+                          className="fixed right-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
+                          style={{ 
+                            zIndex: 10001,
+                            opacity: 1,
+                            pointerEvents: 'auto',
+                            transform: 'translateZ(0)', // Force GPU acceleration
+                            WebkitTransform: 'translateZ(0)',
+                            willChange: 'transform'
+                          }}
                           variants={menuVariants}
                           initial="hidden"
                           animate="visible"

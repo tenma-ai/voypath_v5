@@ -69,9 +69,19 @@ export function AddPlaceForm({
   const [preferredDuration, setPreferredDuration] = useState(60); // minutes
   const [notes, setNotes] = useState('');
   const [isPersonalFavorite, setIsPersonalFavorite] = useState(false);
-  const [preferredDate, setPreferredDate] = useState<Date | undefined>(
-    defaultDate || (paramDate ? new Date(paramDate) : undefined)
-  );
+  
+  // Initialize preferred date based on trip dates or provided date
+  const getInitialDate = () => {
+    if (defaultDate) return defaultDate;
+    if (paramDate) return new Date(paramDate);
+    // If trip has a start date, default to the first day of the trip
+    if (activeTrip?.start_date) {
+      return new Date(activeTrip.start_date);
+    }
+    return undefined;
+  };
+  
+  const [preferredDate, setPreferredDate] = useState<Date | undefined>(getInitialDate());
   
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -376,6 +386,9 @@ export function AddPlaceForm({
                   setPreferredDate(date);
                   setCalendarOpen(false);
                 }}
+                defaultMonth={activeTrip?.start_date ? new Date(activeTrip.start_date) : undefined}
+                fromDate={activeTrip?.start_date ? new Date(activeTrip.start_date) : undefined}
+                toDate={activeTrip?.end_date ? new Date(activeTrip.end_date) : undefined}
                 initialFocus
               />
             </PopoverContent>

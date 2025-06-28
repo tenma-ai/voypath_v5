@@ -58,13 +58,21 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
     }
   }, [location.state]);
   
-  // Form state
+  // Form state - Initialize visitDate based on trip dates
+  const getInitialVisitDate = () => {
+    // If trip has a start date, default to the first day of the trip
+    if (currentTrip?.startDate) {
+      return currentTrip.startDate;
+    }
+    return '';
+  };
+  
   const [formData, setFormData] = useState({
     visitPriority: 3,
     duration: 120, // 2 hours in minutes
     budget: 2,
     timeSlot: 'any',
-    visitDate: '',
+    visitDate: getInitialVisitDate(),
     notes: ''
   });
 
