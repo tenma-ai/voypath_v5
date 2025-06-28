@@ -5,6 +5,7 @@ import { MemberColorService } from '../services/MemberColorService';
 import { useStore } from '../store/useStore';
 import { getPlaceColor as getPlaceColorUtil } from '../utils/ColorUtils';
 import { DateUtils } from '../utils/DateUtils';
+import { PlaceDateUtils } from '../utils/PlaceDateUtils';
 
 interface CalendarGridViewProps {
   optimizationResult?: any;
@@ -22,8 +23,13 @@ interface CalendarPlace {
 const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult }) => {
   const { currentTrip, memberColors, tripMembers } = useStore();
   const [currentDate, setCurrentDate] = useState(() => {
-    // Initialize with trip start date if available, otherwise current date
-    return DateUtils.getTripStartDate(currentTrip) || new Date();
+    // Initialize with trip start date if available, otherwise use first day of current month
+    const tripStartDate = PlaceDateUtils.getCalendarInitialDate(currentTrip);
+    if (tripStartDate) return tripStartDate;
+    
+    // Use first day of current month as fallback instead of today
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
   });
   const [monthSchedule, setMonthSchedule] = useState<Record<string, CalendarPlace[]>>({});
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
@@ -218,12 +224,11 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
           </button>
           <button
             onClick={() => {
-              const tripStartDate = DateUtils.getTripStartDate(currentTrip);
+              const tripStartDate = PlaceDateUtils.getCalendarInitialDate(currentTrip);
               if (tripStartDate) {
                 setCurrentDate(tripStartDate);
-              } else {
-                setCurrentDate(new Date());
               }
+              // Do nothing if no trip date - keep current calendar position
             }}
             className="px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
           >

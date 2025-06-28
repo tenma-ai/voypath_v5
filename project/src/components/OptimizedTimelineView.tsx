@@ -4,6 +4,7 @@ import { Clock, MapPin, DollarSign, Car, Train, Calendar, Star, AlertCircle } fr
 import { useStore } from '../store/useStore';
 import { Place, DetailedSchedule, PlaceWithTiming } from '../types/optimization';
 import { TransportIcon, getTransportColor, getTransportEmoji } from '../utils/transportIcons';
+import { DateUtils } from '../utils/DateUtils';
 
 interface OptimizedTimelineViewProps {
   optimizationResult?: DetailedSchedule;
@@ -53,13 +54,19 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
   const timelineData = useMemo(() => {
     if (!currentTrip || selectedPlaces.length === 0) return [];
 
-    const startDate = new Date(currentTrip.start_date || new Date());
-    const endDate = new Date(currentTrip.end_date || new Date());
+    const startDate = DateUtils.getTripStartDate(currentTrip);
+    const endDate = DateUtils.getTripEndDate(currentTrip);
+    
+    if (!startDate) {
+      console.warn('OptimizedTimelineView: No trip start date available');
+      return [];
+    }
     const days: TimelineDay[] = [];
 
     // Generate days between start and end date
     const currentDate = new Date(startDate);
-    while (currentDate <= endDate) {
+    const finalEndDate = endDate || new Date(startDate.getTime() + (7 * 24 * 60 * 60 * 1000)); // Default to 7 days if no end date
+    while (currentDate <= finalEndDate) {
       const dateStr = currentDate.toISOString().split('T')[0];
       
       // Filter places for this day

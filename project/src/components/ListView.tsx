@@ -7,6 +7,7 @@ import { PlaceSearchInput } from './common/PlaceSearchInput';
 import { GooglePlace } from '../services/PlaceSearchService';
 import { calculatePlaceColor, getCSSProperties, PlaceColorResult } from '../utils/PlaceColorHelper';
 import { TransportIcon, getTransportColor, getTransportEmoji } from '../utils/transportIcons';
+import { PlaceDateUtils } from '../utils/PlaceDateUtils';
 
 interface ScheduleEvent {
   id: string;
@@ -44,7 +45,11 @@ const getTransportIcon = (mode?: string): string => {
 export function ListView() {
   const navigate = useNavigate();
   const { places, currentTrip, isLoading, optimizationResult, memberColors, tripMembers, hasUserOptimized } = useStore();
-  const [selectedDay, setSelectedDay] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDay, setSelectedDay] = useState(() => {
+    // Initialize with trip start date if available
+    const initialDay = PlaceDateUtils.getInitialSelectedDay(currentTrip);
+    return initialDay || new Date().toISOString().split('T')[0];
+  });
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 

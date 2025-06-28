@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { PlaceImage } from '../components/PlaceImage';
 import { DateUtils } from '../utils/DateUtils';
+import { PlaceDateUtils } from '../utils/PlaceDateUtils';
 
 export function MyPlacesPage() {
   const navigate = useNavigate();
@@ -22,25 +23,9 @@ export function MyPlacesPage() {
   });
   const { places, currentTrip, trips, initializeFromDatabase, updatePlace, deletePlace, hasUserOptimized, tripMembers, user, memberColors } = useStore();
 
-  // Calculate place date based on trip schedule
+  // Use centralized place date logic
   const getPlaceDisplayDate = (place: any) => {
-    // If place has scheduled_date, use it
-    if (place.scheduled_date || place.scheduledDate) {
-      return new Date(place.scheduled_date || place.scheduledDate);
-    }
-    
-    // If place has day number and trip has start date, calculate the date
-    if (place.day && currentTrip) {
-      return DateUtils.calculateTripDate(currentTrip, place.day);
-    }
-    
-    // If trip has start date, use it as fallback instead of current date
-    if (currentTrip?.startDate || currentTrip?.start_date) {
-      return DateUtils.getTripStartDate(currentTrip) || new Date(place.created_at || Date.now());
-    }
-    
-    // Final fallback to created_at date
-    return place.created_at ? new Date(place.created_at) : new Date();
+    return PlaceDateUtils.getPlaceDisplayDate(place, currentTrip);
   };
 
   // Check if deadline has passed
@@ -487,7 +472,7 @@ export function MyPlacesPage() {
                         <div className="mb-2">
                           {(place.scheduled_date || place.scheduledDate || (place.day && currentTrip)) && (
                             <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                              {DateUtils.formatCalendarDate(getPlaceDisplayDate(place))}
+                              {PlaceDateUtils.formatPlaceDate(place, currentTrip, 'No date set')}
                             </div>
                           )}
                           <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm line-clamp-2">
@@ -531,7 +516,7 @@ export function MyPlacesPage() {
                         <div>
                           <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Visit Time</div>
                           <div className="text-sm text-slate-900 dark:text-slate-100">
-                            {DateUtils.formatCalendarDate(getPlaceDisplayDate(place))}
+                            {PlaceDateUtils.formatPlaceDate(place, currentTrip, 'No date set')}
                           </div>
                         </div>
                       )}

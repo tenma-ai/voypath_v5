@@ -53,6 +53,7 @@ export class DateUtils {
 
   /**
    * Calculate the actual date for a given day number of the trip
+   * Throws error if no trip start date is available to prevent current date fallback
    */
   static calculateTripDate(trip: TripDate, dayNumber: number): Date {
     const startDate = this.getTripStartDate(trip);
@@ -63,11 +64,8 @@ export class DateUtils {
       return resultDate;
     }
     
-    // Fallback to today + day offset if no trip start date
-    const today = new Date();
-    const resultDate = new Date(today);
-    resultDate.setDate(today.getDate() + (dayNumber - 1));
-    return resultDate;
+    // Throw error instead of falling back to current date
+    throw new Error('Cannot calculate trip date: trip start date is required');
   }
 
   /**

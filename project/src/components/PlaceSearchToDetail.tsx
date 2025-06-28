@@ -11,6 +11,7 @@ import { DurationSlider } from './DurationSlider';
 import { useStore } from '../store/useStore';
 import { GooglePlace } from '../services/PlaceSearchService';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { PlaceDateUtils } from '../utils/PlaceDateUtils';
 
 interface PlaceSearchToDetailProps {
   onCancel?: () => void;
@@ -60,14 +61,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
   
   // Form state - Initialize visitDate based on trip dates
   const getInitialVisitDate = () => {
-    // If trip has a start date, use it, otherwise return empty string
-    if (currentTrip?.startDate) {
-      return new Date(currentTrip.startDate).toISOString().split('T')[0];
-    }
-    if (currentTrip?.start_date) {
-      return new Date(currentTrip.start_date).toISOString().split('T')[0];
-    }
-    return '';
+    return PlaceDateUtils.getInitialPlaceDate(currentTrip);
   };
   
   const [formData, setFormData] = useState({
