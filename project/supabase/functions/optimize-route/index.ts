@@ -88,6 +88,7 @@ function normalizePreferences(places) {
 }
 // 場所の絞り込み（公平性考慮）
 function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
+  // システムプレース（出発地・帰国地）を除外し、my placesのみを絞り込み対象とする
   const systemPlaces = places.filter((p)=>p.place_type === 'departure' || p.place_type === 'destination');
   const visitPlaces = places.filter((p)=>p.place_type === 'visit');
   
@@ -107,13 +108,18 @@ function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
     const timeBasedMaxPlaces = Math.floor(totalAvailableMinutes / avgTimePerPlace);
     effectiveMaxPlaces = Math.min(maxPlaces, timeBasedMaxPlaces);
     
+    // 時間制約でさらに絞り込みが必要な場合のログ
+    if (timeBasedMaxPlaces < maxPlaces) {
+      console.log(`⚠️ Time constraint applied: ${maxPlaces} → ${timeBasedMaxPlaces} places (${availableDays} days available)`);
+    }
   }
   
+  // 時間制約内に収まる場合はそのまま返す
   if (visitPlaces.length <= effectiveMaxPlaces - systemPlaces.length) {
     return places;
   }
   
-  // ラウンドロビン方式で公平に選択
+  // 公平性を考慮したラウンドロビン方式で選択
   const userGroups = new Map();
   visitPlaces.forEach((place)=>{
     if (!userGroups.has(place.user_id)) {
@@ -121,31 +127,66 @@ function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
     }
     userGroups.get(place.user_id).push(place);
   });
+  
   // 各ユーザーの場所を希望度順にソート
   userGroups.forEach((places)=>{
     places.sort((a, b)=>(b.normalized_wish_level || 1) - (a.normalized_wish_level || 1));
   });
+  
   const selectedVisitPlaces = [];
   const maxVisitPlaces = effectiveMaxPlaces - systemPlaces.length;
   
-  // ラウンドロビンで選択
+  // メンバー数を考慮した公平性重み計算
+  const memberCount = userGroups.size;
+  const fairnessWeight = Math.max(0.5, 1.0 - (memberCount * 0.1)); // メンバー数が多いほど公平性を重視
+  
+  // ラウンドロビンで選択（公平性を保証）
   let round = 0;
   while(selectedVisitPlaces.length < maxVisitPlaces && Array.from(userGroups.values()).some((arr)=>arr.length > 0)){
-    for (const [, userPlaces] of userGroups){
+    // 各ラウンドでメンバー間の公平性をチェック
+    const currentUserCounts = new Map();
+    selectedVisitPlaces.forEach(place => {
+      currentUserCounts.set(place.user_id, (currentUserCounts.get(place.user_id) || 0) + 1);
+    });
+    
+    for (const [userId, userPlaces] of userGroups){
       if (userPlaces.length > 0 && selectedVisitPlaces.length < maxVisitPlaces) {
-        const selectedPlace = userPlaces.shift();
-        selectedPlace.selection_round = round + 1; // Track which round this place was selected
-        selectedVisitPlaces.push(selectedPlace);
+        const currentCount = currentUserCounts.get(userId) || 0;
+        const maxCount = Math.max(...Array.from(currentUserCounts.values()), 0);
+        
+        // 公平性チェック：現在のユーザーが他のユーザーより極端に少ない場合は優先選択
+        const fairnessRatio = maxCount > 0 ? currentCount / maxCount : 1.0;
+        const shouldSelect = fairnessRatio >= fairnessWeight || selectedVisitPlaces.length === 0;
+        
+        if (shouldSelect) {
+          const selectedPlace = userPlaces.shift();
+          selectedPlace.selection_round = round + 1; // Track which round this place was selected
+          selectedVisitPlaces.push(selectedPlace);
+        }
       }
     }
     round++;
+    
+    // 無限ループ防止
+    if (round > 100) {
+      console.warn("⚠️ Round limit reached in place selection");
+      break;
+    }
   }
   
-  // Calculate fairness statistics
+  // 公平性統計の計算とログ出力
   const userSelections = new Map();
   selectedVisitPlaces.forEach(place => {
     userSelections.set(place.user_id, (userSelections.get(place.user_id) || 0) + 1);
   });
+  
+  const selectionCounts = Array.from(userSelections.values());
+  const minSelections = Math.min(...selectionCounts);
+  const maxSelections = Math.max(...selectionCounts);
+  const fairnessScore = minSelections / maxSelections;
+  
+  console.log(`✅ Fair selection completed: ${selectedVisitPlaces.length}/${maxVisitPlaces} places selected`);
+  console.log(`📊 Fairness score: ${fairnessScore.toFixed(2)} (${minSelections}-${maxSelections} per member)`);
   
   return [
     ...systemPlaces,
@@ -707,9 +748,8 @@ function calculateRouteDetails(places) {
   }
   return route;
 }
-// 日別スケジュール分割
+// 日別スケジュール分割（時間制約対応強化）
 function createDailySchedule(places, tripStartDate = null, availableDays = null) {
-  // Log message
   const maxDailyHours = 10; // 1日最大10時間（より現実的に調整）
   const maxDailyMinutes = maxDailyHours * 60;
   const schedules = [];
@@ -718,13 +758,18 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
   let currentTime = 0;
   let timeCounter = 9 * 60; // 9:00 AMから開始
   
+  // 時間制約チェック用の変数
+  let skippedPlaces = [];
+  let totalProcessedTime = 0;
+  
   for(let i = 0; i < places.length; i++){
     const place = places[i];
     const placeTime = place.stay_duration_minutes + (place.travel_time_from_previous || 0);
     
     // Check if we've exceeded available days
     if (availableDays !== null && currentDay > availableDays) {
-      // Log: `⚠️ Reached trip duration limit (${availableDays} days). Stopping schedule.`);
+      console.log(`⚠️ Reached trip duration limit (${availableDays} days). Remaining ${places.length - i} places will be skipped.`);
+      skippedPlaces = places.slice(i);
       break;
     }
     
@@ -746,9 +791,13 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
     
     // Check again if we've exceeded available days after creating a new day
     if (availableDays !== null && currentDay > availableDays) {
-      // Log: `⚠️ Reached trip duration limit (${availableDays} days). Stopping schedule.`);
+      console.log(`⚠️ Reached trip duration limit (${availableDays} days) after day creation. Remaining ${places.length - i} places will be skipped.`);
+      skippedPlaces = places.slice(i);
       break;
     }
+    
+    // システムプレース（出発地・帰国地）は必ず含める
+    const isSystemPlace = place.place_type === 'departure' || place.place_type === 'destination';
     
     // 時間設定 - 1日の時間制限を適用
     if (place.travel_time_from_previous) {
@@ -763,14 +812,44 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
     timeCounter = arrival + stayDuration;
     place.departure_time = formatTime(timeCounter);
     place.order_in_day = currentPlaces.length + 1;
-    currentPlaces.push(place);
-    currentTime += placeTime;
+    
+    // システムプレースは常に追加、それ以外は時間制約をチェック
+    if (isSystemPlace || (availableDays === null || currentDay <= availableDays)) {
+      currentPlaces.push(place);
+      currentTime += placeTime;
+      totalProcessedTime += placeTime;
+    } else {
+      skippedPlaces.push(place);
+    }
   }
+  
   // 最後の日を追加（日数制限内の場合のみ）
   if (currentPlaces.length > 0 && (availableDays === null || currentDay <= availableDays)) {
     schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
   }
-  // Log: `✅ Created ${schedules.length} daily schedules (limit was ${availableDays || 'none'} days)`);
+  
+  // スキップされた場所の情報をログ出力
+  if (skippedPlaces.length > 0) {
+    console.log(`⚠️ ${skippedPlaces.length} places were skipped due to time constraints:`);
+    skippedPlaces.forEach(place => {
+      console.log(`  - ${place.name} (${place.user_id}, wish_level: ${place.normalized_wish_level || 'N/A'})`);
+    });
+    
+    // 公平性に配慮した代替提案のためのデータを保存
+    const skippedByUser = new Map();
+    skippedPlaces.forEach(place => {
+      if (!skippedByUser.has(place.user_id)) {
+        skippedByUser.set(place.user_id, []);
+      }
+      skippedByUser.get(place.user_id).push(place);
+    });
+    
+    console.log(`📊 Skipped places by member: ${Array.from(skippedByUser.entries()).map(([userId, places]) => `${userId}:${places.length}`).join(', ')}`);
+  }
+  
+  console.log(`✅ Created ${schedules.length} daily schedules (limit was ${availableDays || 'none'} days)`);
+  console.log(`⏱️ Total processed time: ${Math.round(totalProcessedTime / 60)}h ${totalProcessedTime % 60}m`);
+  
   return schedules;
 }
 function createDaySchedule(day, places, tripStartDate = null) {

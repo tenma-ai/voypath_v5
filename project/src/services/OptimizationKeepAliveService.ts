@@ -11,8 +11,7 @@ export class OptimizationKeepAliveService {
   private static readonly PING_INTERVAL = 4 * 60 * 1000; // 4 minutes (before 5min cold start)
   private static readonly FUNCTIONS_TO_KEEP_WARM = [
     'optimize-route',
-    'normalize-preferences', 
-    'select-optimal-places'
+    'normalize-preferences'
   ];
 
   /**

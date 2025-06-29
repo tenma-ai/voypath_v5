@@ -103,20 +103,6 @@ export interface NormalizationResult {
   message: string
 }
 
-export interface PlaceSelectionResult {
-  success: boolean
-  result: {
-    tripId: string
-    selectedPlaces: any[]
-    totalPlacesConsidered: number
-    selectionRounds: number
-    finalFairnessScore: number
-    userFairnessScores: Record<string, number>
-    executionTimeMs: number
-  }
-  cached: boolean
-  message: string
-}
 
 export class TripOptimizationService {
   private static readonly DEFAULT_SETTINGS: OptimizationSettings = {
@@ -127,7 +113,7 @@ export class TripOptimizationService {
   }
 
   /**
-   * Full optimization pipeline: normalize → select → route
+   * Full optimization pipeline: normalize → route
    */
   static async optimizeTrip(
     tripId: string,
@@ -152,16 +138,7 @@ export class TripOptimizationService {
         throw new Error('Preference normalization failed')
       }
 
-      // Skip place selection - use all places for now to ensure nothing is excluded
-      onProgress?.({ 
-        stage: 'selecting', 
-        progress: 40, 
-        message: 'Including all places for optimization...' 
-      })
-      
-      // Using all available places
-
-      // Stage 3: Optimize route using constrained generation
+      // Stage 2: Optimize route using constrained generation
       onProgress?.({ 
         stage: 'routing', 
         progress: 70, 
@@ -171,7 +148,7 @@ export class TripOptimizationService {
       const result = await this.optimizeRouteWithConstraints(tripId, optimizationSettings)
       // Route optimization complete
       
-      // Stage 4: Update places with schedule information
+      // Stage 3: Update places with schedule information
       if (result.success && result.optimization) {
         onProgress?.({ 
           stage: 'complete', 
@@ -273,114 +250,9 @@ export class TripOptimizationService {
     }
   }
 
-  /**
-   * Step 2: Select optimal places
-   */
-  static async selectOptimalPlaces(
-    tripId: string,
-    options: {
-      max_places?: number
-      fairness_weight?: number
-    } = {}
-  ): Promise<PlaceSelectionResult> {
-    try {
-      // Get normalized places from database (from step 1)
-      const { data: places, error: placesError } = await supabase
-        .from('places')
-        .select('*')
-        .eq('trip_id', tripId)
-        .neq('place_type', 'departure')
-        .neq('place_type', 'destination')
-
-      if (placesError) {
-        throw new Error(`Failed to fetch places: ${placesError.message}`)
-      }
-
-      const { data: members, error: membersError } = await supabase
-        .from('trip_members')
-        .select('*')
-        .eq('trip_id', tripId)
-
-      if (membersError) {
-        throw new Error(`Failed to fetch members: ${membersError.message}`)
-      }
-
-      const { data: trip, error: tripError } = await supabase
-        .from('trips')
-        .select('*')
-        .eq('id', tripId)
-        .single()
-
-      if (tripError) {
-        throw new Error(`Failed to fetch trip: ${tripError.message}`)
-      }
-
-      // Calculate trip duration
-      const tripDurationDays = trip?.end_date && trip?.start_date 
-        ? Math.ceil((new Date(trip.end_date).getTime() - new Date(trip.start_date).getTime()) / (1000 * 60 * 60 * 24))
-        : 7
-
-      // Use production Edge Function with proper authentication
-      const { callSupabaseFunction } = await import('../lib/supabase');
-      
-      // Transform places to match Edge Function expected format
-      const transformedPlaces = (places || []).map(place => {
-        const member = members?.find(m => m.user_id === place.user_id);
-        const memberColor = member?.assigned_color_index ? 
-          MemberColorService.getColorByIndex(member.assigned_color_index).hex : '#666666';
-        
-        return {
-          id: place.id,
-          name: place.name,
-          address: place.address || '',
-          location: {
-            lat: place.latitude,
-            lng: place.longitude
-          },
-          preference_score: place.wish_level || 3,
-          normalized_preference: place.normalized_wish_level,
-          type: place.category,
-          member_id: place.user_id,
-          member_color: memberColor,
-          stay_duration: place.stay_duration_minutes || 120
-        };
-      });
-
-      // Transform members to match Edge Function expected format
-      const transformedMembers = (members || []).map(member => ({
-        id: member.user_id,
-        name: member.user_id, // Use user_id as name for now
-        color: member.assigned_color_index ? MemberColorService.getColorByIndex(member.assigned_color_index).hex : '#666666',
-        preference_weight: 1.0
-      }));
-
-      // Get current user for member_id
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      // Use Edge Function call with correct parameters
-      const response = await callSupabaseFunction('select-optimal-places', {
-        places: transformedPlaces,
-        members: transformedMembers,
-        preferences: {
-          total_budget: 100000,
-          duration_days: tripDurationDays,
-          max_places_per_day: options.max_places ? Math.ceil(options.max_places / tripDurationDays) : 4,
-          fairness_weight: options.fairness_weight || 0.6
-        }
-      })
-
-      return response as PlaceSelectionResult
-    } catch (error) {
-      // Place selection error occurred
-      throw error
-    }
-  }
 
   /**
-   * Step 3: Optimize route using comprehensive constrained route generation
+   * Step 2: Optimize route using comprehensive constrained route generation
    */
   static async optimizeRouteWithConstraints(
     tripId: string, 
@@ -553,8 +425,8 @@ export class TripOptimizationService {
   /**
    * Test Edge Functions connectivity
    */
-  static async testConnectivity(): Promise<{ normalize: boolean, select: boolean, route: boolean }> {
-    const results = { normalize: false, select: false, route: false }
+  static async testConnectivity(): Promise<{ normalize: boolean, route: boolean }> {
+    const results = { normalize: false, route: false }
 
     try {
       // Test normalize-preferences
@@ -562,12 +434,6 @@ export class TripOptimizationService {
         body: { type: 'keep_alive' }
       })
       results.normalize = normalizeResponse.data?.message === 'pong'
-
-      // Test select-optimal-places
-      const selectResponse = await supabase.functions.invoke('select-optimal-places', {
-        body: { type: 'keep_alive' }
-      })
-      results.select = selectResponse.data?.message === 'pong'
 
       // Test optimize-route
       const routeResponse = await supabase.functions.invoke('optimize-route', {
