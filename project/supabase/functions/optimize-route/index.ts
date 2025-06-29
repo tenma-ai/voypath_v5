@@ -1011,10 +1011,10 @@ Deno.serve(async (req)=>{
     // Log message
     const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
     
-    // Get trip details including dates
+    // Get trip details including dates and locations
     const { data: tripData, error: tripError } = await supabase
       .from('trips')
-      .select('start_date, end_date')
+      .select('start_date, end_date, departure_location, destination')
       .eq('id', trip_id)
       .single();
     
@@ -1072,8 +1072,48 @@ Deno.serve(async (req)=>{
     const maxPlaces = constraints?.max_places || 50; // Increase default limit
     const filteredPlaces = filterPlacesByFairness(normalizedPlaces, maxPlaces, null);
     // 4. 出発地・目的地の固定（必須機能）
-    const departure = filteredPlaces.find((p)=>p.source === 'system' && p.category === 'departure_point');
-    const destination = filteredPlaces.find((p)=>p.source === 'system' && p.category === 'destination_point');
+    let departure = filteredPlaces.find((p)=>p.source === 'system' && p.category === 'departure_point');
+    let destination = filteredPlaces.find((p)=>p.source === 'system' && p.category === 'destination_point');
+    
+    // If departure or destination not found in places, create them from trip data
+    if (!departure && tripData.departure_location) {
+      departure = {
+        id: `departure_${trip_id}`,
+        name: `${tripData.departure_location} (Departure)`,
+        place_name: `${tripData.departure_location} (Departure)`,
+        latitude: null, // Will be handled by geocoding if needed
+        longitude: null,
+        source: 'system',
+        category: 'departure_point',
+        place_type: 'departure',
+        wish_level: 5,
+        stay_duration_minutes: 0,
+        trip_id: trip_id,
+        user_id: member_id
+      };
+      filteredPlaces.unshift(departure); // Add to beginning
+    }
+    
+    if (!destination && tripData.destination) {
+      const isRoundTrip = tripData.destination.toLowerCase() === 'same as departure location' || 
+                         tripData.destination === tripData.departure_location;
+      
+      destination = {
+        id: `destination_${trip_id}`,
+        name: isRoundTrip ? `Return to ${tripData.departure_location}` : `${tripData.destination} (Destination)`,
+        place_name: isRoundTrip ? `Return to ${tripData.departure_location}` : `${tripData.destination} (Destination)`,
+        latitude: isRoundTrip && departure ? departure.latitude : null,
+        longitude: isRoundTrip && departure ? departure.longitude : null,
+        source: 'system',
+        category: 'destination_point', 
+        place_type: 'destination',
+        wish_level: 5,
+        stay_duration_minutes: 0,
+        trip_id: trip_id,
+        user_id: member_id
+      };
+      filteredPlaces.push(destination); // Add to end
+    }
     // Log message
     // 5. ルート最適化（TSP）- 基本的な場所のみで実行
     const optimizedRoute = optimizeRouteOrder(filteredPlaces);
