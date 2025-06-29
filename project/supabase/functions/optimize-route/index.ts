@@ -69,7 +69,10 @@ function normalizePreferences(places) {
   // ユーザーごとにグループ化
   const userGroups = new Map();
   places.forEach((place)=>{
-    if (place.source !== 'system' && place.category !== 'departure_point' && place.category !== 'destination_point') {
+    if (place.source !== 'system' && 
+        place.category !== 'departure_point' && 
+        place.category !== 'destination_point' &&
+        place.place_type !== 'system_airport') {
       if (!userGroups.has(place.user_id)) {
         userGroups.set(place.user_id, []);
       }
@@ -88,9 +91,19 @@ function normalizePreferences(places) {
 }
 // 場所の絞り込み（公平性考慮）
 function filterPlacesByFairness(places, maxPlaces, availableDays = null) {
-  // システムプレース（出発地・帰国地）を除外し、my placesのみを絞り込み対象とする
-  const systemPlaces = places.filter((p)=>p.source === 'system' || p.category === 'departure_point' || p.category === 'destination_point');
-  const visitPlaces = places.filter((p)=>p.source !== 'system' && p.category !== 'departure_point' && p.category !== 'destination_point');
+  // システムプレース（出発地・帰国地・システム空港）を除外し、my placesのみを絞り込み対象とする
+  const systemPlaces = places.filter((p)=>
+    p.source === 'system' || 
+    p.category === 'departure_point' || 
+    p.category === 'destination_point' ||
+    p.place_type === 'system_airport'
+  );
+  const visitPlaces = places.filter((p)=>
+    p.source !== 'system' && 
+    p.category !== 'departure_point' && 
+    p.category !== 'destination_point' &&
+    p.place_type !== 'system_airport'
+  );
   
   // If available days is specified, calculate max places based on time constraints
   let effectiveMaxPlaces = maxPlaces;
@@ -301,10 +314,11 @@ async function insertAirportsIfNeeded(supabase, places) {
               latitude: depAirport.latitude,
               longitude: depAirport.longitude,
               category: 'airport',
-              category: 'airport',
+              place_type: 'system_airport',
+              source: 'system',
               stay_duration_minutes: 120,
               wish_level: 1,
-              user_id: currentPlace.user_id,
+              user_id: null,
               is_airport: true,
               airport_code: depAirport.iata_code
             };
@@ -322,10 +336,11 @@ async function insertAirportsIfNeeded(supabase, places) {
               latitude: arrAirport.latitude,
               longitude: arrAirport.longitude,
               category: 'airport',
-              category: 'airport',
+              place_type: 'system_airport',
+              source: 'system',
               stay_duration_minutes: 120,
               wish_level: 1,
-              user_id: nextPlace.user_id,
+              user_id: null,
               is_airport: true,
               airport_code: arrAirport.iata_code
             };
@@ -654,7 +669,10 @@ function optimizeRouteOrder(places) {
   if (places.length <= 2) return places;
   const departure = places.find((p)=>p.source === 'system' && p.category === 'departure_point');
   const destination = places.find((p)=>p.source === 'system' && p.category === 'destination_point');
-  const others = places.filter((p)=>p.source !== 'system' || (p.category !== 'departure_point' && p.category !== 'destination_point'));
+  const others = places.filter((p)=>
+    (p.source !== 'system' || (p.category !== 'departure_point' && p.category !== 'destination_point')) &&
+    p.place_type !== 'system_airport'
+  );
   // Log message
   // Log message
   // Log: `  Others: ${others.map((p)=>p.name).join(', ')}`);
@@ -934,7 +952,12 @@ function calculateOptimizationScore(places, schedules) {
   // 効率性（訪問時間 / 総時間）
   const efficiency = totalVisit > 0 && totalTravel > 0 ? totalVisit / (totalVisit + totalTravel) : 0.5;
   // 希望度満足度
-  const visitPlaces = places.filter((p)=>p.source !== 'system' && p.category !== 'departure_point' && p.category !== 'destination_point');
+  const visitPlaces = places.filter((p)=>
+    p.source !== 'system' && 
+    p.category !== 'departure_point' && 
+    p.category !== 'destination_point' &&
+    p.place_type !== 'system_airport'
+  );
   const avgNormalizedWish = visitPlaces.length > 0 ? visitPlaces.reduce((sum, p)=>sum + (p.normalized_wish_level || 0.8), 0) / visitPlaces.length : 0.8;
   // 公平性（ユーザー間のバランス）
   let fairness = 1.0;
