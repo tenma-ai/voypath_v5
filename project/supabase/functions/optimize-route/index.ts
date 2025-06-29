@@ -308,44 +308,58 @@ async function insertAirportsIfNeeded(supabase, places) {
         if (!currentPlace.is_airport) {
           const depAirport = await findNearestAirport(supabase, currentPlace.latitude, currentPlace.longitude);
           if (depAirport) {
-            const depAirportPlace = {
-              id: `airport_${depAirport.iata_code}_dep_${Date.now()}`,
-              name: `${depAirport.airport_name} (${depAirport.iata_code})`,
-              latitude: depAirport.latitude,
-              longitude: depAirport.longitude,
-              category: 'airport',
-              place_type: 'system_airport',
-              source: 'system',
-              stay_duration_minutes: 120,
-              wish_level: 1,
-              user_id: null,
-              is_airport: true,
-              airport_code: depAirport.iata_code
-            };
-            newRoute.push(depAirportPlace);
-            // Log message
+            // Check if this airport already exists in the route
+            const existingAirport = newRoute.find(p => 
+              p.is_airport && p.airport_code === depAirport.iata_code
+            );
+            
+            if (!existingAirport) {
+              const depAirportPlace = {
+                id: `airport_${depAirport.iata_code}_dep`,
+                name: `${depAirport.airport_name} (${depAirport.iata_code})`,
+                latitude: depAirport.latitude,
+                longitude: depAirport.longitude,
+                category: 'airport',
+                place_type: 'system_airport',
+                source: 'system',
+                stay_duration_minutes: 120,
+                wish_level: 1,
+                user_id: null,
+                is_airport: true,
+                airport_code: depAirport.iata_code
+              };
+              newRoute.push(depAirportPlace);
+              // Log message
+            }
           }
         }
         // 到着空港を追加（次の場所が空港でない場合）
         if (!nextPlace.is_airport) {
           const arrAirport = await findNearestAirport(supabase, nextPlace.latitude, nextPlace.longitude);
           if (arrAirport) {
-            const arrAirportPlace = {
-              id: `airport_${arrAirport.iata_code}_arr_${Date.now()}`,
-              name: `${arrAirport.airport_name} (${arrAirport.iata_code})`,
-              latitude: arrAirport.latitude,
-              longitude: arrAirport.longitude,
-              category: 'airport',
-              place_type: 'system_airport',
-              source: 'system',
-              stay_duration_minutes: 120,
-              wish_level: 1,
-              user_id: null,
-              is_airport: true,
-              airport_code: arrAirport.iata_code
-            };
-            newRoute.push(arrAirportPlace);
-            // Log message
+            // Check if this airport already exists in the route
+            const existingAirport = newRoute.find(p => 
+              p.is_airport && p.airport_code === arrAirport.iata_code
+            );
+            
+            if (!existingAirport) {
+              const arrAirportPlace = {
+                id: `airport_${arrAirport.iata_code}_arr`,
+                name: `${arrAirport.airport_name} (${arrAirport.iata_code})`,
+                latitude: arrAirport.latitude,
+                longitude: arrAirport.longitude,
+                category: 'airport',
+                place_type: 'system_airport',
+                source: 'system',
+                stay_duration_minutes: 120,
+                wish_level: 1,
+                user_id: null,
+                is_airport: true,
+                airport_code: arrAirport.iata_code
+              };
+              newRoute.push(arrAirportPlace);
+              // Log message
+            }
           }
         }
       }
