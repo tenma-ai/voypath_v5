@@ -208,6 +208,8 @@ export function ListView() {
             name: destination === 'same as departure location' 
               ? `Return to Departure: ${departureLocation}` 
               : `Arrival at ${destination}`,
+            time: '18:00',
+            duration: '1時間',
             assignedTo: [],
             category: 'destination',
             description: 'End point of the trip'

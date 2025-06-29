@@ -85,6 +85,27 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
             contributors: place.member_contribution || []
           };
         });
+
+        // Add destination on last day
+        const isLastDay = dayIndex === optimizationResult.optimization.daily_schedules.length - 1;
+        if (isLastDay && currentTrip) {
+          const destination = currentTrip.destination || (currentTrip as any).destination;
+          const departureLocation = currentTrip.departureLocation || (currentTrip as any).departure_location;
+          
+          if (destination) {
+            schedule[dateKey] = schedule[dateKey] || [];
+            schedule[dateKey].push({
+              id: `destination-${dayIndex}`,
+              name: destination === 'same as departure location' 
+                ? `Return to: ${departureLocation}` 
+                : `Arrival: ${destination}`,
+              time: '18:00',
+              duration: 60,
+              category: 'destination',
+              contributors: []
+            });
+          }
+        }
         
         // Log message
       }
