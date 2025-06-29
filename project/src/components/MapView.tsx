@@ -466,10 +466,12 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         </div>
         
         <div style="space-y: 8px;">
-          <div style="margin-bottom: 8px;">
-            <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Added by</p>
-            <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${userInfo || 'Unknown'}</p>
-          </div>
+          ${!isTransportPlace ? `
+            <div style="margin-bottom: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Added by</p>
+              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${userInfo || 'Unknown'}</p>
+            </div>
+          ` : ''}
           
           
           ${dateInfo ? `
