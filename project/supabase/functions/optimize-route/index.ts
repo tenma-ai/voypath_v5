@@ -1068,9 +1068,9 @@ Deno.serve(async (req)=>{
     });
     // 2. 希望度の正規化（必須機能）
     const normalizedPlaces = normalizePreferences(places);
-    // 3. 場所の絞り込み（公平性考慮）- Pass available days for time-based filtering
-    const maxPlaces = constraints?.max_places || 20;
-    const filteredPlaces = filterPlacesByFairness(normalizedPlaces, maxPlaces, availableDays);
+    // 3. 場所の絞り込み（公平性考慮）- Remove time-based filtering to include all places
+    const maxPlaces = constraints?.max_places || 50; // Increase default limit
+    const filteredPlaces = filterPlacesByFairness(normalizedPlaces, maxPlaces, null);
     // 4. 出発地・目的地の固定（必須機能）
     const departure = filteredPlaces.find((p)=>p.source === 'system' && p.category === 'departure_point');
     const destination = filteredPlaces.find((p)=>p.source === 'system' && p.category === 'destination_point');
@@ -1081,8 +1081,8 @@ Deno.serve(async (req)=>{
     const routeWithAirports = await insertAirportsIfNeeded(supabase, optimizedRoute);
     // 7. 移動時間・移動手段計算
     const routeWithDetails = calculateRouteDetails(routeWithAirports);
-    // 8. 日別スケジュール作成 - Pass trip start date and available days
-    const dailySchedules = createDailySchedule(routeWithDetails, tripData.start_date, availableDays);
+    // 8. 日別スケジュール作成 - Pass trip start date with no date constraints to include all places
+    const dailySchedules = createDailySchedule(routeWithDetails, tripData.start_date, null);
     // 9. 最適化スコア計算
     const optimizationScore = calculateOptimizationScore(routeWithDetails, dailySchedules);
     const executionTime = Date.now() - startTime;
