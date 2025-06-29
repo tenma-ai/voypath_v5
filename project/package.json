@@ -1,7 +1,7 @@
 {
   "name": "voypath-travel-app",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "node --max-old-space-size=16384 --optimize-for-size node_modules/.bin/vite",
