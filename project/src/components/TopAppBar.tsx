@@ -752,6 +752,7 @@ function TopAppBar() {
                 className="relative px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50"
                 variants={itemVariants}
                 custom={0}
+                onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center space-x-3">
                   <div className="relative">
@@ -793,7 +794,10 @@ function TopAppBar() {
               </motion.div>
 
               {/* Menu Items Section */}
-              <div className="relative py-1">
+              <div 
+                className="relative py-1"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-2">Account</div>
                 {[
                   { key: 'profile', icon: User, label: 'Profile Settings' },
@@ -801,6 +805,11 @@ function TopAppBar() {
                   <button
                     key={item.key}
                     onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleMenuAction(item.key);
+                    }}
+                    onTouchEnd={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       handleMenuAction(item.key);
@@ -822,6 +831,11 @@ function TopAppBar() {
                     <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-1" />
                     <button
                       onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleMenuAction('upgrade');
+                      }}
+                      onTouchEnd={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         handleMenuAction('upgrade');
@@ -849,6 +863,11 @@ function TopAppBar() {
                     <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-1" />
                     <button
                       onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleMenuAction('logout');
+                      }}
+                      onTouchEnd={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         handleMenuAction('logout');
