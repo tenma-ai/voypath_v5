@@ -40,6 +40,15 @@ export function getPlaceColor(place: PlaceWithColorInfo): PlaceColorResult {
  * Get place creator information
  */
 export function getPlaceCreator(place: PlaceWithColorInfo): { userId: string; name: string; color: string } | null {
+  // Check for system place first
+  if (isSystemPlace(place)) {
+    return {
+      userId: 'system',
+      name: 'System',
+      color: '#000000' // Black color for system places
+    };
+  }
+
   const { memberColors, tripMembers } = useStore.getState();
   
   const userId = place.user_id || place.userId;
@@ -56,13 +65,15 @@ export function getPlaceCreator(place: PlaceWithColorInfo): { userId: string; na
 }
 
 /**
- * Check if place is a system place (departure/destination)
+ * Check if place is a system place (departure/destination/return)
  */
 export function isSystemPlace(place: PlaceWithColorInfo): boolean {
-  return place.place_type === 'departure' || 
+  return place.source === 'system' ||
+         place.place_type === 'departure' || 
          place.place_type === 'destination' ||
          place.category === 'departure_point' ||
          place.category === 'destination_point' ||
+         place.category === 'return_point' ||
          place.category === 'transportation';
 }
 

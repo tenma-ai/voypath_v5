@@ -27,12 +27,22 @@ export interface PlaceColorResult {
 export function calculatePlaceColor(place: any, members: any[] = [], memberColors?: Record<string, string>): PlaceColorResult {
   // Calculating color for place
 
-  // システム場所（出発地・到着地・空港）の場合は特別な処理
-  if (place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport') {
+  // システム場所（出発地・到着地・復路・空港）の場合は特別な処理
+  const isSystemPlace = (
+    place.source === 'system' ||
+    place.place_type === 'departure' || 
+    place.place_type === 'destination' || 
+    place.place_type === 'airport' ||
+    place.category === 'departure_point' ||
+    place.category === 'destination_point' ||
+    place.category === 'return_point'
+  );
+  
+  if (isSystemPlace) {
     // Log message
     return {
       type: 'single',
-      background: '#374151', // Gray-700 for system places
+      background: '#000000', // Black for system places
       contributors: []
     };
   }
