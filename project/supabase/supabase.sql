@@ -1149,9 +1149,13 @@ LANGUAGE plpgsql;
 -- Create trip with owner function
 CREATE OR REPLACE FUNCTION create_trip_with_owner(
   p_departure_location TEXT,
+  p_departure_latitude DECIMAL(10, 8) DEFAULT NULL,
+  p_departure_longitude DECIMAL(11, 8) DEFAULT NULL,
   p_name TEXT DEFAULT NULL,
   p_description TEXT DEFAULT NULL,
   p_destination TEXT DEFAULT NULL,
+  p_destination_latitude DECIMAL(10, 8) DEFAULT NULL,
+  p_destination_longitude DECIMAL(11, 8) DEFAULT NULL,
   p_start_date DATE DEFAULT NULL,
   p_end_date DATE DEFAULT NULL,
   p_owner_id UUID
@@ -1194,7 +1198,9 @@ BEGIN
     scheduled,
     scheduled_date,
     notes,
-    source
+    source,
+    latitude,
+    longitude
   ) VALUES (
     p_departure_location || '' (Departure)'',
     ''departure_point'',
@@ -1205,7 +1211,9 @@ BEGIN
     CASE WHEN p_start_date IS NOT NULL THEN true ELSE false END,
     p_start_date,
     ''Auto-generated departure location'',
-    ''system''
+    ''system'',
+    p_departure_latitude,
+    p_departure_longitude
   );
   
   -- Add destination/return point as the last place
@@ -1221,7 +1229,9 @@ BEGIN
       scheduled,
       scheduled_date,
       notes,
-      source
+      source,
+      latitude,
+      longitude
     ) VALUES (
       v_final_destination || '' (Final Destination)'',
       ''destination_point'',
@@ -1232,7 +1242,9 @@ BEGIN
       CASE WHEN p_end_date IS NOT NULL THEN true ELSE false END,
       p_end_date,
       ''Auto-generated final destination'',
-      ''system''
+      ''system'',
+      p_destination_latitude,
+      p_destination_longitude
     );
   ELSE
     -- Same as departure: add return point
@@ -1246,7 +1258,9 @@ BEGIN
       scheduled,
       scheduled_date,
       notes,
-      source
+      source,
+      latitude,
+      longitude
     ) VALUES (
       v_final_destination || '' (Return)'',
       ''return_point'',
@@ -1257,7 +1271,9 @@ BEGIN
       CASE WHEN p_end_date IS NOT NULL THEN true ELSE false END,
       p_end_date,
       ''Auto-generated return to departure location'',
-      ''system''
+      ''system'',
+      p_departure_latitude,
+      p_departure_longitude
     );
   END IF;
   

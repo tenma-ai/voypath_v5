@@ -104,9 +104,13 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
       
       const tripUpdateData = {
         departure_location: departureLocation,
+        departure_latitude: selectedDeparture?.geometry?.location?.lat || null,
+        departure_longitude: selectedDeparture?.geometry?.location?.lng || null,
         name: formData.name || undefined,
         description: formData.description || undefined,
         destination: finalDestination || undefined,
+        destination_latitude: useSameDeparture ? null : (selectedDestination?.geometry?.location?.lat || null),
+        destination_longitude: useSameDeparture ? null : (selectedDestination?.geometry?.location?.lng || null),
         start_date: selectedRange.start?.toISOString().split('T')[0] || undefined,
         end_date: selectedRange.end?.toISOString().split('T')[0] || undefined,
       };

@@ -984,158 +984,43 @@ export const useStore = create<StoreState>()((set, get) => ({
         }
 
         try {
-          // Creating trip in Supabase database
-          // Current user from store
-          
-          // Check current authentication status
+          // Use trip-management API for proper coordinate handling
           const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-          // Current authenticated user
           if (authError) {
-            // Auth error
             throw new Error('Authentication required');
           }
           if (!currentUser) {
             throw new Error('User not authenticated');
           }
-          
-          // Generate UUID with timestamp to avoid conflicts
-          const generateUUID = () => {
-            const hex = (n: number) => n.toString(16).padStart(2, '0');
-            const bytes = new Uint8Array(16);
-            crypto.getRandomValues(bytes);
-            
-            // Set version (4) and variant bits
-            bytes[6] = (bytes[6] & 0x0f) | 0x40;
-            bytes[8] = (bytes[8] & 0x3f) | 0x80;
-            
-            const uuid = [
-              bytes.slice(0, 4),
-              bytes.slice(4, 6),
-              bytes.slice(6, 8),
-              bytes.slice(8, 10),
-              bytes.slice(10, 16)
-            ].map((group, i) => 
-              Array.from(group).map(hex).join('')
-            ).join('-');
-            
-            return uuid;
-          };
 
-          // First ensure user exists in database
-          const { error: userError } = await supabase
-            .from('users')
-            .upsert({
-              id: user.id,
-              email: user.email || 'dev@voypath.com',
-              name: user.name || user.user_metadata?.name || 'Development User',
-              is_guest: false,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              last_active_at: new Date().toISOString()
-            }, { onConflict: 'id' });
+          // Call trip-management Edge Function with coordinate data
+          const response = await fetch('/api/trip-management', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+            },
+            body: JSON.stringify({
+              action: 'create',
+              ...tripData
+            })
+          });
 
-          if (userError) {
-            // Failed to ensure user exists
-            throw userError;
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to create trip');
           }
 
-          const tripId = generateUUID();
-          const createdTrip = {
-            id: tripId,
-            name: tripData.name || `${tripData.departure_location} Trip`,
-            departure_location: tripData.departure_location,
-            description: tripData.description,
-            destination: tripData.destination,
-            start_date: tripData.start_date,
-            end_date: tripData.end_date,
-            owner_id: currentUser.id, // Use authenticated user ID
-          };
+          const result = await response.json();
+          const createdTrip = result.trip;
 
-          // Save to Supabase database with retry on conflict
-          let savedTrip;
-          let attempts = 0;
-          const maxAttempts = 3;
-          
-          while (attempts < maxAttempts) {
-            const { data, error } = await supabase
-              .from('trips')
-              .insert(createdTrip)
-              .select()
-              .single();
-
-            if (!error) {
-              savedTrip = data;
-              break;
-            }
-
-            if (error.code === '23505' || error.code === '409') {
-              // UUID conflict, generate new one and retry
-              attempts++;
-              createdTrip.id = generateUUID();
-              // Trip ID conflict, retrying with new ID
-            } else {
-              // Failed to save trip to database
-              throw error;
-            }
-          }
-
-          if (!savedTrip) {
-            throw new Error('Failed to create trip after multiple attempts');
-          }
-
-          // Trip created successfully in database
-
-          // User already added at the beginning of the function
-
-          // Add owner as trip member
-          const { error: memberError } = await supabase
-            .from('trip_members')
-            .insert({
-              trip_id: savedTrip.id,
-              user_id: user.id,
-              role: 'admin',
-              joined_at: new Date().toISOString(),
-              can_add_places: true,
-              can_edit_places: true,
-              can_optimize: true,
-              can_invite_members: true
-            });
-
-          if (memberError) {
-            // Failed to add trip member
-            throw memberError;
-          }
-
-          // Auto-assign color to trip owner
-          try {
-            const { MemberColorService } = await import('../services/MemberColorService');
-            await MemberColorService.assignColorToMember(savedTrip.id, user.id);
-          } catch (colorError) {
-            // Color assignment failed, but trip creation succeeded
-            console.warn('Failed to assign color to trip owner:', colorError);
-          }
-
-          // Convert to frontend format
-          const newTrip: Trip = {
-            id: savedTrip.id,
-            name: savedTrip.name,
-            departureLocation: savedTrip.departure_location,
-            description: savedTrip.description,
-            destination: savedTrip.destination,
-            startDate: savedTrip.start_date,
-            endDate: savedTrip.end_date,
-            memberCount: savedTrip.total_members || 1,
-            createdAt: savedTrip.created_at,
-            ownerId: savedTrip.owner_id,
-          };
-
-          // Update store state
-          set((state) => ({ 
-            trips: [...state.trips, newTrip],
-            currentTrip: newTrip 
+          // 状態更新
+          set(state => ({
+            trips: [...state.trips, createdTrip],
+            isLoading: false
           }));
 
-          return newTrip;
+          return createdTrip;
         } catch (error) {
           // Failed to create trip
           throw error;
