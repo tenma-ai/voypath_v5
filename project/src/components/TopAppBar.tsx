@@ -711,19 +711,20 @@ function TopAppBar() {
                       <>
                         {/* Backdrop */}
                         <div 
-                          className="fixed inset-0 bg-black/10 backdrop-blur-sm" 
+                          className="fixed inset-0 bg-black/10" 
                           onClick={() => setShowProfileMenu(false)} 
                           style={{ zIndex: 10000 }} 
                         />
                         
                         <motion.div 
-                          className="fixed right-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden touch-manipulation"
+                          className="fixed right-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
                           style={{ 
                             zIndex: 10001,
                             opacity: 1,
                             pointerEvents: 'auto',
                             transform: 'translateZ(0)',
-                            willChange: 'transform',
+                            WebkitTransform: 'translateZ(0)',
+                            willChange: 'transform'
                           }}
                           variants={menuVariants}
                           initial="hidden"
