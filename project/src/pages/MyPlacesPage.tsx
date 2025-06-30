@@ -273,6 +273,20 @@ export function MyPlacesPage() {
 
   // Get member info for a place
   const getMemberInfo = (place: any) => {
+    // Check for system place first
+    const isSystemPlace = (
+      place.source === 'system' ||
+      place.category === 'departure_point' ||
+      place.category === 'destination_point' ||
+      place.category === 'return_point' ||
+      place.place_type === 'departure' ||
+      place.place_type === 'destination'
+    );
+    
+    if (isSystemPlace) {
+      return { name: 'System', color: '#000000' };
+    }
+    
     const userId = place.user_id || place.userId;
     if (!userId) return { name: 'Unknown', color: '#6B7280' };
     
