@@ -138,6 +138,7 @@ async function handleCreateTrip(req: Request, supabase: any, userId: string) {
   const { data: tripId, error: tripError } = await supabase
     .rpc('create_trip_with_owner', {
       p_departure_location: requestData.departure_location,
+      p_owner_id: userId,
       p_departure_latitude: requestData.departure_latitude || null,
       p_departure_longitude: requestData.departure_longitude || null,
       p_name: requestData.name || null,
@@ -146,8 +147,7 @@ async function handleCreateTrip(req: Request, supabase: any, userId: string) {
       p_destination_latitude: requestData.destination_latitude || null,
       p_destination_longitude: requestData.destination_longitude || null,
       p_start_date: requestData.start_date || null,
-      p_end_date: requestData.end_date || null,
-      p_owner_id: userId
+      p_end_date: requestData.end_date || null
     });
 
   if (tripError) {
