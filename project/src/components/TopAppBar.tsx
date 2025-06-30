@@ -62,7 +62,7 @@ function TopAppBar() {
   
   // Debug: Monitor profile menu state changes
   useEffect(() => {
-    // Log message
+    console.log('Profile menu state changed:', showProfileMenu);
   }, [showProfileMenu]);
   const [showVoypathMenu, setShowVoypathMenu] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
@@ -710,17 +710,18 @@ function TopAppBar() {
                     {showProfileMenu && (
                       <>
                         {/* Backdrop */}
-                        <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10000 }} />
+                        <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 99998 }} />
                         
                         <motion.div 
-                          className="fixed right-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
+                          className="profile-menu-dropdown fixed right-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
                           style={{ 
-                            zIndex: 10001,
+                            zIndex: 99999,
                             opacity: 1,
                             pointerEvents: 'auto',
                             transform: 'translateZ(0)',
                             WebkitTransform: 'translateZ(0)',
-                            willChange: 'transform'
+                            willChange: 'transform',
+                            position: 'fixed'
                           }}
                           variants={menuVariants}
                           initial="hidden"

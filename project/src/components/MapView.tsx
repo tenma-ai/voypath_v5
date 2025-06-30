@@ -77,11 +77,20 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     const colorResult = getPlaceColor(place);
     // Log message
     
-    // Handle system places (departure/destination) based on place type
-    if (place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport') {
+    // Check for system place first (same logic as MyPlacesPage)
+    const isSystemPlace = (
+      place.source === 'system' ||
+      place.category === 'departure_point' ||
+      place.category === 'destination_point' ||
+      place.category === 'return_point' ||
+      place.place_type === 'departure' ||
+      place.place_type === 'destination'
+    );
+    
+    if (isSystemPlace) {
       return {
         path: google.maps.SymbolPath.CIRCLE,
-        fillColor: '#374151', // Gray for system places
+        fillColor: '#000000', // Black for system places (matching list view)
         fillOpacity: 1,
         strokeColor: '#FFFFFF',
         strokeWeight: 2,
