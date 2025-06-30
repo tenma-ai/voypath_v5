@@ -167,7 +167,7 @@ export function TripDetailPage() {
             name: member.users.name || member.users.email,
             email: member.users.email,
             role: member.role,
-            joinedAt: new Date(member.joined_at).toLocaleDateString(),
+            joinedAt: `Joined ${new Date(member.joined_at).toLocaleDateString()}`,
             avatar: member.users.name?.charAt(0).toUpperCase() || member.users.email?.charAt(0).toUpperCase() || 'U',
             color: memberColor,
             isOnline: Math.random() > 0.5 // Temporary random online status
@@ -703,7 +703,7 @@ export function TripDetailPage() {
                             )}
                           </div>
                           <div className="text-xs text-slate-500 dark:text-slate-400">
-                            {member.email}
+                            {member.joinedAt}
                           </div>
                         </div>
                       </div>
