@@ -115,12 +115,14 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
         end_date: selectedRange.end?.toISOString().split('T')[0] || undefined,
       };
 
+      let createdTrip = null;
+      
       if (editMode && tripData) {
         // Update existing trip
         await updateTrip(tripData.id, tripUpdateData);
       } else {
         // Create new trip
-        await createTripWithAPI(tripUpdateData);
+        createdTrip = await createTripWithAPI(tripUpdateData);
       }
       
       onClose();
@@ -139,9 +141,9 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
       setSelectedRange({ start: null, end: null });
       setUseSameDeparture(false);
       
-      // Navigate to the trip page only when creating new trip
-      if (!editMode) {
-        navigate('/my-trip');
+      // Navigate to the created trip page
+      if (!editMode && createdTrip) {
+        navigate(`/trip/${createdTrip.id}/plan`);
       }
     } catch (error) {
       // Error occurred

@@ -76,7 +76,16 @@ function normalizePreferences(places) {
   // ユーザーごとにグループ化
   const userGroups = new Map();
   places.forEach((place) => {
-    if (place.source !== 'system' && place.category !== 'departure_point' && place.category !== 'destination_point' && place.place_type !== 'system_airport') {
+    // システムプレースを除外（source=system OR 特定カテゴリ OR システム空港）
+    const isSystemPlace = (
+      place.source === 'system' || 
+      place.category === 'departure_point' || 
+      place.category === 'destination_point' ||
+      place.category === 'return_point' ||
+      place.place_type === 'system_airport'
+    );
+    
+    if (!isSystemPlace) {
       if (!userGroups.has(place.user_id)) {
         userGroups.set(place.user_id, []);
       }
@@ -97,9 +106,21 @@ function normalizePreferences(places) {
 
 // 場所の絞り込み（公平性考慮） - 時間制約部分を削除
 function filterPlacesByFairness(places, maxPlaces) {
-  // システムプレース（出発地・帰国地・システム空港）を除外し、my placesのみを絞り込み対象とする
-  const systemPlaces = places.filter((p) => p.source === 'system' || p.category === 'departure_point' || p.category === 'destination_point' || p.place_type === 'system_airport');
-  const visitPlaces = places.filter((p) => p.source !== 'system' && p.category !== 'departure_point' && p.category !== 'destination_point' && p.place_type !== 'system_airport');
+  // システムプレース（出発地・帰国地・復路・システム空港）を除外し、my placesのみを絞り込み対象とする
+  const systemPlaces = places.filter((p) => 
+    p.source === 'system' || 
+    p.category === 'departure_point' || 
+    p.category === 'destination_point' ||
+    p.category === 'return_point' ||
+    p.place_type === 'system_airport'
+  );
+  const visitPlaces = places.filter((p) => 
+    p.source !== 'system' && 
+    p.category !== 'departure_point' && 
+    p.category !== 'destination_point' &&
+    p.category !== 'return_point' &&
+    p.place_type !== 'system_airport'
+  );
   
   // 場所数が制限内に収まる場合はそのまま返す
   if (visitPlaces.length <= maxPlaces - systemPlaces.length) {
@@ -266,14 +287,16 @@ function removeOneRandomPlacePerUser(places) {
   const systemPlaces = places.filter((p) => 
     p.source === 'system' || 
     p.category === 'departure_point' || 
-    p.category === 'destination_point' || 
+    p.category === 'destination_point' ||
+    p.category === 'return_point' ||
     p.place_type === 'system_airport'
   );
   
   const visitPlaces = places.filter((p) => 
     p.source !== 'system' && 
     p.category !== 'departure_point' && 
-    p.category !== 'destination_point' && 
+    p.category !== 'destination_point' &&
+    p.category !== 'return_point' &&
     p.place_type !== 'system_airport'
   );
   
@@ -333,9 +356,10 @@ async function iterativelyOptimizeWithDateConstraints(places, availableDays, tri
       p.source === 'system' || 
       p.category === 'departure_point' || 
       p.category === 'destination_point' ||
+      p.category === 'return_point' ||
       p.place_type === 'system_airport' ||
       (p.name && (p.name.toLowerCase().includes('departure') || p.name.toLowerCase().includes('destination'))) ||
-      (p.category && (p.category.includes('departure') || p.category.includes('destination')))
+      (p.category && (p.category.includes('departure') || p.category.includes('destination') || p.category.includes('return')))
     );
     
     if (isSystem) {
@@ -350,9 +374,10 @@ async function iterativelyOptimizeWithDateConstraints(places, availableDays, tri
       p.source === 'system' || 
       p.category === 'departure_point' || 
       p.category === 'destination_point' ||
+      p.category === 'return_point' ||
       p.place_type === 'system_airport' ||
       (p.name && (p.name.toLowerCase().includes('departure') || p.name.toLowerCase().includes('destination'))) ||
-      (p.category && (p.category.includes('departure') || p.category.includes('destination')))
+      (p.category && (p.category.includes('departure') || p.category.includes('destination') || p.category.includes('return')))
     );
     
     if (isUser) {
@@ -893,11 +918,12 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
     const place = places[i];
     const placeTime = place.stay_duration_minutes + (place.travel_time_from_previous || 0);
     
-    // システムプレース判定を強化（出発地・到着地・システム空港は絶対保護）
+    // システムプレース判定を強化（出発地・到着地・復路・システム空港は絶対保護）
     const isSystemPlace = (
       place.source === 'system' || 
       place.category === 'departure_point' || 
       place.category === 'destination_point' ||
+      place.category === 'return_point' ||
       place.place_type === 'system_airport' ||
       (place.id && place.id.toString().startsWith('airport_')) ||
       (place.id && place.id.toString().startsWith('return_'))
@@ -979,6 +1005,7 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
       p.source === 'system' || 
       p.category === 'departure_point' || 
       p.category === 'destination_point' ||
+      p.category === 'return_point' ||
       p.place_type === 'system_airport' ||
       (p.id && p.id.toString().startsWith('airport_')) ||
       (p.id && p.id.toString().startsWith('return_'))
@@ -1110,7 +1137,13 @@ function calculateOptimizationScore(places, schedules) {
   const efficiency = totalVisit > 0 && totalTravel > 0 ? totalVisit / (totalVisit + totalTravel) : 0.5;
   
   // 希望度満足度
-  const visitPlaces = places.filter((p) => p.source !== 'system' && p.category !== 'departure_point' && p.category !== 'destination_point' && p.place_type !== 'system_airport');
+  const visitPlaces = places.filter((p) => 
+    p.source !== 'system' && 
+    p.category !== 'departure_point' && 
+    p.category !== 'destination_point' &&
+    p.category !== 'return_point' &&
+    p.place_type !== 'system_airport'
+  );
   const avgNormalizedWish = visitPlaces.length > 0 ? visitPlaces.reduce((sum, p) => sum + (p.normalized_wish_level || 0.8), 0) / visitPlaces.length : 0.8;
   
   // 公平性（ユーザー間のバランス）

@@ -995,10 +995,7 @@ export const useStore = create<StoreState>()((set, get) => ({
 
           // Call trip-management Edge Function with coordinate data
           const { data, error } = await supabase.functions.invoke('trip-management', {
-            body: {
-              action: 'create',
-              ...tripData
-            }
+            body: tripData
           });
 
           if (error) {
