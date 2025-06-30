@@ -8,9 +8,13 @@ const corsHeaders = {
 
 interface TripCreateRequest {
   departure_location: string; // Required - most important field
+  departure_latitude?: number; // Coordinates for departure
+  departure_longitude?: number;
   name?: string; // Optional - auto-generated if not provided
   description?: string;
   destination?: string; // Optional - can be "same as departure location" or auto-set
+  destination_latitude?: number; // Coordinates for destination
+  destination_longitude?: number;
   start_date?: string; // Optional - for unscheduled trips
   end_date?: string; // Optional - for unscheduled trips
   add_place_deadline?: string;
