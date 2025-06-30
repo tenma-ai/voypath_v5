@@ -798,13 +798,14 @@ function TopAppBar() {
                 {[
                   { key: 'profile', icon: User, label: 'Profile Settings' },
                 ].map((item, index) => (
-                  <motion.button
+                  <button
                     key={item.key}
-                    onClick={() => handleMenuAction(item.key)}
-                    className="w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden"
-                    variants={itemVariants}
-                    custom={index + 5}
-                    whileHover={{ x: 4 }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleMenuAction(item.key);
+                    }}
+                    className="w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden touch-manipulation"
                   >
                     <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-primary-100 dark:group-hover:bg-primary-900/30 transition-colors duration-300 relative z-10">
                       <item.icon className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-300" />
@@ -812,19 +813,20 @@ function TopAppBar() {
                     <span className="text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 font-medium transition-colors duration-300 relative z-10 text-sm">
                       {item.label}
                     </span>
-                  </motion.button>
+                  </button>
                 ))}
 
                 {/* Premium Upgrade Section */}
                 {!isPremium && (
                   <>
                     <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-1" />
-                    <motion.button
-                      onClick={() => handleMenuAction('upgrade')}
-                      className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-gradient-to-r hover:from-yellow-50 hover:to-orange-50 dark:hover:from-yellow-900/20 dark:hover:to-orange-900/20 transition-all duration-300 group relative overflow-hidden"
-                      variants={itemVariants}
-                      custom={8}
-                      whileHover={{ x: 4 }}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleMenuAction('upgrade');
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-gradient-to-r hover:from-yellow-50 hover:to-orange-50 dark:hover:from-yellow-900/20 dark:hover:to-orange-900/20 transition-all duration-300 group relative overflow-hidden touch-manipulation"
                     >
                       <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center shadow-soft relative z-10">
                         <Crown className="w-4 h-4 text-white fill-current" />
@@ -838,19 +840,20 @@ function TopAppBar() {
                         </div>
                       </div>
                       <Star className="w-4 h-4 text-yellow-500 fill-current relative z-10" />
-                    </motion.button>
+                    </button>
                   </>
                 )}
 
                 {!user.isGuest && (
                   <>
                     <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-1" />
-                    <motion.button
-                      onClick={() => handleMenuAction('logout')}
-                      className="w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-all duration-300 group relative overflow-hidden"
-                      variants={itemVariants}
-                      custom={10}
-                      whileHover={{ x: 4 }}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleMenuAction('logout');
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-2.5 text-left hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-all duration-300 group relative overflow-hidden touch-manipulation"
                     >
                       <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center group-hover:bg-red-200 dark:group-hover:bg-red-900/50 transition-colors duration-300 relative z-10">
                         <LogOut className="w-4 h-4 text-red-600 dark:text-red-400 transition-colors duration-300" />
@@ -858,7 +861,7 @@ function TopAppBar() {
                       <span className="text-red-600 dark:text-red-400 font-medium transition-colors duration-300 relative z-10 text-sm">
                         Sign Out
                       </span>
-                    </motion.button>
+                    </button>
                   </>
                 )}
               </div>
