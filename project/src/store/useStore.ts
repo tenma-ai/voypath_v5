@@ -994,25 +994,22 @@ export const useStore = create<StoreState>()((set, get) => ({
           }
 
           // Call trip-management Edge Function with coordinate data
-          const response = await fetch('/api/trip-management', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-            },
-            body: JSON.stringify({
+          const { data, error } = await supabase.functions.invoke('trip-management', {
+            body: {
               action: 'create',
               ...tripData
-            })
+            }
           });
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to create trip');
+          if (error) {
+            throw new Error(error.message || 'Failed to create trip');
           }
 
-          const result = await response.json();
-          const createdTrip = result.trip;
+          if (!data || !data.trip) {
+            throw new Error('Invalid response from trip creation');
+          }
+
+          const createdTrip = data.trip;
 
           // 状態更新
           set(state => ({
