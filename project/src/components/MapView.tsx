@@ -479,7 +479,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
 
     // Format schedule for different place types
     let scheduleDisplay = '';
-    if (place.day_number && place.hour) {
+    if (place.day_number && place.hour !== undefined) {
       // For airports and trip places - show schedule as month/day/hour/minute
       const scheduleDate = new Date();
       scheduleDate.setDate(scheduleDate.getDate() + (place.day_number - 1));
@@ -493,6 +493,17 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         hour12: false
       });
     }
+
+    // Debug schedule data
+    console.log('📅 Schedule debug:', {
+      name: place.place_name || place.name,
+      day_number: place.day_number,
+      hour: place.hour,
+      minute: place.minute,
+      scheduleDisplay,
+      arrival_time: place.arrival_time,
+      departure_time: place.departure_time
+    });
 
     // Format departure/arrival times
     let departureDisplay = '';
@@ -654,6 +665,21 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         </div>
       `;
     }
+
+    // Debug final content
+    console.log('🎯 Final popup content debug:', {
+      name: place.place_name || place.name,
+      isDeparture,
+      isDestination,
+      isAirport,
+      isMovement,
+      isTripPlace,
+      hasScheduleDisplay: !!scheduleDisplay,
+      hasUserInfo: !!userInfo,
+      hasWishLevel: !!place.wish_level,
+      hasDuration: !!(place.duration_minutes || place.stay_duration_minutes),
+      contentLength: content.length
+    });
 
     infoWindow.setContent(content);
     infoWindow.setPosition({ 
