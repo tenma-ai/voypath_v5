@@ -185,7 +185,7 @@ export function FloatingActionButtons() {
                 />
               </defs>
               <text className="text-[5.5px] fill-white font-medium" style={{ letterSpacing: '0.3px' }}>
-                <textPath href="#add-circle-path" startOffset="20%">
+                <textPath href="#add-circle-path" startOffset="9%">
                   ADD PLACES
                 </textPath>
               </text>
