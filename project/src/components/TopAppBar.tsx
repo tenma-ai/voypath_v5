@@ -135,26 +135,14 @@ function TopAppBar() {
     };
   }, [showProfileMenu, showVoypathMenu]);
 
-  const handleProfileMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleProfileMenuToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Prevent double-firing on touch devices
-    if (e.type === 'touchend' && e.nativeEvent instanceof TouchEvent) {
-      e.preventDefault();
-    }
-    
-    // Skip if this is a click event on a touch device after touchend was already handled
-    if (e.type === 'click' && 'ontouchstart' in window && e.nativeEvent instanceof MouseEvent) {
-      const timeSinceLastToggle = Date.now() - (window as any).lastProfileToggle || 1000;
-      if (timeSinceLastToggle < 300) {
-        return; // Skip duplicate events
-      }
-    }
+    console.log('Profile menu toggle clicked, current state:', showProfileMenu);
     
     setShowProfileMenu(!showProfileMenu);
     setShowVoypathMenu(false);
-    (window as any).lastProfileToggle = Date.now();
   };
 
   const handleVoypathMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {
@@ -679,7 +667,6 @@ function TopAppBar() {
                 <div className="relative profile-menu-container" style={{ zIndex: 10000 }}>
                   <motion.button
                     onClick={handleProfileMenuToggle}
-                    onTouchEnd={handleProfileMenuToggle}
                     className="relative group touch-manipulation"
                     whileHover={{ scale: 1.05, y: -1 }}
                     whileTap={{ scale: 0.95 }}
@@ -713,9 +700,9 @@ function TopAppBar() {
                         <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 99998 }} />
                         
                         <motion.div 
-                          className="profile-menu-dropdown fixed right-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
+                          className="profile-menu-dropdown fixed right-2 sm:right-4 top-14 sm:top-16 w-[calc(100vw-1rem)] sm:w-80 max-w-[calc(100vw-1rem)] max-h-[calc(100vh-4rem)] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
                           style={{ 
-                            zIndex: 99999,
+                            zIndex: 999999,
                             opacity: 1,
                             pointerEvents: 'auto',
                             transform: 'translateZ(0)',
@@ -723,16 +710,14 @@ function TopAppBar() {
                             willChange: 'transform',
                             position: 'fixed'
                           }}
-                          variants={menuVariants}
-                          initial="hidden"
-                          animate="visible"
-                          exit="hidden"
+                          initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                          transition={{ duration: 0.15, ease: "easeOut" }}
                         >
                           {/* User Info */}
-                          <motion.div 
+                          <div 
                             className="relative px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50"
-                            variants={itemVariants}
-                            custom={0}
                           >
                             <div className="flex items-center space-x-3">
                               <div className="relative">
@@ -771,17 +756,14 @@ function TopAppBar() {
                                 </div>
                               </div>
                             </div>
-                          </motion.div>
+                          </div>
 
                           {/* Menu Items Section */}
                           <div className="px-2 py-2">
                             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-2 mb-2">Account</div>
-                            <motion.button
+                            <button
                               onClick={() => handleMenuAction('profile')}
                               className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden rounded-xl"
-                              variants={itemVariants}
-                              custom={1}
-                              whileHover={{ x: 4 }}
                             >
                               <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-primary-100 dark:group-hover:bg-primary-900/30 transition-colors duration-300 relative z-10">
                                 <User className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-300" />
@@ -791,18 +773,15 @@ function TopAppBar() {
                                   Profile Settings
                                 </span>
                               </div>
-                            </motion.button>
+                            </button>
 
                             {/* Premium Upgrade Section */}
                             {!isPremium && (
                               <>
                                 <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-2" />
-                                <motion.button
+                                <button
                                   onClick={() => handleMenuAction('upgrade')}
                                   className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-gradient-to-r hover:from-yellow-50 hover:to-orange-50 dark:hover:from-yellow-900/20 dark:hover:to-orange-900/20 transition-all duration-300 group relative overflow-hidden rounded-xl"
-                                  variants={itemVariants}
-                                  custom={2}
-                                  whileHover={{ x: 4 }}
                                 >
                                   <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center shadow-soft relative z-10">
                                     <Crown className="w-4 h-4 text-white fill-current" />
@@ -816,19 +795,16 @@ function TopAppBar() {
                                     </div>
                                   </div>
                                   <Star className="w-4 h-4 text-yellow-500 fill-current relative z-10" />
-                                </motion.button>
+                                </button>
                               </>
                             )}
 
                             {!user.isGuest && (
                               <>
                                 <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-2" />
-                                <motion.button
+                                <button
                                   onClick={() => handleMenuAction('logout')}
                                   className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-all duration-300 group relative overflow-hidden rounded-xl"
-                                  variants={itemVariants}
-                                  custom={3}
-                                  whileHover={{ x: 4 }}
                                 >
                                   <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center group-hover:bg-red-200 dark:group-hover:bg-red-900/50 transition-colors duration-300 relative z-10">
                                     <LogOut className="w-4 h-4 text-red-600 dark:text-red-400 transition-colors duration-300" />
@@ -836,7 +812,7 @@ function TopAppBar() {
                                   <span className="text-red-600 dark:text-red-400 font-medium transition-colors duration-300 relative z-10 text-sm">
                                     Sign Out
                                   </span>
-                                </motion.button>
+                                </button>
                               </>
                             )}
                           </div>
