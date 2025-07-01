@@ -447,12 +447,25 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       return timeString;
     };
 
-    // Check place type
+    // Check place type - be more specific about what constitutes each type
     const isDeparture = place.place_type === 'departure';
     const isDestination = place.place_type === 'destination';
-    const isAirport = place.place_type === 'airport';
-    const isMovement = place.transport_mode || (place.place_type && !isDeparture && !isDestination && !isAirport);
+    const isAirport = place.place_type === 'airport' || 
+      (place.name?.toLowerCase().includes('airport') || place.place_name?.toLowerCase().includes('airport'));
+    const isMovement = place.transport_mode && !isAirport && !isDeparture && !isDestination;
     const isTripPlace = !isDeparture && !isDestination && !isAirport && !isMovement;
+
+    // Debug logging
+    console.log('🏷️ Place debug:', {
+      name: place.place_name || place.name,
+      place_type: place.place_type,
+      transport_mode: place.transport_mode,
+      isDeparture,
+      isDestination, 
+      isAirport,
+      isMovement,
+      isTripPlace
+    });
 
     // Format schedule for different place types
     let scheduleDisplay = '';
@@ -525,7 +538,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         </div>
       `;
     } else if (isAirport) {
-      // Airport: show schedule only
+      // Airport: show schedule only (no duration, no travel times)
       content = `
         <div style="padding: 12px; min-width: 280px; max-width: 350px;">
           <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
