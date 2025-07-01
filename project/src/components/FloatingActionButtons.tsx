@@ -86,66 +86,66 @@ export function FloatingActionButtons() {
   return (
     <>
       {/* Optimize Route Button - Bottom position */}
-      <motion.button
-        className="fixed bottom-20 right-4 z-40"
-        whileHover={{ scale: 1.05, y: -2 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={hasPlaces ? handleOptimization : () => setOptimizationError('Please add places to your trip before optimizing')}
-        initial={{ opacity: 0, scale: 0 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3, delay: 0.3 }}
-      >
-        <div className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
-          isOptimizing
-            ? 'bg-gradient-to-br from-green-500 to-emerald-600'
-            : 'bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600'
-        }`}>
-          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          
-          {/* Sparkle effects */}
-          <div className="absolute inset-0">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-0.5 h-0.5 bg-white rounded-full"
-                style={{
-                  left: `${25 + i * 25}%`,
-                  top: `${25 + i * 20}%`,
-                }}
-                animate={{
-                  scale: [0, 1, 0],
-                  opacity: [0, 1, 0],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  delay: i * 0.7,
-                }}
-              />
-            ))}
-          </div>
-
-          {isOptimizing ? (
-            <div className="relative w-8 h-8 flex items-center justify-center">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="w-6 h-6"
-              >
-                <Wand2 className="w-6 h-6 text-white" />
-              </motion.div>
+      <div className="fixed bottom-20 right-4 z-40 flex flex-col items-center">
+        <motion.button
+          whileHover={{ scale: 1.05, y: -2 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={hasPlaces ? handleOptimization : () => setOptimizationError('Please add places to your trip before optimizing')}
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+        >
+          <div className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
+            isOptimizing
+              ? 'bg-gradient-to-br from-green-500 to-emerald-600'
+              : 'bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600'
+          }`}>
+            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            
+            {/* Sparkle effects */}
+            <div className="absolute inset-0">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-0.5 h-0.5 bg-white rounded-full"
+                  style={{
+                    left: `${25 + i * 25}%`,
+                    top: `${25 + i * 20}%`,
+                  }}
+                  animate={{
+                    scale: [0, 1, 0],
+                    opacity: [0, 1, 0],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    delay: i * 0.7,
+                  }}
+                />
+              ))}
             </div>
-          ) : (
-            <Wand2 className="w-6 h-6 text-white relative z-10" />
-          )}
-          
-          {/* Tooltip */}
-          <div className="absolute right-full mr-3 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-sm rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap pointer-events-none">
-            Optimize Route
-            <div className="absolute left-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-l-slate-900 dark:border-l-slate-700"></div>
+
+            {isOptimizing ? (
+              <div className="relative w-8 h-8 flex items-center justify-center">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-6 h-6"
+                >
+                  <Wand2 className="w-6 h-6 text-white" />
+                </motion.div>
+              </div>
+            ) : (
+              <Wand2 className="w-6 h-6 text-white relative z-10" />
+            )}
           </div>
+        </motion.button>
+        
+        {/* Label Below Button */}
+        <div className="mt-1 text-xs text-slate-600 dark:text-slate-400 font-medium">
+          {isOptimizing ? 'Processing' : 'Optimize'}
         </div>
-      </motion.button>
+      </div>
 
       {/* Add Place Button - Top position, only show if deadline hasn't passed */}
       {!isDeadlinePassed() && (
