@@ -460,8 +460,9 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       place.category === 'airport' ||
       (place.name?.toLowerCase().includes('airport') || place.place_name?.toLowerCase().includes('airport'));
       
-    const isMovement = place.transport_mode && !isAirport && !isDeparture && !isDestination;
-    const isTripPlace = !isDeparture && !isDestination && !isAirport && !isMovement;
+    // Member-added places are never movements, even if they have transport_mode
+    const isMovement = false; // Removed movement detection - all non-system places are trip places
+    const isTripPlace = !isDeparture && !isDestination && !isAirport;
 
     // Debug logging
     console.log('🏷️ Place debug:', {
@@ -609,37 +610,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           </div>
         </div>
       `;
-    } else if (isMovement) {
-      // Movement/Transport: show route information with proper travel times
-      content = `
-        <div style="padding: 12px; min-width: 280px; max-width: 350px;">
-          <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
-            <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
-              Route Information
-            </h3>
-          </div>
-          
-          <div style="space-y: 8px;">
-            ${place.duration_minutes || place.stay_duration_minutes ? `
-              <div style="margin-bottom: 8px;">
-                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Duration</p>
-                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${DateUtils.formatDuration(place.duration_minutes || place.stay_duration_minutes)}</p>
-              </div>
-            ` : ''}
-            
-            ${place.arrival_time && place.departure_time ? `
-              <div style="margin-bottom: 8px;">
-                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Travel Times</p>
-                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">
-                  Departure: ${departureDisplay}<br>
-                  Arrival: ${arrivalDisplay}
-                </p>
-              </div>
-            ` : ''}
-          </div>
-        </div>
-      `;
-    } else {
+    } else if (isTripPlace) {
       // Trip places: show schedule with time range, added by, priority (no duration display)
       let scheduleDisplay = '';
       if (place.stay_duration_minutes && place.arrival_time && place.departure_time) {
@@ -830,8 +801,40 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
             <div style="margin-bottom: 8px;">
               <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Travel Times</p>
               <div style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">
-                ${fromPlace.departure_time ? `<div>Departure: ${DateUtils.formatDateTime(new Date(fromPlace.departure_time), { includeWeekday: false, includeDate: true, includeTime: true })}</div>` : ''}
-                ${toPlace.arrival_time ? `<div>Arrival: ${DateUtils.formatDateTime(new Date(toPlace.arrival_time), { includeWeekday: false, includeDate: true, includeTime: true })}</div>` : ''}
+                ${fromPlace.departure_time ? (() => {
+                  const formatTime = (time) => {
+                    const date = new Date(`1970-01-01T${time}`);
+                    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                  };
+                  let actualDate = null;
+                  try {
+                    if (currentTrip && fromPlace.day_number) {
+                      actualDate = DateUtils.calculateTripDate(currentTrip, fromPlace.day_number);
+                    }
+                  } catch (error) {
+                    console.warn('Could not calculate trip date:', error);
+                  }
+                  const timeStr = formatTime(fromPlace.departure_time);
+                  const dateStr = actualDate ? `${actualDate.getMonth() + 1}/${actualDate.getDate()} ` : '';
+                  return `<div>Departure: ${dateStr}${timeStr}</div>`;
+                })() : ''}
+                ${toPlace.arrival_time ? (() => {
+                  const formatTime = (time) => {
+                    const date = new Date(`1970-01-01T${time}`);
+                    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                  };
+                  let actualDate = null;
+                  try {
+                    if (currentTrip && toPlace.day_number) {
+                      actualDate = DateUtils.calculateTripDate(currentTrip, toPlace.day_number);
+                    }
+                  } catch (error) {
+                    console.warn('Could not calculate trip date:', error);
+                  }
+                  const timeStr = formatTime(toPlace.arrival_time);
+                  const dateStr = actualDate ? `${actualDate.getMonth() + 1}/${actualDate.getDate()} ` : '';
+                  return `<div>Arrival: ${dateStr}${timeStr}</div>`;
+                })() : ''}
               </div>
             </div>
           ` : ''}

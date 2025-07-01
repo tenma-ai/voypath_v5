@@ -84,15 +84,25 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
         });
         
         schedule[dateKey] = validPlaces.map((place: any, placeIndex: number) => {
-          // Processing place for calendar grid
+          // Processing place for calendar grid - preserve all original data
           
           return {
+            ...place, // Preserve all original place properties
             id: place.id || `place-${daySchedule.day || (dayIndex + 1)}-${placeIndex}`,
             name: place.place_name || place.name || 'Unknown Place',
             time: place.arrival_time || place.scheduled_time_start || `${8 + placeIndex}:00`,
             duration: place.stay_duration_minutes || 120,
             category: place.category || 'attraction',
-            contributors: place.member_contribution || []
+            contributors: place.member_contribution || [],
+            // Ensure these key properties are present
+            place_name: place.place_name || place.name,
+            member_contribution: place.member_contribution || [],
+            place_type: place.place_type,
+            wish_level: place.wish_level,
+            stay_duration_minutes: place.stay_duration_minutes,
+            arrival_time: place.arrival_time,
+            departure_time: place.departure_time,
+            day_number: place.day_number || daySchedule.day || (dayIndex + 1)
           };
         });
 
@@ -109,10 +119,19 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
               name: destination === 'same as departure location' 
                 ? `Return to: ${departureLocation}` 
                 : `Arrival: ${destination}`,
+              place_name: destination === 'same as departure location' 
+                ? `Return to: ${departureLocation}` 
+                : `Arrival: ${destination}`,
               time: '18:00',
               duration: 60,
               category: 'destination',
-              contributors: []
+              place_type: 'destination',
+              contributors: [],
+              member_contribution: [],
+              arrival_time: '18:00',
+              departure_time: '19:00',
+              stay_duration_minutes: 60,
+              day_number: daySchedule.day || (dayIndex + 1)
             });
           }
         }
