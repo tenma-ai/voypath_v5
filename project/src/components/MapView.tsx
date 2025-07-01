@@ -505,15 +505,33 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       departure_time: place.departure_time
     });
 
-    // Format departure/arrival times
+    // Format departure/arrival times with date context
     let departureDisplay = '';
     let arrivalDisplay = '';
     
+    // Calculate actual date for this place using DateUtils
+    let actualDate = null;
+    try {
+      if (currentTrip && place.day_number) {
+        actualDate = DateUtils.calculateTripDate(currentTrip, place.day_number);
+      }
+    } catch (error) {
+      console.warn('Could not calculate trip date:', error);
+    }
+    
     if (place.departure_time) {
       departureDisplay = formatTimeWithoutSeconds(place.departure_time);
+      if (actualDate) {
+        const dateStr = `${actualDate.getMonth() + 1}/${actualDate.getDate()}`;
+        departureDisplay = `${dateStr} ${departureDisplay}`;
+      }
     }
     if (place.arrival_time) {
       arrivalDisplay = formatTimeWithoutSeconds(place.arrival_time);
+      if (actualDate) {
+        const dateStr = `${actualDate.getMonth() + 1}/${actualDate.getDate()}`;
+        arrivalDisplay = `${dateStr} ${arrivalDisplay}`;
+      }
     }
 
     let content = '';
@@ -559,7 +577,21 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         </div>
       `;
     } else if (isAirport) {
-      // Airport: show schedule only (no duration, no travel times)
+      // Airport: show stay duration in format "6/5 18:00-19:30"
+      let durationDisplay = '';
+      if (place.stay_duration_minutes && arrivalDisplay && departureDisplay) {
+        // Extract time parts from formatted display (remove date prefix if present)
+        const arrivalTime = arrivalDisplay.includes(' ') ? arrivalDisplay.split(' ')[1] : arrivalDisplay;
+        const departureTime = departureDisplay.includes(' ') ? departureDisplay.split(' ')[1] : departureDisplay;
+        
+        if (actualDate) {
+          const dateStr = `${actualDate.getMonth() + 1}/${actualDate.getDate()}`;
+          durationDisplay = `${dateStr} ${arrivalTime}-${departureTime}`;
+        } else {
+          durationDisplay = `${arrivalTime}-${departureTime}`;
+        }
+      }
+      
       content = `
         <div style="padding: 12px; min-width: 280px; max-width: 350px;">
           <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
@@ -569,10 +601,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           </div>
           
           <div style="space-y: 8px;">
-            ${scheduleDisplay ? `
+            ${durationDisplay ? `
               <div style="margin-bottom: 8px;">
                 <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Schedule</p>
-                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${scheduleDisplay}</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${durationDisplay}</p>
               </div>
             ` : ''}
           </div>
@@ -614,7 +646,21 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         </div>
       `;
     } else {
-      // Trip places: show schedule, added by, priority, duration
+      // Trip places: show schedule with time range, added by, priority
+      let durationDisplay = '';
+      if (place.stay_duration_minutes && arrivalDisplay && departureDisplay) {
+        // Extract time parts from formatted display (remove date prefix if present)
+        const arrivalTime = arrivalDisplay.includes(' ') ? arrivalDisplay.split(' ')[1] : arrivalDisplay;
+        const departureTime = departureDisplay.includes(' ') ? departureDisplay.split(' ')[1] : departureDisplay;
+        
+        if (actualDate) {
+          const dateStr = `${actualDate.getMonth() + 1}/${actualDate.getDate()}`;
+          durationDisplay = `${dateStr} ${arrivalTime}-${departureTime}`;
+        } else {
+          durationDisplay = `${arrivalTime}-${departureTime}`;
+        }
+      }
+      
       content = `
         <div style="padding: 12px; min-width: 280px; max-width: 350px;">
           <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
@@ -625,10 +671,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           </div>
           
           <div style="space-y: 8px;">
-            ${scheduleDisplay ? `
+            ${durationDisplay ? `
               <div style="margin-bottom: 8px;">
                 <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Schedule</p>
-                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${scheduleDisplay}</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${durationDisplay}</p>
               </div>
             ` : ''}
             
@@ -647,11 +693,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
             ${place.duration_minutes || place.stay_duration_minutes ? `
               <div style="margin-bottom: 8px;">
                 <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Duration</p>
-                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${(() => {
-                  const durationValue = place.duration_minutes || place.stay_duration_minutes;
-                  const minutes = durationValue > 1440 ? Math.floor(durationValue / 60) : durationValue;
-                  return formatDuration(minutes);
-                })()}</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${DateUtils.formatDuration(place.duration_minutes || place.stay_duration_minutes)}</p>
               </div>
             ` : ''}
             

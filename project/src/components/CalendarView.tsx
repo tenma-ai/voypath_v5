@@ -436,20 +436,100 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
             
             {/* Content */}
             <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 180px)' }}>
-              {/* Check if system place */}
-              {selectedPlace.place_type === 'departure' || selectedPlace.place_type === 'destination' || selectedPlace.place_type === 'airport' ? (
-                // System place - only show duration
-                <>
-                  {(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes) && (
-                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                      <h4 className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Duration</h4>
-                      <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
-                        {formatDuration(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes)}
-                      </p>
-                    </div>
-                  )}
-                </>
-              ) : (
+              {/* Check place type and display accordingly */}
+              {(() => {
+                const isDeparture = selectedPlace.category === 'departure_point' || selectedPlace.place_type === 'departure';
+                const isDestination = selectedPlace.category === 'final_destination' || selectedPlace.place_type === 'destination';
+                const isAirport = selectedPlace.place_type === 'airport' || selectedPlace.place_type === 'system_airport' || 
+                                selectedPlace.category === 'airport' || selectedPlace.name?.toLowerCase().includes('airport');
+                
+                // Calculate actual date for this place
+                let actualDate = null;
+                try {
+                  if (currentTrip && selectedPlace.day_number) {
+                    actualDate = DateUtils.calculateTripDate(currentTrip, selectedPlace.day_number);
+                  }
+                } catch (error) {
+                  console.warn('Could not calculate trip date:', error);
+                }
+                
+                // Format times with date context
+                let arrivalDisplay = '';
+                let departureDisplay = '';
+                if (selectedPlace.arrival_time) {
+                  arrivalDisplay = formatTime(selectedPlace.arrival_time);
+                  if (actualDate) {
+                    const dateStr = `${actualDate.getMonth() + 1}/${actualDate.getDate()}`;
+                    arrivalDisplay = `${dateStr} ${arrivalDisplay}`;
+                  }
+                }
+                if (selectedPlace.departure_time) {
+                  departureDisplay = formatTime(selectedPlace.departure_time);
+                  if (actualDate) {
+                    const dateStr = `${actualDate.getMonth() + 1}/${actualDate.getDate()}`;
+                    departureDisplay = `${dateStr} ${departureDisplay}`;
+                  }
+                }
+                
+                if (isDeparture) {
+                  // Departure: show departure time only
+                  return (
+                    <>
+                      {departureDisplay && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                          <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Departure</h4>
+                          <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{departureDisplay}</p>
+                        </div>
+                      )}
+                    </>
+                  );
+                } else if (isDestination) {
+                  // Destination: show arrival time only
+                  return (
+                    <>
+                      {arrivalDisplay && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                          <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Arrival</h4>
+                          <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{arrivalDisplay}</p>
+                        </div>
+                      )}
+                    </>
+                  );
+                } else if (isAirport || isDeparture || isDestination) {
+                  // Airport: show schedule in "M/D HH:MM-HH:MM" format
+                  let scheduleDisplay = '';
+                  if (selectedPlace.stay_duration_minutes && arrivalDisplay && departureDisplay) {
+                    const arrivalTime = arrivalDisplay.includes(' ') ? arrivalDisplay.split(' ')[1] : arrivalDisplay;
+                    const departureTime = departureDisplay.includes(' ') ? departureDisplay.split(' ')[1] : departureDisplay;
+                    
+                    if (actualDate) {
+                      const dateStr = `${actualDate.getMonth() + 1}/${actualDate.getDate()}`;
+                      scheduleDisplay = `${dateStr} ${arrivalTime}-${departureTime}`;
+                    } else {
+                      scheduleDisplay = `${arrivalTime}-${departureTime}`;
+                    }
+                  }
+                  
+                  return (
+                    <>
+                      {scheduleDisplay && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                          <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Schedule</h4>
+                          <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{scheduleDisplay}</p>
+                        </div>
+                      )}
+                    </>
+                  );
+                }
+                
+                return null; // Fall through to regular place handling below
+              })()}
+              
+              {/* Regular places - check if this is not a system place */}
+              {!(selectedPlace.category === 'departure_point' || selectedPlace.place_type === 'departure' ||
+                 selectedPlace.category === 'final_destination' || selectedPlace.place_type === 'destination' ||
+                 selectedPlace.place_type === 'airport' || selectedPlace.place_type === 'system_airport' || 
+                 selectedPlace.category === 'airport' || selectedPlace.name?.toLowerCase().includes('airport')) ? (
                 // Regular place - show full information
                 <>
                   {/* User Information - Always show who added */}
@@ -473,37 +553,57 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                     );
                   })()}
               
-              {/* Schedule and Duration Info */}
-              <div className="grid grid-cols-2 gap-3">
-                {(selectedPlace.day_number || selectedPlace.hour || selectedPlace.arrival_time) && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                    <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Schedule</h4>
-                    <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
-                      {selectedPlace.day_number && `Day ${selectedPlace.day_number}`}
-                      {selectedPlace.hour && `, ${selectedPlace.hour}:00`}
-                      {selectedPlace.arrival_time && !selectedPlace.hour && selectedPlace.arrival_time}
-                    </p>
-                  </div>
-                )}
+              {/* Schedule and Duration Info for Regular Places */}
+              {(() => {
+                // Calculate actual date and format schedule consistently
+                let actualDate = null;
+                try {
+                  if (currentTrip && selectedPlace.day_number) {
+                    actualDate = DateUtils.calculateTripDate(currentTrip, selectedPlace.day_number);
+                  }
+                } catch (error) {
+                  console.warn('Could not calculate trip date:', error);
+                }
                 
-                {(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes) && (
-                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                    <h4 className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Duration</h4>
-                    <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
-                      {formatDuration(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes)}
-                    </p>
+                let scheduleDisplay = '';
+                if (selectedPlace.stay_duration_minutes && selectedPlace.arrival_time && selectedPlace.departure_time) {
+                  const arrivalTime = formatTime(selectedPlace.arrival_time);
+                  const departureTime = formatTime(selectedPlace.departure_time);
+                  
+                  if (actualDate) {
+                    const dateStr = `${actualDate.getMonth() + 1}/${actualDate.getDate()}`;
+                    scheduleDisplay = `${dateStr} ${arrivalTime}-${departureTime}`;
+                  } else {
+                    scheduleDisplay = `${arrivalTime}-${departureTime}`;
+                  }
+                }
+                
+                return (
+                  <div className="grid grid-cols-2 gap-3">
+                    {scheduleDisplay && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                        <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Schedule</h4>
+                        <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{scheduleDisplay}</p>
+                      </div>
+                    )}
+                    
+                    {(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes) && (
+                      <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                        <h4 className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Duration</h4>
+                        <p className="text-base text-gray-900 dark:text-gray-100 font-medium">
+                          {DateUtils.formatDuration(selectedPlace.duration_minutes || selectedPlace.stay_duration_minutes)}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
               
-              {/* Wish Level */}
+              {/* Priority Level */}
               {selectedPlace.wish_level && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
-                  <h4 className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-1">Priority Level</h4>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-2xl">{['⭐', '⭐', '⭐', '⭐', '⭐'].slice(0, selectedPlace.wish_level).join('')}</span>
-                    <span className="text-base text-gray-900 dark:text-gray-100 font-medium">({selectedPlace.wish_level}/5)</span>
-                  </div>
+                  <h4 className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-1">Priority</h4>
+                  <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{selectedPlace.wish_level}/10</p>
                 </div>
               )}
               

@@ -142,11 +142,17 @@ function TopAppBar() {
     console.log('🎯 Profile menu toggle clicked', { 
       type: e.type, 
       currentState: showProfileMenu,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      windowWidth: window.innerWidth
     });
     
-    setShowProfileMenu(!showProfileMenu);
-    setShowVoypathMenu(false);
+    // モバイル対応: 768px未満では直接プロフィールページへ遷移
+    if (window.innerWidth < 768) {
+      navigate('/profile');
+    } else {
+      setShowProfileMenu(!showProfileMenu);
+      setShowVoypathMenu(false);
+    }
   };
 
   const handleVoypathMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {
@@ -704,8 +710,18 @@ function TopAppBar() {
                         <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="fixed right-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden opacity-100"
-                          style={{ zIndex: 10001 }}
+                          className="fixed w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden opacity-100"
+                          style={{ 
+                            zIndex: 10001,
+                            // モバイル対応の位置調整
+                            right: window.innerWidth < 768 ? '8px' : '16px',
+                            top: window.innerWidth < 768 ? '56px' : '64px',
+                            // デバッグ用: モバイルで要素が見えるか確認
+                            ...(window.innerWidth < 768 ? {
+                              border: '3px solid red',
+                              backgroundColor: 'yellow'
+                            } : {})
+                          }}
                           variants={menuVariants}
                           initial="hidden"
                           animate="visible"
