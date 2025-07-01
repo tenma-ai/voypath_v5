@@ -572,7 +572,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
                     </div>
                   )}
                 </>
-              )}
+              ) : null}
             </div>
           </div>
         </div>,

@@ -617,7 +617,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                 </div>
               )}
                 </>
-              )}
+              ) : null}
             </div>
           </div>
         </div>,
