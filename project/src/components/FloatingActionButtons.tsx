@@ -147,7 +147,7 @@ export function FloatingActionButtons() {
                     />
                   </defs>
                   <text className="text-[6px] fill-white font-medium" style={{ letterSpacing: '0.5px' }}>
-                    <textPath href="#circle-path" startOffset="25%">
+                    <textPath href="#circle-path" startOffset="12.5%">
                       OPTIMIZE
                     </textPath>
                   </text>
@@ -175,6 +175,21 @@ export function FloatingActionButtons() {
           >
             <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             <Plus className="w-6 h-6 text-white relative z-10" />
+            
+            {/* Circular Text */}
+            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 56 56">
+              <defs>
+                <path
+                  id="add-circle-path"
+                  d="M 28 28 m -20 0 a 20 20 0 1 1 40 0 a 20 20 0 1 1 -40 0"
+                />
+              </defs>
+              <text className="text-[5px] fill-white font-medium" style={{ letterSpacing: '0.3px' }}>
+                <textPath href="#add-circle-path" startOffset="15%">
+                  ADD PLACES
+                </textPath>
+              </text>
+            </svg>
             
             {/* Tooltip */}
             <div className="absolute right-full mr-3 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-sm rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap pointer-events-none">
