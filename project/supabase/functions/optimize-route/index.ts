@@ -910,6 +910,9 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
     const place = places[i];
     const placeTime = place.stay_duration_minutes + (place.travel_time_from_previous || 0);
     
+    // 最終目的地判定を最初に行う
+    const isFinalDestination = place.category === 'final_destination';
+    
     // システムプレース判定を強化（出発地・最終目的地・システム空港は絶対保護）
     const isSystemPlace = (
       place.source === 'system' || 
@@ -919,9 +922,6 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
       (place.id && place.id.toString().startsWith('airport_')) ||
       (place.id && place.id.toString().startsWith('return_'))
     );
-    
-    // 最終目的地は最終日に特別処理
-    const isFinalDestination = place.category === 'final_destination';
     
     // フライトの場合の処理
     if (place.transport_mode === 'flight' && currentPlaces.length > 0) {
@@ -951,12 +951,36 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
       // 時間がある場合は同日続行（何もしない）
       continue; // この場所の処理は完了したので次へ
     } else if (currentTime + placeTime > maxDailyMinutes && currentPlaces.length > 0) {
-      // 1日の時間制限を超える場合、新しい日を作成
-      schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
-      currentDay++;
-      currentPlaces = [];
-      currentTime = 0;
-      timeCounter = 8 * 60; // リセット（朝8時から活動開始）
+      // Final destinationの場合は、前の場所の時間から続けて同じ日に配置するかチェック
+      if (isFinalDestination && currentPlaces.length > 0) {
+        const lastPlace = currentPlaces[currentPlaces.length - 1];
+        if (lastPlace && lastPlace.departure_time) {
+          const [hours, minutes] = lastPlace.departure_time.split(':').map(Number);
+          const lastPlaceEndTime = hours * 60 + minutes;
+          const finalDestinationArrival = lastPlaceEndTime + (place.travel_time_from_previous || 0);
+          
+          // 20:00 (1200分) 以前なら同じ日に配置
+          if (finalDestinationArrival <= 20 * 60) {
+            console.log(`🎯 Final destination fits on same day: arrival at ${formatTime(finalDestinationArrival)}`);
+            // 新しい日を作らずに、同じ日に続ける
+            timeCounter = finalDestinationArrival;
+          } else {
+            // 20:00を過ぎるので翌日へ
+            schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
+            currentDay++;
+            currentPlaces = [];
+            currentTime = 0;
+            timeCounter = 8 * 60; // 翌日は8:00から開始
+          }
+        }
+      } else {
+        // 通常の場所の場合、新しい日を作成
+        schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
+        currentDay++;
+        currentPlaces = [];
+        currentTime = 0;
+        timeCounter = 8 * 60; // 朝8時から活動開始
+      }
     }
     
     // 最終目的地は通常の順序でスケジューリング（強制的に最終日にしない）
@@ -976,9 +1000,12 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
       }
     }
     
-    // 時間設定
-    if (place.travel_time_from_previous) {
+    // 時間設定（Final destinationの場合は既に時間が設定済みなのでスキップ）
+    if (place.travel_time_from_previous && !isFinalDestination) {
       timeCounter += place.travel_time_from_previous;
+    } else if (place.travel_time_from_previous && isFinalDestination) {
+      // Final destinationの場合は既に正しい時間が設定済み
+      console.log(`🎯 Skipping travel time addition for final destination (already calculated): ${place.name}`);
     }
     
     // 1日の終了時刻（20:00 = 1200分）を超えないよう制限
