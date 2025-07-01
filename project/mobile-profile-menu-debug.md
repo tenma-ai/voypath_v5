@@ -3,7 +3,8 @@
 ## 問題の概要
 - **症状**: スマホでプロフィールメニューのポップアップが表示されない
 - **状況**: デスクトップでは正常動作、モバイルのみで問題発生
-- **現状**: クリックしても何も表示されない（ポップアップすら表示されない）
+- **最新の発見**: バックドロップがピンク色に変わることを確認 = クリックは正常に動作している
+- **推定原因**: メニュー要素が何らかの原因で隠れている（レンダリングはされているが表示されない）
 
 ## 試行した解決策と結果
 
@@ -131,9 +132,129 @@ right-4; /* 16px - モバイルビューポートで問題の可能性 */
 2. 別のアニメーションライブラリ使用
 3. アニメーションなしのシンプル実装
 
-## ログ確認項目
-- [ ] `🎯 Profile menu state changed: true` - 状態変化の確認
-- [ ] `🎯 Profile menu toggle clicked` - クリックイベントの確認  
+## 最新の調査結果 (2024年現在)
+
+### 確認できた事実
+- ✅ クリックイベントは正常に動作（バックドロップがピンク色に変化）
+- ✅ 状態管理は正常（`showProfileMenu`がtrueになっている）
+- ✅ JavaScriptエラーは発生していない
+- ❌ メニュー要素が視覚的に表示されない
+
+### 絞り込まれた原因候補
+
+#### 1. CSS可視性問題
+**最有力候補**: メニューがレンダリングされているが隠れている
+- `opacity: 0` になっている可能性
+- `transform` による画面外への移動
+- `overflow: hidden` による切り取り
+- モバイル固有のCSS制約
+
+#### 2. 位置計算の問題  
+```css
+position: fixed;
+right: 4; /* 16px */
+top: 16; /* 64px */
+```
+- モバイルでは画面右端から16pxが画面外になる可能性
+- top: 64pxがモバイルのヘッダー高さと合わない可能性
+- Safe areaを考慮していない（iPhone等）
+
+#### 3. Framer Motion互換性
+- モバイルでのアニメーション処理が異なる
+- `variants` の `hidden` 状態から `visible` への遷移が失敗
+- ハードウェアアクセラレーションの問題
+
+## 引き継ぎ事項と推奨解決策
+
+### 即効性のある対策
+
+#### A. デバッグ版で要素位置確認
+現在のコードには以下のデバッグ要素が追加済み:
+```css
+border: '3px solid red',
+backgroundColor: 'yellow'
+```
+この要素がモバイルで見えるかどうかで原因を特定可能。
+
+#### B. 強制表示テスト
+以下のスタイルを一時的に追加してテスト:
+```css
+style={{
+  position: 'fixed',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  zIndex: 999999,
+  display: 'block !important',
+  visibility: 'visible !important',
+  opacity: '1 !important'
+}}
+```
+
+#### C. モバイル専用の位置設定
+```css
+/* モバイル専用 */
+@media (max-width: 768px) {
+  .profile-menu {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    left: 20px;
+    transform: none;
+  }
+}
+```
+
+### 長期的な解決策
+
+#### 1. モバイル専用UI実装
+```jsx
+const isMobile = window.innerWidth < 768;
+
+{isMobile ? (
+  // Bottom sheet スタイル
+  <motion.div className="fixed bottom-0 left-0 right-0" />
+) : (
+  // デスクトップ用ドロップダウン
+  <motion.div className="fixed right-4 top-16" />
+)}
+```
+
+#### 2. アニメーションライブラリ変更
+- Framer MotionからCSS Transitionへ変更
+- React Transitionグループの使用
+- アニメーションなしのシンプル実装
+
+#### 3. 既存ライブラリ使用
+- Headless UI Menuコンポーネント
+- Radix UI Dropdown Menu
+- React Aria メニューコンポーネント
+
+## 作業ファイル
+- **メインファイル**: `src/components/TopAppBar.tsx`
+- **デバッグログ**: `project/mobile-profile-menu-debug.md` (このファイル)
+- **テスト用ブランチ**: 必要に応じて`fix-mobile-menu`等を作成
+
+## 緊急回避案
+モバイルではプロフィールアイコンを直接Profile ページに遷移させる:
+```jsx
+const handleProfileClick = () => {
+  if (window.innerWidth < 768) {
+    navigate('/profile'); // モバイルは直接遷移
+  } else {
+    setShowProfileMenu(!showProfileMenu); // デスクトップはメニュー表示
+  }
+};
+```
+
+## 検証済み項目
+- [x] `🎯 Profile menu state changed: true` - 状態変化の確認 ✅
+- [x] `🎯 Profile menu toggle clicked` - クリックイベントの確認 ✅
+- [x] バックドロップの表示確認 ✅ (ピンク色になることを確認)
 - [ ] DOM要素の実際の存在確認
 - [ ] CSS computedStylesの確認
-- [ ] モバイルでのJavaScriptエラー確認
+- [ ] 要素の位置座標確認 (getBoundingClientRect)
+
+---
+
+**次の担当者へ**: バックドロップが表示されているので、メニュー要素の可視性・位置に焦点を当てて調査してください。
