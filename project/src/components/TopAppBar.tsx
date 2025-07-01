@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Settings, Sun, Moon, User, LogOut, Edit, Crown, Sparkles, MapPin, Calendar, Users, MessageCircle, Share2, Bell, Shield, Download, HelpCircle, Star, Info, Phone, FileText, Heart, Award, Zap, Globe } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -692,134 +693,6 @@ function TopAppBar() {
                     </div>
                   </motion.button>
 
-                  {/* Profile Menu Dropdown */}
-                  <AnimatePresence>
-                    {showProfileMenu && (
-                      <>
-                        {/* Backdrop */}
-                        <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 99998 }} />
-                        
-                        <motion.div 
-                          className="profile-menu-dropdown fixed right-2 sm:right-4 top-14 sm:top-16 w-[calc(100vw-1rem)] sm:w-80 max-w-[calc(100vw-1rem)] max-h-[calc(100vh-4rem)] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
-                          style={{ 
-                            zIndex: 999999,
-                            opacity: 1,
-                            pointerEvents: 'auto',
-                            transform: 'translateZ(0)',
-                            WebkitTransform: 'translateZ(0)',
-                            willChange: 'transform',
-                            position: 'fixed'
-                          }}
-                          initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                          transition={{ duration: 0.15, ease: "easeOut" }}
-                        >
-                          {/* User Info */}
-                          <div 
-                            className="relative px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="relative">
-                                <div 
-                                  className="w-12 h-12 rounded-xl flex items-center justify-center shadow-medium"
-                                  style={isPremium ? {
-                                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #000000 100%)',
-                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                                  } : userColor ? {
-                                    backgroundColor: userColor,
-                                  } : {
-                                    background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)',
-                                  }}
-                                >
-                                  <span className={`${isPremium ? 'text-yellow-400' : 'text-white'} font-bold text-lg drop-shadow-sm`}>
-                                    {user.name?.charAt(0) || 'U'}
-                                  </span>
-                                  {isPremium && (
-                                    <Crown className="absolute -top-0.5 -right-0.5 w-4 h-4 text-yellow-400 fill-current drop-shadow-sm" />
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center space-x-1.5">
-                                  <p className="font-medium text-slate-900 dark:text-slate-100 truncate text-sm">
-                                    {user.name || 'Guest User'}
-                                  </p>
-                                  {isPremium && <PremiumBadge size="sm" />}
-                                </div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                                  {user.email || (user.isGuest ? 'Guest Account' : 'No email')}
-                                </p>
-                                <div className="flex items-center mt-1">
-                                  <div className="w-1.5 h-1.5 bg-success-500 rounded-full mr-1.5 animate-pulse-soft"></div>
-                                  <span className="text-xs text-success-600 dark:text-success-400 font-medium">Online</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Menu Items Section */}
-                          <div className="px-2 py-2">
-                            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-2 mb-2">Account</div>
-                            <button
-                              onClick={() => handleMenuAction('profile')}
-                              className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden rounded-xl"
-                            >
-                              <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-primary-100 dark:group-hover:bg-primary-900/30 transition-colors duration-300 relative z-10">
-                                <User className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-300" />
-                              </div>
-                              <div className="flex-1 relative z-10">
-                                <span className="text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 font-medium transition-colors duration-300 text-sm">
-                                  Profile Settings
-                                </span>
-                              </div>
-                            </button>
-
-                            {/* Premium Upgrade Section */}
-                            {!isPremium && (
-                              <>
-                                <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-2" />
-                                <button
-                                  onClick={() => handleMenuAction('upgrade')}
-                                  className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-gradient-to-r hover:from-yellow-50 hover:to-orange-50 dark:hover:from-yellow-900/20 dark:hover:to-orange-900/20 transition-all duration-300 group relative overflow-hidden rounded-xl"
-                                >
-                                  <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center shadow-soft relative z-10">
-                                    <Crown className="w-4 h-4 text-white fill-current" />
-                                  </div>
-                                  <div className="flex-1 relative z-10">
-                                    <span className="text-yellow-600 dark:text-yellow-400 font-bold text-sm">
-                                      Upgrade to Premium
-                                    </span>
-                                    <div className="text-xs text-yellow-500 dark:text-yellow-500">
-                                      Unlock unlimited features
-                                    </div>
-                                  </div>
-                                  <Star className="w-4 h-4 text-yellow-500 fill-current relative z-10" />
-                                </button>
-                              </>
-                            )}
-
-                            {!user.isGuest && (
-                              <>
-                                <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-2" />
-                                <button
-                                  onClick={() => handleMenuAction('logout')}
-                                  className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-all duration-300 group relative overflow-hidden rounded-xl"
-                                >
-                                  <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center group-hover:bg-red-200 dark:group-hover:bg-red-900/50 transition-colors duration-300 relative z-10">
-                                    <LogOut className="w-4 h-4 text-red-600 dark:text-red-400 transition-colors duration-300" />
-                                  </div>
-                                  <span className="text-red-600 dark:text-red-400 font-medium transition-colors duration-300 relative z-10 text-sm">
-                                    Sign Out
-                                  </span>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
                 </div>
               )}
             </div>
@@ -841,6 +714,129 @@ function TopAppBar() {
           onClose={() => setShowInfoModal(null)}
           type={showInfoModal}
         />
+      )}
+
+      {/* Profile Menu Portal - Rendered at document root for maximum z-index */}
+      {showProfileMenu && user && ReactDOM.createPortal(
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[999999] flex items-start justify-end pt-16 pr-4"
+            style={{ zIndex: 999999 }}
+            onClick={() => setShowProfileMenu(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: -20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] overflow-y-auto overflow-x-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* User Info */}
+              <div className="relative px-4 py-3 border-b border-slate-200/50 dark:border-slate-700/50">
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <div 
+                      className="w-12 h-12 rounded-xl flex items-center justify-center shadow-medium"
+                      style={isPremium ? {
+                        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #000000 100%)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                      } : userColor ? {
+                        backgroundColor: userColor,
+                      } : {
+                        background: 'linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4)',
+                      }}
+                    >
+                      <span className={`${isPremium ? 'text-yellow-400' : 'text-white'} font-bold text-lg drop-shadow-sm`}>
+                        {user.name?.charAt(0) || 'U'}
+                      </span>
+                      {isPremium && (
+                        <Crown className="absolute -top-0.5 -right-0.5 w-4 h-4 text-yellow-400 fill-current drop-shadow-sm" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-1.5">
+                      <p className="font-medium text-slate-900 dark:text-slate-100 truncate text-sm">
+                        {user.name || 'Guest User'}
+                      </p>
+                      {isPremium && <PremiumBadge size="sm" />}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {user.email || (user.isGuest ? 'Guest Account' : 'No email')}
+                    </p>
+                    <div className="flex items-center mt-1">
+                      <div className="w-1.5 h-1.5 bg-success-500 rounded-full mr-1.5 animate-pulse-soft"></div>
+                      <span className="text-xs text-success-600 dark:text-success-400 font-medium">Online</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Menu Items Section */}
+              <div className="px-2 py-2">
+                <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-2 mb-2">Account</div>
+                <button
+                  onClick={() => handleMenuAction('profile')}
+                  className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-slate-100/60 dark:hover:bg-slate-700/60 transition-all duration-300 group relative overflow-hidden rounded-xl touch-manipulation"
+                >
+                  <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center group-hover:bg-primary-100 dark:group-hover:bg-primary-900/30 transition-colors duration-300 relative z-10">
+                    <User className="w-4 h-4 text-slate-600 dark:text-slate-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-300" />
+                  </div>
+                  <div className="flex-1 relative z-10">
+                    <span className="text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 font-medium transition-colors duration-300 text-sm">
+                      Profile Settings
+                    </span>
+                  </div>
+                </button>
+
+                {/* Premium Upgrade Section */}
+                {!isPremium && (
+                  <>
+                    <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-2" />
+                    <button
+                      onClick={() => handleMenuAction('upgrade')}
+                      className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-gradient-to-r hover:from-yellow-50 hover:to-orange-50 dark:hover:from-yellow-900/20 dark:hover:to-orange-900/20 transition-all duration-300 group relative overflow-hidden rounded-xl touch-manipulation"
+                    >
+                      <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center shadow-soft relative z-10">
+                        <Crown className="w-4 h-4 text-white fill-current" />
+                      </div>
+                      <div className="flex-1 relative z-10">
+                        <span className="text-yellow-600 dark:text-yellow-400 font-bold text-sm">
+                          Upgrade to Premium
+                        </span>
+                        <div className="text-xs text-yellow-500 dark:text-yellow-500">
+                          Unlock unlimited features
+                        </div>
+                      </div>
+                      <Star className="w-4 h-4 text-yellow-500 fill-current relative z-10" />
+                    </button>
+                  </>
+                )}
+
+                {!user.isGuest && (
+                  <>
+                    <div className="border-t border-slate-200/50 dark:border-slate-700/50 my-2" />
+                    <button
+                      onClick={() => handleMenuAction('logout')}
+                      className="w-full flex items-center space-x-3 px-3 py-2.5 text-left hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-all duration-300 group relative overflow-hidden rounded-xl touch-manipulation"
+                    >
+                      <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center group-hover:bg-red-200 dark:group-hover:bg-red-900/50 transition-colors duration-300 relative z-10">
+                        <LogOut className="w-4 h-4 text-red-600 dark:text-red-400 transition-colors duration-300" />
+                      </div>
+                      <span className="text-red-600 dark:text-red-400 font-medium transition-colors duration-300 relative z-10 text-sm">
+                        Sign Out
+                      </span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
       )}
 
     </>
