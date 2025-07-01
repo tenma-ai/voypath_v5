@@ -80,8 +80,7 @@ function normalizePreferences(places) {
     const isSystemPlace = (
       place.source === 'system' || 
       place.category === 'departure_point' || 
-      place.category === 'destination_point' ||
-      place.category === 'return_point' ||
+      place.category === 'final_destination' ||
       place.place_type === 'system_airport'
     );
     
@@ -110,15 +109,13 @@ function filterPlacesByFairness(places, maxPlaces) {
   const systemPlaces = places.filter((p) => 
     p.source === 'system' || 
     p.category === 'departure_point' || 
-    p.category === 'destination_point' ||
-    p.category === 'return_point' ||
+    p.category === 'final_destination' ||
     p.place_type === 'system_airport'
   );
   const visitPlaces = places.filter((p) => 
     p.source !== 'system' && 
     p.category !== 'departure_point' && 
-    p.category !== 'destination_point' &&
-    p.category !== 'return_point' &&
+    p.category !== 'final_destination' &&
     p.place_type !== 'system_airport'
   );
   
@@ -287,16 +284,14 @@ function removeOneRandomPlacePerUser(places) {
   const systemPlaces = places.filter((p) => 
     p.source === 'system' || 
     p.category === 'departure_point' || 
-    p.category === 'destination_point' ||
-    p.category === 'return_point' ||
+    p.category === 'final_destination' ||
     p.place_type === 'system_airport'
   );
   
   const visitPlaces = places.filter((p) => 
     p.source !== 'system' && 
     p.category !== 'departure_point' && 
-    p.category !== 'destination_point' &&
-    p.category !== 'return_point' &&
+    p.category !== 'final_destination' &&
     p.place_type !== 'system_airport'
   );
   
@@ -355,11 +350,9 @@ async function iterativelyOptimizeWithDateConstraints(places, availableDays, tri
     const isSystem = (
       p.source === 'system' || 
       p.category === 'departure_point' || 
-      p.category === 'destination_point' ||
-      p.category === 'return_point' ||
+      p.category === 'final_destination' ||
       p.place_type === 'system_airport' ||
-      (p.name && (p.name.toLowerCase().includes('departure') || p.name.toLowerCase().includes('destination'))) ||
-      (p.category && (p.category.includes('departure') || p.category.includes('destination') || p.category.includes('return')))
+      (p.name && (p.name.toLowerCase().includes('departure') || p.name.toLowerCase().includes('destination')))
     );
     
     if (isSystem) {
@@ -373,11 +366,9 @@ async function iterativelyOptimizeWithDateConstraints(places, availableDays, tri
     const isUser = !(
       p.source === 'system' || 
       p.category === 'departure_point' || 
-      p.category === 'destination_point' ||
-      p.category === 'return_point' ||
+      p.category === 'final_destination' ||
       p.place_type === 'system_airport' ||
-      (p.name && (p.name.toLowerCase().includes('departure') || p.name.toLowerCase().includes('destination'))) ||
-      (p.category && (p.category.includes('departure') || p.category.includes('destination') || p.category.includes('return')))
+      (p.name && (p.name.toLowerCase().includes('departure') || p.name.toLowerCase().includes('destination')))
     );
     
     if (isUser) {
@@ -768,25 +759,23 @@ function optimizeRouteOrder(places) {
     return isDeparture;
   });
   
-  const destination = places.find((p) => {
-    const isDestination = (
-      (p.source === 'system' && p.category === 'destination_point') ||
-      (p.category === 'destination_point') ||
+  const finalDestination = places.find((p) => {
+    const isFinalDestination = (
+      p.category === 'final_destination' ||
       (p.name && p.name.toLowerCase().includes('destination'))
     );
-    if (isDestination) {
-      console.log(`🏁 Found destination: ${p.name} (category: ${p.category})`);
+    if (isFinalDestination) {
+      console.log(`🏁 Found final destination: ${p.name} (category: ${p.category})`);
     }
-    return isDestination;
+    return isFinalDestination;
   });
   
-  // その他の場所（出発地・到着地・システム空港以外）
+  // その他の場所（出発地・最終目的地・システム空港以外）
   const others = places.filter((p) => {
     const isOther = !(
       (p.source === 'system' && p.category === 'departure_point') ||
-      (p.source === 'system' && p.category === 'destination_point') ||
       (p.category === 'departure_point') ||
-      (p.category === 'destination_point') ||
+      (p.category === 'final_destination') ||
       p.place_type === 'system_airport' ||
       (p.name && (p.name.toLowerCase().includes('departure') || p.name.toLowerCase().includes('destination')))
     );
@@ -798,7 +787,7 @@ function optimizeRouteOrder(places) {
     return isOther;
   });
   
-  console.log(`📊 Route composition: ${departure ? 1 : 0} departure + ${others.length} others + ${destination ? 1 : 0} destination`);
+  console.log(`📊 Route composition: ${departure ? 1 : 0} departure + ${others.length} others + ${finalDestination ? 1 : 0} final destination`);
   
   const route = [];
   
@@ -832,17 +821,17 @@ function optimizeRouteOrder(places) {
     current = nearest;
   }
   
-  // 3. 目的地を最後に（必須）
-  if (destination) {
+  // 3. 最終目的地を最後に（必須）
+  if (finalDestination) {
     const depName = departure?.name || '';
-    const destName = destination.name || '';
+    const destName = finalDestination.name || '';
     
     // 往復判定：名前に明確に「same as departure」が含まれる場合のみ往復として扱う
     const isExplicitRoundTrip = destName.toLowerCase().includes('same as departure');
     
     // 座標チェック：destination座標が設定されていない場合の処理
-    const hasValidCoordinates = destination.latitude && destination.longitude && 
-                               Math.abs(destination.latitude) > 0.001 && Math.abs(destination.longitude) > 0.001;
+    const hasValidCoordinates = finalDestination.latitude && finalDestination.longitude && 
+                               Math.abs(finalDestination.latitude) > 0.001 && Math.abs(finalDestination.longitude) > 0.001;
     
     if (isExplicitRoundTrip && departure) {
       // 復路として出発地のコピーを作成
@@ -851,7 +840,7 @@ function optimizeRouteOrder(places) {
         id: `return_${departure.id}`,
         name: `Return to ${depName}`,
         source: 'system',
-        category: 'destination_point'
+        category: 'final_destination'
       };
       route.push(returnPlace);
       console.log(`🔄 Added return destination at position ${route.length}: ${returnPlace.name}`);
@@ -863,18 +852,18 @@ function optimizeRouteOrder(places) {
         id: `return_${departure.id}`,
         name: `Return to ${depName} (fallback for ${destName})`,
         source: 'system',
-        category: 'destination_point',
+        category: 'final_destination',
         original_destination_name: destName
       };
       route.push(returnPlace);
       console.log(`🔄 Added fallback return destination at position ${route.length}: ${returnPlace.name}`);
     } else {
       // 通常の目的地として追加（座標が有効な場合）
-      route.push(destination);
-      console.log(`🏁 Added destination at position ${route.length}: ${destination.name} (lat: ${destination.latitude}, lng: ${destination.longitude})`);
+      route.push(finalDestination);
+      console.log(`🏁 Added final destination at position ${route.length}: ${finalDestination.name} (lat: ${finalDestination.latitude}, lng: ${finalDestination.longitude})`);
     }
   } else {
-    console.warn(`⚠️ No destination point found in ${places.length} places`);
+    console.warn(`⚠️ No final destination found in ${places.length} places`);
   }
   
   console.log(`✅ Route optimized: ${route.map((p, i) => `${i+1}.${p.name}`).join(' → ')}`);
@@ -900,7 +889,7 @@ function calculateRouteDetails(places) {
   return route;
 }
 
-// 日別スケジュール分割（システムプレース保護強化）
+// 日別スケジュール分割（適切な時間計算版）
 function createDailySchedule(places, tripStartDate = null, availableDays = null) {
   const maxDailyHours = 10; // 1日最大10時間
   const maxDailyMinutes = maxDailyHours * 60;
@@ -914,20 +903,25 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
   let skippedPlaces = [];
   let totalProcessedTime = 0;
   
+  console.log(`📅 Scheduling ${places.length} places with ${availableDays} days limit`);
+  console.log(`🗺️ Route order: ${places.map(p => p.name).join(' → ')}`);
+  
   for (let i = 0; i < places.length; i++) {
     const place = places[i];
     const placeTime = place.stay_duration_minutes + (place.travel_time_from_previous || 0);
     
-    // システムプレース判定を強化（出発地・到着地・復路・システム空港は絶対保護）
+    // システムプレース判定を強化（出発地・最終目的地・システム空港は絶対保護）
     const isSystemPlace = (
       place.source === 'system' || 
       place.category === 'departure_point' || 
-      place.category === 'destination_point' ||
-      place.category === 'return_point' ||
+      place.category === 'final_destination' ||
       place.place_type === 'system_airport' ||
       (place.id && place.id.toString().startsWith('airport_')) ||
       (place.id && place.id.toString().startsWith('return_'))
     );
+    
+    // 最終目的地は最終日に特別処理
+    const isFinalDestination = place.category === 'final_destination';
     
     // フライトの場合の処理
     if (place.transport_mode === 'flight' && currentPlaces.length > 0) {
@@ -965,9 +959,14 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
       timeCounter = 8 * 60; // リセット（朝8時から活動開始）
     }
     
+    // 最終目的地は通常の順序でスケジューリング（強制的に最終日にしない）
+    if (isFinalDestination) {
+      console.log(`🎯 Processing final destination ${place.name} in normal order`);
+    }
+    
     // システムプレースは日数制限を無視して必ず含める
     if (isSystemPlace) {
-      console.log(`🔒 System place protected: ${place.name} (${place.category || place.place_type})`);
+      console.log(`🔒 System place protected: ${place.name} (${place.category || place.place_type}) on day ${currentDay}`);
     } else {
       // 一般の場所のみ日数制限をチェック
       if (availableDays !== null && currentDay > availableDays) {
@@ -997,6 +996,8 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
     currentPlaces.push(place);
     currentTime += placeTime;
     totalProcessedTime += placeTime;
+    
+    console.log(`📍 Scheduled: ${place.name} on day ${currentDay} at ${place.arrival_time}-${place.departure_time}`);
   }
   
   // 最後の日を追加（ユーザー設定の日数制限を厳格に適用）
@@ -1004,8 +1005,7 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
     const hasSystemPlace = currentPlaces.some(p => (
       p.source === 'system' || 
       p.category === 'departure_point' || 
-      p.category === 'destination_point' ||
-      p.category === 'return_point' ||
+      p.category === 'final_destination' ||
       p.place_type === 'system_airport' ||
       (p.id && p.id.toString().startsWith('airport_')) ||
       (p.id && p.id.toString().startsWith('return_'))
@@ -1140,8 +1140,7 @@ function calculateOptimizationScore(places, schedules) {
   const visitPlaces = places.filter((p) => 
     p.source !== 'system' && 
     p.category !== 'departure_point' && 
-    p.category !== 'destination_point' &&
-    p.category !== 'return_point' &&
+    p.category !== 'final_destination' &&
     p.place_type !== 'system_airport'
   );
   const avgNormalizedWish = visitPlaces.length > 0 ? visitPlaces.reduce((sum, p) => sum + (p.normalized_wish_level || 0.8), 0) / visitPlaces.length : 0.8;

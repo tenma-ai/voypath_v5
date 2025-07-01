@@ -1234,7 +1234,7 @@ BEGIN
       longitude
     ) VALUES (
       v_final_destination || '' (Final Destination)'',
-      ''destination_point'',
+      ''final_destination'',
       v_trip_id,
       p_owner_id,
       5,
@@ -1263,7 +1263,7 @@ BEGIN
       longitude
     ) VALUES (
       v_final_destination || '' (Return)'',
-      ''return_point'',
+      ''final_destination'',
       v_trip_id,
       p_owner_id,
       5,
