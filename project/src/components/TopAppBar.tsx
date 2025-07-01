@@ -699,13 +699,42 @@ function TopAppBar() {
                   {/* Profile Menu Dropdown */}
                   <AnimatePresence>
                     {showProfileMenu && (
+                      // Debug log for mobile
+                      console.log('🚀 MOBILE DEBUG: Profile menu rendering', {
+                        showProfileMenu,
+                        userAgent: navigator.userAgent,
+                        viewport: {
+                          width: window.innerWidth,
+                          height: window.innerHeight
+                        },
+                        timestamp: new Date().toISOString()
+                      }) || true
+                    ) && showProfileMenu && (
                       <>
                         {/* Backdrop */}
-                        <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10000 }} />
+                        <div 
+                          className="fixed inset-0 bg-black/10" 
+                          onClick={() => {
+                            console.log('🎯 MOBILE DEBUG: Backdrop clicked');
+                            setShowProfileMenu(false);
+                          }} 
+                          style={{ 
+                            zIndex: 10000,
+                            // Debug: Make backdrop very visible on mobile
+                            backgroundColor: 'rgba(255, 0, 0, 0.3)'
+                          }} 
+                        />
                         
                         <motion.div 
                           className="fixed right-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden opacity-100"
-                          style={{ zIndex: 10001 }}
+                          style={{ 
+                            zIndex: 10001,
+                            // Debug styles for mobile visibility
+                            border: '3px solid red',
+                            backgroundColor: 'yellow'
+                          }}
+                          onAnimationStart={() => console.log('🎬 MOBILE DEBUG: Animation started')}
+                          onAnimationComplete={() => console.log('✅ MOBILE DEBUG: Animation completed')}
                           variants={menuVariants}
                           initial="hidden"
                           animate="visible"
