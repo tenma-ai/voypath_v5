@@ -17,6 +17,7 @@ import { AuthCallback } from './components/AuthCallback';
 import { SharedTripView } from './components/SharedTripView';
 import { useStore } from './store/useStore';
 import { supabase } from './lib/supabase';
+import './debug-env.js';
 
 function App() {
   const { initializeFromDatabase, setUser } = useStore();
