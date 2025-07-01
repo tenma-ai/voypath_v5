@@ -136,15 +136,27 @@ export function FloatingActionButtons() {
                 </motion.div>
               </div>
             ) : (
-              <Wand2 className="w-6 h-6 text-white relative z-10" />
+              <>
+                <Wand2 className="w-6 h-6 text-white relative z-10" />
+                {/* Circular Text */}
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 56 56">
+                  <defs>
+                    <path
+                      id="circle-path"
+                      d="M 28 28 m -20 0 a 20 20 0 1 1 40 0 a 20 20 0 1 1 -40 0"
+                    />
+                  </defs>
+                  <text className="text-[6px] fill-white font-medium" style={{ letterSpacing: '0.5px' }}>
+                    <textPath href="#circle-path" startOffset="25%">
+                      OPTIMIZE
+                    </textPath>
+                  </text>
+                </svg>
+              </>
             )}
           </div>
         </motion.button>
         
-        {/* Label Below Button */}
-        <div className="mt-1 text-xs text-slate-600 dark:text-slate-400 font-medium">
-          {isOptimizing ? 'Processing' : 'Optimize'}
-        </div>
       </div>
 
       {/* Add Place Button - Top position, only show if deadline hasn't passed */}
