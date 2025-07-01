@@ -419,17 +419,49 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     // Format wish level with stars (removed from display per requirements)
     const wishStars = place.wish_level ? '⭐'.repeat(place.wish_level) : '';
 
+    // Helper function to format time without seconds
+    const formatTimeWithoutSeconds = (timeString: string) => {
+      if (!timeString) return timeString;
+      
+      // Handle different time formats
+      if (timeString.includes('T')) {
+        // ISO format: 2024-01-01T14:30:00
+        const date = new Date(timeString);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          });
+        }
+      } else if (timeString.includes(':')) {
+        // Time format: 14:30:00 or 14:30
+        const timeParts = timeString.split(':');
+        if (timeParts.length >= 2) {
+          return `${timeParts[0]}:${timeParts[1]}`;
+        }
+      }
+      
+      return timeString;
+    };
+
     // Format dates and times with departure/arrival info for movement/transport places
     let dateInfo = '';
     let arrivalDepartureInfo = '';
     
     if (place.arrival_time && place.departure_time) {
-      dateInfo = `${place.arrival_time} - ${place.departure_time}`;
-      arrivalDepartureInfo = `Arrival: ${place.arrival_time}, Departure: ${place.departure_time}`;
+      const formattedArrival = formatTimeWithoutSeconds(place.arrival_time);
+      const formattedDeparture = formatTimeWithoutSeconds(place.departure_time);
+      dateInfo = `${formattedArrival} - ${formattedDeparture}`;
+      arrivalDepartureInfo = `Arrival: ${formattedArrival}, Departure: ${formattedDeparture}`;
     } else if (place.arrival_time) {
-      arrivalDepartureInfo = `Arrival: ${place.arrival_time}`;
+      const formattedArrival = formatTimeWithoutSeconds(place.arrival_time);
+      arrivalDepartureInfo = `Arrival: ${formattedArrival}`;
     } else if (place.departure_time) {
-      arrivalDepartureInfo = `Departure: ${place.departure_time}`;
+      const formattedDeparture = formatTimeWithoutSeconds(place.departure_time);
+      arrivalDepartureInfo = `Departure: ${formattedDeparture}`;
     } else if (scheduleInfo) {
       dateInfo = scheduleInfo;
     }
@@ -480,6 +512,13 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
               <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Added by</p>
               <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${userInfo || 'Unknown'}</p>
             </div>
+            
+            ${place.wish_level ? `
+              <div style="margin-bottom: 8px;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Priority</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${place.wish_level}/10</p>
+              </div>
+            ` : ''}
           ` : ''}
           
           
