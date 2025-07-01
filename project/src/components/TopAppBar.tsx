@@ -146,13 +146,9 @@ function TopAppBar() {
       windowWidth: window.innerWidth
     });
     
-    // モバイル対応: 768px未満では直接プロフィールページへ遷移
-    if (window.innerWidth < 768) {
-      navigate('/profile');
-    } else {
-      setShowProfileMenu(!showProfileMenu);
-      setShowVoypathMenu(false);
-    }
+    // 全デバイスでポップアップを表示
+    setShowProfileMenu(!showProfileMenu);
+    setShowVoypathMenu(false);
   };
 
   const handleVoypathMenuToggle = (e: React.MouseEvent | React.TouchEvent) => {
@@ -710,17 +706,18 @@ function TopAppBar() {
                         <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="fixed w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden opacity-100"
+                          className="fixed w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
                           style={{ 
-                            zIndex: 10001,
-                            // モバイル対応の位置調整
-                            right: window.innerWidth < 768 ? '8px' : '16px',
-                            top: window.innerWidth < 768 ? '56px' : '64px',
-                            // デバッグ用: モバイルで要素が見えるか確認
-                            ...(window.innerWidth < 768 ? {
-                              border: '3px solid red',
-                              backgroundColor: 'yellow'
-                            } : {})
+                            zIndex: 999999,
+                            // モバイル対応の位置調整  
+                            right: window.innerWidth < 768 ? '4px' : '16px',
+                            top: window.innerWidth < 768 ? '60px' : '64px',
+                            // モバイル専用の強制表示
+                            position: 'fixed',
+                            display: 'block',
+                            visibility: 'visible',
+                            opacity: 1,
+                            transform: window.innerWidth < 768 ? 'none' : undefined
                           }}
                           variants={menuVariants}
                           initial="hidden"

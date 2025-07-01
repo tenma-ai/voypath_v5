@@ -558,7 +558,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
                   {selectedPlace.wish_level && (
                     <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
                       <h4 className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-1">Priority</h4>
-                      <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{selectedPlace.wish_level}/10</p>
+                      <p className="text-base text-gray-900 dark:text-gray-100 font-medium">{selectedPlace.wish_level}/5</p>
                     </div>
                   )}
                   
