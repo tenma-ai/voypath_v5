@@ -447,11 +447,19 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       return timeString;
     };
 
-    // Check place type - be more specific about what constitutes each type
-    const isDeparture = place.place_type === 'departure';
-    const isDestination = place.place_type === 'destination';
-    const isAirport = place.place_type === 'airport' || 
+    // Check place type based on Edge Function logic
+    const isDeparture = place.place_type === 'departure' || 
+      place.category === 'departure_point' ||
+      (place.source === 'system' && place.category === 'departure_point');
+      
+    const isDestination = place.place_type === 'destination' || 
+      place.category === 'destination_point' ||
+      (place.source === 'system' && place.category === 'destination_point');
+      
+    const isAirport = place.place_type === 'system_airport' || 
+      place.category === 'airport' ||
       (place.name?.toLowerCase().includes('airport') || place.place_name?.toLowerCase().includes('airport'));
+      
     const isMovement = place.transport_mode && !isAirport && !isDeparture && !isDestination;
     const isTripPlace = !isDeparture && !isDestination && !isAirport && !isMovement;
 
@@ -459,6 +467,8 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     console.log('🏷️ Place debug:', {
       name: place.place_name || place.name,
       place_type: place.place_type,
+      category: place.category,
+      source: place.source,
       transport_mode: place.transport_mode,
       isDeparture,
       isDestination, 
