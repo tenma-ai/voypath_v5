@@ -217,39 +217,76 @@ export const useStore = create<StoreState>()((set, get) => ({
         set((state) => ({ trips: [...state.trips, trip] })),
       updateTrip: async (id, updates) => {
         try {
-          // Update in database first
-          const dbUpdates: any = {};
-          if (updates.name !== undefined) dbUpdates.name = updates.name;
-          if (updates.description !== undefined) dbUpdates.description = updates.description;
-          if (updates.departureLocation !== undefined) dbUpdates.departure_location = updates.departureLocation;
-          if (updates.destination !== undefined) dbUpdates.destination = updates.destination;
-          if (updates.startDate !== undefined) dbUpdates.start_date = updates.startDate;
-          if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate;
-          if (updates.addPlaceDeadline !== undefined) dbUpdates.add_place_deadline = updates.addPlaceDeadline;
-
-          const { error } = await supabase
-            .from('trips')
-            .update(dbUpdates)
-            .eq('id', id);
-
-          if (error) {
-            // Failed to update trip in database
-            throw error;
+          // Use trip-management Edge Function for consistency
+          const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+          if (authError) {
+            throw new Error('Authentication required');
+          }
+          if (!currentUser) {
+            throw new Error('User not authenticated');
           }
 
-          // Update local state
-          set((state) => ({
-            trips: state.trips.map((trip) =>
-              trip.id === id ? { ...trip, ...updates } : trip
-            ),
-            // Update currentTrip if it's the one being updated
-            currentTrip: state.currentTrip?.id === id 
-              ? { ...state.currentTrip, ...updates } 
-              : state.currentTrip,
-          }));
+          // Prepare update data for trip-management API
+          const updateData: any = {
+            trip_id: id
+          };
+
+          // Handle both camelCase and snake_case field names for compatibility
+          if (updates.name !== undefined) updateData.name = updates.name;
+          if (updates.description !== undefined) updateData.description = updates.description;
+          if (updates.departureLocation !== undefined) updateData.departure_location = updates.departureLocation;
+          if (updates.departure_location !== undefined) updateData.departure_location = updates.departure_location;
+          if (updates.departure_latitude !== undefined) updateData.departure_latitude = updates.departure_latitude;
+          if (updates.departure_longitude !== undefined) updateData.departure_longitude = updates.departure_longitude;
+          if (updates.destination !== undefined) updateData.destination = updates.destination;
+          if (updates.destination_latitude !== undefined) updateData.destination_latitude = updates.destination_latitude;
+          if (updates.destination_longitude !== undefined) updateData.destination_longitude = updates.destination_longitude;
+          if (updates.startDate !== undefined) updateData.start_date = updates.startDate;
+          if (updates.start_date !== undefined) updateData.start_date = updates.start_date;
+          if (updates.endDate !== undefined) updateData.end_date = updates.endDate;
+          if (updates.end_date !== undefined) updateData.end_date = updates.end_date;
+          if (updates.addPlaceDeadline !== undefined) updateData.add_place_deadline = updates.addPlaceDeadline;
+
+          console.log('Updating trip via API with data:', updateData);
+          
+          // Call trip-management Edge Function with PUT method
+          const { data, error } = await supabase.functions.invoke('trip-management', {
+            body: updateData,
+            method: 'PUT'
+          });
+
+          if (error) {
+            console.error('Failed to update trip via API:', error);
+            throw new Error(error.message || 'Failed to update trip');
+          }
+          
+          console.log('Trip updated successfully via API:', data);
+
+          // Update local state with the response data
+          if (data && data.trip) {
+            const updatedTrip = data.trip;
+            set((state) => ({
+              trips: state.trips.map((trip) =>
+                trip.id === id ? updatedTrip : trip
+              ),
+              currentTrip: state.currentTrip?.id === id 
+                ? updatedTrip 
+                : state.currentTrip,
+            }));
+          } else {
+            // Fallback: update with provided updates if no trip data returned
+            set((state) => ({
+              trips: state.trips.map((trip) =>
+                trip.id === id ? { ...trip, ...updates } : trip
+              ),
+              currentTrip: state.currentTrip?.id === id 
+                ? { ...state.currentTrip, ...updates } 
+                : state.currentTrip,
+            }));
+          }
 
         } catch (error) {
-          // Failed to update trip
+          console.error('Trip update error:', error);
           throw error;
         }
       },

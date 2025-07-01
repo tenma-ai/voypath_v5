@@ -115,6 +115,9 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
         end_date: selectedRange.end?.toISOString().split('T')[0] || undefined,
       };
 
+      console.log('Trip form data being sent:', tripUpdateData);
+      console.log('Edit mode:', editMode, 'Trip ID:', tripData?.id);
+
       let createdTrip = null;
       
       if (editMode && tripData) {
@@ -146,8 +149,11 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
         navigate(`/trip/${createdTrip.id}/plan`);
       }
     } catch (error) {
-      // Error occurred
-      alert('Failed to create trip. Please try again.');
+      console.error('Trip save error:', error);
+      const errorMessage = editMode 
+        ? 'Failed to update trip. Please try again.' 
+        : 'Failed to create trip. Please try again.';
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

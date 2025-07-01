@@ -25,9 +25,13 @@ interface TripCreateRequest {
 interface TripUpdateRequest {
   trip_id: string;
   departure_location?: string;
+  departure_latitude?: number;
+  departure_longitude?: number;
   name?: string;
   description?: string;
   destination?: string;
+  destination_latitude?: number;
+  destination_longitude?: number;
   start_date?: string;
   end_date?: string;
   add_place_deadline?: string;
@@ -381,9 +385,13 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
   };
 
   if (requestData.departure_location) updateData.departure_location = requestData.departure_location;
+  if (requestData.departure_latitude !== undefined) updateData.departure_latitude = requestData.departure_latitude;
+  if (requestData.departure_longitude !== undefined) updateData.departure_longitude = requestData.departure_longitude;
   if (requestData.name) updateData.name = requestData.name;
   if (requestData.description !== undefined) updateData.description = requestData.description;
   if (requestData.destination) updateData.destination = requestData.destination;
+  if (requestData.destination_latitude !== undefined) updateData.destination_latitude = requestData.destination_latitude;
+  if (requestData.destination_longitude !== undefined) updateData.destination_longitude = requestData.destination_longitude;
   if (requestData.start_date) updateData.start_date = requestData.start_date;
   if (requestData.end_date) updateData.end_date = requestData.end_date;
   if (requestData.add_place_deadline !== undefined) updateData.add_place_deadline = requestData.add_place_deadline;
