@@ -447,67 +447,157 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       return timeString;
     };
 
-    // Format dates and times with departure/arrival info for movement/transport places
-    let dateInfo = '';
-    let arrivalDepartureInfo = '';
-    
-    if (place.arrival_time && place.departure_time) {
-      const formattedArrival = formatTimeWithoutSeconds(place.arrival_time);
-      const formattedDeparture = formatTimeWithoutSeconds(place.departure_time);
-      dateInfo = `${formattedArrival} - ${formattedDeparture}`;
-      arrivalDepartureInfo = `Arrival: ${formattedArrival}, Departure: ${formattedDeparture}`;
-    } else if (place.arrival_time) {
-      const formattedArrival = formatTimeWithoutSeconds(place.arrival_time);
-      arrivalDepartureInfo = `Arrival: ${formattedArrival}`;
-    } else if (place.departure_time) {
-      const formattedDeparture = formatTimeWithoutSeconds(place.departure_time);
-      arrivalDepartureInfo = `Departure: ${formattedDeparture}`;
-    } else if (scheduleInfo) {
-      dateInfo = scheduleInfo;
+    // Check place type
+    const isDeparture = place.place_type === 'departure';
+    const isDestination = place.place_type === 'destination';
+    const isAirport = place.place_type === 'airport';
+    const isMovement = place.transport_mode || (place.place_type && !isDeparture && !isDestination && !isAirport);
+    const isTripPlace = !isDeparture && !isDestination && !isAirport && !isMovement;
+
+    // Format schedule for different place types
+    let scheduleDisplay = '';
+    if (place.day_number && place.hour) {
+      // For airports and trip places - show schedule as month/day/hour/minute
+      const scheduleDate = new Date();
+      scheduleDate.setDate(scheduleDate.getDate() + (place.day_number - 1));
+      scheduleDate.setHours(place.hour, place.minute || 0, 0, 0);
+      
+      scheduleDisplay = scheduleDate.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
     }
+
+    // Format departure/arrival times
+    let departureDisplay = '';
+    let arrivalDisplay = '';
     
-    // Check if this is a movement/transport place
-    const isTransportPlace = place.place_type === 'airport' || 
-      place.transport_mode || 
-      place.name?.toLowerCase().includes('airport') || 
-      place.place_name?.toLowerCase().includes('airport');
+    if (place.departure_time) {
+      departureDisplay = formatTimeWithoutSeconds(place.departure_time);
+    }
+    if (place.arrival_time) {
+      arrivalDisplay = formatTimeWithoutSeconds(place.arrival_time);
+    }
 
-    // Check if system place
-    const isSystemPlace = place.place_type === 'departure' || place.place_type === 'destination' || place.place_type === 'airport';
+    let content = '';
 
-    const content = isSystemPlace ? `
-      <div style="padding: 12px; min-width: 280px; max-width: 350px;">
-        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
-          <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
-            ${place.place_name || place.name}
-          </h3>
+    if (isDeparture) {
+      // Departure place: show departure time only
+      content = `
+        <div style="padding: 12px; min-width: 280px; max-width: 350px;">
+          <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
+              ${place.place_name || place.name}
+            </h3>
+          </div>
+          
+          <div style="space-y: 8px;">
+            ${departureDisplay ? `
+              <div style="margin-bottom: 8px;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Departure</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${departureDisplay}</p>
+              </div>
+            ` : ''}
+          </div>
         </div>
-        
-        <div style="space-y: 8px;">
-          ${place.duration_minutes || place.stay_duration_minutes ? `
-            <div style="margin-bottom: 8px;">
-              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Stay Duration</p>
-              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${(() => {
-                const durationValue = place.duration_minutes || place.stay_duration_minutes;
-                // If the value is very large (likely in seconds), convert to minutes
-                const minutes = durationValue > 1440 ? Math.floor(durationValue / 60) : durationValue;
-                return formatDuration(minutes);
-              })()}</p>
-            </div>
-          ` : ''}
+      `;
+    } else if (isDestination) {
+      // Destination place: show arrival time only
+      content = `
+        <div style="padding: 12px; min-width: 280px; max-width: 350px;">
+          <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
+              ${place.place_name || place.name}
+            </h3>
+          </div>
+          
+          <div style="space-y: 8px;">
+            ${arrivalDisplay ? `
+              <div style="margin-bottom: 8px;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Arrival</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${arrivalDisplay}</p>
+              </div>
+            ` : ''}
+          </div>
         </div>
-      </div>
-    ` : `
-      <div style="padding: 12px; min-width: 280px; max-width: 350px;">
-        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
-          <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
-            ${place.place_name || place.name}
-          </h3>
-          ${place.category ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">${place.category}</p>` : ''}
+      `;
+    } else if (isAirport) {
+      // Airport: show schedule only
+      content = `
+        <div style="padding: 12px; min-width: 280px; max-width: 350px;">
+          <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
+              ${place.place_name || place.name}
+            </h3>
+          </div>
+          
+          <div style="space-y: 8px;">
+            ${scheduleDisplay ? `
+              <div style="margin-bottom: 8px;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Schedule</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${scheduleDisplay}</p>
+              </div>
+            ` : ''}
+          </div>
         </div>
-        
-        <div style="space-y: 8px;">
-          ${!isTransportPlace ? `
+      `;
+    } else if (isMovement) {
+      // Movement/Transport: show from/to duration and travel times
+      content = `
+        <div style="padding: 12px; min-width: 280px; max-width: 350px;">
+          <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
+              ${place.place_name || place.name}
+            </h3>
+          </div>
+          
+          <div style="space-y: 8px;">
+            ${place.duration_minutes || place.stay_duration_minutes ? `
+              <div style="margin-bottom: 8px;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Duration</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${(() => {
+                  const durationValue = place.duration_minutes || place.stay_duration_minutes;
+                  const minutes = durationValue > 1440 ? Math.floor(durationValue / 60) : durationValue;
+                  return formatDuration(minutes);
+                })()}</p>
+              </div>
+            ` : ''}
+            
+            ${departureDisplay || arrivalDisplay ? `
+              <div style="margin-bottom: 8px;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Travel Times</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">
+                  ${departureDisplay ? `Departure: ${departureDisplay}` : ''}
+                  ${departureDisplay && arrivalDisplay ? ', ' : ''}
+                  ${arrivalDisplay ? `Arrival: ${arrivalDisplay}` : ''}
+                </p>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    } else {
+      // Trip places: show schedule, added by, priority, duration
+      content = `
+        <div style="padding: 12px; min-width: 280px; max-width: 350px;">
+          <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">
+              ${place.place_name || place.name}
+            </h3>
+            ${place.category ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">${place.category}</p>` : ''}
+          </div>
+          
+          <div style="space-y: 8px;">
+            ${scheduleDisplay ? `
+              <div style="margin-bottom: 8px;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Schedule</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${scheduleDisplay}</p>
+              </div>
+            ` : ''}
+            
             <div style="margin-bottom: 8px;">
               <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Added by</p>
               <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${userInfo || 'Unknown'}</p>
@@ -519,51 +609,28 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
                 <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${place.wish_level}/10</p>
               </div>
             ` : ''}
-          ` : ''}
-          
-          
-          ${dateInfo ? `
-            <div style="margin-bottom: 8px;">
-              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Schedule</p>
-              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${dateInfo}</p>
-            </div>
-          ` : ''}
-          
-          ${isTransportPlace && arrivalDepartureInfo ? `
-            <div style="margin-bottom: 8px;">
-              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Transport Times</p>
-              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${arrivalDepartureInfo}</p>
-            </div>
-          ` : ''}
-          
-          ${place.duration_minutes || place.stay_duration_minutes ? `
-            <div style="margin-bottom: 8px;">
-              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Stay Duration</p>
-              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${(() => {
-                const durationValue = place.duration_minutes || place.stay_duration_minutes;
-                // If the value is very large (likely in seconds), convert to minutes
-                const minutes = durationValue > 1440 ? Math.floor(durationValue / 60) : durationValue;
-                return formatDuration(minutes);
-              })()}</p>
-            </div>
-          ` : ''}
-          
-          ${travelInfo ? `
-            <div style="margin-bottom: 8px;">
-              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Next Travel</p>
-              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${travelInfo}</p>
-            </div>
-          ` : ''}
-          
-          ${place.notes ? `
-            <div style="margin-bottom: 8px;">
-              <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Notes</p>
-              <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${place.notes}</p>
-            </div>
-          ` : ''}
+            
+            ${place.duration_minutes || place.stay_duration_minutes ? `
+              <div style="margin-bottom: 8px;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Duration</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${(() => {
+                  const durationValue = place.duration_minutes || place.stay_duration_minutes;
+                  const minutes = durationValue > 1440 ? Math.floor(durationValue / 60) : durationValue;
+                  return formatDuration(minutes);
+                })()}</p>
+              </div>
+            ` : ''}
+            
+            ${place.notes ? `
+              <div style="margin-bottom: 8px;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 600;">Notes</p>
+                <p style="margin: 2px 0 0 0; font-size: 14px; color: #1f2937;">${place.notes}</p>
+              </div>
+            ` : ''}
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
 
     infoWindow.setContent(content);
     infoWindow.setPosition({ 
