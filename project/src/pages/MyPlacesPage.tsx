@@ -12,6 +12,7 @@ export function MyPlacesPage() {
   const [filter, setFilter] = useState('all');
   const [editingPlace, setEditingPlace] = useState<string | null>(null);
   const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
+  const [showFirstTimeGuidance, setShowFirstTimeGuidance] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     category: '',
@@ -70,6 +71,15 @@ export function MyPlacesPage() {
     return false;
   };
 
+  // Hide first time guidance and mark as seen
+  const hideFirstTimeGuidance = () => {
+    if (!currentTrip || !user) return;
+    
+    const guidanceKey = `firstTimeGuidance_${user.id}_${currentTrip.id}`;
+    localStorage.setItem(guidanceKey, 'true');
+    setShowFirstTimeGuidance(false);
+  };
+
   // Load data from database on component mount and when currentTrip changes
   useEffect(() => {
     const loadPlacesForCurrentTrip = async () => {
@@ -86,6 +96,20 @@ export function MyPlacesPage() {
     // Always load places when currentTrip changes or when component mounts
     loadPlacesForCurrentTrip();
   }, [currentTrip?.id]); // Re-run when currentTrip changes
+
+  // Check if first time guidance should be shown
+  useEffect(() => {
+    if (!currentTrip || !user) return;
+
+    // Check if this is the first time for this user in this trip
+    const guidanceKey = `firstTimeGuidance_${user.id}_${currentTrip.id}`;
+    const hasSeenGuidance = localStorage.getItem(guidanceKey);
+    
+    // Only show guidance if no places exist and user hasn't seen it before
+    if (!hasSeenGuidance && filteredPlaces.length === 0 && activeTab === 'my') {
+      setShowFirstTimeGuidance(true);
+    }
+  }, [currentTrip?.id, user?.id, filteredPlaces.length, activeTab]);
 
   // Get all trip places and my places separately
   
@@ -697,12 +721,15 @@ export function MyPlacesPage() {
           <p className="text-slate-500 dark:text-slate-400 mb-6">
             {activeTab === 'trip' 
               ? 'No places have been added to this trip yet'
-              : 'Add places to your wishlist to see them here'
+              : showFirstTimeGuidance 
+                ? 'Add your first place\nClick the plus button below'
+                : 'Add places to your wishlist to see them here'
             }
           </p>
           {!isDeadlinePassed() && (
             <Link
               to="/add-place"
+              onClick={hideFirstTimeGuidance}
               className="inline-flex items-center space-x-2 bg-gradient-to-r from-primary-500 to-secondary-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-glow hover:shadow-glow-lg transition-all duration-300"
             >
               <Plus className="w-5 h-5" />

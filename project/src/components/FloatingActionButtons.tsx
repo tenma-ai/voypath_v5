@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Plus, Wand2 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -8,12 +8,31 @@ export function FloatingActionButtons() {
   const location = useLocation();
   const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult, setHasUserOptimized, setShowOptimizationSuccess } = useStore();
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
+  const [shouldBlinkPlusButton, setShouldBlinkPlusButton] = useState(false);
 
   // Check if deadline has passed
   const isDeadlinePassed = () => {
     if (!currentTrip?.addPlaceDeadline) return false;
     return new Date() > new Date(currentTrip.addPlaceDeadline);
   };
+
+  // Check if plus button should blink for first time guidance
+  useEffect(() => {
+    if (!currentTrip || !user || !places) return;
+
+    // Check if this is the first time for this user in this trip
+    const guidanceKey = `firstTimeGuidance_${user.id}_${currentTrip.id}`;
+    const hasSeenGuidance = localStorage.getItem(guidanceKey);
+    
+    // Get user's places for this trip
+    const userPlaces = places.filter(place => 
+      place.user_id === user.id && 
+      place.source !== 'system' // Exclude departure/destination places
+    );
+    
+    // Blink if no places exist and user hasn't seen guidance
+    setShouldBlinkPlusButton(!hasSeenGuidance && userPlaces.length === 0);
+  }, [currentTrip?.id, user?.id, places]);
 
   // Get places for current trip
   const tripPlaces = places.filter(place => 
@@ -164,14 +183,33 @@ export function FloatingActionButtons() {
         <Link
           to="/add-place"
           className="fixed bottom-36 right-4 z-40"
+          onClick={() => {
+            if (shouldBlinkPlusButton && currentTrip && user) {
+              const guidanceKey = `firstTimeGuidance_${user.id}_${currentTrip.id}`;
+              localStorage.setItem(guidanceKey, 'true');
+              setShouldBlinkPlusButton(false);
+            }
+          }}
         >
           <motion.div
             className="w-14 h-14 bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center group relative overflow-hidden"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.5 }}
+            animate={shouldBlinkPlusButton ? {
+              opacity: [1, 0.5, 1],
+              scale: [1, 1.1, 1],
+              boxShadow: [
+                '0 0 20px rgba(99, 102, 241, 0.5)',
+                '0 0 30px rgba(99, 102, 241, 0.8)',
+                '0 0 20px rgba(99, 102, 241, 0.5)'
+              ]
+            } : { opacity: 1, scale: 1 }}
+            transition={shouldBlinkPlusButton ? {
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            } : { duration: 0.3, delay: 0.5 }}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             <Plus className="w-6 h-6 text-white relative z-10" />
