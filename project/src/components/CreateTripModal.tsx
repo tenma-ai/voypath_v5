@@ -89,6 +89,12 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
       return;
     }
     
+    // Check if travel dates are selected
+    if (!selectedRange.start) {
+      alert('Travel dates are required');
+      return;
+    }
+    
     // Check trip creation limits for new trips
     if (!editMode && !canCreateTrip()) {
       alert('You have reached the trip limit for your current plan. Please upgrade to Premium to create more trips.');
@@ -445,7 +451,7 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                     <Calendar className="w-4 h-4 inline mr-2 text-secondary-500" />
-                    Travel Dates <span className="text-slate-400 font-normal">(optional)</span>
+                    Travel Dates <span className="text-red-500">*</span>
                   </label>
                   
                   <div className="relative">
@@ -567,7 +573,7 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
                   </motion.button>
                   <motion.button
                     type="submit"
-                    disabled={isSubmitting || !formData.departureLocation.trim()}
+                    disabled={isSubmitting || !formData.departureLocation.trim() || !selectedRange.start}
                     className="flex-1 px-4 py-3 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 text-white rounded-2xl hover:from-primary-600 hover:via-secondary-600 hover:to-primary-700 transition-all duration-300 font-semibold shadow-glow hover:shadow-glow-lg relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
                     whileHover={!isSubmitting ? { scale: 1.02 } : {}}
                     whileTap={!isSubmitting ? { scale: 0.98 } : {}}
