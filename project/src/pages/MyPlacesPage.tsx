@@ -99,17 +99,26 @@ export function MyPlacesPage() {
 
   // Check if first time guidance should be shown
   useEffect(() => {
-    if (!currentTrip || !user) return;
+    if (!currentTrip || !user || !places) return;
 
     // Check if this is the first time for this user in this trip
     const guidanceKey = `firstTimeGuidance_${user.id}_${currentTrip.id}`;
     const hasSeenGuidance = localStorage.getItem(guidanceKey);
     
+    // Get user's places for this trip (excluding system places)
+    const userPlaces = places.filter(place => 
+      (place.user_id === user.id || place.userId === user.id) &&
+      place.source !== 'system' &&
+      (place.trip_id === currentTrip.id || place.tripId === currentTrip.id)
+    );
+    
     // Only show guidance if no places exist and user hasn't seen it before
-    if (!hasSeenGuidance && filteredPlaces.length === 0 && activeTab === 'my') {
+    if (!hasSeenGuidance && userPlaces.length === 0 && activeTab === 'my') {
       setShowFirstTimeGuidance(true);
+    } else {
+      setShowFirstTimeGuidance(false);
     }
-  }, [currentTrip?.id, user?.id, filteredPlaces.length, activeTab]);
+  }, [currentTrip?.id, user?.id, places, activeTab]);
 
   // Get all trip places and my places separately
   
