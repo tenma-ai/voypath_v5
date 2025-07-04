@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
-import { X, Settings, Users, Shield, Calendar, Clock, UserCheck, UserX, Plus } from 'lucide-react';
+import { X, Settings, Users, Shield, Calendar, Clock, UserCheck, UserX, Plus, MapPin, Navigation } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { PlaceSearchInput } from './common/PlaceSearchInput';
+import { GooglePlace } from '../services/PlaceSearchService';
 
 interface TripSettingsModalProps {
   isOpen: boolean;
@@ -23,12 +25,22 @@ interface TripMember {
 
 export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
   const { currentTrip, updateTrip, user } = useStore();
-  const [activeTab, setActiveTab] = useState<'general' | 'permissions' | 'deadline'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'locations' | 'dates' | 'permissions' | 'deadline'>('general');
   const [members, setMembers] = useState<TripMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [addPlaceDeadline, setAddPlaceDeadline] = useState(
     currentTrip?.addPlaceDeadline ? new Date(currentTrip.addPlaceDeadline).toISOString().slice(0, 16) : ''
   );
+
+  // Location and date states
+  const [selectedDeparture, setSelectedDeparture] = useState<GooglePlace | null>(null);
+  const [selectedDestination, setSelectedDestination] = useState<GooglePlace | null>(null);
+  const [useSameDeparture, setUseSameDeparture] = useState(false);
+  const [selectedRange, setSelectedRange] = useState<{ start: Date | null; end: Date | null }>({
+    start: null,
+    end: null
+  });
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // Load trip members when modal opens and currentTrip is available
   useEffect(() => {
@@ -36,10 +48,29 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
     if (isOpen && currentTrip?.id) {
       // Log message
       loadTripMembers();
+      initializeTripData();
     } else {
       // Log message
     }
   }, [isOpen, currentTrip?.id]);
+
+  // Initialize trip data for editing
+  const initializeTripData = () => {
+    if (!currentTrip) return;
+
+    // Initialize destination state
+    setUseSameDeparture(
+      currentTrip.destination === 'same as departure location' || 
+      currentTrip.destination === currentTrip.departureLocation
+    );
+
+    // Initialize date range
+    if (currentTrip.startDate) {
+      const startDate = new Date(currentTrip.startDate);
+      const endDate = currentTrip.endDate ? new Date(currentTrip.endDate) : startDate;
+      setSelectedRange({ start: startDate, end: endDate });
+    }
+  };
 
   const loadTripMembers = async () => {
     if (!currentTrip?.id) return;
@@ -169,6 +200,69 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
     }
   };
 
+  // Handle location updates
+  const handleDepartureUpdate = async (place: GooglePlace | null, locationString?: string) => {
+    if (!currentTrip) return;
+    
+    try {
+      const departureLocation = place?.formatted_address || locationString || '';
+      await updateTrip(currentTrip.id, {
+        departureLocation,
+        departure_latitude: place?.geometry?.location?.lat || null,
+        departure_longitude: place?.geometry?.location?.lng || null,
+      });
+      setSelectedDeparture(place);
+    } catch (error) {
+      console.error('Failed to update departure location:', error);
+    }
+  };
+
+  const handleDestinationUpdate = async (place: GooglePlace | null, locationString?: string) => {
+    if (!currentTrip) return;
+    
+    try {
+      const destination = useSameDeparture ? 'same as departure location' : (place?.formatted_address || locationString || '');
+      await updateTrip(currentTrip.id, {
+        destination,
+        destination_latitude: useSameDeparture ? null : (place?.geometry?.location?.lat || null),
+        destination_longitude: useSameDeparture ? null : (place?.geometry?.location?.lng || null),
+      });
+      setSelectedDestination(place);
+    } catch (error) {
+      console.error('Failed to update destination:', error);
+    }
+  };
+
+  const handleSameDepartureToggle = async (enabled: boolean) => {
+    setUseSameDeparture(enabled);
+    if (currentTrip) {
+      try {
+        await updateTrip(currentTrip.id, {
+          destination: enabled ? 'same as departure location' : '',
+          destination_latitude: null,
+          destination_longitude: null,
+        });
+      } catch (error) {
+        console.error('Failed to update destination setting:', error);
+      }
+    }
+  };
+
+  // Handle date updates
+  const handleDateRangeUpdate = async (start: Date | null, end: Date | null) => {
+    if (!currentTrip) return;
+    
+    try {
+      await updateTrip(currentTrip.id, {
+        startDate: start?.toISOString().split('T')[0],
+        endDate: end?.toISOString().split('T')[0],
+      });
+      setSelectedRange({ start, end });
+    } catch (error) {
+      console.error('Failed to update dates:', error);
+    }
+  };
+
   const formatDeadline = (deadline: string) => {
     if (!deadline) return null;
     const date = new Date(deadline);
@@ -188,10 +282,130 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
 
   const deadlineInfo = addPlaceDeadline ? formatDeadline(addPlaceDeadline) : null;
 
+  // Calendar utility functions
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const isDateSelected = (date: Date) => {
+    if (!selectedRange.start && !selectedRange.end) return false;
+    
+    const dateStr = date.toDateString();
+    const startStr = selectedRange.start?.toDateString();
+    const endStr = selectedRange.end?.toDateString();
+    
+    return dateStr === startStr || dateStr === endStr;
+  };
+
+  const isDateInRange = (date: Date) => {
+    if (!selectedRange.start || !selectedRange.end) return false;
+    return date > selectedRange.start && date < selectedRange.end;
+  };
+
+  const handleDateClick = (date: Date) => {
+    if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
+      setSelectedRange({ start: date, end: null });
+    } else {
+      if (date < selectedRange.start) {
+        const newRange = { start: date, end: selectedRange.start };
+        setSelectedRange(newRange);
+        handleDateRangeUpdate(newRange.start, newRange.end);
+      } else {
+        const newRange = { start: selectedRange.start, end: date };
+        setSelectedRange(newRange);
+        handleDateRangeUpdate(newRange.start, newRange.end);
+      }
+    }
+  };
+
+  const formatDateRange = () => {
+    if (!selectedRange.start) return 'Select dates';
+    if (!selectedRange.end) return selectedRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    
+    const start = selectedRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const end = selectedRange.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${start} - ${end}`;
+  };
+
+  const getDuration = () => {
+    if (!selectedRange.start || !selectedRange.end) return null;
+    const diffTime = Math.abs(selectedRange.end.getTime() - selectedRange.start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => {
+      const newMonth = new Date(prev);
+      if (direction === 'prev') {
+        newMonth.setMonth(prev.getMonth() - 1);
+      } else {
+        newMonth.setMonth(prev.getMonth() + 1);
+      }
+      return newMonth;
+    });
+  };
+
+  const renderCalendar = () => {
+    const daysInMonth = getDaysInMonth(currentMonth);
+    const firstDay = getFirstDayOfMonth(currentMonth);
+    const today = new Date();
+    const days = [];
+
+    // Empty cells for days before the first day of the month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="h-10" />);
+    }
+
+    // Days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      const isToday = date.toDateString() === today.toDateString();
+      const isPast = date < today;
+      const isSelected = isDateSelected(date);
+      const isInRange = isDateInRange(date);
+
+      days.push(
+        <motion.button
+          key={day}
+          type="button"
+          onClick={() => !isPast && handleDateClick(date)}
+          disabled={isPast}
+          className={`h-10 w-10 rounded-xl text-sm font-medium transition-all duration-200 relative ${
+            isPast
+              ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+              : isSelected
+              ? 'bg-gradient-to-r from-primary-500 to-secondary-600 text-white shadow-glow'
+              : isInRange
+              ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
+              : isToday
+              ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-2 border-primary-300'
+              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+          }`}
+          whileHover={!isPast ? { scale: 1.05 } : {}}
+          whileTap={!isPast ? { scale: 0.95 } : {}}
+        >
+          {day}
+          {isToday && (
+            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary-500 rounded-full" />
+          )}
+        </motion.button>
+      );
+    }
+
+    return days;
+  };
+
   const tabs = [
     { key: 'general', label: 'General', icon: Settings },
+    { key: 'locations', label: 'Locations', icon: MapPin },
+    { key: 'dates', label: 'Dates', icon: Calendar },
     { key: 'permissions', label: 'Permissions', icon: Users },
-    { key: 'deadline', label: 'Add Place Deadline', icon: Calendar },
+    { key: 'deadline', label: 'Deadline', icon: Clock },
   ];
 
   return (
@@ -298,6 +512,152 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
                               className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300 resize-none"
                             />
                           </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {activeTab === 'locations' && (
+                    <motion.div
+                      key="locations"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="space-y-6"
+                    >
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                          Trip Locations
+                        </h3>
+                        <div className="space-y-4">
+                          {/* Departure Location */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                              Departure Location <span className="text-red-400">*</span>
+                            </label>
+                            <PlaceSearchInput
+                              placeholder="Where are you departing from?"
+                              initialValue={currentTrip?.departureLocation || ''}
+                              onPlaceSelect={handleDepartureUpdate}
+                              icon={<Navigation className="w-5 h-5 text-primary-500" />}
+                            />
+                          </div>
+
+                          {/* Destination */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                              Destination
+                            </label>
+                            
+                            {/* Same as departure toggle */}
+                            <div className="mb-3">
+                              <label className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={useSameDeparture}
+                                  onChange={(e) => handleSameDepartureToggle(e.target.checked)}
+                                  className="w-5 h-5 text-primary-600 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 rounded focus:ring-primary-500 focus:ring-2"
+                                />
+                                <span className="text-sm text-slate-700 dark:text-slate-300">
+                                  Same as departure location (round trip)
+                                </span>
+                              </label>
+                            </div>
+
+                            {!useSameDeparture && (
+                              <PlaceSearchInput
+                                placeholder="Where are you going? (optional)"
+                                initialValue={currentTrip?.destination === 'same as departure location' ? '' : currentTrip?.destination || ''}
+                                onPlaceSelect={handleDestinationUpdate}
+                                icon={<MapPin className="w-5 h-5 text-secondary-500" />}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {activeTab === 'dates' && (
+                    <motion.div
+                      key="dates"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="space-y-6"
+                    >
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                          Travel Dates
+                        </h3>
+                        
+                        {/* Date Range Display */}
+                        <div className="mb-6">
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                            Selected Dates <span className="text-red-400">*</span>
+                          </label>
+                          <div className="p-4 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-2xl border border-primary-200/50 dark:border-primary-800/50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <Calendar className="w-5 h-5 text-primary-500" />
+                                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                  {formatDateRange()}
+                                </span>
+                              </div>
+                              {getDuration() && (
+                                <span className="text-sm text-slate-600 dark:text-slate-400">
+                                  {getDuration()} {getDuration() === 1 ? 'day' : 'days'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Calendar */}
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 p-4">
+                          {/* Calendar Header */}
+                          <div className="flex items-center justify-between mb-4">
+                            <motion.button
+                              onClick={() => navigateMonth('prev')}
+                              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                            >
+                              ←
+                            </motion.button>
+                            <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                              {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                            </h4>
+                            <motion.button
+                              onClick={() => navigateMonth('next')}
+                              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                            >
+                              →
+                            </motion.button>
+                          </div>
+
+                          {/* Weekday Headers */}
+                          <div className="grid grid-cols-7 gap-1 mb-2">
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                              <div key={day} className="h-10 flex items-center justify-center">
+                                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                  {day}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Calendar Grid */}
+                          <div className="grid grid-cols-7 gap-1">
+                            {renderCalendar()}
+                          </div>
+
+                          {/* Instructions */}
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 text-center">
+                            Click a date to start, then click another date to set your travel period
+                          </p>
                         </div>
                       </div>
                     </motion.div>
