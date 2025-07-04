@@ -57,8 +57,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
   // Get places for current trip
   const tripPlaces = places.filter(place => place.trip_id === tripId || place.tripId === tripId);
   const hasPlaces = tripPlaces.length > 0;
-  // Allow optimization even without places - the system will generate departure/destination places
-  const isReady = currentUser && !isOptimizing;
+  const isReady = hasPlaces && currentUser && !isOptimizing;
   
   // Debug logging
   useEffect(() => {
@@ -140,7 +139,10 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       return;
     }
 
-    // Remove the places requirement - optimization can work with just departure/destination
+    if (!hasPlaces) {
+      setError('Please add places to your trip before optimizing');
+      return;
+    }
 
     // Execute real optimization process
     setIsOptimizing(true);
@@ -260,7 +262,14 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       );
     }
 
-    // Allow optimization without places - system will use departure/destination
+    if (!hasPlaces) {
+      return (
+        <>
+          <Wand2 className="w-5 h-5" />
+          <span>Add Places First</span>
+        </>
+      );
+    }
 
     return (
       <>
@@ -274,7 +283,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
     if (error) return 'from-red-500 to-red-600';
     if (showSuccess) return 'from-green-500 to-emerald-600';
     if (isOptimizing && progress) return STAGE_COLORS[progress.stage] || 'from-blue-500 to-blue-600';
-    // Remove grayed out state when no places
+    if (!hasPlaces) return 'from-gray-400 to-gray-500';
     return 'from-primary-500 via-secondary-500 to-primary-600';
   };
 
