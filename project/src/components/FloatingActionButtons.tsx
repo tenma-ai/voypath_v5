@@ -72,6 +72,17 @@ export function FloatingActionButtons() {
   );
   const hasUserPlaces = userPlaces.length > 0;
 
+  // Debug: Log current state for debugging
+  console.log('FloatingActionButtons Debug:', {
+    currentTrip: currentTrip?.id,
+    user: user?.id,
+    placesCount: places.length,
+    userPlacesCount: userPlaces.length,
+    isPlanPage,
+    isPlacesPage,
+    pathname: location.pathname
+  });
+
   // Handle optimization
   const handleOptimization = async () => {
     if (!currentTrip?.id || !user) {
@@ -136,8 +147,8 @@ export function FloatingActionButtons() {
 
   return (
     <>
-      {/* Optimize Route Button - Bottom position - Show on both pages if user has places */}
-      {(isPlanPage || isPlacesPage) && (
+      {/* Optimize Route Button - Bottom position - Show on both pages */}
+      {(isPlanPage || isPlacesPage) && currentTrip && user && (
         <div className="fixed bottom-20 right-4 z-40 flex flex-col items-center">
         <motion.button
           whileHover={{ scale: 1.05, y: -2 }}
@@ -234,7 +245,7 @@ export function FloatingActionButtons() {
       )}
 
       {/* Add Place Button - Top position, show on both pages if deadline hasn't passed */}
-      {(isPlanPage || isPlacesPage) && !isDeadlinePassed() && (
+      {(isPlanPage || isPlacesPage) && currentTrip && user && !isDeadlinePassed() && (
         <Link
           to="/add-place"
           className="fixed bottom-36 right-4 z-40"
