@@ -210,6 +210,34 @@
   background: rgba(71, 85, 105, 0.5);
 }
 
+/* Duration slider thumb removal */
+.duration-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.duration-slider-input::-moz-range-thumb {
+  width: 0;
+  height: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+}
+
+.duration-slider-input::-ms-thumb {
+  width: 0;
+  height: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
 /* Selection styles */
 ::selection {
   background: rgba(59, 130, 246, 0.2);

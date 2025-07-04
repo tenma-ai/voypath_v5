@@ -169,16 +169,12 @@ export function DurationSlider({ value, onChange, className = '' }: DurationSlid
           step={1}
           value={sliderValue}
           onChange={(e) => handleSliderChange(parseInt(e.target.value))}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-
-        {/* Thumb */}
-        <motion.div
-          className={`absolute top-1/2 transform -translate-y-1/2 w-6 h-6 bg-white border-3 border-current ${colors.text} rounded-full shadow-medium cursor-pointer`}
-          style={{ left: `calc(${progress}% - 12px)` }}
-          whileHover={{ scale: 1.2 }}
-          whileTap={{ scale: 0.9 }}
-          transition={{ duration: 0.2 }}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer duration-slider-input"
+          style={{
+            background: 'transparent',
+            WebkitAppearance: 'none',
+            appearance: 'none',
+          }}
         />
       </div>
 
