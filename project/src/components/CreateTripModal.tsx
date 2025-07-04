@@ -125,7 +125,10 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
         await updateTrip(tripData.id, tripUpdateData);
       } else {
         // Create new trip
+        console.log('🚀 About to call createTripWithAPI...');
         createdTrip = await createTripWithAPI(tripUpdateData);
+        console.log('✅ Created trip result:', createdTrip);
+        console.log('✅ Trip ID from result:', createdTrip?.id);
       }
       
       onClose();
@@ -146,10 +149,19 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
       
       // Navigate to the created trip page
       if (!editMode && createdTrip) {
-        navigate(`/trip/${createdTrip.id}/plan`);
+        console.log('Navigating to trip ID:', createdTrip.id);
+        navigate(`/trip/${createdTrip.id}`);
+      } else if (!editMode) {
+        console.log('Navigation failed - createdTrip:', createdTrip);
       }
     } catch (error) {
-      console.error('Trip save error:', error);
+      console.error('💥 Trip save error in CreateTripModal:', error);
+      console.error('💥 Error details:', {
+        type: typeof error,
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
       const errorMessage = editMode 
         ? 'Failed to update trip. Please try again.' 
         : 'Failed to create trip. Please try again.';
