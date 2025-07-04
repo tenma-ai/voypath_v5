@@ -480,10 +480,15 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
     updated_at: new Date().toISOString()
   };
 
+  console.log('📝 Processing update fields:', {
+    received_data_keys: Object.keys(requestData),
+    received_data: requestData
+  });
+
   if (requestData.departure_location) updateData.departure_location = requestData.departure_location;
   if (requestData.departure_latitude !== undefined) updateData.departure_latitude = requestData.departure_latitude;
   if (requestData.departure_longitude !== undefined) updateData.departure_longitude = requestData.departure_longitude;
-  if (requestData.name) updateData.name = requestData.name;
+  if (requestData.name !== undefined) updateData.name = requestData.name;
   if (requestData.description !== undefined) updateData.description = requestData.description;
   if (requestData.destination) updateData.destination = requestData.destination;
   if (requestData.destination_latitude !== undefined) updateData.destination_latitude = requestData.destination_latitude;
@@ -493,6 +498,8 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
   if (requestData.add_place_deadline !== undefined) updateData.add_place_deadline = requestData.add_place_deadline;
   if (requestData.max_members) updateData.max_members = requestData.max_members;
   if (requestData.optimization_preferences) updateData.optimization_preferences = requestData.optimization_preferences;
+
+  console.log('💾 Final update data being sent to database:', updateData);
 
   // 日付検証（提供された場合）
   if (updateData.start_date && updateData.end_date) {
@@ -505,6 +512,7 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
   }
 
   // 旅行更新
+  console.log('📋 Executing database update for trip:', requestData.trip_id);
   const { data: updatedTrip, error: updateError } = await supabase
     .from('trips')
     .update(updateData)
@@ -512,9 +520,18 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
     .select()
     .single();
 
+  console.log('📋 Database update result:', {
+    updated_trip: updatedTrip,
+    update_error: updateError
+  });
+
   if (updateError) {
+    console.log('❌ Database update failed:', updateError);
     throw new Error(`Failed to update trip: ${updateError.message}`);
   }
+  
+  console.log('✅ Trip updated successfully in database');
+  console.log('📋 Updated trip data:', updatedTrip);
 
   // 使用状況イベント記録
   await supabase

@@ -109,6 +109,7 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
         : (selectedDestination?.formatted_address || formData.destination);
       
       const tripUpdateData = {
+        ...(editMode && tripData?.id ? { trip_id: tripData.id } : {}),
         departure_location: departureLocation,
         departure_latitude: selectedDeparture?.geometry?.location?.lat || null,
         departure_longitude: selectedDeparture?.geometry?.location?.lng || null,
