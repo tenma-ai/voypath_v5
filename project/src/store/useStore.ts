@@ -1079,6 +1079,10 @@ export const useStore = create<StoreState>()((set, get) => ({
             isLoading: false
           }));
 
+          // 作成したtripを現在のtripとして設定
+          console.log('🎯 Setting created trip as current trip:', createdTrip.id);
+          await get().setCurrentTrip(createdTrip);
+
           return createdTrip;
         } catch (error) {
           console.error('💥 createTripWithAPI error caught:', error);

@@ -64,6 +64,7 @@ Deno.serve(async (req) => {
             email: user.email,
             metadata: {
               supabase_user_id: user.id,
+              business_type: 'individual', // 個人事業主として設定
             },
           });
           
@@ -96,7 +97,7 @@ Deno.serve(async (req) => {
             address: 'auto',
           },
           tax_id_collection: {
-            enabled: false, // 個人向けサービスのため
+            enabled: false, // 個人事業主・個人向けサービスのため
           },
           metadata: {
             user_id: user.id,

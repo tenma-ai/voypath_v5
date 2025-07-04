@@ -35,8 +35,9 @@ export const STRIPE_PRICES = {
 export const TAX_CONFIG = {
   enabled: true,
   defaultTaxCode: 'txcd_10000000', // SaaS/デジタルサービス
-  collectTaxId: false, // 個人向けサービスのため
-  automaticTax: true
+  collectTaxId: false, // 個人事業主・個人向けサービスのため
+  automaticTax: true,
+  businessType: 'individual' // 個人事業主として設定
 } as const;
 
 // Get auth headers for Supabase requests
