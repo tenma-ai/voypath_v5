@@ -63,6 +63,15 @@ export function FloatingActionButtons() {
   );
   const hasPlaces = tripPlaces.length > 0;
 
+  // Get user's places for this trip (excluding system places like departure/destination)
+  const userPlaces = places.filter(place => 
+    currentTrip && 
+    (place.trip_id === currentTrip.id || place.tripId === currentTrip.id) &&
+    place.user_id === user?.id && 
+    place.source !== 'system'
+  );
+  const hasUserPlaces = userPlaces.length > 0;
+
   // Handle optimization
   const handleOptimization = async () => {
     if (!currentTrip?.id || !user) {
@@ -70,7 +79,7 @@ export function FloatingActionButtons() {
       return;
     }
 
-    if (!hasPlaces) {
+    if (!hasUserPlaces) {
       setOptimizationError('Please add places to your trip before optimizing');
       return;
     }
@@ -127,8 +136,9 @@ export function FloatingActionButtons() {
 
   return (
     <>
-      {/* Optimize Route Button - Bottom position */}
-      <div className="fixed bottom-20 right-4 z-40 flex flex-col items-center">
+      {/* Optimize Route Button - Bottom position - Show on both pages if user has places */}
+      {(isPlanPage || isPlacesPage) && (
+        <div className="fixed bottom-20 right-4 z-40 flex flex-col items-center">
         <motion.button
           whileHover={{ scale: 1.05, y: -2 }}
           whileTap={{ scale: 0.95 }}
@@ -138,7 +148,7 @@ export function FloatingActionButtons() {
               localStorage.setItem(optimizeGuidanceKey, 'true');
               setShouldBlinkOptimizeButton(false);
             }
-            if (hasPlaces) {
+            if (hasUserPlaces) {
               handleOptimization();
             } else {
               setOptimizationError('Please add places to your trip before optimizing');
@@ -159,7 +169,9 @@ export function FloatingActionButtons() {
           <div className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
             isOptimizing
               ? 'bg-gradient-to-br from-green-500 to-emerald-600'
-              : 'bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600'
+              : hasUserPlaces
+              ? 'bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600'
+              : 'bg-gradient-to-br from-gray-400 via-gray-500 to-gray-600 opacity-60'
           }`}>
             <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             
@@ -218,10 +230,11 @@ export function FloatingActionButtons() {
           </div>
         </motion.button>
         
-      </div>
+        </div>
+      )}
 
-      {/* Add Place Button - Top position, only show if deadline hasn't passed */}
-      {!isDeadlinePassed() && (
+      {/* Add Place Button - Top position, show on both pages if deadline hasn't passed */}
+      {(isPlanPage || isPlacesPage) && !isDeadlinePassed() && (
         <Link
           to="/add-place"
           className="fixed bottom-36 right-4 z-40"
