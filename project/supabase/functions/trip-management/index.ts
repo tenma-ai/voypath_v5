@@ -151,9 +151,24 @@ serve(async (req) => {
         );
     }
   } catch (error) {
-    // Error occurred
+    console.error('❌ Trip management error:', {
+      error_message: error.message,
+      error_stack: error.stack,
+      error_type: error.constructor.name,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Provide detailed error response
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: {
+          type: error.constructor.name,
+          timestamp: new Date().toISOString(),
+          method: req.method,
+          url: req.url
+        }
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -390,7 +405,16 @@ async function handleGetTrip(supabase: any, userId: string, tripId: string) {
 }
 
 async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
-  const requestData: TripUpdateRequest = await req.json();
+  let requestData: TripUpdateRequest;
+  
+  try {
+    const bodyText = await req.text();
+    console.log('📦 Raw request body:', bodyText);
+    requestData = JSON.parse(bodyText);
+  } catch (parseError) {
+    console.error('❌ JSON parse error:', parseError);
+    throw new Error(`Invalid JSON in request body: ${parseError.message}`);
+  }
   
   console.log('🔍 handleUpdateTrip called with:', {
     trip_id: requestData.trip_id,
