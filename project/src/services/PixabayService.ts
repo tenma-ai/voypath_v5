@@ -121,6 +121,29 @@ class PixabayService {
     return this.searchPhoto(locationName, 'medium');
   }
 
+  async getPlacePhotos(placeName: string, count: number = 5): Promise<string[]> {
+    const cleanQuery = this.extractLocationName(placeName);
+    
+    if (!this.apiKey) {
+      // Return fallback images when API key is not available
+      return Array(count).fill(this.getFallbackImage());
+    }
+
+    try {
+      const data = await this.fetchFromPixabay(cleanQuery, 1, Math.min(count, 20));
+      
+      if (data.hits && data.hits.length > 0) {
+        return data.hits.slice(0, count).map(photo => photo.webformatURL);
+      }
+      
+      // No photos found, return fallback images
+      return Array(count).fill(this.getFallbackImage());
+    } catch (error) {
+      // Error fetching photos, return fallback images
+      return Array(count).fill(this.getFallbackImage());
+    }
+  }
+
   private extractLocationName(placeName: string): string {
     // Remove common prefixes and suffixes
     let cleaned = placeName

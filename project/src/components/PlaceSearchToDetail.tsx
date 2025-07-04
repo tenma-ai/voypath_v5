@@ -8,6 +8,7 @@ import { Search, MapPin, Star, Calendar, Plus, ArrowLeft, Clock } from 'lucide-r
 import { motion, AnimatePresence } from 'framer-motion';
 import { PlaceSearchInput } from './common/PlaceSearchInput';
 import { DurationSlider } from './DurationSlider';
+import { pixabayService } from '../services/PixabayService';
 import { useStore } from '../store/useStore';
 import { GooglePlace } from '../services/PlaceSearchService';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -155,12 +156,8 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
           google_price_level: selectedPlace.price_level,
           google_types: selectedPlace.types,
           estimated_cost: formData.budget * 10, // Rough estimate
-          image_url: selectedPlace.photos && selectedPlace.photos.length > 0 
-            ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${selectedPlace.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
-            : undefined,
-          images: selectedPlace.photos ? selectedPlace.photos.map(photo => 
-            `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photo.photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
-          ) : [],
+          image_url: await pixabayService.getPlacePhoto(selectedPlace.name),
+          images: await pixabayService.getPlacePhotos(selectedPlace.name, 5),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
