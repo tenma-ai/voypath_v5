@@ -219,6 +219,13 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
   const handleTripDetailsSubmit = async () => {
     if (!currentTrip) return;
     
+    console.log('📅 Current selectedRange state:', {
+      start: selectedRange.start?.toISOString(),
+      end: selectedRange.end?.toISOString(),
+      start_formatted: selectedRange.start?.toISOString().split('T')[0],
+      end_formatted: selectedRange.end?.toISOString().split('T')[0]
+    });
+    
     try {
       const finalDestination = useSameDeparture 
         ? 'same as departure location' 
@@ -237,10 +244,11 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
         end_date: selectedRange.end?.toISOString().split('T')[0] || undefined,
       };
 
+      console.log('📤 Sending update data:', updateData);
       await updateTrip(currentTrip.id, updateData);
-      console.log('Trip details updated successfully');
+      console.log('✅ Trip details updated successfully');
     } catch (error) {
-      console.error('Failed to update trip details:', error);
+      console.error('❌ Failed to update trip details:', error);
     }
   };
 
@@ -330,17 +338,36 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
   };
 
   const handleDateClick = (date: Date) => {
+    console.log('🗿 Date clicked:', date.toISOString());
+    console.log('🗿 Current range before update:', {
+      start: selectedRange.start?.toISOString(),
+      end: selectedRange.end?.toISOString()
+    });
+    
     if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
+      console.log('🗿 Setting start date:', date.toISOString());
       setSelectedRange({ start: date, end: null });
     } else {
       if (date < selectedRange.start) {
         const newRange = { start: date, end: selectedRange.start };
+        console.log('🗿 Setting range (date before start):', {
+          start: newRange.start.toISOString(),
+          end: newRange.end.toISOString()
+        });
         setSelectedRange(newRange);
-        handleDateRangeUpdate(newRange.start, newRange.end);
+        setShowDatePicker(false);
+        // Removed auto-save to fix conflict
+        // handleDateRangeUpdate(newRange.start, newRange.end);
       } else {
         const newRange = { start: selectedRange.start, end: date };
+        console.log('🗿 Setting range (date after start):', {
+          start: newRange.start.toISOString(),
+          end: newRange.end.toISOString()
+        });
         setSelectedRange(newRange);
-        handleDateRangeUpdate(newRange.start, newRange.end);
+        setShowDatePicker(false);
+        // Removed auto-save to fix conflict
+        // handleDateRangeUpdate(newRange.start, newRange.end);
       }
     }
   };
