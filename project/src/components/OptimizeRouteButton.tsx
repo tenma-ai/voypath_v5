@@ -57,7 +57,8 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
   // Get places for current trip
   const tripPlaces = places.filter(place => place.trip_id === tripId || place.tripId === tripId);
   const hasPlaces = tripPlaces.length > 0;
-  const isReady = hasPlaces && currentUser && !isOptimizing;
+  // Always allow optimization if user is authenticated (regardless of places)
+  const isReady = currentUser && !isOptimizing;
   
   // Debug logging
   useEffect(() => {
@@ -139,10 +140,8 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       return;
     }
 
-    if (!hasPlaces) {
-      setError('Please add places to your trip before optimizing');
-      return;
-    }
+    // Remove the places requirement - allow optimization even without places
+    // The backend will handle cases with no places appropriately
 
     // Execute real optimization process
     setIsOptimizing(true);
