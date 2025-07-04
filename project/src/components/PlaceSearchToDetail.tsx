@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PlaceSearchInput } from './common/PlaceSearchInput';
 import { DurationSlider } from './DurationSlider';
 import { pixabayService } from '../services/PixabayService';
+import { PlaceImage } from './PlaceImage';
 import { useStore } from '../store/useStore';
 import { GooglePlace } from '../services/PlaceSearchService';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -297,17 +298,11 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
                 className="bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-primary-900/20 dark:via-slate-800/80 dark:to-secondary-900/20 backdrop-blur-xl rounded-3xl p-4 border border-primary-200/50 dark:border-primary-800/50 shadow-glass"
               >
                 <div className="flex items-start space-x-3">
-                  {selectedPlace.photos && selectedPlace.photos.length > 0 ? (
-                    <img
-                      src={`https://maps.googleapis.com/maps/api/place/photo?maxwidth=200&photoreference=${selectedPlace.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
-                      alt={selectedPlace.name}
-                      className="w-16 h-16 rounded-xl object-cover flex-shrink-0 shadow-medium"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/40 dark:to-secondary-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-8 h-8 text-primary-600 dark:text-primary-400" />
-                    </div>
-                  )}
+                  <PlaceImage
+                    placeName={selectedPlace.name}
+                    className="w-16 h-16 rounded-xl object-cover flex-shrink-0 shadow-medium"
+                    size="small"
+                  />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
                       {selectedPlace.name}

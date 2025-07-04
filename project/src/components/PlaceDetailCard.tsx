@@ -23,6 +23,7 @@ import {
   Globe
 } from 'lucide-react';
 import type { OptimizedPlace, MemberPreference } from '../types/optimization';
+import { PlaceImage } from './PlaceImage';
 
 interface PlaceDetailCardProps {
   place: OptimizedPlace;
