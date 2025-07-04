@@ -1012,34 +1012,62 @@ export const useStore = create<StoreState>()((set, get) => ({
 
       // API Integration
       createTripWithAPI: async (tripData: TripCreateData): Promise<Trip> => {
+        console.log('🎯 createTripWithAPI called with data:', tripData);
+        
         const { user, canCreateTrip } = get();
+        console.log('👤 Current user from store:', user);
+        
         if (!user) throw new Error('User not authenticated');
         
         // Double-check trip creation limits
         if (!canCreateTrip()) {
           throw new Error('You have reached the trip limit for your current plan. Please upgrade to Premium to create more trips.');
         }
+        
+        console.log('✅ Trip creation checks passed');
 
         try {
           // Use trip-management API for proper coordinate handling
+          console.log('🔐 Checking authentication...');
           const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+          console.log('🔐 Auth check result - user:', currentUser?.id, 'error:', authError);
+          
           if (authError) {
+            console.error('🔐 Authentication error:', authError);
             throw new Error('Authentication required');
           }
           if (!currentUser) {
+            console.error('🔐 No current user found');
             throw new Error('User not authenticated');
           }
 
           // Call trip-management Edge Function with coordinate data
+          console.log('🚀 Calling trip-management API with data:', JSON.stringify(tripData, null, 2));
+          console.log('🚀 Supabase client config check:', {
+            url: import.meta.env.VITE_SUPABASE_URL,
+            hasAnonKey: !!import.meta.env.VITE_SUPABASE_ANON_KEY,
+            anonKeyPrefix: import.meta.env.VITE_SUPABASE_ANON_KEY?.substring(0, 20) + '...'
+          });
+          
           const { data, error } = await supabase.functions.invoke('trip-management', {
             body: tripData
           });
 
+          console.log('📡 API Response - data:', data);
+          console.log('📡 API Response - error:', error);
+
           if (error) {
+            console.error('❌ API Error details:', error);
             throw new Error(error.message || 'Failed to create trip');
           }
 
           if (!data || !data.trip) {
+            console.error('❌ Invalid API response structure:', {
+              hasData: !!data,
+              dataKeys: data ? Object.keys(data) : [],
+              hasTrip: data?.trip ? true : false,
+              dataType: typeof data
+            });
             throw new Error('Invalid response from trip creation');
           }
 
@@ -1053,6 +1081,11 @@ export const useStore = create<StoreState>()((set, get) => ({
 
           return createdTrip;
         } catch (error) {
+          console.error('💥 createTripWithAPI error caught:', error);
+          console.error('💥 Error type:', typeof error);
+          console.error('💥 Error name:', error instanceof Error ? error.name : 'Unknown');
+          console.error('💥 Error message:', error instanceof Error ? error.message : String(error));
+          console.error('💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
           // Failed to create trip
           throw error;
         }
