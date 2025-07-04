@@ -33,10 +33,24 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
     try {
       // Log message
       
-      // Get auth headers
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Please log in to join a trip');
+      // Get current user and session with detailed logging
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      console.log('Auth Debug:', {
+        user: user?.id,
+        session: !!session,
+        sessionError,
+        userError,
+        accessToken: session?.access_token ? 'present' : 'missing'
+      });
+      
+      if (userError || !user) {
+        throw new Error('Please log in to join a trip. User authentication failed.');
+      }
+      
+      if (sessionError || !session?.access_token) {
+        throw new Error('Please log in to join a trip. Session authentication failed.');
       }
 
       // Log message
@@ -45,7 +59,7 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
 
       // Remove hyphens from the code if present
       const cleanCode = joinCode.replace(/-/g, '').toUpperCase();
-      // Log message
+      console.log('Join attempt:', { cleanCode, userId: user.id });
 
       // Call trip-member-management Edge Function
       const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/join-trip', {
@@ -60,19 +74,18 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
         }),
       });
 
-      // Log message
-      // Log message
-
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
         let errorMessage = 'Failed to join trip';
         try {
           const errorData = await response.json();
-          // Log message
+          console.log('Error response data:', errorData);
           errorMessage = errorData.error || errorData.message || errorMessage;
         } catch (parseError) {
-          // Log message
+          console.log('Failed to parse error response');
           const errorText = await response.text();
-          // Log message
+          console.log('Error response text:', errorText);
           if (errorText) errorMessage = errorText;
         }
         
