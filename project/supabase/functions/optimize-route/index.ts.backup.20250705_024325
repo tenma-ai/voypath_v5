@@ -1314,13 +1314,76 @@ Deno.serve(async (req) => {
     }
     
     if (places.length === 0) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'No places found for optimization'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      });
+      console.log('⚠️ No places found - creating minimal route with departure and destination');
+      
+      // Get trip details for departure and destination
+      const { data: tripDetails, error: tripDetailsError } = await supabase
+        .from('trips')
+        .select('departure_location, departure_latitude, departure_longitude, destination_location, destination_latitude, destination_longitude')
+        .eq('id', trip_id)
+        .single();
+        
+      if (tripDetailsError || !tripDetails) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Could not retrieve trip details for optimization'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        });
+      }
+      
+      // Create minimal system places
+      const systemPlaces = [];
+      
+      // Add departure point if available
+      if (tripDetails.departure_location && tripDetails.departure_latitude && tripDetails.departure_longitude) {
+        systemPlaces.push({
+          id: 'departure_' + trip_id,
+          trip_id,
+          user_id: member_id,
+          name: tripDetails.departure_location,
+          latitude: tripDetails.departure_latitude,
+          longitude: tripDetails.departure_longitude,
+          category: 'departure_point',
+          source: 'system',
+          place_type: 'departure',
+          stay_duration_minutes: 0,
+          wish_level: 5,
+          created_at: new Date().toISOString()
+        });
+      }
+      
+      // Add destination if available
+      if (tripDetails.destination_location && tripDetails.destination_latitude && tripDetails.destination_longitude) {
+        systemPlaces.push({
+          id: 'destination_' + trip_id,
+          trip_id,
+          user_id: member_id,
+          name: tripDetails.destination_location,
+          latitude: tripDetails.destination_latitude,
+          longitude: tripDetails.destination_longitude,
+          category: 'final_destination',
+          source: 'system',
+          place_type: 'destination',
+          stay_duration_minutes: 0,
+          wish_level: 5,
+          created_at: new Date().toISOString()
+        });
+      }
+      
+      if (systemPlaces.length === 0) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'No places or trip locations found for optimization'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        });
+      }
+      
+      places = systemPlaces;
+      console.log(`✅ Created ${places.length} system places for minimal route`);
     }
     
     // デバッグ：全ての場所の詳細をログ出力
