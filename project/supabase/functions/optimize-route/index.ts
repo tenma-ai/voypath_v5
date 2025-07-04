@@ -371,13 +371,15 @@ async function iterativelyOptimizeWithDateConstraints(places, availableDays, tri
       (p.name && (p.name.toLowerCase().includes('departure') || p.name.toLowerCase().includes('destination')))
     );
     
-    // Skip logging for performance when many places
-    if (isUser && userPlaces.length <= 20) {
-      console.log(`👤 User place: ${p.name} (category: ${p.category || 'none'}, user: ${p.user_id})`);
-    }
-    
     return isUser;
   });
+  
+  // Log user places only if not too many
+  if (userPlaces.length <= 20) {
+    userPlaces.forEach(p => {
+      console.log(`👤 User place: ${p.name} (category: ${p.category || 'none'}, user: ${p.user_id})`);
+    });
+  }
   
   console.log(`🔒 Protected ${systemPlaces.length} system places, optimizing ${userPlaces.length} user places`);
   systemPlaces.forEach(p => console.log(`  - System: ${p.name} (${p.category || p.place_type || 'unknown'})`));
