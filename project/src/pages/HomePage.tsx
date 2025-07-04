@@ -54,6 +54,7 @@ export function HomePage() {
     tripsPlanned: totalUserTrips
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [shouldBlinkCreateTripButton, setShouldBlinkCreateTripButton] = useState(false);
 
   const formatDate = (dateStr: string) => {
     return DateUtils.formatCompactDate(new Date(dateStr));
@@ -87,6 +88,13 @@ export function HomePage() {
   };
 
   const handleCreateTrip = () => {
+    // Stop blinking if it was showing
+    if (shouldBlinkCreateTripButton && user) {
+      const createTripGuidanceKey = `createTripGuidance_${user.id}`;
+      localStorage.setItem(createTripGuidanceKey, 'true');
+      setShouldBlinkCreateTripButton(false);
+    }
+    
     if (canCreateTrip()) {
       setShowCreateModal(true);
     } else {
@@ -141,6 +149,21 @@ export function HomePage() {
     
     loadUserStats();
   }, [user, totalUserTrips]);
+
+  // Check if create trip button should blink
+  useEffect(() => {
+    if (!user) return;
+
+    // Check if this is the first time for create trip guidance
+    const createTripGuidanceKey = `createTripGuidance_${user.id}`;
+    const hasSeenCreateTripGuidance = localStorage.getItem(createTripGuidanceKey);
+    
+    // Blink if user has no trips and hasn't seen guidance
+    setShouldBlinkCreateTripButton(
+      !hasSeenCreateTripGuidance && 
+      totalUserTrips === 0
+    );
+  }, [user?.id, totalUserTrips]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -276,6 +299,20 @@ export function HomePage() {
           className="group relative flex-1 bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600 rounded-3xl p-3 sm:p-6 shadow-glow hover:shadow-glow-lg transition-all duration-300 overflow-hidden"
           whileHover={{ scale: 1.02, y: -2 }}
           whileTap={{ scale: 0.98 }}
+          animate={shouldBlinkCreateTripButton ? {
+            opacity: [1, 0.7, 1],
+            scale: [1, 1.05, 1],
+            boxShadow: [
+              '0 0 20px rgba(99, 102, 241, 0.5)',
+              '0 0 30px rgba(99, 102, 241, 0.8)',
+              '0 0 20px rgba(99, 102, 241, 0.5)'
+            ]
+          } : {}}
+          transition={shouldBlinkCreateTripButton ? {
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          } : {}}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           <div className="relative z-10 flex items-center justify-center space-x-3 text-white">

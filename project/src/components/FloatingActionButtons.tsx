@@ -6,9 +6,10 @@ import { useStore } from '../store/useStore';
 
 export function FloatingActionButtons() {
   const location = useLocation();
-  const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult, setHasUserOptimized, setShowOptimizationSuccess } = useStore();
+  const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult, setHasUserOptimized, setShowOptimizationSuccess, hasUserOptimized } = useStore();
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
   const [shouldBlinkPlusButton, setShouldBlinkPlusButton] = useState(false);
+  const [shouldBlinkOptimizeButton, setShouldBlinkOptimizeButton] = useState(false);
 
   // Check if deadline has passed
   const isDeadlinePassed = () => {
@@ -33,6 +34,28 @@ export function FloatingActionButtons() {
     // Blink if no places exist and user hasn't seen guidance
     setShouldBlinkPlusButton(!hasSeenGuidance && userPlaces.length === 0);
   }, [currentTrip?.id, user?.id, places]);
+
+  // Check if optimize button should blink
+  useEffect(() => {
+    if (!currentTrip || !user || !places) return;
+
+    // Check if this is the first time for optimize guidance
+    const optimizeGuidanceKey = `optimizeGuidance_${user.id}_${currentTrip.id}`;
+    const hasSeenOptimizeGuidance = localStorage.getItem(optimizeGuidanceKey);
+    
+    // Get user's places for this trip (excluding system places)
+    const userPlaces = places.filter(place => 
+      place.user_id === user.id && 
+      place.source !== 'system' // Exclude departure/destination places
+    );
+    
+    // Blink if user has places but hasn't optimized yet and hasn't seen guidance
+    setShouldBlinkOptimizeButton(
+      !hasSeenOptimizeGuidance && 
+      userPlaces.length > 0 && 
+      !hasUserOptimized
+    );
+  }, [currentTrip?.id, user?.id, places, hasUserOptimized]);
 
   // Get places for current trip
   const tripPlaces = places.filter(place => 
@@ -109,10 +132,29 @@ export function FloatingActionButtons() {
         <motion.button
           whileHover={{ scale: 1.05, y: -2 }}
           whileTap={{ scale: 0.95 }}
-          onClick={hasPlaces ? handleOptimization : () => setOptimizationError('Please add places to your trip before optimizing')}
+          onClick={(e) => {
+            if (shouldBlinkOptimizeButton && currentTrip && user) {
+              const optimizeGuidanceKey = `optimizeGuidance_${user.id}_${currentTrip.id}`;
+              localStorage.setItem(optimizeGuidanceKey, 'true');
+              setShouldBlinkOptimizeButton(false);
+            }
+            if (hasPlaces) {
+              handleOptimization();
+            } else {
+              setOptimizationError('Please add places to your trip before optimizing');
+            }
+          }}
           initial={{ opacity: 0, scale: 0 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3, delay: 0.3 }}
+          animate={shouldBlinkOptimizeButton ? {
+            opacity: [1, 0.5, 1],
+            scale: [1, 1.1, 1],
+            y: [0, -5, 0]
+          } : { opacity: 1, scale: 1 }}
+          transition={shouldBlinkOptimizeButton ? {
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          } : { duration: 0.3, delay: 0.3 }}
         >
           <div className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
             isOptimizing
