@@ -88,6 +88,20 @@ serve(async (req)=>{
     });
   }
   try {
+    const requestData = await req.json();
+    
+    // Handle keep-alive requests
+    if (requestData.type === 'keep_alive') {
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'pong',
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...COMMON_CORS_HEADERS, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+    
     const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
       global: {
         headers: {
@@ -95,7 +109,7 @@ serve(async (req)=>{
         }
       }
     });
-    const requestData = await req.json();
+    
     // バリデーション
     if (!requestData.trip_id || !requestData.places || !requestData.members) {
       return createErrorResponse('trip_id, places, and members are required', 400);

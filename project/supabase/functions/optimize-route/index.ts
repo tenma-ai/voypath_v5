@@ -1237,6 +1237,18 @@ Deno.serve(async (req) => {
       });
     }
     
+    // Handle keep-alive requests
+    if (requestData.type === 'keep_alive') {
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'pong',
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+    
     const { trip_id, member_id, user_places, constraints } = requestData;
     
     // 必須パラメータの検証
