@@ -409,20 +409,30 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
   
   try {
     const bodyText = await req.text();
-    console.log('📦 Raw request body:', bodyText);
+    console.log('📦 Raw request body (length: ' + bodyText.length + '):', bodyText);
+    console.log('📦 Raw request body first 500 chars:', bodyText.substring(0, 500));
     requestData = JSON.parse(bodyText);
   } catch (parseError) {
     console.error('❌ JSON parse error:', parseError);
+    console.error('❌ Body that failed to parse:', bodyText);
     throw new Error(`Invalid JSON in request body: ${parseError.message}`);
   }
   
   console.log('🔍 handleUpdateTrip called with:', {
     trip_id: requestData.trip_id,
     user_id: userId,
-    request_keys: Object.keys(requestData)
+    request_keys: Object.keys(requestData),
+    request_data: requestData
+  });
+  
+  // Log each field value for debugging
+  console.log('📋 Detailed field values:');
+  Object.entries(requestData).forEach(([key, value]) => {
+    console.log(`  ${key}: ${typeof value} = ${JSON.stringify(value)}`);
   });
   
   if (!requestData.trip_id) {
+    console.error('❌ Missing trip_id in request:', requestData);
     throw new Error('Trip ID is required');
   }
 
@@ -509,19 +519,46 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
     received_data: requestData
   });
 
-  if (requestData.departure_location) updateData.departure_location = requestData.departure_location;
-  if (requestData.departure_latitude !== undefined) updateData.departure_latitude = requestData.departure_latitude;
-  if (requestData.departure_longitude !== undefined) updateData.departure_longitude = requestData.departure_longitude;
-  if (requestData.name !== undefined) updateData.name = requestData.name;
-  if (requestData.description !== undefined) updateData.description = requestData.description;
-  if (requestData.destination) updateData.destination = requestData.destination;
-  if (requestData.destination_latitude !== undefined) updateData.destination_latitude = requestData.destination_latitude;
-  if (requestData.destination_longitude !== undefined) updateData.destination_longitude = requestData.destination_longitude;
-  if (requestData.start_date) updateData.start_date = requestData.start_date;
-  if (requestData.end_date) updateData.end_date = requestData.end_date;
-  if (requestData.add_place_deadline !== undefined) updateData.add_place_deadline = requestData.add_place_deadline;
-  if (requestData.max_members) updateData.max_members = requestData.max_members;
-  if (requestData.optimization_preferences) updateData.optimization_preferences = requestData.optimization_preferences;
+  // Handle string and non-string values properly
+  if (requestData.departure_location && typeof requestData.departure_location === 'string') {
+    updateData.departure_location = requestData.departure_location;
+  }
+  if (requestData.departure_latitude !== undefined && requestData.departure_latitude !== null && requestData.departure_latitude !== 'null') {
+    updateData.departure_latitude = typeof requestData.departure_latitude === 'string' ? parseFloat(requestData.departure_latitude) : requestData.departure_latitude;
+  }
+  if (requestData.departure_longitude !== undefined && requestData.departure_longitude !== null && requestData.departure_longitude !== 'null') {
+    updateData.departure_longitude = typeof requestData.departure_longitude === 'string' ? parseFloat(requestData.departure_longitude) : requestData.departure_longitude;
+  }
+  if (requestData.name !== undefined && requestData.name !== null && requestData.name !== 'null') {
+    updateData.name = requestData.name;
+  }
+  if (requestData.description !== undefined && requestData.description !== null && requestData.description !== 'null') {
+    updateData.description = requestData.description;
+  }
+  if (requestData.destination && typeof requestData.destination === 'string') {
+    updateData.destination = requestData.destination;
+  }
+  if (requestData.destination_latitude !== undefined && requestData.destination_latitude !== null && requestData.destination_latitude !== 'null') {
+    updateData.destination_latitude = typeof requestData.destination_latitude === 'string' ? parseFloat(requestData.destination_latitude) : requestData.destination_latitude;
+  }
+  if (requestData.destination_longitude !== undefined && requestData.destination_longitude !== null && requestData.destination_longitude !== 'null') {
+    updateData.destination_longitude = typeof requestData.destination_longitude === 'string' ? parseFloat(requestData.destination_longitude) : requestData.destination_longitude;
+  }
+  if (requestData.start_date && typeof requestData.start_date === 'string') {
+    updateData.start_date = requestData.start_date;
+  }
+  if (requestData.end_date && typeof requestData.end_date === 'string') {
+    updateData.end_date = requestData.end_date;
+  }
+  if (requestData.add_place_deadline !== undefined && requestData.add_place_deadline !== null && requestData.add_place_deadline !== 'null') {
+    updateData.add_place_deadline = requestData.add_place_deadline;
+  }
+  if (requestData.max_members && typeof requestData.max_members === 'number') {
+    updateData.max_members = requestData.max_members;
+  }
+  if (requestData.optimization_preferences && typeof requestData.optimization_preferences === 'object') {
+    updateData.optimization_preferences = requestData.optimization_preferences;
+  }
 
   console.log('💾 Final update data being sent to database:', updateData);
 

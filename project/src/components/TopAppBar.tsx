@@ -403,14 +403,17 @@ function TopAppBar() {
                         <div className="fixed inset-0 bg-black/10" onClick={() => setShowVoypathMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="fixed left-4 top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
+                          className="absolute left-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
                           style={{ 
                             zIndex: 10001,
                             opacity: 1,
                             pointerEvents: 'auto',
                             transform: 'translateZ(0)', // Force GPU acceleration
                             WebkitTransform: 'translateZ(0)',
-                            willChange: 'transform'
+                            willChange: 'transform',
+                            position: 'fixed',
+                            left: '0.5rem',
+                            top: '3.5rem'
                           }}
                           variants={menuVariants}
                           initial="hidden"
@@ -706,14 +709,17 @@ function TopAppBar() {
                         <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="fixed right-2 sm:right-4 top-14 sm:top-16 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
+                          className="absolute right-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
                           style={{ 
                             zIndex: 10001,
                             opacity: 1,
                             pointerEvents: 'auto',
                             transform: 'translateZ(0)', // Force GPU acceleration
                             WebkitTransform: 'translateZ(0)',
-                            willChange: 'transform'
+                            willChange: 'transform',
+                            position: 'fixed',
+                            right: '0.5rem',
+                            top: '3.5rem'
                           }}
                           variants={menuVariants}
                           initial="hidden"
