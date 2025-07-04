@@ -30,7 +30,7 @@ const extractPlaceName = (address: string): string => {
 
 export function HomePage() {
   const navigate = useNavigate();
-  const { user, trips, currentTrip, deleteTrip, canCreateTrip, canJoinTrip, setCurrentTrip, loadPlacesFromAPI } = useStore();
+  const { user, trips, currentTrip, deleteTrip, canCreateTrip, canJoinTrip, setCurrentTrip, loadPlacesFromAPI, loadTripsFromDatabase } = useStore();
   
   // Calculate user's owned trips count for limit display  
   const userOwnedTrips = user ? trips.filter(trip => trip.ownerId === user.id) : [];
@@ -698,7 +698,15 @@ export function HomePage() {
       {/* Modals */}
       <CreateTripModal
         isOpen={showCreateModal}
-        onClose={() => {
+        onClose={async () => {
+          // If we were editing a trip, reload the trips list to reflect changes
+          if (editTripData) {
+            try {
+              await loadTripsFromDatabase();
+            } catch (error) {
+              console.error('Failed to reload trips after edit:', error);
+            }
+          }
           setShowCreateModal(false);
           setEditTripData(null);
         }}
@@ -716,7 +724,15 @@ export function HomePage() {
       />
       <TripSettingsModal
         isOpen={showTripSettingsModal}
-        onClose={() => setShowTripSettingsModal(false)}
+        onClose={async () => {
+          // Reload trips list to reflect any changes made in settings
+          try {
+            await loadTripsFromDatabase();
+          } catch (error) {
+            console.error('Failed to reload trips after settings change:', error);
+          }
+          setShowTripSettingsModal(false);
+        }}
       />
     </motion.div>
   );

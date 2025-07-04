@@ -261,10 +261,12 @@ export const useStore = create<StoreState>()((set, get) => ({
           }
           
           console.log('Trip updated successfully via API:', data);
+          console.log('Response data structure:', JSON.stringify(data, null, 2));
 
           // Update local state with the response data
           if (data && data.trip) {
             const updatedTrip = data.trip;
+            console.log('Updating local state with trip data:', updatedTrip);
             set((state) => ({
               trips: state.trips.map((trip) =>
                 trip.id === id ? updatedTrip : trip
@@ -273,7 +275,9 @@ export const useStore = create<StoreState>()((set, get) => ({
                 ? updatedTrip 
                 : state.currentTrip,
             }));
+            console.log('Local state updated successfully');
           } else {
+            console.log('No trip data in response, using fallback update');
             // Fallback: update with provided updates if no trip data returned
             set((state) => ({
               trips: state.trips.map((trip) =>
