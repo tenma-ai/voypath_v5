@@ -214,8 +214,14 @@ async function handleCreateInvitation(req: Request, supabase: any, userId: strin
 
   // 招待コード生成（8文字のランダム英数字）
   const invitationCode = generateInvitationCode();
-  const expiresAt = new Date();
-  expiresAt.setHours(expiresAt.getHours() + (requestData.expires_hours || 72));
+  
+  // Only set expiration if explicitly requested
+  let expiresAt = null;
+  if (requestData.expires_hours) {
+    const expireDate = new Date();
+    expireDate.setHours(expireDate.getHours() + requestData.expires_hours);
+    expiresAt = expireDate.toISOString();
+  }
 
   const { data: invitations, error: invitationError } = await supabase
     .from('invitation_codes')
@@ -224,7 +230,7 @@ async function handleCreateInvitation(req: Request, supabase: any, userId: strin
       created_by: userId,
       code: invitationCode,
       max_uses: requestData.max_uses || 1,
-      expires_at: expiresAt.toISOString(),
+      expires_at: expiresAt,
       description: requestData.description || 'Trip invitation'
     })
     .select('*');

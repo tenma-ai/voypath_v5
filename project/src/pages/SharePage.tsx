@@ -85,7 +85,6 @@ export function SharePage() {
         body: JSON.stringify({
           trip_id: currentTrip.id,
           max_uses: 10,
-          expires_hours: 168, // 1 week
           description: 'Share page invitation'
         }),
       });
