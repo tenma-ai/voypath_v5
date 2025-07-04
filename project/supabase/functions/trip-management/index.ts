@@ -359,7 +359,7 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
     throw new Error('Trip ID is required');
   }
 
-  // 更新権限確認（所有者のみ）
+  // 更新権限確認（所有者またはadmin）
   const { data: trip, error: checkError } = await supabase
     .from('trips')
     .select('owner_id')
@@ -370,9 +370,27 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
     throw new Error(`Trip not found: ${checkError.message}`);
   }
 
-  if (trip.owner_id !== userId) {
+  // Check if user is owner
+  const isOwner = trip.owner_id === userId;
+  
+  // Check if user is admin member
+  let isAdmin = false;
+  if (!isOwner) {
+    const { data: membership, error: memberError } = await supabase
+      .from('trip_members')
+      .select('role')
+      .eq('trip_id', requestData.trip_id)
+      .eq('user_id', userId)
+      .single();
+    
+    if (!memberError && membership) {
+      isAdmin = membership.role === 'admin';
+    }
+  }
+
+  if (!isOwner && !isAdmin) {
     return new Response(
-      JSON.stringify({ error: 'Insufficient permissions' }),
+      JSON.stringify({ error: 'Insufficient permissions - only trip owner or admin can edit trip details' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,

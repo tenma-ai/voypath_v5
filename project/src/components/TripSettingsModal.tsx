@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
-import { X, Settings, Users, Shield, Calendar, Clock, UserCheck, UserX, Plus, MapPin, Navigation } from 'lucide-react';
+import { X, Settings, Users, Shield, Calendar, Clock, UserCheck, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -25,14 +25,20 @@ interface TripMember {
 
 export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
   const { currentTrip, updateTrip, user } = useStore();
-  const [activeTab, setActiveTab] = useState<'general' | 'locations' | 'dates' | 'permissions' | 'deadline'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'permissions' | 'deadline'>('general');
   const [members, setMembers] = useState<TripMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [addPlaceDeadline, setAddPlaceDeadline] = useState(
     currentTrip?.addPlaceDeadline ? new Date(currentTrip.addPlaceDeadline).toISOString().slice(0, 16) : ''
   );
 
-  // Location and date states
+  // Form data states (similar to CreateTripModal)
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    departureLocation: '',
+    destination: '',
+  });
   const [selectedDeparture, setSelectedDeparture] = useState<GooglePlace | null>(null);
   const [selectedDestination, setSelectedDestination] = useState<GooglePlace | null>(null);
   const [useSameDeparture, setUseSameDeparture] = useState(false);
@@ -41,6 +47,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
     end: null
   });
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Load trip members when modal opens and currentTrip is available
   useEffect(() => {
@@ -57,6 +64,14 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
   // Initialize trip data for editing
   const initializeTripData = () => {
     if (!currentTrip) return;
+
+    // Initialize form data
+    setFormData({
+      name: currentTrip.name || '',
+      description: currentTrip.description || '',
+      departureLocation: currentTrip.departureLocation || '',
+      destination: currentTrip.destination || '',
+    });
 
     // Initialize destination state
     setUseSameDeparture(
@@ -200,67 +215,62 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
     }
   };
 
-  // Handle location updates
-  const handleDepartureUpdate = async (place: GooglePlace | null, locationString?: string) => {
+  // Handle form submission for trip details
+  const handleTripDetailsSubmit = async () => {
     if (!currentTrip) return;
     
     try {
-      const departureLocation = place?.formatted_address || locationString || '';
-      await updateTrip(currentTrip.id, {
-        departureLocation,
-        departure_latitude: place?.geometry?.location?.lat || null,
-        departure_longitude: place?.geometry?.location?.lng || null,
-      });
-      setSelectedDeparture(place);
+      const finalDestination = useSameDeparture 
+        ? 'same as departure location' 
+        : (selectedDestination?.formatted_address || formData.destination);
+      
+      const updateData = {
+        name: formData.name || undefined,
+        description: formData.description || undefined,
+        departure_location: selectedDeparture?.formatted_address || formData.departureLocation,
+        departure_latitude: selectedDeparture?.geometry?.location?.lat || null,
+        departure_longitude: selectedDeparture?.geometry?.location?.lng || null,
+        destination: finalDestination || undefined,
+        destination_latitude: useSameDeparture ? null : (selectedDestination?.geometry?.location?.lat || null),
+        destination_longitude: useSameDeparture ? null : (selectedDestination?.geometry?.location?.lng || null),
+        start_date: selectedRange.start?.toISOString().split('T')[0] || undefined,
+        end_date: selectedRange.end?.toISOString().split('T')[0] || undefined,
+      };
+
+      await updateTrip(currentTrip.id, updateData);
+      console.log('Trip details updated successfully');
     } catch (error) {
-      console.error('Failed to update departure location:', error);
+      console.error('Failed to update trip details:', error);
     }
   };
 
-  const handleDestinationUpdate = async (place: GooglePlace | null, locationString?: string) => {
-    if (!currentTrip) return;
+
+  const formatDateRange = () => {
+    if (!selectedRange.start) return 'Select dates';
+    if (!selectedRange.end) return selectedRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     
-    try {
-      const destination = useSameDeparture ? 'same as departure location' : (place?.formatted_address || locationString || '');
-      await updateTrip(currentTrip.id, {
-        destination,
-        destination_latitude: useSameDeparture ? null : (place?.geometry?.location?.lat || null),
-        destination_longitude: useSameDeparture ? null : (place?.geometry?.location?.lng || null),
-      });
-      setSelectedDestination(place);
-    } catch (error) {
-      console.error('Failed to update destination:', error);
-    }
+    const start = selectedRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const end = selectedRange.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${start} - ${end}`;
   };
 
-  const handleSameDepartureToggle = async (enabled: boolean) => {
-    setUseSameDeparture(enabled);
-    if (currentTrip) {
-      try {
-        await updateTrip(currentTrip.id, {
-          destination: enabled ? 'same as departure location' : '',
-          destination_latitude: null,
-          destination_longitude: null,
-        });
-      } catch (error) {
-        console.error('Failed to update destination setting:', error);
+  const getDuration = () => {
+    if (!selectedRange.start || !selectedRange.end) return null;
+    const diffTime = Math.abs(selectedRange.end.getTime() - selectedRange.start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => {
+      const newMonth = new Date(prev);
+      if (direction === 'prev') {
+        newMonth.setMonth(prev.getMonth() - 1);
+      } else {
+        newMonth.setMonth(prev.getMonth() + 1);
       }
-    }
-  };
-
-  // Handle date updates
-  const handleDateRangeUpdate = async (start: Date | null, end: Date | null) => {
-    if (!currentTrip) return;
-    
-    try {
-      await updateTrip(currentTrip.id, {
-        startDate: start?.toISOString().split('T')[0],
-        endDate: end?.toISOString().split('T')[0],
-      });
-      setSelectedRange({ start, end });
-    } catch (error) {
-      console.error('Failed to update dates:', error);
-    }
+      return newMonth;
+    });
   };
 
   const formatDeadline = (deadline: string) => {
@@ -306,6 +316,19 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
     return date > selectedRange.start && date < selectedRange.end;
   };
 
+  const handleDateRangeUpdate = (startDate: Date, endDate: Date) => {
+    // Auto-save the date range when both dates are selected
+    if (currentTrip && startDate && endDate) {
+      const updateData = {
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+      };
+      updateTrip(currentTrip.id, updateData).catch(error => {
+        console.error('Failed to update trip dates:', error);
+      });
+    }
+  };
+
   const handleDateClick = (date: Date) => {
     if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
       setSelectedRange({ start: date, end: null });
@@ -320,34 +343,6 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
         handleDateRangeUpdate(newRange.start, newRange.end);
       }
     }
-  };
-
-  const formatDateRange = () => {
-    if (!selectedRange.start) return 'Select dates';
-    if (!selectedRange.end) return selectedRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    
-    const start = selectedRange.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const end = selectedRange.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    return `${start} - ${end}`;
-  };
-
-  const getDuration = () => {
-    if (!selectedRange.start || !selectedRange.end) return null;
-    const diffTime = Math.abs(selectedRange.end.getTime() - selectedRange.start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return diffDays;
-  };
-
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentMonth(prev => {
-      const newMonth = new Date(prev);
-      if (direction === 'prev') {
-        newMonth.setMonth(prev.getMonth() - 1);
-      } else {
-        newMonth.setMonth(prev.getMonth() + 1);
-      }
-      return newMonth;
-    });
   };
 
   const renderCalendar = () => {
@@ -401,9 +396,7 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
   };
 
   const tabs = [
-    { key: 'general', label: 'General', icon: Settings },
-    { key: 'locations', label: 'Locations', icon: MapPin },
-    { key: 'dates', label: 'Dates', icon: Calendar },
+    { key: 'general', label: 'Trip Details', icon: Settings },
     { key: 'permissions', label: 'Permissions', icon: Users },
     { key: 'deadline', label: 'Deadline', icon: Clock },
   ];
@@ -485,183 +478,243 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
                       exit={{ opacity: 0, x: 20 }}
                       className="space-y-6"
                     >
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                          Trip Information
-                        </h3>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                              Trip Name
-                            </label>
+                      <div className="space-y-5">
+                        {/* Trip Name */}
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            Trip Name <span className="text-slate-400 font-normal">(optional)</span>
+                          </label>
+                          <div className="relative">
                             <input
                               type="text"
-                              value={currentTrip?.name || ''}
-                              onChange={(e) => currentTrip && updateTrip(currentTrip.id, { name: e.target.value }).catch(() => {})}
-                              className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
+                              value={formData.name}
+                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                              placeholder="Auto-generated from departure location if empty"
+                              className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
                             />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                              Description
-                            </label>
-                            <textarea
-                              value={currentTrip?.description || ''}
-                              onChange={(e) => currentTrip && updateTrip(currentTrip.id, { description: e.target.value }).catch(() => {})}
-                              rows={3}
-                              className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300 resize-none"
-                            />
+                            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                           </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  )}
 
-                  {activeTab === 'locations' && (
-                    <motion.div
-                      key="locations"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      className="space-y-6"
-                    >
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                          Trip Locations
-                        </h3>
-                        <div className="space-y-4">
-                          {/* Departure Location */}
-                          <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                              Departure Location <span className="text-red-400">*</span>
-                            </label>
-                            <PlaceSearchInput
-                              placeholder="Where are you departing from?"
-                              initialValue={currentTrip?.departureLocation || ''}
-                              onPlaceSelect={handleDepartureUpdate}
-                              icon={<Navigation className="w-5 h-5 text-primary-500" />}
-                            />
-                          </div>
-
-                          {/* Destination */}
-                          <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                              Destination
-                            </label>
-                            
-                            {/* Same as departure toggle */}
-                            <div className="mb-3">
-                              <label className="flex items-center space-x-3 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={useSameDeparture}
-                                  onChange={(e) => handleSameDepartureToggle(e.target.checked)}
-                                  className="w-5 h-5 text-primary-600 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 rounded focus:ring-primary-500 focus:ring-2"
-                                />
-                                <span className="text-sm text-slate-700 dark:text-slate-300">
-                                  Same as departure location (round trip)
-                                </span>
-                              </label>
-                            </div>
-
-                            {!useSameDeparture && (
-                              <PlaceSearchInput
-                                placeholder="Where are you going? (optional)"
-                                initialValue={currentTrip?.destination === 'same as departure location' ? '' : currentTrip?.destination || ''}
-                                onPlaceSelect={handleDestinationUpdate}
-                                icon={<MapPin className="w-5 h-5 text-secondary-500" />}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {activeTab === 'dates' && (
-                    <motion.div
-                      key="dates"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      className="space-y-6"
-                    >
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                          Travel Dates
-                        </h3>
-                        
-                        {/* Date Range Display */}
-                        <div className="mb-6">
-                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            Selected Dates <span className="text-red-400">*</span>
+                        {/* Departure Location */}
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            <MapPin className="w-4 h-4 inline mr-2 text-primary-500" />
+                            Departure Location *
                           </label>
-                          <div className="p-4 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-2xl border border-primary-200/50 dark:border-primary-800/50">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <Calendar className="w-5 h-5 text-primary-500" />
-                                <span className="font-semibold text-slate-900 dark:text-slate-100">
-                                  {formatDateRange()}
-                                </span>
+                          <PlaceSearchInput
+                            value={formData.departureLocation}
+                            onChange={(value) => setFormData({ ...formData, departureLocation: value })}
+                            onPlaceSelect={(place) => {
+                              setSelectedDeparture(place);
+                              setFormData({ ...formData, departureLocation: place?.name || '' });
+                            }}
+                            placeholder="e.g., Tokyo Station, New York JFK"
+                          />
+                        </div>
+
+                        {/* Destination */}
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            <MapPin className="w-4 h-4 inline mr-2 text-secondary-500" />
+                            Destination <span className="text-slate-400 font-normal">(optional)</span>
+                          </label>
+                          
+                          {/* Same as departure location option */}
+                          <motion.button
+                            type="button"
+                            onClick={() => {
+                              setUseSameDeparture(!useSameDeparture);
+                              if (!useSameDeparture) {
+                                setFormData({ ...formData, destination: '' });
+                                setSelectedDestination(null);
+                              }
+                            }}
+                            className={`w-full p-3 rounded-xl text-left transition-all duration-300 border-2 ${
+                              useSameDeparture
+                                ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-300 dark:border-primary-600/50 text-primary-700 dark:text-primary-300'
+                                : 'bg-slate-50/50 dark:bg-slate-700/50 border-slate-200/50 dark:border-slate-600/50 text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-700/80'
+                            }`}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                                useSameDeparture
+                                  ? 'border-primary-500 bg-primary-500'
+                                  : 'border-slate-300 dark:border-slate-600'
+                              }`}>
+                                {useSameDeparture && (
+                                  <motion.div
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="w-2 h-2 bg-white rounded-full"
+                                  />
+                                )}
                               </div>
+                              <div>
+                                <div className="text-sm font-medium">Same as departure location</div>
+                                <div className="text-xs opacity-75">
+                                  {useSameDeparture && formData.departureLocation 
+                                    ? `Return to ${formData.departureLocation}`
+                                    : 'Round trip returning to departure point'
+                                  }
+                                </div>
+                              </div>
+                            </div>
+                          </motion.button>
+
+                          {/* Custom destination input */}
+                          {!useSameDeparture && (
+                            <motion.div 
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="relative"
+                            >
+                              <PlaceSearchInput
+                                value={formData.destination}
+                                onChange={(value) => setFormData({ ...formData, destination: value })}
+                                onPlaceSelect={(place) => {
+                                  setSelectedDestination(place);
+                                  setFormData({ ...formData, destination: place?.name || '' });
+                                }}
+                                placeholder="Where are you going?"
+                              />
+                            </motion.div>
+                          )}
+                        </div>
+
+                        {/* Travel Dates */}
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            <Calendar className="w-4 h-4 inline mr-2 text-secondary-500" />
+                            Travel Dates <span className="text-red-500">*</span>
+                          </label>
+                          
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setShowDatePicker(!showDatePicker)}
+                              className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-left text-slate-900 dark:text-slate-100 hover:border-primary-300/50 dark:hover:border-primary-600/50 transition-all duration-300"
+                            >
+                              <span className={selectedRange.start ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500'}>
+                                {formatDateRange()}
+                              </span>
                               {getDuration() && (
-                                <span className="text-sm text-slate-600 dark:text-slate-400">
-                                  {getDuration()} {getDuration() === 1 ? 'day' : 'days'}
+                                <span className="ml-2 text-xs bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 px-2 py-1 rounded-lg">
+                                  {getDuration()} day{getDuration() !== 1 ? 's' : ''}
                                 </span>
                               )}
-                            </div>
+                            </button>
+
+                            <AnimatePresence>
+                              {showDatePicker && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                  className="absolute top-full mt-2 left-0 right-0 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl border border-slate-200/50 dark:border-slate-700/50 shadow-glass p-4 z-50"
+                                >
+                                  {/* Calendar Header */}
+                                  <div className="flex items-center justify-between mb-4">
+                                    <motion.button
+                                      type="button"
+                                      onClick={() => navigateMonth('prev')}
+                                      className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                      whileHover={{ scale: 1.1 }}
+                                      whileTap={{ scale: 0.9 }}
+                                    >
+                                      <ChevronLeft className="w-4 h-4" />
+                                    </motion.button>
+                                    
+                                    <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                                      {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                                    </h3>
+                                    
+                                    <motion.button
+                                      type="button"
+                                      onClick={() => navigateMonth('next')}
+                                      className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                      whileHover={{ scale: 1.1 }}
+                                      whileTap={{ scale: 0.9 }}
+                                    >
+                                      <ChevronRight className="w-4 h-4" />
+                                    </motion.button>
+                                  </div>
+
+                                  {/* Calendar Grid */}
+                                  <div className="grid grid-cols-7 gap-1 mb-2">
+                                    {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                                      <div key={day} className="h-8 flex items-center justify-center text-xs font-medium text-slate-500 dark:text-slate-400">
+                                        {day}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-7 gap-1">
+                                    {renderCalendar()}
+                                  </div>
+
+                                  {/* Calendar Footer */}
+                                  <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-700/50">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedRange({ start: null, end: null });
+                                      }}
+                                      className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                                    >
+                                      Clear
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowDatePicker(false)}
+                                      className="px-4 py-2 bg-gradient-to-r from-primary-500 to-secondary-600 text-white text-sm rounded-xl hover:from-primary-600 hover:to-secondary-700 transition-all"
+                                    >
+                                      Done
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         </div>
 
-                        {/* Calendar */}
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 p-4">
-                          {/* Calendar Header */}
-                          <div className="flex items-center justify-between mb-4">
-                            <motion.button
-                              onClick={() => navigateMonth('prev')}
-                              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                            >
-                              ←
-                            </motion.button>
-                            <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                              {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                            </h4>
-                            <motion.button
-                              onClick={() => navigateMonth('next')}
-                              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                            >
-                              →
-                            </motion.button>
+                        {/* Description */}
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                            Description <span className="text-slate-400 font-normal">(optional)</span>
+                          </label>
+                          <div className="relative">
+                            <textarea
+                              value={formData.description}
+                              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                              rows={3}
+                              placeholder="Tell us about your trip plans..."
+                              className="w-full px-4 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300 resize-none"
+                            />
+                            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary-500/10 to-secondary-500/10 opacity-0 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                           </div>
+                        </div>
 
-                          {/* Weekday Headers */}
-                          <div className="grid grid-cols-7 gap-1 mb-2">
-                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                              <div key={day} className="h-10 flex items-center justify-center">
-                                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                                  {day}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Calendar Grid */}
-                          <div className="grid grid-cols-7 gap-1">
-                            {renderCalendar()}
-                          </div>
-
-                          {/* Instructions */}
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 text-center">
-                            Click a date to start, then click another date to set your travel period
-                          </p>
+                        {/* Save Button */}
+                        <div className="pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
+                          <motion.button
+                            type="button"
+                            onClick={handleTripDetailsSubmit}
+                            className="w-full px-6 py-3 bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-600 text-white rounded-2xl hover:from-primary-600 hover:via-secondary-600 hover:to-primary-700 transition-all duration-300 font-semibold shadow-glow hover:shadow-glow-lg relative overflow-hidden group"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                            <span className="relative z-10">Save Trip Details</span>
+                          </motion.button>
                         </div>
                       </div>
                     </motion.div>
                   )}
+
 
                   {activeTab === 'permissions' && (
                     <motion.div
