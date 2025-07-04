@@ -247,16 +247,33 @@ export const useStore = create<StoreState>()((set, get) => ({
           if (updates.end_date !== undefined) updateData.end_date = updates.end_date;
           if (updates.addPlaceDeadline !== undefined) updateData.add_place_deadline = updates.addPlaceDeadline;
 
-          console.log('Updating trip via API with data:', updateData);
+          console.log('🚀 Updating trip via API with data:', updateData);
+          console.log('🔑 Current auth session check...');
+          
+          const { data: session, error: sessionError } = await supabase.auth.getSession();
+          console.log('📊 Session status:', {
+            has_session: !!session?.session,
+            user_id: session?.session?.user?.id,
+            session_error: sessionError
+          });
           
           // Call trip-management Edge Function with PUT method
+          console.log('📞 Calling Edge Function...');
           const { data, error } = await supabase.functions.invoke('trip-management', {
             body: updateData,
             method: 'PUT'
           });
 
+          console.log('📥 Edge Function response:', { data, error });
+
           if (error) {
-            console.error('Failed to update trip via API:', error);
+            console.error('❌ Failed to update trip via API:', error);
+            console.error('❌ Error details:', {
+              message: error.message,
+              details: error.details,
+              hint: error.hint,
+              code: error.code
+            });
             throw new Error(error.message || 'Failed to update trip');
           }
           

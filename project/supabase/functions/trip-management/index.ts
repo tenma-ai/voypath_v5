@@ -41,19 +41,34 @@ interface TripUpdateRequest {
 }
 
 serve(async (req) => {
+  console.log('🚀 trip-management function called - version 15.1', {
+    method: req.method,
+    url: req.url,
+    timestamp: new Date().toISOString()
+  });
+  
   // CORS対応
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    // Header logging for debugging
+    const authHeader = req.headers.get('Authorization');
+    console.log('🔑 Request headers debug:', {
+      method: req.method,
+      url: req.url,
+      has_auth_header: !!authHeader,
+      auth_header_preview: authHeader ? authHeader.substring(0, 20) + '...' : null
+    });
+
     // Supabase クライアント初期化
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader! },
         },
       }
     );
@@ -64,9 +79,23 @@ serve(async (req) => {
       error: userError,
     } = await supabaseClient.auth.getUser();
 
+    console.log('🔐 Authentication check:', {
+      user_id: user?.id,
+      user_email: user?.email,
+      user_error: userError,
+      has_user: !!user
+    });
+
     if (userError || !user) {
+      console.log('❌ Authentication failed:', { userError, user });
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ 
+          error: 'Unauthorized',
+          debug: {
+            user_error: userError,
+            has_user: !!user
+          }
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
@@ -79,6 +108,12 @@ serve(async (req) => {
     const pathSegments = url.pathname.split('/').filter(Boolean);
 
     // ルーティング
+    console.log('🔀 Routing request:', {
+      method,
+      pathSegments,
+      user_id: user.id
+    });
+    
     switch (method) {
       case 'POST':
         return await handleCreateTrip(req, supabaseClient, user.id);
@@ -94,6 +129,7 @@ serve(async (req) => {
         }
       
       case 'PUT':
+        console.log('🔄 Processing PUT request for trip update');
         return await handleUpdateTrip(req, supabaseClient, user.id);
       
       case 'DELETE':
@@ -105,8 +141,9 @@ serve(async (req) => {
         }
       
       default:
+        console.log('❌ Method not allowed:', method);
         return new Response(
-          JSON.stringify({ error: 'Method not allowed' }),
+          JSON.stringify({ error: 'Method not allowed', method }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 405,
@@ -355,6 +392,12 @@ async function handleGetTrip(supabase: any, userId: string, tripId: string) {
 async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
   const requestData: TripUpdateRequest = await req.json();
   
+  console.log('🔍 handleUpdateTrip called with:', {
+    trip_id: requestData.trip_id,
+    user_id: userId,
+    request_keys: Object.keys(requestData)
+  });
+  
   if (!requestData.trip_id) {
     throw new Error('Trip ID is required');
   }
@@ -366,12 +409,24 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
     .eq('id', requestData.trip_id)
     .single();
 
+  console.log('🔍 Trip ownership check:', {
+    trip_data: trip,
+    check_error: checkError,
+    trip_id: requestData.trip_id
+  });
+
   if (checkError) {
+    console.log('❌ Trip not found error:', checkError);
     throw new Error(`Trip not found: ${checkError.message}`);
   }
 
   // Check if user is owner
   const isOwner = trip.owner_id === userId;
+  console.log('🔍 Owner check:', {
+    trip_owner_id: trip.owner_id,
+    current_user_id: userId,
+    is_owner: isOwner
+  });
   
   // Check if user is admin member
   let isAdmin = false;
@@ -383,14 +438,36 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
       .eq('user_id', userId)
       .single();
     
+    console.log('🔍 Member role check:', {
+      membership_data: membership,
+      member_error: memberError,
+      trip_id: requestData.trip_id,
+      user_id: userId
+    });
+    
     if (!memberError && membership) {
       isAdmin = membership.role === 'admin';
     }
   }
 
+  console.log('🔍 Final permission check:', {
+    is_owner: isOwner,
+    is_admin: isAdmin,
+    has_permission: isOwner || isAdmin
+  });
+
   if (!isOwner && !isAdmin) {
+    console.log('❌ Permission denied for user:', userId);
     return new Response(
-      JSON.stringify({ error: 'Insufficient permissions - only trip owner or admin can edit trip details' }),
+      JSON.stringify({ 
+        error: 'Insufficient permissions - only trip owner or admin can edit trip details',
+        debug: {
+          user_id: userId,
+          trip_owner_id: trip.owner_id,
+          is_owner: isOwner,
+          is_admin: isAdmin
+        }
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,
