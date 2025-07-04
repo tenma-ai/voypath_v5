@@ -1274,11 +1274,11 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Get trip details including dates
+    // Get trip details including dates and locations
     console.log(`🔍 Fetching trip details for ${trip_id}`);
     const { data: tripData, error: tripError } = await supabase
       .from('trips')
-      .select('start_date, end_date')
+      .select('start_date, end_date, departure_location, destination, departure_latitude, departure_longitude, destination_latitude, destination_longitude')
       .eq('id', trip_id)
       .single();
       
@@ -1326,13 +1326,59 @@ Deno.serve(async (req) => {
     }
     
     if (places.length === 0) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'No places found for optimization'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      });
+      console.log('🏠 No user places found - generating system places from trip data');
+      
+      // Generate system places from trip departure_location and destination
+      const systemPlaces = [];
+      
+      // Create departure place
+      if (tripData.departure_location) {
+        systemPlaces.push({
+          id: `departure_${trip_id}`,
+          name: tripData.departure_location,
+          category: 'departure_point',
+          source: 'system',
+          latitude: tripData.departure_latitude || 35.6762, // Default to Tokyo if no coordinates
+          longitude: tripData.departure_longitude || 139.6503,
+          stay_duration_minutes: 60, // 1 hour at departure
+          wish_level: 5, // High priority for system places
+          user_id: member_id,
+          trip_id: trip_id
+        });
+      }
+      
+      // Create destination place
+      if (tripData.destination && tripData.destination !== 'same as departure location') {
+        systemPlaces.push({
+          id: `destination_${trip_id}`,
+          name: tripData.destination,
+          category: 'final_destination',
+          source: 'system',
+          latitude: tripData.destination_latitude || tripData.departure_latitude || 35.6762,
+          longitude: tripData.destination_longitude || tripData.departure_longitude || 139.6503,
+          stay_duration_minutes: 60, // 1 hour at destination
+          wish_level: 5, // High priority for system places
+          user_id: member_id,
+          trip_id: trip_id
+        });
+      } else if (tripData.departure_location) {
+        // Round trip - create return to departure
+        systemPlaces.push({
+          id: `return_${trip_id}`,
+          name: `Return to ${tripData.departure_location}`,
+          category: 'final_destination',
+          source: 'system',
+          latitude: tripData.departure_latitude || 35.6762,
+          longitude: tripData.departure_longitude || 139.6503,
+          stay_duration_minutes: 60, // 1 hour at return destination
+          wish_level: 5, // High priority for system places
+          user_id: member_id,
+          trip_id: trip_id
+        });
+      }
+      
+      places = systemPlaces;
+      console.log(`✅ Generated ${systemPlaces.length} system places: ${systemPlaces.map(p => p.name).join(', ')}`);
     }
     
     // デバッグ：全ての場所の詳細をログ出力

@@ -41,7 +41,7 @@ interface TripUpdateRequest {
 }
 
 serve(async (req) => {
-  console.log('🚀 trip-management function called - version 15.1', {
+  console.log('🚀 trip-management function called - version 15.2', {
     method: req.method,
     url: req.url,
     timestamp: new Date().toISOString()
@@ -155,8 +155,18 @@ serve(async (req) => {
       error_message: error.message,
       error_stack: error.stack,
       error_type: error.constructor.name,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      method: req.method,
+      url: req.url
     });
+    
+    // Log the request body if available for debugging
+    try {
+      const bodyText = await req.clone().text();
+      console.error('📦 Request body that caused error:', bodyText);
+    } catch (bodyError) {
+      console.error('❌ Could not read request body for debugging:', bodyError.message);
+    }
     
     // Provide detailed error response
     return new Response(
@@ -166,7 +176,8 @@ serve(async (req) => {
           type: error.constructor.name,
           timestamp: new Date().toISOString(),
           method: req.method,
-          url: req.url
+          url: req.url,
+          stack: error.stack
         }
       }),
       {
@@ -409,17 +420,25 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
   
   try {
     const bodyText = await req.text();
-    console.log('📦 Raw request body:', bodyText);
+    console.log('📦 Raw request body (length: ' + bodyText.length + '):', bodyText);
+    
+    if (!bodyText || bodyText.trim() === '') {
+      throw new Error('Request body is empty');
+    }
+    
     requestData = JSON.parse(bodyText);
+    console.log('📦 Parsed request data:', JSON.stringify(requestData, null, 2));
   } catch (parseError) {
     console.error('❌ JSON parse error:', parseError);
+    console.error('❌ Body text that failed to parse:', bodyText);
     throw new Error(`Invalid JSON in request body: ${parseError.message}`);
   }
   
   console.log('🔍 handleUpdateTrip called with:', {
     trip_id: requestData.trip_id,
     user_id: userId,
-    request_keys: Object.keys(requestData)
+    request_keys: Object.keys(requestData),
+    data_values: requestData
   });
   
   if (!requestData.trip_id) {
@@ -427,6 +446,7 @@ async function handleUpdateTrip(req: Request, supabase: any, userId: string) {
   }
 
   // 更新権限確認（所有者またはadmin）
+  console.log('🔍 Checking trip ownership for trip_id:', requestData.trip_id);
   const { data: trip, error: checkError } = await supabase
     .from('trips')
     .select('owner_id')
