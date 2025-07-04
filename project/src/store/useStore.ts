@@ -232,20 +232,21 @@ export const useStore = create<StoreState>()((set, get) => ({
           };
 
           // Handle both camelCase and snake_case field names for compatibility
-          if (updates.name !== undefined) updateData.name = updates.name;
-          if (updates.description !== undefined) updateData.description = updates.description;
-          if (updates.departureLocation !== undefined) updateData.departure_location = updates.departureLocation;
-          if (updates.departure_location !== undefined) updateData.departure_location = updates.departure_location;
+          // Only include fields that are not undefined and not null
+          if (updates.name !== undefined && updates.name !== null) updateData.name = updates.name;
+          if (updates.description !== undefined && updates.description !== null) updateData.description = updates.description;
+          if (updates.departureLocation !== undefined && updates.departureLocation !== null) updateData.departure_location = updates.departureLocation;
+          if (updates.departure_location !== undefined && updates.departure_location !== null) updateData.departure_location = updates.departure_location;
           if (updates.departure_latitude !== undefined) updateData.departure_latitude = updates.departure_latitude;
           if (updates.departure_longitude !== undefined) updateData.departure_longitude = updates.departure_longitude;
-          if (updates.destination !== undefined) updateData.destination = updates.destination;
+          if (updates.destination !== undefined && updates.destination !== null) updateData.destination = updates.destination;
           if (updates.destination_latitude !== undefined) updateData.destination_latitude = updates.destination_latitude;
           if (updates.destination_longitude !== undefined) updateData.destination_longitude = updates.destination_longitude;
-          if (updates.startDate !== undefined) updateData.start_date = updates.startDate;
-          if (updates.start_date !== undefined) updateData.start_date = updates.start_date;
-          if (updates.endDate !== undefined) updateData.end_date = updates.endDate;
-          if (updates.end_date !== undefined) updateData.end_date = updates.end_date;
-          if (updates.addPlaceDeadline !== undefined) updateData.add_place_deadline = updates.addPlaceDeadline;
+          if (updates.startDate !== undefined && updates.startDate !== null) updateData.start_date = updates.startDate;
+          if (updates.start_date !== undefined && updates.start_date !== null) updateData.start_date = updates.start_date;
+          if (updates.endDate !== undefined && updates.endDate !== null) updateData.end_date = updates.endDate;
+          if (updates.end_date !== undefined && updates.end_date !== null) updateData.end_date = updates.end_date;
+          if (updates.addPlaceDeadline !== undefined && updates.addPlaceDeadline !== null) updateData.add_place_deadline = updates.addPlaceDeadline;
 
           console.log('🚀 Updating trip via API with data:', updateData);
           console.log('🔑 Current auth session check...');

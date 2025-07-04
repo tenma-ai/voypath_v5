@@ -108,19 +108,31 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
         ? 'same as departure location' 
         : (selectedDestination?.formatted_address || formData.destination);
       
-      const tripUpdateData = {
+      const tripUpdateData: any = {
         ...(editMode && tripData?.id ? { trip_id: tripData.id } : {}),
         departure_location: departureLocation,
         departure_latitude: selectedDeparture?.geometry?.location?.lat || null,
         departure_longitude: selectedDeparture?.geometry?.location?.lng || null,
-        name: formData.name || undefined,
-        description: formData.description || undefined,
-        destination: finalDestination || undefined,
         destination_latitude: useSameDeparture ? null : (selectedDestination?.geometry?.location?.lat || null),
         destination_longitude: useSameDeparture ? null : (selectedDestination?.geometry?.location?.lng || null),
-        start_date: selectedRange.start?.toISOString().split('T')[0] || undefined,
-        end_date: selectedRange.end?.toISOString().split('T')[0] || undefined,
       };
+
+      // Only include optional fields if they have values
+      if (formData.name && formData.name.trim()) {
+        tripUpdateData.name = formData.name;
+      }
+      if (formData.description && formData.description.trim()) {
+        tripUpdateData.description = formData.description;
+      }
+      if (finalDestination && finalDestination.trim()) {
+        tripUpdateData.destination = finalDestination;
+      }
+      if (selectedRange.start) {
+        tripUpdateData.start_date = selectedRange.start.toISOString().split('T')[0];
+      }
+      if (selectedRange.end) {
+        tripUpdateData.end_date = selectedRange.end.toISOString().split('T')[0];
+      }
 
       console.log('Trip form data being sent:', tripUpdateData);
       console.log('Edit mode:', editMode, 'Trip ID:', tripData?.id);
