@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { X, Key } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 
@@ -14,7 +15,8 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
   const [joinCode, setJoinCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { initializeFromDatabase, canJoinTrip } = useStore();
+  const navigate = useNavigate();
+  const { initializeFromDatabase, canJoinTrip, setCurrentTrip } = useStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,9 +96,17 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
       // Refresh trips data from database
       await initializeFromDatabase();
       
+      // Set the joined trip as current trip
+      setCurrentTrip(data.trip);
+      
       alert(`Trip joined successfully! Welcome to "${data.trip.name}"`);
       onClose();
       setJoinCode('');
+      
+      // Navigate to the plan page after a brief delay
+      setTimeout(() => {
+        navigate('/my-trip');
+      }, 100);
     } catch (error) {
       // Error occurred
       setError(error instanceof Error ? error.message : 'Failed to join trip');
