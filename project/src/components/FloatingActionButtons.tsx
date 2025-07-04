@@ -144,7 +144,6 @@ export function FloatingActionButtons() {
     <>
       {/* Optimize Route Button - Bottom position */}
       <div className="fixed bottom-20 right-4 z-40 flex flex-col items-center">
-        <div className="fixed bottom-20 right-4 z-40 flex flex-col items-center">
         <motion.button
           whileHover={{ scale: 1.05, y: -2 }}
           whileTap={{ scale: 0.95 }}
@@ -235,8 +234,7 @@ export function FloatingActionButtons() {
             )}
           </div>
         </motion.button>
-        
-        </div>
+      </div>
 
       {/* Add Place Button - Top position, show if deadline hasn't passed */}
       {!isDeadlinePassed() && (
