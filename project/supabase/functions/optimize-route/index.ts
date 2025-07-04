@@ -341,9 +341,9 @@ function removeOneRandomPlacePerUser(places) {
 async function iterativelyOptimizeWithDateConstraints(places, availableDays, tripStartDate, supabase) {
   console.log(`🔄 Starting efficient optimization with ${places.length} places and ${availableDays} days limit (airports included, 8:00 start time)`);
   
-  // 実行時間制限を考慮（25秒でタイムアウト）
+  // 実行時間制限を考慮（50秒でタイムアウト - Edge Function限界の60秒より余裕を持たせる）
   const startTime = Date.now();
-  const maxExecutionTime = 25000; // 25秒
+  const maxExecutionTime = 50000; // 50秒
   
   // システムプレースを事前に分離・保護（検出条件を強化）
   const systemPlaces = places.filter((p) => {
@@ -371,7 +371,8 @@ async function iterativelyOptimizeWithDateConstraints(places, availableDays, tri
       (p.name && (p.name.toLowerCase().includes('departure') || p.name.toLowerCase().includes('destination')))
     );
     
-    if (isUser) {
+    // Skip logging for performance when many places
+    if (isUser && userPlaces.length <= 20) {
       console.log(`👤 User place: ${p.name} (category: ${p.category || 'none'}, user: ${p.user_id})`);
     }
     
@@ -382,7 +383,7 @@ async function iterativelyOptimizeWithDateConstraints(places, availableDays, tri
   systemPlaces.forEach(p => console.log(`  - System: ${p.name} (${p.category || p.place_type || 'unknown'})`));
   
   let iteration = 0;
-  const maxIterations = 10; // 大幅に削減
+  const maxIterations = Math.min(10, Math.ceil(userPlaces.length / 5)); // 場所数に応じて調整、最大10回
   
   // 事前計算でパフォーマンス向上
   let lastValidResult = null;
@@ -447,11 +448,14 @@ async function iterativelyOptimizeWithDateConstraints(places, availableDays, tri
       
       // 効率的な場所削除（希望度の低いものから）
       userPlaces.sort((a, b) => (a.normalized_wish_level || 1) - (b.normalized_wish_level || 1));
-      const toRemove = Math.max(1, Math.ceil(userPlaces.length * 0.2)); // 20%ずつ削除
+      const toRemove = Math.max(1, Math.ceil(userPlaces.length * 0.3)); // 30%ずつ削除（より積極的に）
       const removed = userPlaces.splice(0, toRemove);
       
-      console.log(`🗑️ Removed ${removed.length} user places:`);
-      removed.forEach(p => console.log(`  - ${p.name} (wish_level: ${p.normalized_wish_level || 'N/A'})`));
+      console.log(`🗑️ Removed ${removed.length} user places`);
+      // 詳細ログは場所が少ない時のみ
+      if (removed.length <= 10) {
+        removed.forEach(p => console.log(`  - ${p.name} (wish_level: ${p.normalized_wish_level || 'N/A'})`));
+      }
       
     } catch (error) {
       console.error(`❌ Error in iteration ${iteration}:`, error.message);

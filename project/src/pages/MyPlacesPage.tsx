@@ -52,20 +52,10 @@ export function MyPlacesPage() {
     // For "My Places" tab, users can always edit their own places
     if (activeTab === 'my') return true;
     
-    // For "Trip Places" tab, check permissions
+    // For "Trip Places" tab, users can only edit their own places
     if (activeTab === 'trip') {
-      // Trip owner can edit any place
-      if (currentTrip.ownerId === user.id) return true;
-      
-      // Users can edit their own places
+      // Users can only edit their own places
       if (place.user_id === user.id || place.userId === user.id) return true;
-      
-      // Check if user is an admin or has edit permissions
-      const userMember = tripMembers.find(m => m.user_id === user.id);
-      if (userMember) {
-        if (userMember.role === 'admin') return true;
-        if (userMember.can_edit_places === true) return true;
-      }
     }
     
     return false;
