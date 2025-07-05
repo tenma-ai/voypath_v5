@@ -746,6 +746,22 @@ async function findNearestAirportFallback(lat, lng) {
   };
 }
 
+// 時間帯別事前ソート（距離最適化前）
+function sortPlacesByTimePreference(places) {
+  const timeOrder = {
+    'morning': 1,
+    'noon': 2, 
+    'afternoon': 3,
+    'night': 4
+  };
+  
+  return places.sort((a, b) => {
+    const aTime = a.preferred_time_of_day ? timeOrder[a.preferred_time_of_day] || 5 : 5;
+    const bTime = b.preferred_time_of_day ? timeOrder[b.preferred_time_of_day] || 5 : 5;
+    return aTime - bTime;
+  });
+}
+
 // シンプルなTSP（最短距離貪欲法）- 順序修正版
 function optimizeRouteOrder(places) {
   console.log(`🗺️ Optimizing route order for ${places.length} places`);
@@ -805,8 +821,9 @@ function optimizeRouteOrder(places) {
     console.warn(`⚠️ No departure point found in ${places.length} places`);
   }
   
-  // 2. 貪欲法で中間地点を最適化
-  const remaining = [...others];
+  // 2. 時間帯別事前ソート → 貪欲法で中間地点を最適化
+  const sortedOthers = sortPlacesByTimePreference(others);
+  const remaining = [...sortedOthers];
   let current = departure || (others.length > 0 ? others[0] : null);
   
   while (remaining.length > 0 && current) {
@@ -1073,59 +1090,6 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
   return schedules;
 }
 
-// Sort places by preferred time of day while preserving system places order
-function sortPlacesByTimePreference(places) {
-  // Separate system places and user places
-  const systemPlaces = [];
-  const userPlaces = [];
-  
-  places.forEach(place => {
-    const isSystemPlace = (
-      place.source === 'system' || 
-      place.category === 'departure_point' || 
-      place.category === 'final_destination' ||
-      place.place_type === 'system_airport' ||
-      (place.id && place.id.toString().startsWith('airport_')) ||
-      (place.id && place.id.toString().startsWith('return_'))
-    );
-    
-    if (isSystemPlace) {
-      systemPlaces.push(place);
-    } else {
-      userPlaces.push(place);
-    }
-  });
-  
-  // Time preference order map
-  const timeOrder = {
-    'morning': 1,
-    'noon': 2,
-    'afternoon': 3,
-    'night': 4
-  };
-  
-  // Sort user places by preferred time of day
-  const sortedUserPlaces = userPlaces.sort((a, b) => {
-    const aTime = a.preferred_time_of_day ? timeOrder[a.preferred_time_of_day] || 5 : 5;
-    const bTime = b.preferred_time_of_day ? timeOrder[b.preferred_time_of_day] || 5 : 5;
-    return aTime - bTime;
-  });
-  
-  // If the day starts with departure, keep it first
-  if (systemPlaces.length > 0 && systemPlaces[0].category === 'departure_point') {
-    return [systemPlaces[0], ...sortedUserPlaces, ...systemPlaces.slice(1)];
-  }
-  
-  // If the day ends with destination, keep it last
-  const lastSystemPlace = systemPlaces[systemPlaces.length - 1];
-  if (systemPlaces.length > 0 && (lastSystemPlace.category === 'final_destination' || lastSystemPlace.category === 'destination')) {
-    return [...systemPlaces.slice(0, -1), ...sortedUserPlaces, lastSystemPlace];
-  }
-  
-  // Otherwise, keep system places at their original positions
-  return [...systemPlaces, ...sortedUserPlaces];
-}
-
 function createDaySchedule(day, places, tripStartDate = null) {
   let date;
   if (tripStartDate) {
@@ -1136,27 +1100,12 @@ function createDaySchedule(day, places, tripStartDate = null) {
     date.setDate(date.getDate() + day - 1);
   }
   
-  // Sort places by preferred time of day within the day
-  const sortedPlaces = sortPlacesByTimePreference(places);
-  
-  // Recalculate travel times after sorting
-  for (let i = 1; i < sortedPlaces.length; i++) {
-    const prev = sortedPlaces[i - 1];
-    const curr = sortedPlaces[i];
-    const distance = calculateDistance([prev.latitude, prev.longitude], [curr.latitude, curr.longitude]);
-    const transportMode = determineTransportMode(distance, prev.is_airport, curr.is_airport);
-    const travelTime = calculateTravelTime(distance, transportMode);
-    
-    curr.transport_mode = transportMode;
-    curr.travel_time_from_previous = travelTime;
-  }
-  
   return {
     day,
     date: date.toISOString().split('T')[0],
-    scheduled_places: sortedPlaces,
-    total_travel_time: sortedPlaces.reduce((sum, p) => sum + (p.travel_time_from_previous || 0), 0),
-    total_visit_time: sortedPlaces.reduce((sum, p) => sum + p.stay_duration_minutes, 0),
+    scheduled_places: places,
+    total_travel_time: places.reduce((sum, p) => sum + (p.travel_time_from_previous || 0), 0),
+    total_visit_time: places.reduce((sum, p) => sum + p.stay_duration_minutes, 0),
     meal_breaks: []
   };
 }

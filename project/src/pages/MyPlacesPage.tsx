@@ -221,6 +221,38 @@ export function MyPlacesPage() {
     ));
   };
 
+  const getTimeIcon = (timeOfDay: string | null) => {
+    if (!timeOfDay) return null;
+    const iconMap = {
+      'morning': '/icons8-morning-48.png',
+      'noon': '/icons8-midday-48.png', 
+      'afternoon': '/icons8-afternoon-32.png',
+      'night': '/icons8-night-66.png'
+    };
+    return iconMap[timeOfDay] || null;
+  };
+
+  const getTimeLabel = (timeOfDay: string | null) => {
+    if (!timeOfDay) return null;
+    const labelMap = {
+      'morning': 'Morning',
+      'noon': 'Noon',
+      'afternoon': 'Afternoon', 
+      'night': 'Night'
+    };
+    return labelMap[timeOfDay] || null;
+  };
+
+  const isSystemPlace = (place: any) => {
+    return place.source === 'system' || 
+           place.source === 'system_old' ||
+           place.category === 'departure_point' || 
+           place.category === 'final_destination' ||
+           place.place_type === 'departure' ||
+           place.place_type === 'destination' ||
+           place.place_type === 'system_airport';
+  };
+
   const handleEditPlace = (place: any) => {
     // Convert place to GooglePlace format for PlaceSearchToDetail
     const googlePlaceFormat = {
@@ -593,6 +625,19 @@ export function MyPlacesPage() {
                           </span>
                         </div>
                       </div>
+
+                      {/* Preferred Time (Trip Places only, non-system) */}
+                      {activeTab === 'trip' && place.preferred_time_of_day && !isSystemPlace(place) && (
+                        <div>
+                          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Preferred Time</div>
+                          <div className="flex items-center space-x-1 mt-1">
+                            <img src={getTimeIcon(place.preferred_time_of_day)} alt={getTimeLabel(place.preferred_time_of_day)} className="w-3 h-3" />
+                            <span className="text-sm text-slate-900 dark:text-slate-100">
+                              {getTimeLabel(place.preferred_time_of_day)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="text-xs text-slate-400 text-center">
@@ -634,6 +679,15 @@ export function MyPlacesPage() {
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
                         {place.address}
                       </p>
+                      {/* Preferred Time (Trip Places only, non-system) */}
+                      {activeTab === 'trip' && place.preferred_time_of_day && !isSystemPlace(place) && (
+                        <div className="flex items-center space-x-1 mt-1">
+                          <img src={getTimeIcon(place.preferred_time_of_day)} alt={getTimeLabel(place.preferred_time_of_day)} className="w-3 h-3" />
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {getTimeLabel(place.preferred_time_of_day)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2">
                       {(() => {

@@ -270,6 +270,34 @@ export function ListView() {
     return categoryIcons[event.category?.toLowerCase()] || categoryIcons.default;
   };
 
+  const getTimeIcon = (timeOfDay: string | null) => {
+    if (!timeOfDay) return null;
+    const iconMap = {
+      'morning': '/icons8-morning-48.png',
+      'noon': '/icons8-midday-48.png', 
+      'afternoon': '/icons8-afternoon-32.png',
+      'night': '/icons8-night-66.png'
+    };
+    return iconMap[timeOfDay] || null;
+  };
+
+  const getTimeLabel = (timeOfDay: string | null) => {
+    if (!timeOfDay) return null;
+    const labelMap = {
+      'morning': 'Morning',
+      'noon': 'Noon',
+      'afternoon': 'Afternoon', 
+      'night': 'Night'
+    };
+    return labelMap[timeOfDay] || null;
+  };
+
+  const isSystemPlace = (event: ScheduleEvent) => {
+    return event.category === 'departure' || 
+           event.category === 'destination' || 
+           event.category === 'airport';
+  };
+
   const selectedSchedule = schedule.find(s => s.date === selectedDay) || schedule[0];
 
   const handleAddPlace = (place: GooglePlace) => {
@@ -466,6 +494,26 @@ export function ListView() {
                               ) : null}
                             </div>
                           )}
+
+                          {/* Preferred Time Display (non-system places only) */}
+                          {event.type === 'place' && !isSystemPlace(event) && (() => {
+                            const place = tripPlaces.find(p => p.id === event.id);
+                            const timeOfDay = place?.preferred_time_of_day;
+                            const timeIcon = getTimeIcon(timeOfDay);
+                            const timeLabel = getTimeLabel(timeOfDay);
+                            
+                            if (timeIcon && timeLabel) {
+                              return (
+                                <div className="mt-1 flex items-center space-x-1">
+                                  <img src={timeIcon} alt={timeLabel} className="w-3 h-3" />
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {timeLabel}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                           
                           {/* Expandable Details */}
                           {event.type === 'place' && !isCollapsed && event.description && (
