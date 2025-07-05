@@ -354,6 +354,55 @@ export function MyPlacesPage() {
     };
   };
 
+  // Helper function for time icon
+  const getTimeIcon = (timeOfDay: string | null) => {
+    if (!timeOfDay) return null;
+    const iconMap = {
+      'morning': '/icons8-morning-48.png',
+      'noon': '/icons8-midday-48.png', 
+      'afternoon': '/icons8-afternoon-32.png',
+      'night': '/icons8-night-66.png'
+    };
+    return iconMap[timeOfDay] || null;
+  };
+
+  // Helper function for time label
+  const getTimeLabel = (timeOfDay: string | null) => {
+    if (!timeOfDay) return null;
+    const labelMap = {
+      'morning': 'Morning',
+      'noon': 'Noon',
+      'afternoon': 'Afternoon', 
+      'night': 'Night'
+    };
+    return labelMap[timeOfDay] || null;
+  };
+
+  // Helper function to detect system places
+  const isSystemPlace = (place: any) => {
+    return place.source === 'system' ||
+           place.category === 'departure_point' ||
+           place.category === 'destination_point' ||
+           place.category === 'return_point' ||
+           place.place_type === 'departure' ||
+           place.place_type === 'destination' ||
+           place.place_type === 'airport';
+  };
+
+  // Helper function to render stars
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star
+        key={i}
+        className={`w-3 h-3 ${
+          i < Math.floor(rating)
+            ? 'text-yellow-400 fill-current'
+            : 'text-slate-300 dark:text-slate-600'
+        }`}
+      />
+    ));
+  };
+
   // Show message if no trip is selected
   if (!currentTrip) {
     return (
@@ -626,7 +675,7 @@ export function MyPlacesPage() {
                         </div>
                       </div>
 
-                      {/* Preferred Time (Trip Places only, non-system) */}
+                      {/* Preferred Time (Trip Places only, non-system) - Card Back */}
                       {activeTab === 'trip' && place.preferred_time_of_day && !isSystemPlace(place) && (
                         <div>
                           <div className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Preferred Time</div>
