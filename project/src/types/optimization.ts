@@ -61,6 +61,7 @@ export interface Place {
   scheduled_time_end?: string;
   visit_date?: string;
   preferred_time_slots?: string[];
+  preferred_time_of_day?: 'morning' | 'noon' | 'afternoon' | 'night';
   transport_mode?: string;
   travel_time_from_previous?: number;
   notes?: string;

@@ -52,7 +52,8 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
           budget: 2,
           timeSlot: 'any',
           visitDate: '',
-          notes: ''         // Should be loaded from existing place
+          notes: '',         // Should be loaded from existing place
+          preferredTimeOfDay: null // Should be loaded from existing place
         });
       }
       
@@ -72,7 +73,8 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
     budget: 2,
     timeSlot: 'any',
     visitDate: getInitialVisitDate(),
-    notes: ''
+    notes: '',
+    preferredTimeOfDay: null as 'morning' | 'noon' | 'afternoon' | 'night' | null
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -122,6 +124,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
           notes: formData.notes || '',
           wish_level: formData.visitPriority,
           stay_duration_minutes: formData.duration,
+          preferred_time_of_day: formData.preferredTimeOfDay,
           updated_at: new Date().toISOString()
         });
         // Log message
@@ -159,6 +162,7 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
           estimated_cost: formData.budget * 10, // Rough estimate
           image_url: await pixabayService.getPlacePhoto(selectedPlace.name),
           images: await pixabayService.getPlacePhotos(selectedPlace.name, 5),
+          preferred_time_of_day: formData.preferredTimeOfDay,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -373,6 +377,50 @@ export function PlaceSearchToDetail({ onCancel, onComplete, className = "" }: Pl
                       onChange={(duration) => setFormData({ ...formData, duration })}
                       className="w-full"
                     />
+                  </div>
+
+                  {/* Preferred Time of Day */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Preferred Time of Day
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { value: 'morning', label: 'Morning', icon: '/icons8-morning-48.png' },
+                        { value: 'noon', label: 'Noon', icon: '/icons8-midday-48.png' },
+                        { value: 'afternoon', label: 'Afternoon', icon: '/icons8-afternoon-32.png' },
+                        { value: 'night', label: 'Night', icon: '/icons8-night-66.png' }
+                      ].map((time) => (
+                        <motion.button
+                          key={time.value}
+                          type="button"
+                          onClick={() => setFormData({ 
+                            ...formData, 
+                            preferredTimeOfDay: formData.preferredTimeOfDay === time.value ? null : time.value as any
+                          })}
+                          className={`
+                            relative p-3 rounded-xl border-2 transition-all duration-300
+                            ${formData.preferredTimeOfDay === time.value
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                              : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                            }
+                          `}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <div className="flex flex-col items-center space-y-1">
+                            <img src={time.icon} alt={time.label} className="w-6 h-6" />
+                            <span className={`text-xs font-medium ${
+                              formData.preferredTimeOfDay === time.value
+                                ? 'text-primary-700 dark:text-primary-300'
+                                : 'text-slate-600 dark:text-slate-400'
+                            }`}>
+                              {time.label}
+                            </span>
+                          </div>
+                        </motion.button>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Notes */}
