@@ -61,6 +61,7 @@ export interface Place {
   estimated_cost?: number;
   created_at?: string;
   updated_at?: string;
+  preferred_time_of_day?: 'morning' | 'noon' | 'afternoon' | 'night';
 }
 
 // Premium limits
@@ -555,6 +556,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             notes: placeWithIds.notes,
             image_url: placeWithIds.image_url,
             images: placeWithIds.images,
+            preferred_time_of_day: placeWithIds.preferred_time_of_day,
             is_selected_for_optimization: false,  // Places start as pending, not auto-selected for optimization
             status: 'pending'  // New places are pending until user decides to optimize
           };
@@ -590,6 +592,7 @@ export const useStore = create<StoreState>()((set, get) => ({
           if (updates.scheduled !== undefined) updateData.is_selected_for_optimization = updates.scheduled;
           if (updates.visitDate) updateData.visit_date = updates.visitDate;
           if (updates.notes) updateData.notes = updates.notes;
+          if (updates.preferred_time_of_day !== undefined) updateData.preferred_time_of_day = updates.preferred_time_of_day;
 
           const { error } = await supabase
             .from('places')
