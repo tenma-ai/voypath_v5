@@ -368,7 +368,7 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                     <MapPin className="w-4 h-4 inline mr-2 text-primary-500" />
-                    Departure Location *
+                    Depart From *
                   </label>
                   <PlaceSearchInput
                     value={formData.departureLocation}
@@ -388,7 +388,7 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                     <MapPin className="w-4 h-4 inline mr-2 text-secondary-500" />
-                    Destination <span className="text-slate-400 font-normal">(optional)</span>
+                    Return To <span className="text-slate-400 font-normal">(optional)</span>
                   </label>
                   
                   {/* Same as departure location option */}
@@ -424,11 +424,11 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
                         )}
                       </div>
                       <div>
-                        <div className="text-sm font-medium">Same as departure location</div>
+                        <div className="text-sm font-medium">Same as depart from location</div>
                         <div className="text-xs opacity-75">
                           {useSameDeparture && formData.departureLocation 
                             ? `Return to ${formData.departureLocation}`
-                            : 'Round trip returning to departure point'
+                            : 'Round trip returning to depart from point'
                           }
                         </div>
                       </div>
@@ -450,7 +450,7 @@ export function CreateTripModal({ isOpen, onClose, editMode = false, tripData }:
                           setSelectedDestination(place);
                           setFormData({ ...formData, destination: place.name });
                         }}
-                        placeholder="Enter destination or leave empty"
+                        placeholder="Enter return destination or leave empty"
                         searchContext={{
                           location: selectedDeparture?.geometry.location,
                           // Remove type filtering to get broader results
