@@ -926,7 +926,87 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           </div>
         `;
         
-        content = content.replace('        </div>\n      </div>\n    `;', loadingHTML + '\n        </div>\n      </div>\n    `;');
+        // Debug: Show current content structure
+        console.log('🔍 Original content length:', content.length);
+        console.log('🔍 Content end preview:', content.slice(-200));
+        console.log('🔍 Content search patterns:');
+        console.log('  - Has Travel Times:', content.includes('Travel Times'));
+        console.log('  - Has Distance:', content.includes('Distance'));
+        console.log('  - Has template end:', content.includes('`;'));
+        
+        // More robust content insertion - find the correct insertion point
+        const originalContent = content;
+        
+        // Find the insertion point: after the Travel Times section but before the closing divs
+        // Strategy: Insert just before the closing </div></div> structure
+        let insertionPoint = -1;
+        
+        // Method 1: Look for the end of the Travel Times section specifically
+        if (content.includes('Travel Times')) {
+          // Travel Times section exists - find its end
+          const travelTimesIndex = content.indexOf('Travel Times');
+          const afterTravelTimes = content.substring(travelTimesIndex);
+          
+          // Look for the closing of the Travel Times div section
+          // Pattern: </div>\n            </div>\n          ` : ''}
+          const travelTimesEndPattern = /<\/div>\s*<\/div>\s*` : ''}/;
+          const travelTimesEndMatch = afterTravelTimes.match(travelTimesEndPattern);
+          
+          if (travelTimesEndMatch) {
+            insertionPoint = travelTimesIndex + travelTimesEndMatch.index + travelTimesEndMatch[0].length;
+            console.log('🔍 Found Travel Times end insertion point at:', insertionPoint);
+          }
+        }
+        
+        // Method 2: If Travel Times not found or method 1 failed, look for final closing pattern
+        if (insertionPoint === -1) {
+          const endingPattern = /(\s*<\/div>\s*<\/div>\s*`;\s*$)/;
+          const endingMatch = content.match(endingPattern);
+          if (endingMatch) {
+            insertionPoint = endingMatch.index;
+            console.log('🔍 Found ending pattern insertion point at:', insertionPoint);
+          }
+        }
+        
+        // Method 3: Alternative fallback - look for just the template literal ending
+        if (insertionPoint === -1) {
+          const templateEndPattern = /(`;\s*$)/;
+          const templateMatch = content.match(templateEndPattern);
+          if (templateMatch) {
+            insertionPoint = templateMatch.index;
+            console.log('🔍 Found template ending at:', insertionPoint);
+          }
+        }
+        
+        // Insert the loading HTML at the found position
+        if (insertionPoint !== -1) {
+          // Insert with proper indentation to match the content structure
+          const beforeInsertion = content.slice(0, insertionPoint);
+          const afterInsertion = content.slice(insertionPoint);
+          
+          console.log('🔍 Insertion context:');
+          console.log('  Before (last 100 chars):', beforeInsertion.slice(-100));
+          console.log('  After (first 100 chars):', afterInsertion.slice(0, 100));
+          
+          const indentedLoadingHTML = loadingHTML.replace(/\n/g, '\n          ');
+          content = beforeInsertion + '\n          ' + indentedLoadingHTML.trim() + '\n          ' + afterInsertion;
+        } else {
+          // Ultimate fallback: simpler approach - just append before the final `; 
+          console.log('🔍 Using simple fallback approach - patterns tried:');
+          console.log('  - Travel Times section present:', content.includes('Travel Times'));
+          console.log('  - Template literal end present:', /`;\s*$/.test(content));
+          console.log('  - Content sample (last 300 chars):', content.slice(-300));
+          
+          if (/`;\s*$/.test(content)) {
+            content = content.replace(/`;\s*$/, loadingHTML + '\n    `;');
+          } else {
+            // Even more aggressive fallback
+            content = content + loadingHTML;
+          }
+        }
+        
+        console.log('🔍 After replace content length:', content.length);
+        console.log('🔍 Did replacement work:', content.includes('Flight Options'));
         
         // Set loading content first
         infoWindow.setContent(content);
