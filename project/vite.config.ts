@@ -6,6 +6,8 @@ export default defineConfig({
   plugins: [react()],
   define: {
     'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(process.env.VITE_GOOGLE_MAPS_API_KEY),
+    'import.meta.env.VITE_TRAVELPAYOUTS_API_KEY': JSON.stringify(process.env.VITE_TRAVELPAYOUTS_API_KEY),
+    'import.meta.env.VITE_TRAVELPAYOUTS_MARKER': JSON.stringify(process.env.VITE_TRAVELPAYOUTS_MARKER),
   },
   optimizeDeps: {
     exclude: ['lucide-react'],
