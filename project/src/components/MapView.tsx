@@ -1149,7 +1149,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
                   </div>
                   ${flightOptionsHTML}
                   <div style="margin-top: 8px; font-size: 11px; color: #10b981; text-align: center;">
-                    ${flights.some(f => f.source === 'WayAway') ? 'Real flight data from WayAway' : 'No live data found, using sample data'}
+                    ${flights.some(f => f.source === 'WayAway') ? 'Real flight data from WayAway' : 'Mock data with WayAway booking links'}
                   </div>
                   <div style="margin-top: 4px; font-size: 11px; color: #9ca3af; text-align: center;">
                     Powered by WayAway

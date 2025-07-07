@@ -14,6 +14,7 @@ export interface FlightOption {
   bookingUrl: string;
   gates?: string;
   matchesSchedule?: boolean; // Indicates if this flight matches the planned schedule
+  source?: string; // Source of flight data (WayAway, mock_wayaway, etc.)
 }
 
 export class TravelPayoutsService {
@@ -45,8 +46,15 @@ export class TravelPayoutsService {
     try {
       const { WayAwayService } = await import('./WayAwayService');
       
+      console.log('🔍 WayAway Service Configuration Check:', WayAwayService.getConfig());
+      
       if (WayAwayService.isConfigured()) {
-        console.log('✅ WayAway service configured, searching real flights...');
+        console.log('✅ WayAway service configured, searching real flights...', {
+          fromIATA,
+          toIATA,
+          date,
+          timePreferences
+        });
         
         const wayawayData = await WayAwayService.searchFlightPrices({
           origin: fromIATA,
@@ -55,14 +63,20 @@ export class TravelPayoutsService {
           currency: 'JPY'
         });
 
+        console.log('🔍 WayAway API Response:', wayawayData);
+
         if (wayawayData.success && wayawayData.data && Object.keys(wayawayData.data).length > 0) {
-          console.log('✅ Real flight data received from WayAway');
-          return WayAwayService.transformToFlightOptions(wayawayData, timePreferences);
+          console.log('✅ Real flight data received from WayAway, transforming to flight options...');
+          const transformedFlights = WayAwayService.transformToFlightOptions(wayawayData, timePreferences);
+          console.log('✅ Transformed flights:', transformedFlights);
+          return transformedFlights;
         } else {
-          console.warn('⚠️ WayAway returned empty data, falling back to mock data');
+          console.warn('⚠️ WayAway returned empty or unsuccessful data:', wayawayData);
+          console.warn('⚠️ Falling back to mock data');
         }
       } else {
         console.warn('⚠️ WayAway service not configured, using mock data');
+        console.warn('Configuration details:', WayAwayService.getConfig());
       }
     } catch (error) {
       console.error('❌ WayAway integration failed:', error);
@@ -514,7 +528,8 @@ export class TravelPayoutsService {
         price: 45000,
         currency: 'JPY',
         bookingUrl: this.generateWayAwayBookingUrl(fromIATA, toIATA, date || new Date().toISOString().split('T')[0]),
-        matchesSchedule: true
+        matchesSchedule: true,
+        source: 'mock_wayaway'
       });
     }
 
@@ -538,7 +553,8 @@ export class TravelPayoutsService {
         price: 35000 + (i * 8000) + Math.floor(Math.random() * 5000),
         currency: 'JPY',
         bookingUrl: this.generateWayAwayBookingUrl(fromIATA, toIATA, date || new Date().toISOString().split('T')[0]),
-        matchesSchedule: false
+        matchesSchedule: false,
+        source: 'mock_wayaway'
       });
     }
 

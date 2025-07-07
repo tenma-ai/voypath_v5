@@ -8,6 +8,8 @@ export default defineConfig({
     'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(process.env.VITE_GOOGLE_MAPS_API_KEY),
     'import.meta.env.VITE_TRAVELPAYOUTS_API_KEY': JSON.stringify(process.env.VITE_TRAVELPAYOUTS_API_KEY),
     'import.meta.env.VITE_TRAVELPAYOUTS_MARKER': JSON.stringify(process.env.VITE_TRAVELPAYOUTS_MARKER),
+    'import.meta.env.TRAVELPAYOUTS_TOKEN': JSON.stringify(process.env.TRAVELPAYOUTS_TOKEN),
+    'import.meta.env.WAYAWAY_MARKER': JSON.stringify(process.env.WAYAWAY_MARKER),
   },
   optimizeDeps: {
     exclude: ['lucide-react'],
