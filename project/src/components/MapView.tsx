@@ -904,12 +904,29 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       if (fromIATA && toIATA) {
         // Calculate departure date from the route
         let departureDate = new Date();
+        
+        // Debug current trip data
+        console.log('🔍 Trip data for date calculation:', {
+          currentTrip: currentTrip,
+          tripStartDate: currentTrip?.start_date,
+          tripEndDate: currentTrip?.end_date,
+          fromPlace: {
+            name: fromPlace.place_name || fromPlace.name,
+            dayNumber: fromPlace.day_number
+          },
+          toPlace: {
+            name: toPlace.place_name || toPlace.name,
+            dayNumber: toPlace.day_number
+          }
+        });
+        
         try {
           if (currentTrip && fromPlace.day_number) {
             departureDate = DateUtils.calculateTripDate(currentTrip, fromPlace.day_number);
             console.log('✅ Using calculated trip date for departure:', {
               fromPlace: fromPlace.place_name || fromPlace.name,
               dayNumber: fromPlace.day_number,
+              tripStartDate: currentTrip.start_date,
               calculatedDate: departureDate.toISOString().split('T')[0]
             });
           } else if (currentTrip && toPlace.day_number) {
