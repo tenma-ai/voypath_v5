@@ -284,21 +284,26 @@ export class TravelPayoutsService {
     // Generate Trip.com search URL
     const tripComUrl = this.generateTripComUrl(fromIATA, toIATA, date);
     
-    // Create TravelPayouts affiliate link
+    // Create TravelPayouts affiliate link (official format)
     const marker = this.MARKER;
     const trs = '434567'; // TravelPayouts tracking ID  
     const p = '8626'; // Trip.com partner ID
     const campaignId = '121';
     
-    const affiliateParams = new URLSearchParams({
-      marker: marker,
-      trs: trs,
-      p: p,
-      u: encodeURIComponent(tripComUrl),
-      campaign_id: campaignId
+    // Use TravelPayouts official link format with proper tracking
+    const encodedUrl = encodeURIComponent(tripComUrl);
+    
+    // Add debugging info
+    console.log('🔗 Generated affiliate link:', {
+      marker,
+      trs,
+      p,
+      tripComUrl,
+      encodedUrl,
+      finalUrl: `https://tp.media/r?marker=${marker}&trs=${trs}&p=${p}&u=${encodedUrl}&campaign_id=${campaignId}`
     });
-
-    return `https://tp.media/r?${affiliateParams.toString()}`;
+    
+    return `https://tp.media/r?marker=${marker}&trs=${trs}&p=${p}&u=${encodedUrl}&campaign_id=${campaignId}`;
   }
 
   /**
