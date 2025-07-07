@@ -923,20 +923,25 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         
         try {
           if (currentTrip && fromPlace.day_number) {
-            // Use the same approach as ListView.tsx - DateUtils.calculateTripDate
-            departureDate = DateUtils.calculateTripDate(currentTrip, fromPlace.day_number);
+            // Use ListView.tsx logic: trip start date + day offset
+            const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
+            departureDate = new Date(tripStartDate);
+            departureDate.setDate(departureDate.getDate() + (fromPlace.day_number - 1)); // day_number is 1-based
             console.log('✅ Using calculated trip date for departure (ListView approach):', {
               fromPlace: fromPlace.place_name || fromPlace.name,
               dayNumber: fromPlace.day_number,
-              tripStartDate: currentTrip.start_date,
+              tripStartDate: tripStartDate,
               calculatedDate: departureDate.toISOString().split('T')[0]
             });
           } else if (currentTrip && toPlace.day_number) {
             // If departure day is not available, use arrival day as reference
-            departureDate = DateUtils.calculateTripDate(currentTrip, toPlace.day_number);
+            const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
+            departureDate = new Date(tripStartDate);
+            departureDate.setDate(departureDate.getDate() + (toPlace.day_number - 1)); // day_number is 1-based
             console.log('✅ Using arrival day as reference for departure (ListView approach):', {
               toPlace: toPlace.place_name || toPlace.name,
               dayNumber: toPlace.day_number,
+              tripStartDate: tripStartDate,
               calculatedDate: departureDate.toISOString().split('T')[0]
             });
           } else {

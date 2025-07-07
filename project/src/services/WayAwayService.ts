@@ -53,41 +53,86 @@ export class WayAwayService {
     }
 
     try {
-      // Use proxy to avoid CORS issues
-      const proxyUrl = `/api/wayaway-search`;
-      const searchParams = new URLSearchParams({
-        origin,
-        destination,
-        depart_date: departDate,
-        currency,
-        token: this.API_TOKEN
-      });
-
-      if (returnDate) {
-        searchParams.append('return_date', returnDate);
-      }
-
-      console.log('🔍 Calling WayAway via proxy:', `${proxyUrl}?${searchParams.toString()}`);
-
-      const response = await fetch(`${proxyUrl}?${searchParams.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
+      // Try proxy first, but fallback to direct API call if proxy fails
+      let response;
+      let result;
       
-      if (!response.ok) {
-        throw new Error(`WayAway API error: ${response.status}`);
+      try {
+        // Use proxy to avoid CORS issues
+        const proxyUrl = `/api/wayaway-search`;
+        const searchParams = new URLSearchParams({
+          origin,
+          destination,
+          depart_date: departDate,
+          currency,
+          token: this.API_TOKEN
+        });
+
+        if (returnDate) {
+          searchParams.append('return_date', returnDate);
+        }
+
+        console.log('🔍 Calling WayAway via proxy:', `${proxyUrl}?${searchParams.toString()}`);
+
+        response = await fetch(`${proxyUrl}?${searchParams.toString()}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`WayAway proxy error: ${response.status}`);
+        }
+
+        result = await response.json();
+        
+        // Check if response is valid JSON (not HTML error page)
+        if (typeof result === 'string' && result.includes('<!doctype')) {
+          throw new Error('Proxy returned HTML instead of JSON - API routing issue');
+        }
+        
+        console.log('✅ WayAway proxy response received:', result);
+        return result;
+        
+      } catch (proxyError) {
+        console.warn('🔄 Proxy failed, attempting direct API call:', proxyError.message);
+        
+        // Fallback: Try direct API call (might fail due to CORS in browser)
+        const directApiUrl = `${this.BASE_URL}/prices/direct`;
+        const directParams = new URLSearchParams({
+          origin,
+          destination,
+          depart_date: departDate,
+          currency,
+          token: this.API_TOKEN
+        });
+
+        if (returnDate) {
+          directParams.append('return_date', returnDate);
+        }
+
+        console.log('🔍 Calling WayAway directly:', `${directApiUrl}?${directParams.toString()}`);
+
+        response = await fetch(`${directApiUrl}?${directParams.toString()}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'VoyPath/1.0'
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`WayAway direct API error: ${response.status}`);
+        }
+
+        result = await response.json();
+        console.log('✅ WayAway direct API response received:', result);
+        return result;
       }
-
-      const result = await response.json();
-      
-      console.log('✅ WayAway response received:', result);
-
-      return result;
       
     } catch (error) {
-      console.error('WayAway flight search failed:', error);
+      console.error('WayAway flight search failed (both proxy and direct):', error);
       throw error;
     }
   }

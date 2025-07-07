@@ -12,13 +12,13 @@
     {
       "src": "/api/travelpayouts-proxy",
       "dest": "/api/travelpayouts-proxy.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1.js"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
