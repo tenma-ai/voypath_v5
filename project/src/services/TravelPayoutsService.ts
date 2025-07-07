@@ -52,8 +52,8 @@ export class TravelPayoutsService {
     }
 
     try {
-      // Use proxy API to avoid CORS issues
-      const proxyUrl = `/api/travelpayouts-proxy`;
+      // Call TravelPayouts API directly (CORS should be allowed for this endpoint)
+      const apiUrl = `${this.BASE_URL}/v1/prices/direct`;
       const params = new URLSearchParams({
         origin: fromIATA,
         destination: toIATA,
@@ -62,23 +62,22 @@ export class TravelPayoutsService {
         currency: 'JPY'
       });
 
-      console.log('🔍 Calling TravelPayouts via proxy:', `${proxyUrl}?${params.toString()}`);
+      console.log('🔍 Calling TravelPayouts directly:', `${apiUrl}?${params.toString()}`);
 
-      const response = await fetch(`${proxyUrl}?${params.toString()}`);
+      const response = await fetch(`${apiUrl}?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
       
       if (!response.ok) {
-        throw new Error(`TravelPayouts proxy error: ${response.status}`);
+        throw new Error(`TravelPayouts API error: ${response.status}`);
       }
 
       const result = await response.json();
       
-      if (!result.success) {
-        console.warn('TravelPayouts proxy returned error:', result.error);
-        console.warn('Falling back to mock data');
-        return this.getMockFlightData(fromIATA, toIATA, timePreferences);
-      }
-
-      console.log('✅ Real flight data received:', result.data);
+      console.log('✅ Real flight data received:', result);
 
       // Check if data is empty (common for short-term bookings or no direct flights)
       if (!result.data || Object.keys(result.data).length === 0) {
