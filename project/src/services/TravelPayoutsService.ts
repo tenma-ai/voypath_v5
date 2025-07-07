@@ -39,11 +39,39 @@ export class TravelPayoutsService {
       duration?: string;      // Duration string like "6h" or "2h 30m"
     }
   ): Promise<FlightOption[]> {
-    console.log('🔍 Using Trip.com affiliate strategy with mock data');
+    console.log('🔍 Using WayAway real flight data integration');
     
-    // Always return mock data with Trip.com affiliate links
-    console.warn('No results found from API - using mock data');
-    return this.getMockFlightData(fromIATA, toIATA, timePreferences, date);
+    // Try to get real flight data from WayAway first
+    try {
+      const { WayAwayService } = await import('./WayAwayService');
+      
+      if (WayAwayService.isConfigured()) {
+        console.log('✅ WayAway service configured, searching real flights...');
+        
+        const wayawayData = await WayAwayService.searchFlightPrices({
+          origin: fromIATA,
+          destination: toIATA,
+          departDate: date,
+          currency: 'JPY'
+        });
+
+        if (wayawayData.success && wayawayData.data && Object.keys(wayawayData.data).length > 0) {
+          console.log('✅ Real flight data received from WayAway');
+          return WayAwayService.transformToFlightOptions(wayawayData, timePreferences);
+        } else {
+          console.warn('⚠️ WayAway returned empty data, falling back to mock data');
+        }
+      } else {
+        console.warn('⚠️ WayAway service not configured, using mock data');
+      }
+    } catch (error) {
+      console.error('❌ WayAway integration failed:', error);
+      console.warn('⚠️ Falling back to mock data due to error');
+    }
+    
+    // Fallback to mock data with WayAway affiliate links
+    console.warn('No results found from API - using mock data with WayAway links');
+    return this.getMockFlightDataWithWayAway(fromIATA, toIATA, timePreferences, date);
   }
 
   /**
@@ -457,5 +485,92 @@ export class TravelPayoutsService {
       if (!a.matchesSchedule && b.matchesSchedule) return 1;
       return a.price - b.price;
     });
+  }
+
+  /**
+   * Generate mock flight data with WayAway affiliate links
+   */
+  private static getMockFlightDataWithWayAway(
+    fromIATA: string,
+    toIATA: string, 
+    timePreferences?: {
+      departureTime?: string;
+      arrivalTime?: string;
+      duration?: string;
+    },
+    date?: string
+  ): FlightOption[] {
+    const airlines = ['ANA', 'JAL', 'United', 'Delta', 'Lufthansa'];
+    const flights: FlightOption[] = [];
+
+    // Create a flight that matches the schedule exactly
+    if (timePreferences?.departureTime && timePreferences?.arrivalTime) {
+      flights.push({
+        airline: 'ANA',
+        flightNumber: 'NH123',
+        departure: timePreferences.departureTime,
+        arrival: timePreferences.arrivalTime,
+        duration: timePreferences.duration || '6h',
+        price: 45000,
+        currency: 'JPY',
+        bookingUrl: this.generateWayAwayBookingUrl(fromIATA, toIATA, date || new Date().toISOString().split('T')[0]),
+        matchesSchedule: true
+      });
+    }
+
+    // Add additional mock flights with WayAway links
+    for (let i = 0; i < 4; i++) {
+      const airline = airlines[i % airlines.length];
+      const airlineCode = airline === 'ANA' ? 'NH' : airline === 'JAL' ? 'JL' : airline.substring(0, 2);
+      const baseHour = 7 + (i * 3);
+      const departureTime = `${String(baseHour).padStart(2, '0')}:${String((i * 20) % 60).padStart(2, '0')}`;
+      const arrivalTime = this.calculateArrivalTime(departureTime, 6);
+      
+      // Skip if this would be identical to the exact match
+      if (timePreferences?.departureTime === departureTime) continue;
+
+      flights.push({
+        airline: airline,
+        flightNumber: `${airlineCode}${String(100 + i * 111).substring(0, 3)}`,
+        departure: departureTime,
+        arrival: arrivalTime,
+        duration: '6h',
+        price: 35000 + (i * 8000) + Math.floor(Math.random() * 5000),
+        currency: 'JPY',
+        bookingUrl: this.generateWayAwayBookingUrl(fromIATA, toIATA, date || new Date().toISOString().split('T')[0]),
+        matchesSchedule: false
+      });
+    }
+
+    // Sort by schedule match first, then by price
+    return flights.sort((a, b) => {
+      // Prioritize flights that match the schedule
+      if (a.matchesSchedule && !b.matchesSchedule) return -1;
+      if (!a.matchesSchedule && b.matchesSchedule) return 1;
+      // Then sort by price
+      return a.price - b.price;
+    });
+  }
+
+  /**
+   * Generate WayAway booking URL for fallback mock data
+   */
+  private static generateWayAwayBookingUrl(
+    fromIATA: string,
+    toIATA: string,
+    date: string
+  ): string {
+    // WayAway affiliate link parameters
+    const marker = '649297';
+    const trs = '434567';
+    const p = '5976'; // WayAway partner ID
+    const campaignId = '200'; // WayAway campaign ID
+    
+    // Generate WayAway search URL
+    const wayawayUrl = `https://wayaway.io/search?origin_iata=${fromIATA}&destination_iata=${toIATA}&depart_date=${date}&adults=1&children=0&infants=0&currency=JPY&marker=${marker}`;
+    
+    // Create TravelPayouts affiliate link
+    const encodedUrl = encodeURIComponent(wayawayUrl);
+    return `https://tp.media/r?marker=${marker}&trs=${trs}&p=${p}&u=${encodedUrl}&campaign_id=${campaignId}`;
   }
 }

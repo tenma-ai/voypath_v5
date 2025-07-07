@@ -1148,11 +1148,11 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
                     ✈️ Flight Options: ${fromIATA} → ${toIATA}
                   </div>
                   ${flightOptionsHTML}
-                  <div style="margin-top: 8px; font-size: 11px; color: #ef4444; text-align: center;">
-                    No results found, using mock data
+                  <div style="margin-top: 8px; font-size: 11px; color: #10b981; text-align: center;">
+                    ${flights.some(f => f.source === 'WayAway') ? 'Real flight data from WayAway' : 'No live data found, using sample data'}
                   </div>
                   <div style="margin-top: 4px; font-size: 11px; color: #9ca3af; text-align: center;">
-                    Powered by Trip.com
+                    Powered by WayAway
                   </div>
                 </div>
               `;

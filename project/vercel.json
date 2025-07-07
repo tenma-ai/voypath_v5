@@ -6,6 +6,14 @@
   },
   "routes": [
     {
+      "src": "/api/wayaway-search",
+      "dest": "/api/wayaway-search.js"
+    },
+    {
+      "src": "/api/travelpayouts-proxy",
+      "dest": "/api/travelpayouts-proxy.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1"
     }
