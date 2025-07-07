@@ -907,9 +907,41 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         try {
           if (currentTrip && fromPlace.day_number) {
             departureDate = DateUtils.calculateTripDate(currentTrip, fromPlace.day_number);
+            console.log('✅ Using calculated trip date for departure:', {
+              fromPlace: fromPlace.place_name || fromPlace.name,
+              dayNumber: fromPlace.day_number,
+              calculatedDate: departureDate.toISOString().split('T')[0]
+            });
+          } else if (currentTrip && toPlace.day_number) {
+            // If departure day is not available, use arrival day as reference
+            departureDate = DateUtils.calculateTripDate(currentTrip, toPlace.day_number);
+            // For flight search, we want the departure to be same day or earlier
+            console.log('✅ Using arrival day as reference for departure:', {
+              toPlace: toPlace.place_name || toPlace.name,
+              dayNumber: toPlace.day_number,
+              calculatedDate: departureDate.toISOString().split('T')[0]
+            });
+          } else if (currentTrip && currentTrip.start_date) {
+            // Fallback to trip start date if day_number is not available
+            departureDate = new Date(currentTrip.start_date);
+            console.log('✅ Using trip start date:', departureDate.toISOString().split('T')[0]);
+          } else {
+            // Last resort: use today's date + 1 week for future flight
+            departureDate = new Date();
+            departureDate.setDate(departureDate.getDate() + 7);
+            console.warn('⚠️ Using fallback date (today + 7 days):', departureDate.toISOString().split('T')[0]);
           }
         } catch (error) {
           console.warn('Could not calculate departure date:', error);
+          // Fallback to trip start date or near future
+          if (currentTrip && currentTrip.start_date) {
+            departureDate = new Date(currentTrip.start_date);
+            console.log('✅ Using trip start date fallback:', departureDate.toISOString().split('T')[0]);
+          } else {
+            departureDate = new Date();
+            departureDate.setDate(departureDate.getDate() + 7);
+            console.warn('⚠️ Using fallback date (today + 7 days):', departureDate.toISOString().split('T')[0]);
+          }
         }
         
         const dateStr = departureDate.toISOString().split('T')[0];
