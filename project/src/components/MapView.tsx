@@ -1094,8 +1094,11 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
                     ✈️ Flight Options: ${fromIATA} → ${toIATA}
                   </div>
                   ${flightOptionsHTML}
-                  <div style="margin-top: 12px; font-size: 11px; color: #9ca3af; text-align: center;">
-                    Powered by TravelPayouts
+                  <div style="margin-top: 8px; font-size: 11px; color: #ef4444; text-align: center;">
+                    No results found, using mock data
+                  </div>
+                  <div style="margin-top: 4px; font-size: 11px; color: #9ca3af; text-align: center;">
+                    Powered by Trip.com
                   </div>
                 </div>
               `;
@@ -1104,7 +1107,8 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
               const updatedContent = content.replace(loadingHTML, flightSearchHTML);
               infoWindow.setContent(updatedContent);
             } else {
-              // No flights found
+              // No flights found - generate Trip.com affiliate URL
+              const tripComUrl = TravelPayoutsService.generateBookingUrl(fromIATA, toIATA, dateStr);
               const noFlightsHTML = `
                 <div style="margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
                   <div style="font-weight: bold; margin-bottom: 12px; color: #333; text-align: center;">
@@ -1114,9 +1118,9 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
                     No flights found for this route
                   </div>
                   <div style="text-align: center;">
-                    <button onclick="window.open('https://www.aviasales.com/search/${fromIATA}${toIATA}${dateStr.replace(/-/g, '')}', '_blank')"
+                    <button onclick="window.open('${tripComUrl}', '_blank')"
                             style="background: #0066cc; color: white; padding: 10px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;">
-                      Search on Aviasales
+                      Search on Trip.com
                     </button>
                   </div>
                 </div>

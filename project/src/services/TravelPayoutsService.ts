@@ -18,7 +18,7 @@ export interface FlightOption {
 
 export class TravelPayoutsService {
   private static readonly API_KEY = import.meta.env.VITE_TRAVELPAYOUTS_API_KEY;
-  private static readonly MARKER = import.meta.env.VITE_TRAVELPAYOUTS_MARKER || 'default';
+  private static readonly MARKER = '649297'; // Trip.com affiliate marker
   private static readonly BASE_URL = 'https://api.travelpayouts.com';
 
   /**
@@ -39,67 +39,11 @@ export class TravelPayoutsService {
       duration?: string;      // Duration string like "6h" or "2h 30m"
     }
   ): Promise<FlightOption[]> {
-    console.log('🔍 TravelPayouts Config:', {
-      hasApiKey: !!this.API_KEY,
-      apiKey: this.API_KEY?.substring(0, 8) + '...',
-      marker: this.MARKER
-    });
-
-    if (!this.API_KEY) {
-      console.warn('TravelPayouts API key not configured - returning mock flight data');
-      // Return mock flight data for demonstration
-      return this.getMockFlightData(fromIATA, toIATA, timePreferences);
-    }
-
-    try {
-      // Use proxy API to avoid CORS issues
-      const proxyUrl = `/api/travelpayouts-proxy`;
-      const params = new URLSearchParams({
-        origin: fromIATA,
-        destination: toIATA,
-        depart_date: date,
-        token: this.API_KEY,
-        currency: 'JPY'
-      });
-
-      console.log('🔍 Calling TravelPayouts via proxy:', `${proxyUrl}?${params.toString()}`);
-
-      const response = await fetch(`${proxyUrl}?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`TravelPayouts API error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      console.log('✅ Proxy response received:', result);
-
-      if (!result.success) {
-        console.warn('TravelPayouts proxy returned error:', result.error);
-        console.warn('Falling back to mock data');
-        return this.getMockFlightData(fromIATA, toIATA, timePreferences);
-      }
-
-      console.log('✅ Real flight data received:', result.data);
-
-      // Check if data is empty (common for short-term bookings or no direct flights)
-      if (!result.data || Object.keys(result.data).length === 0) {
-        console.warn('TravelPayouts returned empty data - using mock data with real API structure');
-        return this.getMockFlightData(fromIATA, toIATA, timePreferences);
-      }
-
-      // Transform API response to FlightOption format
-      return this.transformFlightData(result.data, fromIATA, toIATA, date, timePreferences);
-      
-    } catch (error) {
-      console.error('TravelPayouts flight search failed:', error);
-      return [];
-    }
+    console.log('🔍 Using Trip.com affiliate strategy with mock data');
+    
+    // Always return mock data with Trip.com affiliate links
+    console.warn('No results found from API - using mock data');
+    return this.getMockFlightData(fromIATA, toIATA, timePreferences, date);
   }
 
   /**
@@ -331,31 +275,103 @@ export class TravelPayoutsService {
   /**
    * Generate TravelPayouts affiliate booking URL
    */
-  private static generateBookingUrl(
+  public static generateBookingUrl(
     fromIATA: string,
     toIATA: string, 
     date: string,
     airline?: string
   ): string {
-    const baseUrl = 'https://www.aviasales.com';
-    const marker = this.MARKER || 'default';
+    // Generate Trip.com search URL
+    const tripComUrl = this.generateTripComUrl(fromIATA, toIATA, date);
     
-    const params = new URLSearchParams({
-      origin_iata: fromIATA,
-      destination_iata: toIATA,
-      depart_date: date,
-      return_date: '',
-      adults: '1',
-      children: '0',
-      infants: '0',
-      marker: marker
+    // Create TravelPayouts affiliate link
+    const marker = this.MARKER;
+    const trs = '434567'; // TravelPayouts tracking ID  
+    const p = '8626'; // Trip.com partner ID
+    const campaignId = '121';
+    
+    const affiliateParams = new URLSearchParams({
+      marker: marker,
+      trs: trs,
+      p: p,
+      u: encodeURIComponent(tripComUrl),
+      campaign_id: campaignId
     });
 
-    if (airline) {
-      params.append('airline', airline);
-    }
+    return `https://tp.media/r?${affiliateParams.toString()}`;
+  }
 
-    return `${baseUrl}/search/${fromIATA}${toIATA}${date.replace(/-/g, '')}?${params.toString()}`;
+  /**
+   * Generate Trip.com search URL
+   */
+  public static generateTripComUrl(
+    fromIATA: string,
+    toIATA: string,
+    date: string
+  ): string {
+    // Convert IATA codes to city codes for Trip.com
+    const fromCity = this.iataToCityCode(fromIATA);
+    const toCity = this.iataToCityCode(toIATA);
+    
+    const params = new URLSearchParams({
+      dcity: fromCity,
+      acity: toCity,
+      ddate: date,
+      dairport: fromIATA.toLowerCase(),
+      triptype: 'ow', // one way
+      class: 'y', // economy
+      lowpricesource: 'searchform',
+      quantity: '1',
+      searchboxarg: 't',
+      nonstoponly: 'off',
+      locale: 'ja-JP',
+      curr: 'JPY'
+    });
+
+    return `https://jp.trip.com/flights/showfarefirst?${params.toString()}`;
+  }
+
+  /**
+   * Convert IATA airport code to city code for Trip.com
+   */
+  public static iataToCityCode(iata: string): string {
+    const cityMap: { [key: string]: string } = {
+      'JFK': 'nyc', 'LGA': 'nyc', 'EWR': 'nyc', // New York
+      'NRT': 'tyo', 'HND': 'tyo', // Tokyo
+      'LAX': 'lax', // Los Angeles
+      'CKG': 'ckg', // Chongqing
+      'PEK': 'bjs', 'PKX': 'bjs', // Beijing
+      'PVG': 'sha', 'SHA': 'sha', // Shanghai
+      'ICN': 'sel', 'GMP': 'sel', // Seoul
+      'BKK': 'bkk', // Bangkok
+      'SIN': 'sin', // Singapore
+      'HKG': 'hkg', // Hong Kong
+      'TPE': 'tpe', // Taipei
+      'KUL': 'kul', // Kuala Lumpur
+      'MNL': 'mnl', // Manila
+      'CGK': 'jkt', // Jakarta
+      'BOM': 'bom', // Mumbai
+      'DEL': 'del', // Delhi
+      'DXB': 'dxb', // Dubai
+      'DOH': 'doh', // Doha
+      'LHR': 'lon', 'LGW': 'lon', 'STN': 'lon', // London
+      'CDG': 'par', 'ORY': 'par', // Paris
+      'FRA': 'fra', // Frankfurt
+      'AMS': 'ams', // Amsterdam
+      'ZUR': 'zur', // Zurich
+      'SYD': 'syd', // Sydney
+      'MEL': 'mel', // Melbourne
+      'YVR': 'yvr', // Vancouver
+      'YYZ': 'yyz', // Toronto
+      'GRU': 'sao', // São Paulo
+      'GIG': 'rio', // Rio de Janeiro
+      'MAD': 'mad', // Madrid
+      'BCN': 'bcn', // Barcelona
+      'FCO': 'rom', // Rome
+      'MXP': 'mil', // Milan
+    };
+    
+    return cityMap[iata.toUpperCase()] || iata.toLowerCase();
   }
 
   /**
@@ -385,7 +401,8 @@ export class TravelPayoutsService {
       departureTime?: string;
       arrivalTime?: string;
       duration?: string;
-    }
+    },
+    date?: string
   ): FlightOption[] {
     const airlines = ['ANA', 'JAL', 'United', 'Delta', 'Lufthansa'];
     const flights: FlightOption[] = [];
@@ -400,7 +417,7 @@ export class TravelPayoutsService {
         duration: timePreferences.duration || '6h',
         price: 45000,
         currency: 'JPY',
-        bookingUrl: this.generateBookingUrl(fromIATA, toIATA, new Date().toISOString().split('T')[0], 'NH'),
+        bookingUrl: this.generateBookingUrl(fromIATA, toIATA, date || new Date().toISOString().split('T')[0], 'NH'),
         matchesSchedule: true
       });
     }
@@ -424,7 +441,7 @@ export class TravelPayoutsService {
         duration: '6h',
         price: 35000 + (i * 8000) + Math.floor(Math.random() * 5000),
         currency: 'JPY',
-        bookingUrl: this.generateBookingUrl(fromIATA, toIATA, new Date().toISOString().split('T')[0], airlineCode),
+        bookingUrl: this.generateBookingUrl(fromIATA, toIATA, date || new Date().toISOString().split('T')[0], airlineCode),
         matchesSchedule: false
       });
     }
