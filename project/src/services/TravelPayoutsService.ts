@@ -80,6 +80,12 @@ export class TravelPayoutsService {
 
       console.log('✅ Real flight data received:', result.data);
 
+      // Check if data is empty (common for short-term bookings or no direct flights)
+      if (!result.data || Object.keys(result.data).length === 0) {
+        console.warn('TravelPayouts returned empty data - using mock data with real API structure');
+        return this.getMockFlightData(fromIATA, toIATA, timePreferences);
+      }
+
       // Transform API response to FlightOption format
       return this.transformFlightData(result.data, fromIATA, toIATA, date, timePreferences);
       
