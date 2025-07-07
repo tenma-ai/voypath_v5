@@ -52,8 +52,8 @@ export class TravelPayoutsService {
     }
 
     try {
-      // TravelPayouts Flight Search API
-      const searchUrl = `${this.BASE_URL}/v1/prices/direct`;
+      // Use proxy API to avoid CORS issues
+      const proxyUrl = `/api/travelpayouts-proxy`;
       const params = new URLSearchParams({
         origin: fromIATA,
         destination: toIATA,
@@ -62,21 +62,26 @@ export class TravelPayoutsService {
         currency: 'JPY'
       });
 
-      const response = await fetch(`${searchUrl}?${params.toString()}`);
+      console.log('🔍 Calling TravelPayouts via proxy:', `${proxyUrl}?${params.toString()}`);
+
+      const response = await fetch(`${proxyUrl}?${params.toString()}`);
       
       if (!response.ok) {
-        throw new Error(`TravelPayouts API error: ${response.status}`);
+        throw new Error(`TravelPayouts proxy error: ${response.status}`);
       }
 
-      const data = await response.json();
+      const result = await response.json();
       
-      if (!data.success || !data.data) {
-        console.warn('No flight data returned from TravelPayouts');
-        return [];
+      if (!result.success) {
+        console.warn('TravelPayouts proxy returned error:', result.error);
+        console.warn('Falling back to mock data');
+        return this.getMockFlightData(fromIATA, toIATA, timePreferences);
       }
+
+      console.log('✅ Real flight data received:', result.data);
 
       // Transform API response to FlightOption format
-      return this.transformFlightData(data.data, fromIATA, toIATA, date, timePreferences);
+      return this.transformFlightData(result.data, fromIATA, toIATA, date, timePreferences);
       
     } catch (error) {
       console.error('TravelPayouts flight search failed:', error);
@@ -123,7 +128,7 @@ export class TravelPayoutsService {
         return [];
       }
 
-      return this.transformFlightData(data.data, fromIATA, toIATA, date, timePreferences);
+      return this.transformFlightData(data.data, fromIATA, toIATA, date);
       
     } catch (error) {
       console.error('TravelPayouts cheap flights search failed:', error);
