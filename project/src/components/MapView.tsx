@@ -933,30 +933,80 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         infoWindow.setPosition(event.latLng);
         infoWindow.open(map);
         
-        // Search for flights asynchronously
-        TravelPayoutsService.searchFlights(fromIATA, toIATA, dateStr)
+        // Extract time information from the route popup data
+        let departureTime: string | undefined;
+        let arrivalTime: string | undefined;
+        let routeDuration: string | undefined;
+
+        // Extract departure time
+        if (fromPlace.departure_time) {
+          const formatTime = (time: string) => {
+            const date = new Date(`1970-01-01T${time}`);
+            return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+          };
+          departureTime = formatTime(fromPlace.departure_time);
+        }
+
+        // Extract arrival time
+        if (toPlace.arrival_time) {
+          const formatTime = (time: string) => {
+            const date = new Date(`1970-01-01T${time}`);
+            return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+          };
+          arrivalTime = formatTime(toPlace.arrival_time);
+        }
+
+        // Extract duration
+        if (duration > 0) {
+          const formatDuration = DateUtils.formatDuration;
+          routeDuration = formatDuration(duration);
+        }
+
+        console.log('🕐 Extracted time preferences:', {
+          departureTime,
+          arrivalTime,
+          routeDuration,
+          fromPlace: fromPlace.place_name || fromPlace.name,
+          toPlace: toPlace.place_name || toPlace.name
+        });
+
+        // Search for flights asynchronously with time preferences
+        TravelPayoutsService.searchFlights(fromIATA, toIATA, dateStr, {
+          departureTime,
+          arrivalTime,
+          duration: routeDuration
+        })
           .then((flights: FlightOption[]) => {
             if (flights.length > 0) {
-              // Generate flight options HTML
-              const flightOptionsHTML = flights.slice(0, 3).map(flight => `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; margin: 8px 0; background: white; border-radius: 6px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                  <div style="flex: 1;">
-                    <div style="font-weight: bold; color: #1f2937; margin-bottom: 4px;">
-                      ${flight.airline} ${flight.flightNumber}
+              // Generate flight options HTML with schedule matching indicators
+              const flightOptionsHTML = flights.slice(0, 3).map(flight => {
+                const matchBadge = flight.matchesSchedule ? 
+                  '<span style="background: #10b981; color: white; font-size: 10px; padding: 2px 6px; border-radius: 12px; margin-left: 8px;">MATCHES SCHEDULE</span>' : 
+                  '';
+                const borderColor = flight.matchesSchedule ? '#10b981' : '#e2e8f0';
+                const backgroundColor = flight.matchesSchedule ? '#f0fdf4' : 'white';
+                
+                return `
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; margin: 8px 0; background: ${backgroundColor}; border-radius: 6px; border: 2px solid ${borderColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="flex: 1;">
+                      <div style="font-weight: bold; color: #1f2937; margin-bottom: 4px; display: flex; align-items: center;">
+                        ${flight.airline} ${flight.flightNumber}
+                        ${matchBadge}
+                      </div>
+                      <div style="font-size: 13px; color: #6b7280; margin-bottom: 2px;">
+                        ${flight.departure} → ${flight.arrival} (${flight.duration})
+                      </div>
+                      <div style="font-size: 14px; font-weight: bold; color: #059669;">
+                        ¥${flight.price.toLocaleString()}
+                      </div>
                     </div>
-                    <div style="font-size: 13px; color: #6b7280; margin-bottom: 2px;">
-                      ${flight.departure} → ${flight.arrival} (${flight.duration})
-                    </div>
-                    <div style="font-size: 14px; font-weight: bold; color: #059669;">
-                      ¥${flight.price.toLocaleString()}
-                    </div>
+                    <button onclick="bookFlight('${flight.bookingUrl}')"
+                            style="background: #0066cc; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: 12px;">
+                      Book
+                    </button>
                   </div>
-                  <button onclick="bookFlight('${flight.bookingUrl}')"
-                          style="background: #0066cc; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: 12px;">
-                    Book
-                  </button>
-                </div>
-              `).join('');
+                `;
+              }).join('');
               
               const flightSearchHTML = `
                 <div style="margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">

@@ -13,25 +13,38 @@ export interface FlightOption {
   currency: string;
   bookingUrl: string;
   gates?: string;
+  matchesSchedule?: boolean; // Indicates if this flight matches the planned schedule
 }
 
 export class TravelPayoutsService {
   private static readonly API_KEY = import.meta.env.VITE_TRAVELPAYOUTS_API_KEY;
-  private static readonly MARKER = import.meta.env.VITE_TRAVELPAYOUTS_MARKER;
+  private static readonly MARKER = import.meta.env.VITE_TRAVELPAYOUTS_MARKER || 'default';
   private static readonly BASE_URL = 'https://api.travelpayouts.com';
 
   /**
-   * Search for flights between two airports
+   * Search for flights between two airports with optional time preferences
    * @param fromIATA - Departure airport IATA code
    * @param toIATA - Arrival airport IATA code
    * @param date - Departure date in YYYY-MM-DD format
+   * @param timePreferences - Optional time preferences from existing route data
    * @returns Array of flight options
    */
   static async searchFlights(
     fromIATA: string, 
     toIATA: string, 
-    date: string
+    date: string,
+    timePreferences?: {
+      departureTime?: string; // HH:MM format
+      arrivalTime?: string;   // HH:MM format
+      duration?: string;      // Duration string like "6h" or "2h 30m"
+    }
   ): Promise<FlightOption[]> {
+    console.log('🔍 TravelPayouts Config:', {
+      hasApiKey: !!this.API_KEY,
+      apiKey: this.API_KEY?.substring(0, 8) + '...',
+      marker: this.MARKER
+    });
+
     if (!this.API_KEY) {
       console.warn('TravelPayouts API key not configured');
       return [];
@@ -62,7 +75,7 @@ export class TravelPayoutsService {
       }
 
       // Transform API response to FlightOption format
-      return this.transformFlightData(data.data, fromIATA, toIATA, date);
+      return this.transformFlightData(data.data, fromIATA, toIATA, date, timePreferences);
       
     } catch (error) {
       console.error('TravelPayouts flight search failed:', error);
@@ -109,7 +122,7 @@ export class TravelPayoutsService {
         return [];
       }
 
-      return this.transformFlightData(data.data, fromIATA, toIATA, date);
+      return this.transformFlightData(data.data, fromIATA, toIATA, date, timePreferences);
       
     } catch (error) {
       console.error('TravelPayouts cheap flights search failed:', error);
@@ -124,7 +137,12 @@ export class TravelPayoutsService {
     apiData: any, 
     fromIATA: string, 
     toIATA: string, 
-    date: string
+    date: string,
+    timePreferences?: {
+      departureTime?: string;
+      arrivalTime?: string;
+      duration?: string;
+    }
   ): FlightOption[] {
     const flights: FlightOption[] = [];
 
@@ -132,19 +150,25 @@ export class TravelPayoutsService {
     if (Array.isArray(apiData)) {
       // Direct flights array
       apiData.forEach((flight, index) => {
-        flights.push(this.createFlightOption(flight, fromIATA, toIATA, date, index));
+        flights.push(this.createFlightOption(flight, fromIATA, toIATA, date, index, timePreferences));
       });
     } else if (typeof apiData === 'object') {
       // Object with flight data
       Object.values(apiData).forEach((flight: any, index) => {
         if (flight && typeof flight === 'object') {
-          flights.push(this.createFlightOption(flight, fromIATA, toIATA, date, index));
+          flights.push(this.createFlightOption(flight, fromIATA, toIATA, date, index, timePreferences));
         }
       });
     }
 
-    // Sort by price (ascending)
-    return flights.sort((a, b) => a.price - b.price);
+    // Sort by schedule match first, then by price
+    return flights.sort((a, b) => {
+      // Prioritize flights that match the schedule
+      if (a.matchesSchedule && !b.matchesSchedule) return -1;
+      if (!a.matchesSchedule && b.matchesSchedule) return 1;
+      // Then sort by price
+      return a.price - b.price;
+    });
   }
 
   /**
@@ -155,28 +179,55 @@ export class TravelPayoutsService {
     fromIATA: string,
     toIATA: string, 
     date: string,
-    index: number
+    index: number,
+    timePreferences?: {
+      departureTime?: string;
+      arrivalTime?: string;
+      duration?: string;
+    }
   ): FlightOption {
     // Default values for missing data
     const airlineCode = flightData.airline || 'XX';
     const flightNumber = flightData.flight_number || `${airlineCode}${String(index + 1).padStart(3, '0')}`;
     const price = flightData.value || flightData.price || 0;
     
-    // Generate realistic departure/arrival times if not provided
-    const baseHour = 6 + (index * 2); // Stagger flight times
-    const departureTime = flightData.departure_at || `${String(baseHour).padStart(2, '0')}:${String((index * 15) % 60).padStart(2, '0')}`;
-    const arrivalTime = flightData.return_at || this.calculateArrivalTime(departureTime, 6); // Assume 6 hour flight
+    // Use time preferences if available, otherwise generate realistic times
+    let departureTime: string;
+    let arrivalTime: string;
+    let duration: string;
+    let matchesSchedule = false;
+
+    if (timePreferences?.departureTime && timePreferences?.arrivalTime) {
+      // Use the exact times from the route popup
+      departureTime = timePreferences.departureTime;
+      arrivalTime = timePreferences.arrivalTime;
+      duration = timePreferences.duration || this.calculateDuration(departureTime, arrivalTime);
+      matchesSchedule = true;
+    } else {
+      // Generate realistic departure/arrival times if not provided
+      const baseHour = 6 + (index * 2); // Stagger flight times
+      departureTime = flightData.departure_at || `${String(baseHour).padStart(2, '0')}:${String((index * 15) % 60).padStart(2, '0')}`;
+      arrivalTime = flightData.return_at || this.calculateArrivalTime(departureTime, 6); // Assume 6 hour flight
+      duration = flightData.duration || '6h';
+
+      // Check if generated times are close to preferences
+      if (timePreferences?.departureTime) {
+        const timeDiff = this.calculateTimeDifference(departureTime, timePreferences.departureTime);
+        matchesSchedule = timeDiff <= 60; // Within 1 hour
+      }
+    }
     
     return {
       airline: this.getAirlineName(airlineCode),
       flightNumber: flightNumber,
       departure: departureTime,
       arrival: arrivalTime,
-      duration: flightData.duration || '6h',
+      duration: duration,
       price: Math.round(price),
       currency: 'JPY',
       bookingUrl: this.generateBookingUrl(fromIATA, toIATA, date, airlineCode),
-      gates: flightData.gates
+      gates: flightData.gates,
+      matchesSchedule: matchesSchedule
     };
   }
 
@@ -192,6 +243,45 @@ export class TravelPayoutsService {
     const arrivalMins = arrivalMinutes % 60;
     
     return `${String(arrivalHours).padStart(2, '0')}:${String(arrivalMins).padStart(2, '0')}`;
+  }
+
+  /**
+   * Calculate duration between two times
+   */
+  private static calculateDuration(departureTime: string, arrivalTime: string): string {
+    const [depHours, depMinutes] = departureTime.split(':').map(Number);
+    const [arrHours, arrMinutes] = arrivalTime.split(':').map(Number);
+    
+    const depTotalMinutes = depHours * 60 + depMinutes;
+    let arrTotalMinutes = arrHours * 60 + arrMinutes;
+    
+    // Handle overnight flights
+    if (arrTotalMinutes < depTotalMinutes) {
+      arrTotalMinutes += 24 * 60;
+    }
+    
+    const durationMinutes = arrTotalMinutes - depTotalMinutes;
+    const hours = Math.floor(durationMinutes / 60);
+    const minutes = durationMinutes % 60;
+    
+    if (minutes === 0) {
+      return `${hours}h`;
+    } else {
+      return `${hours}h ${minutes}m`;
+    }
+  }
+
+  /**
+   * Calculate time difference in minutes between two times
+   */
+  private static calculateTimeDifference(time1: string, time2: string): number {
+    const [hours1, minutes1] = time1.split(':').map(Number);
+    const [hours2, minutes2] = time2.split(':').map(Number);
+    
+    const totalMinutes1 = hours1 * 60 + minutes1;
+    const totalMinutes2 = hours2 * 60 + minutes2;
+    
+    return Math.abs(totalMinutes1 - totalMinutes2);
   }
 
   /**
@@ -253,7 +343,7 @@ export class TravelPayoutsService {
    * Check if TravelPayouts service is properly configured
    */
   static isConfigured(): boolean {
-    return !!(this.API_KEY && this.MARKER);
+    return !!this.API_KEY; // Only API_KEY is required
   }
 
   /**
