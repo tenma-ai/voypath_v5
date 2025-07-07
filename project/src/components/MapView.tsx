@@ -9,6 +9,7 @@ import { AnimatePresence } from 'framer-motion';
 import { getColorOrFallback } from '../utils/ColorFallbackUtils';
 import { pixabayService } from '../services/PixabayService';
 import { DateUtils } from '../utils/DateUtils';
+import { TravelPayoutsService, FlightOption } from '../services/TravelPayoutsService';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -38,6 +39,32 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       setShowSuccessOverlay(true);
     }
   }, [showOptimizationSuccess, optimizationResult]);
+
+  // Setup global flight booking function
+  useEffect(() => {
+    // Global flight booking function for InfoWindow buttons
+    (window as any).bookFlight = (bookingUrl: string) => {
+      // Open booking URL in new tab
+      window.open(bookingUrl, '_blank');
+      
+      // Analytics tracking
+      console.log(`Flight booking: ${bookingUrl}`);
+      
+      // Google Analytics tracking (if available)
+      if (typeof gtag !== 'undefined') {
+        gtag('event', 'flight_booking_click', {
+          'event_category': 'TravelPayouts',
+          'event_label': 'Flight_Booking',
+          'value': 1
+        });
+      }
+    };
+
+    // Cleanup function
+    return () => {
+      delete (window as any).bookFlight;
+    };
+  }, []);
 
 
   // Extract places from optimization result
@@ -762,7 +789,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
 
     const transportIconInfo = getTransportIconInfo(transport);
 
-    const content = `
+    let content = `
       <div style="padding: 12px; min-width: 280px; max-width: 350px;">
         <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
           <h3 style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937; display: flex; align-items: center; gap: 8px;">
@@ -849,6 +876,153 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         </div>
       </div>
     `;
+
+    // Add flight search functionality if transport mode is flight
+    console.log('🔍 Route Debug:', {
+      transport: transport.toLowerCase(),
+      fromPlace: fromPlace.place_name || fromPlace.name,
+      toPlace: toPlace.place_name || toPlace.name
+    });
+
+    if (transport.toLowerCase() === 'flight' || transport.toLowerCase() === 'plane') {
+      // Extract IATA codes from place names (airport names contain codes in parentheses)
+      const extractIATACode = (placeName: string): string | null => {
+        const match = placeName.match(/\(([A-Z]{3,4})\)/);
+        return match ? match[1] : null;
+      };
+
+      const fromIATA = extractIATACode(fromPlace.place_name || fromPlace.name || '');
+      const toIATA = extractIATACode(toPlace.place_name || toPlace.name || '');
+
+      console.log('🔍 IATA Extraction:', {
+        fromPlace: fromPlace.place_name || fromPlace.name,
+        toPlace: toPlace.place_name || toPlace.name,
+        fromIATA,
+        toIATA
+      });
+
+      if (fromIATA && toIATA) {
+        // Calculate departure date from the route
+        let departureDate = new Date();
+        try {
+          if (currentTrip && fromPlace.day_number) {
+            departureDate = DateUtils.calculateTripDate(currentTrip, fromPlace.day_number);
+          }
+        } catch (error) {
+          console.warn('Could not calculate departure date:', error);
+        }
+        
+        const dateStr = departureDate.toISOString().split('T')[0];
+        
+        // Add loading placeholder first
+        const loadingHTML = `
+          <div style="margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <div style="font-weight: bold; margin-bottom: 12px; color: #333; text-align: center;">
+              ✈️ Flight Options: ${fromIATA} → ${toIATA}
+            </div>
+            <div style="text-align: center; color: #666; font-style: italic;">
+              🔍 Searching for flights...
+            </div>
+          </div>
+        `;
+        
+        content = content.replace('        </div>\n      </div>\n    `;', loadingHTML + '\n        </div>\n      </div>\n    `;');
+        
+        // Set loading content first
+        infoWindow.setContent(content);
+        infoWindow.setPosition(event.latLng);
+        infoWindow.open(map);
+        
+        // Search for flights asynchronously
+        TravelPayoutsService.searchFlights(fromIATA, toIATA, dateStr)
+          .then((flights: FlightOption[]) => {
+            if (flights.length > 0) {
+              // Generate flight options HTML
+              const flightOptionsHTML = flights.slice(0, 3).map(flight => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; margin: 8px 0; background: white; border-radius: 6px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                  <div style="flex: 1;">
+                    <div style="font-weight: bold; color: #1f2937; margin-bottom: 4px;">
+                      ${flight.airline} ${flight.flightNumber}
+                    </div>
+                    <div style="font-size: 13px; color: #6b7280; margin-bottom: 2px;">
+                      ${flight.departure} → ${flight.arrival} (${flight.duration})
+                    </div>
+                    <div style="font-size: 14px; font-weight: bold; color: #059669;">
+                      ¥${flight.price.toLocaleString()}
+                    </div>
+                  </div>
+                  <button onclick="bookFlight('${flight.bookingUrl}')"
+                          style="background: #0066cc; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: 12px;">
+                    Book
+                  </button>
+                </div>
+              `).join('');
+              
+              const flightSearchHTML = `
+                <div style="margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                  <div style="font-weight: bold; margin-bottom: 12px; color: #333; text-align: center;">
+                    ✈️ Flight Options: ${fromIATA} → ${toIATA}
+                  </div>
+                  ${flightOptionsHTML}
+                  <div style="margin-top: 12px; font-size: 11px; color: #9ca3af; text-align: center;">
+                    Powered by TravelPayouts
+                  </div>
+                </div>
+              `;
+              
+              // Update content with flight options
+              const updatedContent = content.replace(loadingHTML, flightSearchHTML);
+              infoWindow.setContent(updatedContent);
+            } else {
+              // No flights found
+              const noFlightsHTML = `
+                <div style="margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                  <div style="font-weight: bold; margin-bottom: 12px; color: #333; text-align: center;">
+                    ✈️ Flight Search: ${fromIATA} → ${toIATA}
+                  </div>
+                  <div style="text-align: center; color: #666; margin-bottom: 12px;">
+                    No flights found for this route
+                  </div>
+                  <div style="text-align: center;">
+                    <button onclick="window.open('https://www.aviasales.com/search/${fromIATA}${toIATA}${dateStr.replace(/-/g, '')}', '_blank')"
+                            style="background: #0066cc; color: white; padding: 10px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;">
+                      Search on Aviasales
+                    </button>
+                  </div>
+                </div>
+              `;
+              
+              const updatedContent = content.replace(loadingHTML, noFlightsHTML);
+              infoWindow.setContent(updatedContent);
+            }
+          })
+          .catch((error) => {
+            console.error('Flight search failed:', error);
+            // Show error message
+            const errorHTML = `
+              <div style="margin-top: 16px; padding: 16px; background: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+                <div style="font-weight: bold; margin-bottom: 8px; color: #dc2626; text-align: center;">
+                  ⚠️ Flight Search Error
+                </div>
+                <div style="text-align: center; color: #666; margin-bottom: 12px; font-size: 13px;">
+                  Unable to load flight data
+                </div>
+                <div style="text-align: center;">
+                  <button onclick="window.open('https://www.aviasales.com/search/${fromIATA}${toIATA}${dateStr.replace(/-/g, '')}', '_blank')"
+                          style="background: #0066cc; color: white; padding: 10px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;">
+                    Search on Aviasales
+                  </button>
+                </div>
+              </div>
+            `;
+            
+            const updatedContent = content.replace(loadingHTML, errorHTML);
+            infoWindow.setContent(updatedContent);
+          });
+        
+        return; // Exit early as we've already set the content
+      }
+    }
 
     infoWindow.setContent(content);
     infoWindow.setPosition(event.latLng);
