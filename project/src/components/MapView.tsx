@@ -9,6 +9,7 @@ import { AnimatePresence } from 'framer-motion';
 import { getColorOrFallback } from '../utils/ColorFallbackUtils';
 import { pixabayService } from '../services/PixabayService';
 import { DateUtils } from '../utils/DateUtils';
+import { PlaceDateUtils } from '../utils/PlaceDateUtils';
 import { TravelPayoutsService, FlightOption } from '../services/TravelPayoutsService';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
@@ -902,7 +903,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
       });
 
       if (fromIATA && toIATA) {
-        // Calculate departure date from the route
+        // Calculate departure date using the same logic as ListView.tsx
         let departureDate = new Date();
         
         // Debug current trip data
@@ -922,8 +923,9 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         
         try {
           if (currentTrip && fromPlace.day_number) {
+            // Use the same approach as ListView.tsx - DateUtils.calculateTripDate
             departureDate = DateUtils.calculateTripDate(currentTrip, fromPlace.day_number);
-            console.log('✅ Using calculated trip date for departure:', {
+            console.log('✅ Using calculated trip date for departure (ListView approach):', {
               fromPlace: fromPlace.place_name || fromPlace.name,
               dayNumber: fromPlace.day_number,
               tripStartDate: currentTrip.start_date,
@@ -932,28 +934,31 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
           } else if (currentTrip && toPlace.day_number) {
             // If departure day is not available, use arrival day as reference
             departureDate = DateUtils.calculateTripDate(currentTrip, toPlace.day_number);
-            // For flight search, we want the departure to be same day or earlier
-            console.log('✅ Using arrival day as reference for departure:', {
+            console.log('✅ Using arrival day as reference for departure (ListView approach):', {
               toPlace: toPlace.place_name || toPlace.name,
               dayNumber: toPlace.day_number,
               calculatedDate: departureDate.toISOString().split('T')[0]
             });
-          } else if (currentTrip && currentTrip.start_date) {
-            // Fallback to trip start date if day_number is not available
-            departureDate = new Date(currentTrip.start_date);
-            console.log('✅ Using trip start date:', departureDate.toISOString().split('T')[0]);
           } else {
-            // Last resort: use today's date + 1 week for future flight
-            departureDate = new Date();
-            departureDate.setDate(departureDate.getDate() + 7);
-            console.warn('⚠️ Using fallback date (today + 7 days):', departureDate.toISOString().split('T')[0]);
+            // Use PlaceDateUtils approach like ListView.tsx
+            const tripStartDate = DateUtils.getTripStartDate(currentTrip);
+            if (tripStartDate) {
+              departureDate = tripStartDate;
+              console.log('✅ Using trip start date (PlaceDateUtils approach):', departureDate.toISOString().split('T')[0]);
+            } else {
+              // Last resort: use today's date + 1 week for future flight
+              departureDate = new Date();
+              departureDate.setDate(departureDate.getDate() + 7);
+              console.warn('⚠️ Using fallback date (today + 7 days):', departureDate.toISOString().split('T')[0]);
+            }
           }
         } catch (error) {
           console.warn('Could not calculate departure date:', error);
-          // Fallback to trip start date or near future
-          if (currentTrip && currentTrip.start_date) {
-            departureDate = new Date(currentTrip.start_date);
-            console.log('✅ Using trip start date fallback:', departureDate.toISOString().split('T')[0]);
+          // Use PlaceDateUtils fallback like ListView.tsx
+          const tripStartDate = DateUtils.getTripStartDate(currentTrip);
+          if (tripStartDate) {
+            departureDate = tripStartDate;
+            console.log('✅ Using trip start date fallback (PlaceDateUtils):', departureDate.toISOString().split('T')[0]);
           } else {
             departureDate = new Date();
             departureDate.setDate(departureDate.getDate() + 7);
