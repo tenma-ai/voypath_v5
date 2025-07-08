@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
-import { X, Route, Clock, Calendar, Plane, Car, MapPin as WalkingIcon, ExternalLink } from 'lucide-react';
+import { X, Route, Clock, Calendar, Plane, Car, MapPin as WalkingIcon } from 'lucide-react';
 import { DateUtils } from '../utils/DateUtils';
 import { useStore } from '../store/useStore';
-import { TravelPayoutsService, FlightOption } from '../services/TravelPayoutsService';
 
 interface MapRouteModalProps {
   isOpen: boolean;
@@ -14,10 +13,7 @@ interface MapRouteModalProps {
 }
 
 const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlace, toPlace }) => {
-  const { currentTrip, optimizationResult } = useStore();
-  const [flightOptions, setFlightOptions] = useState<FlightOption[]>([]);
-  const [loadingFlights, setLoadingFlights] = useState(false);
-  const [flightError, setFlightError] = useState<string | null>(null);
+  const { currentTrip } = useStore();
 
   // Early return if no data
   if (!fromPlace || !toPlace) return null;
@@ -138,91 +134,6 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
 
   const departureInfo = formatDisplayTime(fromPlace.departure_time, fromActualDate);
   const arrivalInfo = formatDisplayTime(toPlace.arrival_time, toActualDate);
-
-  // Extract IATA codes
-  const extractIATACode = (placeName: string): string | null => {
-    const match = placeName.match(/\(([A-Z]{3,4})\)/);
-    return match ? match[1] : null;
-  };
-
-  const fromIATA = extractIATACode(fromPlace.place_name || fromPlace.name || '');
-  const toIATA = extractIATACode(toPlace.place_name || toPlace.name || '');
-
-  // Flight search effect - properly isolated
-  useEffect(() => {
-    let cancelled = false;
-
-    const searchFlights = async () => {
-      if (!isOpen || transport.toLowerCase() !== 'flight' || !fromIATA || !toIATA) {
-        return;
-      }
-
-      setLoadingFlights(true);
-      setFlightError(null);
-      
-      try {
-        // Calculate departure date
-        let departureDate = new Date();
-        const routeDayNumber = toPlace.day_number || fromPlace.day_number;
-        
-        if (routeDayNumber && optimizationResult?.optimization?.daily_schedules) {
-          const daySchedule = optimizationResult.optimization.daily_schedules.find(
-            schedule => schedule.day === routeDayNumber
-          );
-          
-          if (daySchedule) {
-            const dayIndex = routeDayNumber - 1;
-            const scheduleDate = optimizationResult?.optimization?.daily_schedules?.[dayIndex]?.date;
-            
-            if (scheduleDate) {
-              departureDate = new Date(scheduleDate);
-            } else if (currentTrip) {
-              const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
-              departureDate = new Date(tripStartDate);
-              departureDate.setDate(departureDate.getDate() + dayIndex);
-            }
-          }
-        } else if (currentTrip) {
-          const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
-          departureDate = new Date(tripStartDate);
-        }
-        
-        const dateStr = departureDate.toISOString().split('T')[0];
-        
-        // Extract time preferences
-        const timePreferences = {
-          departureTime: fromPlace.departure_time ? formatTime(fromPlace.departure_time) : undefined,
-          arrivalTime: toPlace.arrival_time ? formatTime(toPlace.arrival_time) : undefined,
-          duration: duration > 0 ? DateUtils.formatDuration(duration) : undefined
-        };
-
-        const flights = await TravelPayoutsService.searchFlights(fromIATA, toIATA, dateStr, timePreferences);
-        
-        if (!cancelled) {
-          setFlightOptions(flights);
-          setLoadingFlights(false);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('Flight search failed:', error);
-          setFlightError('Unable to load flight data');
-          setLoadingFlights(false);
-        }
-      }
-    };
-
-    // Call async function without returning it
-    searchFlights();
-
-    // Return only cleanup function
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, transport, fromIATA, toIATA, fromPlace, toPlace, currentTrip, optimizationResult, duration]);
-
-  const handleBookFlight = (bookingUrl: string) => {
-    window.open(bookingUrl, '_blank');
-  };
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-[9999]">
@@ -354,127 +265,6 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                       </div>
                     )}
                   </div>
-                </div>
-              )}
-
-              {/* Flight Options */}
-              {transport.toLowerCase() === 'flight' && fromIATA && toIATA && (
-                <div>
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Plane className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    <h3 className="font-semibold text-slate-900 dark:text-white">
-                      Flight Options: {fromIATA} → {toIATA}
-                    </h3>
-                  </div>
-
-                  {loadingFlights && (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                      <p className="text-slate-600 dark:text-slate-400">Searching for flights...</p>
-                    </div>
-                  )}
-
-                  {flightError && (
-                    <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-700">
-                      <p className="text-red-600 dark:text-red-400 text-center mb-3">{flightError}</p>
-                      <div className="text-center">
-                        <button
-                          onClick={() => handleBookFlight(`https://www.aviasales.com/search/${fromIATA}${toIATA}`)}
-                          className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          <span>Search on Aviasales</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {!loadingFlights && !flightError && flightOptions.length > 0 && (
-                    <div className="space-y-4">
-                      {flightOptions.slice(0, 3).map((flight, index) => {
-                        const flightDate = fromActualDate || new Date();
-                        const flightDateStr = flightDate.toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric'
-                        });
-                        
-                        return (
-                          <div
-                            key={index}
-                            className={`p-4 rounded-xl border-2 transition-all hover:shadow-lg ${
-                              flight.matchesSchedule 
-                                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700'
-                                : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-500'
-                            }`}
-                          >
-                            <div className="flex justify-between items-start mb-4">
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-bold text-slate-900 dark:text-white text-lg">
-                                    {flight.airline} {flight.flightNumber}
-                                  </h4>
-                                  {flight.matchesSchedule && (
-                                    <div className="bg-green-600 text-white text-xs px-3 py-1 rounded-full font-bold">
-                                      ✓ MATCHES SCHEDULE
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                <div className="flex items-center space-x-4 text-sm text-slate-600 dark:text-slate-400 mb-3">
-                                  <div className="flex items-center space-x-1">
-                                    <Calendar className="w-4 h-4" />
-                                    <span>📅 {flightDateStr}</span>
-                                  </div>
-                                  <div className="flex items-center space-x-1">
-                                    <Clock className="w-4 h-4" />
-                                    <span>{flight.duration}</span>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center justify-between mb-3">
-                                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    {flight.departure} → {flight.arrival}
-                                  </span>
-                                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                    ¥{flight.price.toLocaleString()}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <button
-                              onClick={() => handleBookFlight(flight.bookingUrl)}
-                              className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-semibold text-sm shadow-md hover:shadow-lg"
-                            >
-                              Book Flight →
-                            </button>
-                          </div>
-                        );
-                      })}
-                      
-                      <div className="text-center py-4 border-t border-slate-200 dark:border-slate-600">
-                        <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
-                          {flightOptions.some(f => f.source === 'WayAway') ? '✓ Real flight data from WayAway' : '⚡ Mock data with WayAway booking links'}
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                          Powered by WayAway Travel Platform
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {!loadingFlights && !flightError && flightOptions.length === 0 && (
-                    <div className="bg-slate-50 dark:bg-slate-700 p-6 rounded-xl text-center">
-                      <p className="text-slate-600 dark:text-slate-400 mb-4">No flights found for this route</p>
-                      <button
-                        onClick={() => handleBookFlight(TravelPayoutsService.generateBookingUrl(fromIATA, toIATA, new Date().toISOString().split('T')[0]))}
-                        className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        <span>Search on Trip.com</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
