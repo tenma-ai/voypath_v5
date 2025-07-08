@@ -905,77 +905,64 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
       });
 
       if (fromIATA && toIATA) {
-        // Use selectedDay from ListView if available, otherwise calculate
+        // Use EXACT ListView date calculation logic - find dayIndex in optimization results
         let departureDate = new Date();
+        let dayIndex = null;
         
         // Debug current trip data
         console.log('🔍 Trip data for date calculation:', {
           currentTrip: currentTrip,
-          selectedDay: selectedDay,
           tripStartDate: currentTrip?.start_date,
           fromPlace: {
-            name: fromPlace.place_name || fromPlace.name,
-            dayNumber: fromPlace.day_number
+            name: fromPlace.place_name || fromPlace.name
           },
           toPlace: {
-            name: toPlace.place_name || toPlace.name,
-            dayNumber: toPlace.day_number
+            name: toPlace.place_name || toPlace.name
           }
         });
         
-        // First priority: Use selectedDay from ListView
-        if (selectedDay) {
-          departureDate = new Date(selectedDay);
-          console.log('✅ Using selectedDay from ListView:', {
-            selectedDay: selectedDay,
+        // Find which dayIndex this route belongs to by searching optimization results
+        const currentOptimizationResult = optimizationResult || optimizationResultProp;
+        
+        if (currentOptimizationResult?.optimization?.daily_schedules) {
+          // Search through daily_schedules to find the dayIndex for this route
+          currentOptimizationResult.optimization.daily_schedules.forEach((daySchedule, idx) => {
+            if (daySchedule.scheduled_places) {
+              const fromFound = daySchedule.scheduled_places.some(sp => {
+                const place = sp.place || sp;
+                const placeName = place.name || sp.name;
+                return placeName === (fromPlace.place_name || fromPlace.name);
+              });
+              
+              if (fromFound && dayIndex === null) {
+                dayIndex = idx; // Use first match found
+              }
+            }
+          });
+        }
+        
+        if (dayIndex !== null && currentTrip) {
+          // Use EXACT ListView calculation: tripStartDate + dayIndex
+          const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
+          departureDate = new Date(tripStartDate);
+          departureDate.setDate(departureDate.getDate() + dayIndex);
+          
+          console.log('✅ Using EXACT ListView date calculation:', {
+            fromPlace: fromPlace.place_name || fromPlace.name,
+            dayIndex: dayIndex,
+            tripStartDate: tripStartDate,
             calculatedDate: departureDate.toISOString().split('T')[0]
           });
         } else {
-          // Fallback to original logic if no selectedDay
-          try {
-            if (currentTrip && fromPlace.day_number) {
-              // Use the same approach as the working commit - DateUtils.calculateTripDate
-              departureDate = DateUtils.calculateTripDate(currentTrip, fromPlace.day_number);
-              console.log('✅ Using calculated trip date for departure (working commit approach):', {
-                fromPlace: fromPlace.place_name || fromPlace.name,
-                dayNumber: fromPlace.day_number,
-                tripStartDate: currentTrip.start_date,
-                calculatedDate: departureDate.toISOString().split('T')[0]
-              });
-            } else if (currentTrip && toPlace.day_number) {
-              // If departure day is not available, use arrival day as reference
-              departureDate = DateUtils.calculateTripDate(currentTrip, toPlace.day_number);
-              console.log('✅ Using arrival day as reference for departure (working commit approach):', {
-                toPlace: toPlace.place_name || toPlace.name,
-                dayNumber: toPlace.day_number,
-                calculatedDate: departureDate.toISOString().split('T')[0]
-              });
-            } else {
-              // Use PlaceDateUtils approach like the working commit
-              const tripStartDate = DateUtils.getTripStartDate(currentTrip);
-              if (tripStartDate) {
-                departureDate = tripStartDate;
-                console.log('✅ Using trip start date (PlaceDateUtils approach):', departureDate.toISOString().split('T')[0]);
-              } else {
-                // Last resort: use today's date + 1 week for future flight
-                departureDate = new Date();
-                departureDate.setDate(departureDate.getDate() + 7);
-                console.warn('⚠️ Using fallback date (today + 7 days):', departureDate.toISOString().split('T')[0]);
-              }
-            }
-          } catch (error) {
-            console.warn('Could not calculate departure date:', error);
-            // Use PlaceDateUtils fallback like the working commit
-            const tripStartDate = DateUtils.getTripStartDate(currentTrip);
-            if (tripStartDate) {
-              departureDate = tripStartDate;
-              console.log('✅ Using trip start date fallback (PlaceDateUtils):', departureDate.toISOString().split('T')[0]);
-            } else {
-              departureDate = new Date();
-              departureDate.setDate(departureDate.getDate() + 7);
-              console.warn('⚠️ Using fallback date (today + 7 days):', departureDate.toISOString().split('T')[0]);
-            }
-          }
+          // Fallback: use trip start date
+          const tripStartDate = currentTrip?.startDate || currentTrip?.start_date || new Date().toISOString();
+          departureDate = new Date(tripStartDate);
+          
+          console.warn('⚠️ dayIndex not found, using trip start date:', {
+            fromPlace: fromPlace.place_name || fromPlace.name,
+            tripStartDate: tripStartDate,
+            calculatedDate: departureDate.toISOString().split('T')[0]
+          });
         }
         
         const dateStr = departureDate.toISOString().split('T')[0];
