@@ -1041,6 +1041,7 @@ function createDailySchedule(places, tripStartDate = null, availableDays = null)
     timeCounter = arrival + stayDuration;
     place.departure_time = formatTime(timeCounter);
     place.order_in_day = currentPlaces.length + 1;
+    place.day_number = currentDay; // Add day_number for route date calculation
     
     // 場所を追加
     currentPlaces.push(place);
