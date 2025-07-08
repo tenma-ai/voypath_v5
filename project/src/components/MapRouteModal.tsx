@@ -19,44 +19,49 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
   const [loadingFlights, setLoadingFlights] = useState(false);
   const [flightError, setFlightError] = useState<string | null>(null);
 
+  // Early return if no data
   if (!fromPlace || !toPlace) return null;
 
   // Determine transport mode
-  let transport = toPlace.transport_mode || fromPlace.transport_mode || '';
-  let duration = toPlace.travel_time_from_previous || 0;
-  
-  if (!transport) {
-    const lat1 = Number(fromPlace.latitude);
-    const lng1 = Number(fromPlace.longitude);
-    const lat2 = Number(toPlace.latitude);
-    const lng2 = Number(toPlace.longitude);
-    const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
+  const getTransportMode = () => {
+    let transport = toPlace.transport_mode || fromPlace.transport_mode || '';
     
-    const fromIsAirport = fromPlace.place_type === 'airport' || 
-      fromPlace.name?.toLowerCase().includes('airport') || 
-      fromPlace.place_name?.toLowerCase().includes('airport');
-    const toIsAirport = toPlace.place_type === 'airport' || 
-      toPlace.name?.toLowerCase().includes('airport') || 
-      toPlace.place_name?.toLowerCase().includes('airport');
-    const fromIsSystem = fromPlace.place_type === 'departure' || fromPlace.place_type === 'destination';
-    const toIsSystem = toPlace.place_type === 'departure' || toPlace.place_type === 'destination';
-    
-    if ((fromIsAirport && toIsAirport) || 
-        (fromIsAirport && toIsSystem) || 
-        (fromIsSystem && toIsAirport)) {
-      transport = 'Flight';
-    } else if (distance > 5) {
-      transport = 'Flight';
-    } else if (distance > 0.1 || fromIsAirport || toIsAirport) {
-      transport = 'Car';
-    } else {
-      transport = 'Walking';
+    if (!transport) {
+      const lat1 = Number(fromPlace.latitude);
+      const lng1 = Number(fromPlace.longitude);
+      const lat2 = Number(toPlace.latitude);
+      const lng2 = Number(toPlace.longitude);
+      const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
+      
+      const fromIsAirport = fromPlace.place_type === 'airport' || 
+        fromPlace.name?.toLowerCase().includes('airport') || 
+        fromPlace.place_name?.toLowerCase().includes('airport');
+      const toIsAirport = toPlace.place_type === 'airport' || 
+        toPlace.name?.toLowerCase().includes('airport') || 
+        toPlace.place_name?.toLowerCase().includes('airport');
+      const fromIsSystem = fromPlace.place_type === 'departure' || fromPlace.place_type === 'destination';
+      const toIsSystem = toPlace.place_type === 'departure' || toPlace.place_type === 'destination';
+      
+      if ((fromIsAirport && toIsAirport) || 
+          (fromIsAirport && toIsSystem) || 
+          (fromIsSystem && toIsAirport)) {
+        transport = 'Flight';
+      } else if (distance > 5) {
+        transport = 'Flight';
+      } else if (distance > 0.1 || fromIsAirport || toIsAirport) {
+        transport = 'Car';
+      } else {
+        transport = 'Walking';
+      }
     }
-  }
-  
-  transport = transport.charAt(0).toUpperCase() + transport.slice(1).toLowerCase();
+    
+    return transport.charAt(0).toUpperCase() + transport.slice(1).toLowerCase();
+  };
 
-  // Get transport icon and color
+  const transport = getTransportMode();
+  const duration = toPlace.travel_time_from_previous || 0;
+
+  // Get transport icon and styling
   const getTransportInfo = (mode: string) => {
     const modeLower = mode.toLowerCase();
     if (modeLower.includes('flight') || modeLower.includes('plane') || modeLower.includes('air')) {
@@ -86,65 +91,55 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
   const transportInfo = getTransportInfo(transport);
   const TransportIcon = transportInfo.icon;
 
-  // Helper function to format time
+  // Format time helper
   const formatTime = (time: string) => {
-    const date = new Date(`1970-01-01T${time}`);
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    try {
+      const date = new Date(`1970-01-01T${time}`);
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch {
+      return time;
+    }
   };
 
-  // Calculate actual dates
-  let fromActualDate = null;
-  let toActualDate = null;
-  try {
-    if (currentTrip && fromPlace.day_number) {
-      fromActualDate = DateUtils.calculateTripDate(currentTrip, fromPlace.day_number);
+  // Calculate dates for places
+  const calculatePlaceDate = (place: any) => {
+    try {
+      if (currentTrip && place.day_number) {
+        return DateUtils.calculateTripDate(currentTrip, place.day_number);
+      }
+    } catch (error) {
+      console.warn('Could not calculate trip date:', error);
     }
-    if (currentTrip && toPlace.day_number) {
-      toActualDate = DateUtils.calculateTripDate(currentTrip, toPlace.day_number);
-    }
-  } catch (error) {
-    console.warn('Could not calculate trip date:', error);
-  }
+    return null;
+  };
 
-  // Format departure/arrival times with date context
-  let departureDisplay = '';
-  let arrivalDisplay = '';
-  let departureDateDisplay = '';
-  let arrivalDateDisplay = '';
-  
-  if (fromPlace.departure_time) {
-    const timeStr = formatTime(fromPlace.departure_time);
-    if (fromActualDate) {
-      const dateStr = `${fromActualDate.getMonth() + 1}/${fromActualDate.getDate()}`;
-      const fullDateStr = fromActualDate.toLocaleDateString('en-US', { 
+  const fromActualDate = calculatePlaceDate(fromPlace);
+  const toActualDate = calculatePlaceDate(toPlace);
+
+  // Format display times with dates
+  const formatDisplayTime = (time: string, date: Date | null) => {
+    if (!time) return '';
+    
+    const timeStr = formatTime(time);
+    if (date) {
+      const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+      const fullDateStr = date.toLocaleDateString('en-US', { 
         weekday: 'short', 
         month: 'short', 
         day: 'numeric' 
       });
-      departureDisplay = `${dateStr} ${timeStr}`;
-      departureDateDisplay = fullDateStr;
-    } else {
-      departureDisplay = timeStr;
+      return {
+        display: `${dateStr} ${timeStr}`,
+        fullDate: fullDateStr
+      };
     }
-  }
-  
-  if (toPlace.arrival_time) {
-    const timeStr = formatTime(toPlace.arrival_time);
-    if (toActualDate) {
-      const dateStr = `${toActualDate.getMonth() + 1}/${toActualDate.getDate()}`;
-      const fullDateStr = toActualDate.toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        month: 'short', 
-        day: 'numeric' 
-      });
-      arrivalDisplay = `${dateStr} ${timeStr}`;
-      arrivalDateDisplay = fullDateStr;
-    } else {
-      arrivalDisplay = timeStr;
-    }
-  }
+    return { display: timeStr, fullDate: '' };
+  };
 
-  // Extract IATA codes for flight search
+  const departureInfo = formatDisplayTime(fromPlace.departure_time, fromActualDate);
+  const arrivalInfo = formatDisplayTime(toPlace.arrival_time, toActualDate);
+
+  // Extract IATA codes
   const extractIATACode = (placeName: string): string | null => {
     const match = placeName.match(/\(([A-Z]{3,4})\)/);
     return match ? match[1] : null;
@@ -153,86 +148,75 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
   const fromIATA = extractIATACode(fromPlace.place_name || fromPlace.name || '');
   const toIATA = extractIATACode(toPlace.place_name || toPlace.name || '');
 
-  // Search for flights if transport mode is flight
+  // Flight search effect - properly isolated
   useEffect(() => {
-    let isCancelled = false;
+    let cancelled = false;
 
-    if (isOpen && transport.toLowerCase() === 'flight' && fromIATA && toIATA) {
+    const searchFlights = async () => {
+      if (!isOpen || transport.toLowerCase() !== 'flight' || !fromIATA || !toIATA) {
+        return;
+      }
+
       setLoadingFlights(true);
       setFlightError(null);
       
-      // Calculate departure date
-      let departureDate = new Date();
-      let dayIndex = null;
-      
-      const routeDayNumber = toPlace.day_number || fromPlace.day_number;
-      
-      if (routeDayNumber && optimizationResult?.optimization?.daily_schedules) {
-        const daySchedule = optimizationResult.optimization.daily_schedules.find(
-          schedule => schedule.day === routeDayNumber
-        );
+      try {
+        // Calculate departure date
+        let departureDate = new Date();
+        const routeDayNumber = toPlace.day_number || fromPlace.day_number;
         
-        if (daySchedule) {
-          dayIndex = routeDayNumber - 1;
-        }
-      }
-      
-      if (dayIndex !== null && currentTrip) {
-        const scheduleDate = optimizationResult?.optimization?.daily_schedules?.[dayIndex]?.date;
-        
-        if (scheduleDate) {
-          departureDate = new Date(scheduleDate);
-        } else {
+        if (routeDayNumber && optimizationResult?.optimization?.daily_schedules) {
+          const daySchedule = optimizationResult.optimization.daily_schedules.find(
+            schedule => schedule.day === routeDayNumber
+          );
+          
+          if (daySchedule) {
+            const dayIndex = routeDayNumber - 1;
+            const scheduleDate = optimizationResult?.optimization?.daily_schedules?.[dayIndex]?.date;
+            
+            if (scheduleDate) {
+              departureDate = new Date(scheduleDate);
+            } else if (currentTrip) {
+              const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
+              departureDate = new Date(tripStartDate);
+              departureDate.setDate(departureDate.getDate() + dayIndex);
+            }
+          }
+        } else if (currentTrip) {
           const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
           departureDate = new Date(tripStartDate);
-          departureDate.setDate(departureDate.getDate() + dayIndex);
         }
-      } else {
-        const tripStartDate = currentTrip?.startDate || currentTrip?.start_date || new Date().toISOString();
-        departureDate = new Date(tripStartDate);
-      }
-      
-      const dateStr = departureDate.toISOString().split('T')[0];
-      
-      // Extract time preferences
-      let departureTime: string | undefined;
-      let arrivalTime: string | undefined;
-      let routeDuration: string | undefined;
+        
+        const dateStr = departureDate.toISOString().split('T')[0];
+        
+        // Extract time preferences
+        const timePreferences = {
+          departureTime: fromPlace.departure_time ? formatTime(fromPlace.departure_time) : undefined,
+          arrivalTime: toPlace.arrival_time ? formatTime(toPlace.arrival_time) : undefined,
+          duration: duration > 0 ? DateUtils.formatDuration(duration) : undefined
+        };
 
-      if (fromPlace.departure_time) {
-        departureTime = formatTime(fromPlace.departure_time);
+        const flights = await TravelPayoutsService.searchFlights(fromIATA, toIATA, dateStr, timePreferences);
+        
+        if (!cancelled) {
+          setFlightOptions(flights);
+          setLoadingFlights(false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Flight search failed:', error);
+          setFlightError('Unable to load flight data');
+          setLoadingFlights(false);
+        }
       }
-      if (toPlace.arrival_time) {
-        arrivalTime = formatTime(toPlace.arrival_time);
-      }
-      if (duration > 0) {
-        routeDuration = DateUtils.formatDuration(duration);
-      }
+    };
 
-      TravelPayoutsService.searchFlights(fromIATA, toIATA, dateStr, {
-        departureTime,
-        arrivalTime,
-        duration: routeDuration
-      })
-        .then((flights: FlightOption[]) => {
-          if (!isCancelled) {
-            setFlightOptions(flights);
-            setLoadingFlights(false);
-          }
-        })
-        .catch((error) => {
-          if (!isCancelled) {
-            console.error('Flight search failed:', error);
-            setFlightError('Unable to load flight data');
-            setLoadingFlights(false);
-          }
-        });
-    }
+    searchFlights();
 
     return () => {
-      isCancelled = true;
+      cancelled = true;
     };
-  }, [isOpen, transport, fromIATA, toIATA, currentTrip, optimizationResult, fromPlace, toPlace, duration]);
+  }, [isOpen, transport, fromIATA, toIATA, fromPlace, toPlace, currentTrip, optimizationResult, duration]);
 
   const handleBookFlight = (bookingUrl: string) => {
     window.open(bookingUrl, '_blank');
@@ -264,10 +248,10 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
               </div>
               <div>
                 <Dialog.Title className="text-lg font-bold text-slate-900 dark:text-white">
-                  Route Information
+                  {transport} Route Information
                 </Dialog.Title>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  {transport} route details
+                  Route details and travel information
                 </p>
               </div>
             </div>
@@ -283,107 +267,100 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
           <div className="p-6 overflow-y-auto max-h-96">
             <div className="space-y-6">
               
-              {/* Route Details */}
-              <div className="space-y-4">
-                {/* From */}
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-green-600 dark:text-green-400 text-sm font-bold">F</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">From</p>
-                    <p className="text-slate-600 dark:text-slate-400">{fromPlace.place_name || fromPlace.name}</p>
-                  </div>
+              {/* Route Overview */}
+              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Route className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                  <h3 className="font-semibold text-slate-900 dark:text-white">Route Overview</h3>
                 </div>
-
-                {/* To */}
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-red-600 dark:text-red-400 text-sm font-bold">T</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">To</p>
-                    <p className="text-slate-600 dark:text-slate-400">{toPlace.place_name || toPlace.name}</p>
-                  </div>
-                </div>
-
-                {/* Transport Mode */}
-                <div className="flex items-start space-x-3">
-                  <div className={`w-8 h-8 rounded-lg ${transportInfo.bgColor} flex items-center justify-center flex-shrink-0`}>
-                    <TransportIcon className={`w-4 h-4 ${transportInfo.textColor}`} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Transport Mode</p>
-                    <p className="text-slate-600 dark:text-slate-400">{transport}</p>
-                  </div>
-                </div>
-
-                {/* Duration */}
-                {duration > 0 && (
-                  <div className="flex items-start space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center flex-shrink-0">
-                      <Clock className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">Duration</p>
-                      <p className="text-slate-600 dark:text-slate-400">{DateUtils.formatDuration(duration)}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Travel Times */}
-                {(departureDisplay || arrivalDisplay) && (
-                  <div className="flex items-start space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">Travel Times</p>
-                      <div className="space-y-2 mt-2">
-                        {departureDisplay && (
-                          <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-700">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide">Departure</p>
-                                <p className="text-sm font-medium text-slate-900 dark:text-white">{departureDisplay}</p>
-                                {departureDateDisplay && (
-                                  <p className="text-xs text-green-600 dark:text-green-400">{departureDateDisplay}</p>
-                                )}
-                              </div>
-                              <div className="text-green-600 dark:text-green-400">
-                                <span className="text-lg">🛫</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {arrivalDisplay && (
-                          <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-700">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">Arrival</p>
-                                <p className="text-sm font-medium text-slate-900 dark:text-white">{arrivalDisplay}</p>
-                                {arrivalDateDisplay && (
-                                  <p className="text-xs text-red-600 dark:text-red-400">{arrivalDateDisplay}</p>
-                                )}
-                              </div>
-                              <div className="text-red-600 dark:text-red-400">
-                                <span className="text-lg">🛬</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide">From</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{fromPlace.place_name || fromPlace.name}</p>
+                    </div>
+                    <div className="px-3">
+                      <div className="w-8 h-0.5 bg-slate-300 dark:bg-slate-600"></div>
+                    </div>
+                    <div className="flex-1 text-right">
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">To</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{toPlace.place_name || toPlace.name}</p>
                     </div>
                   </div>
-                )}
+                  
+                  <div className="flex items-center justify-center space-x-4 pt-2">
+                    <div className="flex items-center space-x-2">
+                      <TransportIcon className={`w-4 h-4 ${transportInfo.textColor}`} />
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{transport}</span>
+                    </div>
+                    {duration > 0 && (
+                      <>
+                        <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
+                        <div className="flex items-center space-x-2">
+                          <Clock className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {DateUtils.formatDuration(duration)}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
+
+              {/* Travel Times */}
+              {(departureInfo.display || arrivalInfo.display) && (
+                <div>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Travel Times</h3>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {departureInfo.display && (
+                      <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center space-x-2 mb-1">
+                              <span className="text-lg">🛫</span>
+                              <p className="text-xs font-bold text-green-700 dark:text-green-300 uppercase tracking-wide">Departure</p>
+                            </div>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">{departureInfo.display}</p>
+                            {departureInfo.fullDate && (
+                              <p className="text-sm text-green-600 dark:text-green-400">{departureInfo.fullDate}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {arrivalInfo.display && (
+                      <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-700">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center space-x-2 mb-1">
+                              <span className="text-lg">🛬</span>
+                              <p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wide">Arrival</p>
+                            </div>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">{arrivalInfo.display}</p>
+                            {arrivalInfo.fullDate && (
+                              <p className="text-sm text-red-600 dark:text-red-400">{arrivalInfo.fullDate}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Flight Options */}
               {transport.toLowerCase() === 'flight' && fromIATA && toIATA && (
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-2">
+                <div>
+                  <div className="flex items-center space-x-2 mb-4">
                     <Plane className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    <h3 className="font-semibold text-slate-900 dark:text-white">
                       Flight Options: {fromIATA} → {toIATA}
                     </h3>
                   </div>
@@ -396,9 +373,9 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                   )}
 
                   {flightError && (
-                    <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-700">
-                      <p className="text-red-600 dark:text-red-400 text-center">{flightError}</p>
-                      <div className="mt-3 text-center">
+                    <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-700">
+                      <p className="text-red-600 dark:text-red-400 text-center mb-3">{flightError}</p>
+                      <div className="text-center">
                         <button
                           onClick={() => handleBookFlight(`https://www.aviasales.com/search/${fromIATA}${toIATA}`)}
                           className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -411,9 +388,8 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                   )}
 
                   {!loadingFlights && !flightError && flightOptions.length > 0 && (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {flightOptions.slice(0, 3).map((flight, index) => {
-                        // Format flight date for display
                         const flightDate = fromActualDate || new Date();
                         const flightDateStr = flightDate.toLocaleDateString('en-US', {
                           month: 'short',
@@ -423,58 +399,71 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                         return (
                           <div
                             key={index}
-                            className={`p-4 rounded-lg border-2 ${
+                            className={`p-4 rounded-xl border-2 transition-all hover:shadow-lg ${
                               flight.matchesSchedule 
                                 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700'
-                                : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600'
+                                : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-500'
                             }`}
                           >
-                            <div className="flex justify-between items-start mb-3">
+                            <div className="flex justify-between items-start mb-4">
                               <div className="flex-1">
                                 <div className="flex items-center justify-between mb-2">
-                                  <div className="font-bold text-slate-900 dark:text-white text-lg">
+                                  <h4 className="font-bold text-slate-900 dark:text-white text-lg">
                                     {flight.airline} {flight.flightNumber}
-                                  </div>
+                                  </h4>
                                   {flight.matchesSchedule && (
-                                    <div className="bg-green-600 text-white text-xs px-2 py-1 rounded-full font-semibold">
-                                      MATCHES SCHEDULE
+                                    <div className="bg-green-600 text-white text-xs px-3 py-1 rounded-full font-bold">
+                                      ✓ MATCHES SCHEDULE
                                     </div>
                                   )}
                                 </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                                  📅 {flightDateStr}
+                                
+                                <div className="flex items-center space-x-4 text-sm text-slate-600 dark:text-slate-400 mb-3">
+                                  <div className="flex items-center space-x-1">
+                                    <Calendar className="w-4 h-4" />
+                                    <span>📅 {flightDateStr}</span>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <Clock className="w-4 h-4" />
+                                    <span>{flight.duration}</span>
+                                  </div>
                                 </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                                  {flight.departure} → {flight.arrival} ({flight.duration})
-                                </div>
-                                <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                                  ¥{flight.price.toLocaleString()}
+                                
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    {flight.departure} → {flight.arrival}
+                                  </span>
+                                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                    ¥{flight.price.toLocaleString()}
+                                  </div>
                                 </div>
                               </div>
                             </div>
+                            
                             <button
                               onClick={() => handleBookFlight(flight.bookingUrl)}
-                              className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm"
+                              className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-semibold text-sm shadow-md hover:shadow-lg"
                             >
-                              Book Flight
+                              Book Flight →
                             </button>
                           </div>
                         );
                       })}
-                      <div className="text-center text-xs text-slate-500 dark:text-slate-400 mt-4 pt-3 border-t border-slate-200 dark:border-slate-600">
-                        <div className="text-green-600 dark:text-green-400 font-medium">
-                          {flightOptions.some(f => f.source === 'WayAway') ? 'Real flight data from WayAway' : 'Mock data with WayAway booking links'}
+                      
+                      <div className="text-center py-4 border-t border-slate-200 dark:border-slate-600">
+                        <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
+                          {flightOptions.some(f => f.source === 'WayAway') ? '✓ Real flight data from WayAway' : '⚡ Mock data with WayAway booking links'}
                         </div>
-                        <div className="text-slate-400 dark:text-slate-500">
-                          Powered by WayAway
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          Powered by WayAway Travel Platform
                         </div>
                       </div>
                     </div>
                   )}
 
                   {!loadingFlights && !flightError && flightOptions.length === 0 && (
-                    <div className="bg-slate-50 dark:bg-slate-700 p-4 rounded-lg text-center">
-                      <p className="text-slate-600 dark:text-slate-400 mb-3">No flights found for this route</p>
+                    <div className="bg-slate-50 dark:bg-slate-700 p-6 rounded-xl text-center">
+                      <p className="text-slate-600 dark:text-slate-400 mb-4">No flights found for this route</p>
                       <button
                         onClick={() => handleBookFlight(TravelPayoutsService.generateBookingUrl(fromIATA, toIATA, new Date().toISOString().split('T')[0]))}
                         className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -493,7 +482,7 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
           <div className="p-6 border-t border-slate-200/50 dark:border-slate-700/50">
             <button
               onClick={onClose}
-              className="w-full py-3 px-4 bg-gradient-to-r from-primary-500 to-secondary-600 text-white rounded-xl font-semibold hover:from-primary-600 hover:to-secondary-700 transition-all duration-200"
+              className="w-full py-3 px-4 bg-gradient-to-r from-primary-500 to-secondary-600 text-white rounded-xl font-semibold hover:from-primary-600 hover:to-secondary-700 transition-all duration-200 shadow-md hover:shadow-lg"
             >
               Close
             </button>
