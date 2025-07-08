@@ -921,52 +921,41 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
           }
         });
         
-        // Find which dayIndex this route belongs to by searching optimization results
+        // Use the destination place's day_number to find the correct date
         const currentOptimizationResult = optimizationResult || optimizationResultProp;
         
-        console.log('🔍 Debug optimization result structure:', {
+        console.log('🔍 Route day information:', {
+          fromPlace: {
+            name: fromPlace.place_name || fromPlace.name,
+            dayNumber: fromPlace.day_number
+          },
+          toPlace: {
+            name: toPlace.place_name || toPlace.name,
+            dayNumber: toPlace.day_number
+          },
           hasOptimizationResult: !!currentOptimizationResult,
-          hasOptimization: !!currentOptimizationResult?.optimization,
-          hasDailySchedules: !!currentOptimizationResult?.optimization?.daily_schedules,
-          dailySchedulesCount: currentOptimizationResult?.optimization?.daily_schedules?.length || 0,
-          dailySchedulesPreview: currentOptimizationResult?.optimization?.daily_schedules?.map((ds, idx) => ({
-            day: idx,
-            date: ds.date,
-            placesCount: ds.scheduled_places?.length || 0,
-            placeNames: ds.scheduled_places?.map(sp => sp.name || sp.place?.name || 'unnamed').slice(0, 3)
-          }))
+          hasDailySchedules: !!currentOptimizationResult?.optimization?.daily_schedules
         });
         
-        if (currentOptimizationResult?.optimization?.daily_schedules) {
-          // Search through daily_schedules to find the dayIndex for this route
-          currentOptimizationResult.optimization.daily_schedules.forEach((daySchedule, idx) => {
-            if (daySchedule.scheduled_places) {
-              const fromFound = daySchedule.scheduled_places.some(sp => {
-                const place = sp.place || sp;
-                const placeName = place.name || sp.name;
-                const match = placeName === (fromPlace.place_name || fromPlace.name);
-                if (match) {
-                  console.log('🎯 Found matching place:', {
-                    dayIndex: idx,
-                    date: daySchedule.date,
-                    placeName: placeName,
-                    searchedFor: fromPlace.place_name || fromPlace.name
-                  });
-                }
-                return match;
-              });
-              
-              if (fromFound) {
-                // Always use the latest/last match found (in case airport appears multiple times)
-                dayIndex = idx;
-                console.log('🎯 Found matching place (will use latest):', {
-                  dayIndex: idx,
-                  date: daySchedule.date,
-                  searchedFor: fromPlace.place_name || fromPlace.name
-                });
-              }
-            }
-          });
+        // Use toPlace.day_number to find the correct day schedule
+        let routeDayNumber = toPlace.day_number || fromPlace.day_number;
+        
+        if (routeDayNumber && currentOptimizationResult?.optimization?.daily_schedules) {
+          // Find the exact day schedule for this route
+          const daySchedule = currentOptimizationResult.optimization.daily_schedules.find(
+            schedule => schedule.day === routeDayNumber
+          );
+          
+          if (daySchedule) {
+            dayIndex = routeDayNumber - 1; // Convert 1-based day to 0-based index
+            console.log('✅ Found route day from day_number:', {
+              routeDayNumber: routeDayNumber,
+              dayIndex: dayIndex,
+              scheduleDate: daySchedule.date,
+              fromPlace: fromPlace.place_name || fromPlace.name,
+              toPlace: toPlace.place_name || toPlace.name
+            });
+          }
         }
         
         if (dayIndex !== null && currentTrip) {
