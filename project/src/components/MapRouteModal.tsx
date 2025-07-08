@@ -223,74 +223,52 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
           <div className="p-6 overflow-y-auto max-h-96">
             <div className="space-y-6">
               
-              {/* Travel Times with Route Information */}
+              {/* Route Information */}
               <div>
                 <div className="flex items-center space-x-2 mb-4">
                   <Route className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   <h3 className="font-semibold text-slate-900 dark:text-white">Route Information</h3>
                 </div>
                 
-                {/* Route Overview */}
-                <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl mb-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide">From</p>
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">{fromPlace.place_name || fromPlace.name}</p>
-                      </div>
-                      <div className="px-3">
-                        <div className="w-8 h-0.5 bg-slate-300 dark:bg-slate-600"></div>
-                      </div>
-                      <div className="flex-1 text-right">
-                        <p className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">To</p>
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">{toPlace.place_name || toPlace.name}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-center space-x-4 pt-2">
-                      <div className="flex items-center space-x-2">
-                        <TransportIcon className={`w-4 h-4 ${transportInfo.textColor}`} />
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{transport}</span>
-                      </div>
-                      {duration > 0 && (
-                        <>
-                          <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
-                          <div className="flex items-center space-x-2">
-                            <Clock className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                              {DateUtils.formatDuration(duration)}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                {/* Transport Mode */}
+                <div className="flex items-center justify-center space-x-2 mb-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+                  <TransportIcon className={`w-5 h-5 ${transportInfo.textColor}`} />
+                  <span className="text-lg font-medium text-slate-700 dark:text-slate-300">{transport}</span>
+                  {duration > 0 && (
+                    <>
+                      <div className="w-1 h-1 bg-slate-400 rounded-full mx-2"></div>
+                      <Clock className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                        {DateUtils.formatDuration(duration)}
+                      </span>
+                    </>
+                  )}
                 </div>
 
-                {/* Travel Times */}
-                {(departureInfo.display || arrivalInfo.display) && (
-                  <div className="space-y-3">
-                    {departureInfo.display && (
-                      <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="text-lg">🛫</span>
-                          <p className="text-xs font-bold text-green-700 dark:text-green-300 uppercase tracking-wide">Departure</p>
-                        </div>
-                        <p className="text-lg font-bold text-slate-900 dark:text-white">{departureInfo.display}</p>
+                {/* Travel Times with Location Information */}
+                <div className="space-y-3">
+                  {departureInfo.display && (
+                    <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="text-lg">🛫</span>
+                        <p className="text-xs font-bold text-green-700 dark:text-green-300 uppercase tracking-wide">Departure</p>
                       </div>
-                    )}
-                    
-                    {arrivalInfo.display && (
-                      <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-700">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="text-lg">🛬</span>
-                          <p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wide">Arrival</p>
-                        </div>
-                        <p className="text-lg font-bold text-slate-900 dark:text-white">{arrivalInfo.display}</p>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{fromPlace.place_name || fromPlace.name}</p>
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">{departureInfo.display}</p>
+                    </div>
+                  )}
+                  
+                  {arrivalInfo.display && (
+                    <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-700">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="text-lg">🛬</span>
+                        <p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wide">Arrival</p>
                       </div>
-                    )}
-                  </div>
-                )}
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{toPlace.place_name || toPlace.name}</p>
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">{arrivalInfo.display}</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Flight Booking Section */}
