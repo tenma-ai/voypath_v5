@@ -125,6 +125,10 @@ interface StoreState {
   showOptimizationSuccess: boolean;
   setShowOptimizationSuccess: (value: boolean) => void;
 
+  // Selected day for ListView/MapView synchronization
+  selectedDay: string | null;
+  setSelectedDay: (day: string | null) => void;
+
   // API Integration
   createTripWithAPI: (tripData: TripCreateData) => Promise<Trip>;
   optimizeTrip: (tripId: string) => Promise<void>;
@@ -738,6 +742,12 @@ export const useStore = create<StoreState>()((set, get) => ({
       showOptimizationSuccess: false,
       setShowOptimizationSuccess: (value) => {
         set({ showOptimizationSuccess: value });
+      },
+
+      // Selected day for ListView/MapView synchronization
+      selectedDay: null,
+      setSelectedDay: (day) => {
+        set({ selectedDay: day });
       },
 
       // Premium functions

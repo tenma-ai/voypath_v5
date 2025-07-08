@@ -44,11 +44,14 @@ const getTransportIcon = (mode?: string): string => {
 
 export function ListView() {
   const navigate = useNavigate();
-  const { places, currentTrip, isLoading, optimizationResult, memberColors, tripMembers, hasUserOptimized } = useStore();
+  const { places, currentTrip, isLoading, optimizationResult, memberColors, tripMembers, hasUserOptimized, setSelectedDay: setStoreSelectedDay } = useStore();
   const [selectedDay, setSelectedDay] = useState(() => {
     // Initialize with trip start date if available
     const initialDay = PlaceDateUtils.getInitialSelectedDay(currentTrip);
-    return initialDay || new Date().toISOString().split('T')[0];
+    const day = initialDay || new Date().toISOString().split('T')[0];
+    // Set store state as well
+    setStoreSelectedDay(day);
+    return day;
   });
   const [collapsedEvents, setCollapsedEvents] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -373,7 +376,10 @@ export function ListView() {
           {schedule.map((day) => (
             <button
               key={day.date}
-              onClick={() => setSelectedDay(day.date)}
+              onClick={() => {
+                setSelectedDay(day.date);
+                setStoreSelectedDay(day.date);
+              }}
               className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
                 selectedDay === day.date
                   ? 'bg-blue-600 text-white shadow-lg'
