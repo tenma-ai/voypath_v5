@@ -253,7 +253,7 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                 </div>
               </div>
 
-              {/* Travel Times */}
+              {/* Travel Times - Only Departure and Arrival Times */}
               {(departureInfo.display || arrivalInfo.display) && (
                 <div>
                   <div className="flex items-center space-x-2 mb-4">
@@ -264,35 +264,21 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                   <div className="space-y-3">
                     {departureInfo.display && (
                       <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span className="text-lg">🛫</span>
-                              <p className="text-xs font-bold text-green-700 dark:text-green-300 uppercase tracking-wide">Departure</p>
-                            </div>
-                            <p className="text-lg font-bold text-slate-900 dark:text-white">{departureInfo.display}</p>
-                            {departureInfo.fullDate && (
-                              <p className="text-sm text-green-600 dark:text-green-400">{departureInfo.fullDate}</p>
-                            )}
-                          </div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="text-lg">🛫</span>
+                          <p className="text-xs font-bold text-green-700 dark:text-green-300 uppercase tracking-wide">Departure</p>
                         </div>
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">{departureInfo.display}</p>
                       </div>
                     )}
                     
                     {arrivalInfo.display && (
                       <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-700">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span className="text-lg">🛬</span>
-                              <p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wide">Arrival</p>
-                            </div>
-                            <p className="text-lg font-bold text-slate-900 dark:text-white">{arrivalInfo.display}</p>
-                            {arrivalInfo.fullDate && (
-                              <p className="text-sm text-red-600 dark:text-red-400">{arrivalInfo.fullDate}</p>
-                            )}
-                          </div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="text-lg">🛬</span>
+                          <p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wide">Arrival</p>
                         </div>
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">{arrivalInfo.display}</p>
                       </div>
                     )}
                   </div>
