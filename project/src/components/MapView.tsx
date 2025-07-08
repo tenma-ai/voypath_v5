@@ -905,110 +905,62 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
       });
 
       if (fromIATA && toIATA) {
-        // Calculate departure date using the same logic as ListView.tsx
+        // Use EXACT ListView.tsx date calculation logic
         let departureDate = new Date();
+        let dayIndex = null;
         
         // Debug current trip data
         console.log('🔍 Trip data for date calculation:', {
           currentTrip: currentTrip,
           tripStartDate: currentTrip?.start_date,
-          tripEndDate: currentTrip?.end_date,
           fromPlace: {
             name: fromPlace.place_name || fromPlace.name,
             dayNumber: fromPlace.day_number
-          },
-          toPlace: {
-            name: toPlace.place_name || toPlace.name,
-            dayNumber: toPlace.day_number
           }
         });
         
-        try {
-          // Find the actual day index from optimization result like ListView.tsx does
-          let dayIndex = null;
-          const currentOptimizationResult = optimizationResult || optimizationResultProp;
-          
-          if (currentOptimizationResult?.optimization?.daily_schedules) {
-            // Search through daily schedules to find the actual day index for these places
-            currentOptimizationResult.optimization.daily_schedules.forEach((daySchedule, idx) => {
-              if (daySchedule.scheduled_places) {
-                const fromFound = daySchedule.scheduled_places.some(sp => {
-                  const place = sp.place || sp;
-                  const placeName = place.name || sp.name;
-                  return placeName === (fromPlace.place_name || fromPlace.name);
-                });
-                const toFound = daySchedule.scheduled_places.some(sp => {
-                  const place = sp.place || sp;
-                  const placeName = place.name || sp.name;
-                  return placeName === (toPlace.place_name || toPlace.name);
-                });
-                
-                if (fromFound || toFound) {
-                  dayIndex = idx;
-                }
+        // Find dayIndex using EXACT ListView.tsx logic
+        const currentOptimizationResult = optimizationResult || optimizationResultProp;
+        
+        if (currentOptimizationResult?.optimization?.daily_schedules) {
+          // EXACT ListView.tsx approach: iterate through daily_schedules
+          currentOptimizationResult.optimization.daily_schedules.forEach((daySchedule, idx) => {
+            if (daySchedule.scheduled_places) {
+              const fromFound = daySchedule.scheduled_places.some(sp => {
+                const place = sp.place || sp;
+                const placeName = place.name || sp.name;
+                return placeName === (fromPlace.place_name || fromPlace.name);
+              });
+              
+              if (fromFound) {
+                dayIndex = idx; // Use the exact same dayIndex as ListView
               }
-            });
-          }
-          
-          if (dayIndex !== null && currentTrip) {
-            // Use EXACT ListView.tsx logic: trip start date + dayIndex
-            const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
-            departureDate = new Date(tripStartDate);
-            departureDate.setDate(departureDate.getDate() + dayIndex);
-            console.log('✅ Using ListView.tsx exact logic for date calculation:', {
-              fromPlace: fromPlace.place_name || fromPlace.name,
-              toPlace: toPlace.place_name || toPlace.name,
-              dayIndex: dayIndex,
-              tripStartDate: tripStartDate,
-              calculatedDate: departureDate.toISOString().split('T')[0]
-            });
-          } else if (currentTrip && fromPlace.day_number) {
-            // Fallback: Use day_number if found
-            const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
-            departureDate = new Date(tripStartDate);
-            departureDate.setDate(departureDate.getDate() + (fromPlace.day_number - 1)); // day_number is 1-based
-            console.log('✅ Using day_number fallback:', {
-              fromPlace: fromPlace.place_name || fromPlace.name,
-              dayNumber: fromPlace.day_number,
-              tripStartDate: tripStartDate,
-              calculatedDate: departureDate.toISOString().split('T')[0]
-            });
-          } else if (currentTrip && toPlace.day_number) {
-            // If departure day is not available, use arrival day as reference
-            const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
-            departureDate = new Date(tripStartDate);
-            departureDate.setDate(departureDate.getDate() + (toPlace.day_number - 1)); // day_number is 1-based
-            console.log('✅ Using toPlace day_number fallback:', {
-              toPlace: toPlace.place_name || toPlace.name,
-              dayNumber: toPlace.day_number,
-              tripStartDate: tripStartDate,
-              calculatedDate: departureDate.toISOString().split('T')[0]
-            });
-          } else {
-            // Use PlaceDateUtils approach like ListView.tsx
-            const tripStartDate = DateUtils.getTripStartDate(currentTrip);
-            if (tripStartDate) {
-              departureDate = tripStartDate;
-              console.log('✅ Using trip start date (PlaceDateUtils approach):', departureDate.toISOString().split('T')[0]);
-            } else {
-              // Last resort: use today's date + 1 week for future flight
-              departureDate = new Date();
-              departureDate.setDate(departureDate.getDate() + 7);
-              console.warn('⚠️ Using fallback date (today + 7 days):', departureDate.toISOString().split('T')[0]);
             }
-          }
-        } catch (error) {
-          console.warn('Could not calculate departure date:', error);
-          // Use PlaceDateUtils fallback like ListView.tsx
-          const tripStartDate = DateUtils.getTripStartDate(currentTrip);
-          if (tripStartDate) {
-            departureDate = tripStartDate;
-            console.log('✅ Using trip start date fallback (PlaceDateUtils):', departureDate.toISOString().split('T')[0]);
-          } else {
-            departureDate = new Date();
-            departureDate.setDate(departureDate.getDate() + 7);
-            console.warn('⚠️ Using fallback date (today + 7 days):', departureDate.toISOString().split('T')[0]);
-          }
+          });
+        }
+          
+        if (dayIndex !== null && currentTrip) {
+          // EXACT ListView.tsx calculation: tripStartDate + dayIndex
+          const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
+          departureDate = new Date(tripStartDate);
+          departureDate.setDate(departureDate.getDate() + dayIndex);
+          
+          console.log('✅ Using EXACT ListView.tsx date calculation:', {
+            fromPlace: fromPlace.place_name || fromPlace.name,
+            dayIndex: dayIndex,
+            tripStartDate: tripStartDate,
+            calculatedDate: departureDate.toISOString().split('T')[0]
+          });
+        } else {
+          // Fallback to trip start date if dayIndex not found
+          const tripStartDate = currentTrip?.startDate || currentTrip?.start_date || new Date().toISOString();
+          departureDate = new Date(tripStartDate);
+          
+          console.warn('⚠️ dayIndex not found, using trip start date:', {
+            fromPlace: fromPlace.place_name || fromPlace.name,
+            tripStartDate: tripStartDate,
+            calculatedDate: departureDate.toISOString().split('T')[0]
+          });
         }
         
         const dateStr = departureDate.toISOString().split('T')[0];
@@ -1160,43 +1112,50 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
               // Generate flight options HTML with schedule matching indicators
               const flightOptionsHTML = flights.slice(0, 3).map(flight => {
                 const matchBadge = flight.matchesSchedule ? 
-                  '<span style="background: #10b981; color: white; font-size: 10px; padding: 2px 6px; border-radius: 12px; margin-left: 8px;">MATCHES SCHEDULE</span>' : 
+                  '<div style="background: #10b981; color: white; font-size: 10px; padding: 2px 6px; border-radius: 12px; margin-top: 4px; display: inline-block;">MATCHES SCHEDULE</div>' : 
                   '';
                 const borderColor = flight.matchesSchedule ? '#10b981' : '#e2e8f0';
                 const backgroundColor = flight.matchesSchedule ? '#f0fdf4' : 'white';
                 
+                // Format departure date for display
+                const departureDateStr = dateStr ? new Date(dateStr).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric'
+                }) : '';
+                
                 return `
-                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; margin: 8px 0; background: ${backgroundColor}; border-radius: 6px; border: 2px solid ${borderColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                    <div style="flex: 1;">
-                      <div style="font-weight: bold; color: #1f2937; margin-bottom: 4px; display: flex; align-items: center;">
+                  <div style="padding: 12px; margin: 8px 0; background: ${backgroundColor}; border-radius: 6px; border: 2px solid ${borderColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1); max-width: 100%;">
+                    <div style="margin-bottom: 8px;">
+                      <div style="font-weight: bold; color: #1f2937; margin-bottom: 2px;">
                         ${flight.airline} ${flight.flightNumber}
-                        ${matchBadge}
                       </div>
-                      <div style="font-size: 13px; color: #6b7280; margin-bottom: 2px;">
+                      ${departureDateStr ? `<div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">📅 ${departureDateStr}</div>` : ''}
+                      <div style="font-size: 13px; color: #6b7280; margin-bottom: 4px;">
                         ${flight.departure} → ${flight.arrival} (${flight.duration})
                       </div>
-                      <div style="font-size: 14px; font-weight: bold; color: #059669;">
+                      <div style="font-size: 14px; font-weight: bold; color: #059669; margin-bottom: 4px;">
                         ¥${flight.price.toLocaleString()}
                       </div>
+                      ${matchBadge}
                     </div>
                     <button onclick="bookFlight('${flight.bookingUrl}')"
-                            style="background: #0066cc; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: 12px;">
-                      Book
+                            style="background: #0066cc; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; width: 100%; box-sizing: border-box;">
+                      Book Flight
                     </button>
                   </div>
                 `;
               }).join('');
               
               const flightSearchHTML = `
-                <div style="margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-                  <div style="font-weight: bold; margin-bottom: 12px; color: #333; text-align: center;">
+                <div style="margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; max-width: 320px; width: 100%; box-sizing: border-box;">
+                  <div style="font-weight: bold; margin-bottom: 12px; color: #333; text-align: center; font-size: 14px;">
                     ✈️ Flight Options: ${fromIATA} → ${toIATA}
                   </div>
                   ${flightOptionsHTML}
-                  <div style="margin-top: 8px; font-size: 11px; color: #10b981; text-align: center;">
+                  <div style="margin-top: 8px; font-size: 10px; color: #10b981; text-align: center;">
                     ${flights.some(f => f.source === 'WayAway') ? 'Real flight data from WayAway' : 'Mock data with WayAway booking links'}
                   </div>
-                  <div style="margin-top: 4px; font-size: 11px; color: #9ca3af; text-align: center;">
+                  <div style="margin-top: 4px; font-size: 10px; color: #9ca3af; text-align: center;">
                     Powered by WayAway
                   </div>
                 </div>
