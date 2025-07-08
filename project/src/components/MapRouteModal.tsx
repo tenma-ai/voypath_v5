@@ -211,8 +211,10 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
       }
     };
 
+    // Call async function without returning it
     searchFlights();
 
+    // Return only cleanup function
     return () => {
       cancelled = true;
     };
