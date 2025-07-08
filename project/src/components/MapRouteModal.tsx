@@ -180,106 +180,44 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
     window.open(url, '_blank');
   };
 
-  // Generate flight search widget that opens with specific date
-  const generateFlightSearchWidget = (origin: string, destination: string) => {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { 
-            margin: 0; 
-            padding: 20px; 
-            font-family: Arial, sans-serif; 
-            background: #f8f9fa;
-          }
-          .search-container {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-          }
-          .route-info {
-            text-align: center;
-            margin-bottom: 20px;
-          }
-          .route-title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #2563eb;
-            margin-bottom: 8px;
-          }
-          .date-info {
-            font-size: 16px;
-            color: #6b7280;
-            margin-bottom: 20px;
-          }
-          .search-buttons {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 20px;
-          }
-          .search-btn {
-            display: block;
-            padding: 12px 20px;
-            border-radius: 8px;
-            text-decoration: none;
-            text-align: center;
-            font-weight: 600;
-            transition: all 0.2s;
-          }
-          .primary-btn {
-            background: #2563eb;
-            color: white;
-          }
-          .secondary-btn {
-            background: #f3f4f6;
-            color: #374151;
-            border: 1px solid #d1d5db;
-          }
-          .search-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          }
-          .widget-container {
-            margin: 20px 0;
-            min-height: 200px;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            background: white;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="search-container">
-          <div class="route-info">
-            <div class="route-title">${origin} → ${destination}</div>
-            <div class="date-info">Departure: ${departureDate.toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}</div>
-          </div>
-          
-          <div class="widget-container">
-            <script async src="https://tpwdg.com/content?trs=434567&shmarker=649297&locale=en_us&powered_by=true&origin=${origin}&destination=${destination}&non_direct_flights=true&min_lines=5&border_radius=8&color_background=%23FFFFFF&color_text=%23000000&color_border=%23E5E7EB&promo_id=7281&campaign_id=200" charset="utf-8"></script>
-          </div>
-          
-          <div class="search-buttons">
-            <a href="https://www.aviasales.com/search/${origin}${destination}?depart_date=${dateStr}" target="_parent" class="search-btn primary-btn">
-              Search with Date on Aviasales
-            </a>
-            <a href="https://www.skyscanner.com/flights/${origin}/${destination}/${dateStr.replace(/-/g, '')}" target="_parent" class="search-btn secondary-btn">
-              Search with Date on Skyscanner
-            </a>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+  // Generate mock flight data for display
+  const generateMockFlights = (origin: string, destination: string) => {
+    const flightDate = departureDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+
+    const basePrice = Math.floor(Math.random() * 20000) + 25000; // Base price 25,000-45,000 yen
+    
+    return [
+      {
+        airline: 'ANA',
+        flightNumber: 'NH123',
+        departure: departureInfo.display ? formatTime(fromPlace.departure_time) : '13:45',
+        arrival: arrivalInfo.display ? formatTime(toPlace.arrival_time) : '16:20',
+        duration: '2h 35m',
+        price: basePrice,
+        direct: true
+      },
+      {
+        airline: 'JAL',
+        flightNumber: 'JL456',
+        departure: departureInfo.display ? formatTime(fromPlace.departure_time) : '14:30',
+        arrival: arrivalInfo.display ? formatTime(toPlace.arrival_time) : '17:05',
+        duration: '2h 35m',
+        price: basePrice + 3000,
+        direct: true
+      },
+      {
+        airline: 'Jetstar',
+        flightNumber: 'JQ789',
+        departure: '18:50',
+        arrival: '21:25',
+        duration: '2h 35m',
+        price: basePrice - 8000,
+        direct: true
+      }
+    ];
   };
 
   return (
@@ -385,19 +323,66 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                     </h3>
                   </div>
 
-                  {/* TravelPayouts Widget */}
+                  {/* Mock Flight Options */}
                   <div className="mb-6">
-                    <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden">
-                      <iframe
-                        srcDoc={generateFlightSearchWidget(fromIATA, toIATA)}
-                        width="100%"
-                        height="500"
-                        frameBorder="0"
-                        scrolling="yes"
-                        className="w-full"
-                        title={`Flight options from ${fromIATA} to ${toIATA}`}
-                        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
-                      />
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3 mb-4">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-amber-600 dark:text-amber-400">⚠️</span>
+                        <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                          Mock Data - For demonstration purposes only
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {generateMockFlights(fromIATA, toIATA).map((flight, index) => (
+                        <div
+                          key={index}
+                          className="bg-white dark:bg-slate-700 p-4 rounded-xl border border-slate-200 dark:border-slate-600 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="font-bold text-slate-900 dark:text-white text-lg">
+                                  {flight.airline} {flight.flightNumber}
+                                </div>
+                                {flight.direct && (
+                                  <div className="bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-xs px-2 py-1 rounded-full font-semibold">
+                                    Direct
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center space-x-4 text-sm text-slate-600 dark:text-slate-400 mb-3">
+                                <div className="flex items-center space-x-1">
+                                  <Calendar className="w-4 h-4" />
+                                  <span>{departureDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <Clock className="w-4 h-4" />
+                                  <span>{flight.duration}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-between mb-3">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                  {flight.departure} → {flight.arrival}
+                                </span>
+                                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                  ¥{flight.price.toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleBookFlight(generateWayAwayBookingUrl(fromIATA, toIATA))}
+                            className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-semibold text-sm shadow-md hover:shadow-lg"
+                          >
+                            Book Flight
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
