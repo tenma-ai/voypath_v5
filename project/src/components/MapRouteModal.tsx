@@ -133,6 +133,8 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
 
   // Search for flights if transport mode is flight
   useEffect(() => {
+    let isCancelled = false;
+
     if (isOpen && transport.toLowerCase() === 'flight' && fromIATA && toIATA) {
       setLoadingFlights(true);
       setFlightError(null);
@@ -191,16 +193,24 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
         duration: routeDuration
       })
         .then((flights: FlightOption[]) => {
-          setFlightOptions(flights);
-          setLoadingFlights(false);
+          if (!isCancelled) {
+            setFlightOptions(flights);
+            setLoadingFlights(false);
+          }
         })
         .catch((error) => {
-          console.error('Flight search failed:', error);
-          setFlightError('Unable to load flight data');
-          setLoadingFlights(false);
+          if (!isCancelled) {
+            console.error('Flight search failed:', error);
+            setFlightError('Unable to load flight data');
+            setLoadingFlights(false);
+          }
         });
     }
-  }, [isOpen, transport, fromIATA, toIATA, currentTrip, optimizationResult]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, transport, fromIATA, toIATA, currentTrip, optimizationResult, fromPlace, toPlace, duration]);
 
   const handleBookFlight = (bookingUrl: string) => {
     window.open(bookingUrl, '_blank');
