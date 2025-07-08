@@ -144,11 +144,11 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
   const fromIATA = extractIATACode(fromPlace.place_name || fromPlace.name || '');
   const toIATA = extractIATACode(toPlace.place_name || toPlace.name || '');
 
-  // Generate WayAway booking URL
+  // Generate booking URLs with actual date
+  const departureDate = fromActualDate || new Date();
+  const dateStr = departureDate.toISOString().split('T')[0];
+  
   const generateWayAwayBookingUrl = (origin: string, destination: string) => {
-    const departureDate = fromActualDate || new Date();
-    const dateStr = departureDate.toISOString().split('T')[0];
-    
     // WayAway affiliate booking URL
     const wayAwayUrl = `https://wayaway.io/search?origin_iata=${origin}&destination_iata=${destination}&depart_date=${dateStr}&adults=1&children=0&infants=0&currency=JPY&marker=649297`;
     
@@ -160,6 +160,18 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
     const encodedUrl = encodeURIComponent(wayAwayUrl);
     
     return `https://tp.media/r?marker=${marker}&trs=${trs}&p=${p}&u=${encodedUrl}&campaign_id=${campaignId}`;
+  };
+
+  const generateAviasalesUrl = (origin: string, destination: string) => {
+    return `https://www.aviasales.com/search/${origin}${destination}?depart_date=${dateStr}`;
+  };
+
+  const generateSkyscannerUrl = (origin: string, destination: string) => {
+    return `https://www.skyscanner.com/flights/${origin}/${destination}/${dateStr.replace(/-/g, '')}`;
+  };
+
+  const generateTripComUrl = (origin: string, destination: string) => {
+    return `https://www.trip.com/flights/booking?flightType=ow&dcity=${origin}&acity=${destination}&ddate=${dateStr}&adult=1&child=0&infant=0`;
   };
 
   const handleBookFlight = (url: string) => {
@@ -211,56 +223,52 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
           <div className="p-6 overflow-y-auto max-h-96">
             <div className="space-y-6">
               
-              {/* Route Overview */}
-              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Route className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                  <h3 className="font-semibold text-slate-900 dark:text-white">Route Overview</h3>
+              {/* Travel Times with Route Information */}
+              <div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <Route className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="font-semibold text-slate-900 dark:text-white">Route Information</h3>
                 </div>
                 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide">From</p>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{fromPlace.place_name || fromPlace.name}</p>
+                {/* Route Overview */}
+                <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl mb-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide">From</p>
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">{fromPlace.place_name || fromPlace.name}</p>
+                      </div>
+                      <div className="px-3">
+                        <div className="w-8 h-0.5 bg-slate-300 dark:bg-slate-600"></div>
+                      </div>
+                      <div className="flex-1 text-right">
+                        <p className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">To</p>
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">{toPlace.place_name || toPlace.name}</p>
+                      </div>
                     </div>
-                    <div className="px-3">
-                      <div className="w-8 h-0.5 bg-slate-300 dark:bg-slate-600"></div>
+                    
+                    <div className="flex items-center justify-center space-x-4 pt-2">
+                      <div className="flex items-center space-x-2">
+                        <TransportIcon className={`w-4 h-4 ${transportInfo.textColor}`} />
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{transport}</span>
+                      </div>
+                      {duration > 0 && (
+                        <>
+                          <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
+                          <div className="flex items-center space-x-2">
+                            <Clock className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                              {DateUtils.formatDuration(duration)}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
-                    <div className="flex-1 text-right">
-                      <p className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">To</p>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{toPlace.place_name || toPlace.name}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-center space-x-4 pt-2">
-                    <div className="flex items-center space-x-2">
-                      <TransportIcon className={`w-4 h-4 ${transportInfo.textColor}`} />
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{transport}</span>
-                    </div>
-                    {duration > 0 && (
-                      <>
-                        <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
-                        <div className="flex items-center space-x-2">
-                          <Clock className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                            {DateUtils.formatDuration(duration)}
-                          </span>
-                        </div>
-                      </>
-                    )}
                   </div>
                 </div>
-              </div>
 
-              {/* Travel Times - Only Departure and Arrival Times */}
-              {(departureInfo.display || arrivalInfo.display) && (
-                <div>
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    <h3 className="font-semibold text-slate-900 dark:text-white">Travel Times</h3>
-                  </div>
-                  
+                {/* Travel Times */}
+                {(departureInfo.display || arrivalInfo.display) && (
                   <div className="space-y-3">
                     {departureInfo.display && (
                       <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
@@ -282,8 +290,8 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                       </div>
                     )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Flight Booking Section */}
               {transport.toLowerCase() === 'flight' && fromIATA && toIATA && (
@@ -307,21 +315,29 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                     </button>
 
                     {/* Alternative booking options */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
-                        onClick={() => handleBookFlight(`https://www.aviasales.com/search/${fromIATA}${toIATA}`)}
-                        className="py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-sm flex items-center justify-center space-x-2"
+                        onClick={() => handleBookFlight(generateAviasalesUrl(fromIATA, toIATA))}
+                        className="py-3 px-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-xs flex items-center justify-center space-x-1"
                       >
-                        <ExternalLink className="w-4 h-4" />
+                        <ExternalLink className="w-3 h-3" />
                         <span>Aviasales</span>
                       </button>
                       
                       <button
-                        onClick={() => handleBookFlight(`https://www.skyscanner.com/flights/${fromIATA}/${toIATA}`)}
-                        className="py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-sm flex items-center justify-center space-x-2"
+                        onClick={() => handleBookFlight(generateSkyscannerUrl(fromIATA, toIATA))}
+                        className="py-3 px-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-xs flex items-center justify-center space-x-1"
                       >
-                        <ExternalLink className="w-4 h-4" />
+                        <ExternalLink className="w-3 h-3" />
                         <span>Skyscanner</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleBookFlight(generateTripComUrl(fromIATA, toIATA))}
+                        className="py-3 px-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-xs flex items-center justify-center space-x-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Trip.com</span>
                       </button>
                     </div>
 
