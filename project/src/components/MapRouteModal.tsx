@@ -163,15 +163,17 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
   };
 
   const generateAviasalesUrl = (origin: string, destination: string) => {
-    return `https://www.aviasales.com/search/${origin}${destination}?depart_date=${dateStr}`;
-  };
-
-  const generateSkyscannerUrl = (origin: string, destination: string) => {
-    return `https://www.skyscanner.com/flights/${origin}/${destination}/${dateStr.replace(/-/g, '')}`;
+    const aviasalesUrl = `https://aviasales.com/search/${origin}${destination}?depart_date=${dateStr}`;
+    const encodedUrl = encodeURIComponent(aviasalesUrl);
+    // TravelPayouts affiliate link for Aviasales
+    return `https://tp.media/r?marker=649297&trs=434567&p=4114&u=${encodedUrl}&campaign_id=100`;
   };
 
   const generateTripComUrl = (origin: string, destination: string) => {
-    return `https://www.trip.com/flights/booking?flightType=ow&dcity=${origin}&acity=${destination}&ddate=${dateStr}&adult=1&child=0&infant=0`;
+    const tripComUrl = `https://trip.com/flights/booking?flightType=ow&dcity=${origin}&acity=${destination}&ddate=${dateStr}&adult=1&child=0&infant=0`;
+    const encodedUrl = encodeURIComponent(tripComUrl);
+    // TravelPayouts affiliate link for Trip.com
+    return `https://tp.media/r?marker=649297&trs=434567&p=8626&u=${encodedUrl}&campaign_id=121`;
   };
 
   const handleBookFlight = (url: string) => {
@@ -293,28 +295,20 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                     </button>
 
                     {/* Alternative booking options */}
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <button
                         onClick={() => handleBookFlight(generateAviasalesUrl(fromIATA, toIATA))}
-                        className="py-3 px-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-xs flex items-center justify-center space-x-1"
+                        className="py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-sm flex items-center justify-center space-x-2"
                       >
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="w-4 h-4" />
                         <span>Aviasales</span>
-                      </button>
-                      
-                      <button
-                        onClick={() => handleBookFlight(generateSkyscannerUrl(fromIATA, toIATA))}
-                        className="py-3 px-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-xs flex items-center justify-center space-x-1"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        <span>Skyscanner</span>
                       </button>
 
                       <button
                         onClick={() => handleBookFlight(generateTripComUrl(fromIATA, toIATA))}
-                        className="py-3 px-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-xs flex items-center justify-center space-x-1"
+                        className="py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-sm flex items-center justify-center space-x-2"
                       >
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="w-4 h-4" />
                         <span>Trip.com</span>
                       </button>
                     </div>
@@ -322,10 +316,10 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                     {/* Flight info footer */}
                     <div className="text-center py-3 border-t border-slate-200 dark:border-slate-600">
                       <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
-                        ✓ WayAway Partner Booking
+                        ✓ TravelPayouts Partner Network
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">
-                        Compare prices across multiple airlines
+                        WayAway • Aviasales • Trip.com with affiliate tracking
                       </div>
                     </div>
                   </div>
