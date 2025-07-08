@@ -429,7 +429,6 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
     // Always use the new modal for better UX
     setSelectedPlaceForModal(place);
     setShowPlaceModal(true);
-    return;
 
     // Get user information for the place
     const colorResult = getPlaceColor(place);
@@ -732,7 +731,6 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
     // Always use the new modal for better UX
     setSelectedRouteForModal({ fromPlace, toPlace });
     setShowRouteModal(true);
-    return;
 
     // The edge function sets transport_mode on the destination place
     let transport = toPlace.transport_mode || fromPlace.transport_mode || '';
