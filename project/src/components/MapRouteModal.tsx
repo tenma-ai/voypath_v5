@@ -109,17 +109,39 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
   // Format departure/arrival times with date context
   let departureDisplay = '';
   let arrivalDisplay = '';
+  let departureDateDisplay = '';
+  let arrivalDateDisplay = '';
   
   if (fromPlace.departure_time) {
     const timeStr = formatTime(fromPlace.departure_time);
-    const dateStr = fromActualDate ? `${fromActualDate.getMonth() + 1}/${fromActualDate.getDate()}` : '';
-    departureDisplay = dateStr ? `${dateStr} ${timeStr}` : timeStr;
+    if (fromActualDate) {
+      const dateStr = `${fromActualDate.getMonth() + 1}/${fromActualDate.getDate()}`;
+      const fullDateStr = fromActualDate.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      departureDisplay = `${dateStr} ${timeStr}`;
+      departureDateDisplay = fullDateStr;
+    } else {
+      departureDisplay = timeStr;
+    }
   }
   
   if (toPlace.arrival_time) {
     const timeStr = formatTime(toPlace.arrival_time);
-    const dateStr = toActualDate ? `${toActualDate.getMonth() + 1}/${toActualDate.getDate()}` : '';
-    arrivalDisplay = dateStr ? `${dateStr} ${timeStr}` : timeStr;
+    if (toActualDate) {
+      const dateStr = `${toActualDate.getMonth() + 1}/${toActualDate.getDate()}`;
+      const fullDateStr = toActualDate.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      arrivalDisplay = `${dateStr} ${timeStr}`;
+      arrivalDateDisplay = fullDateStr;
+    } else {
+      arrivalDisplay = timeStr;
+    }
   }
 
   // Extract IATA codes for flight search
@@ -315,14 +337,40 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                     <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
                       <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">Travel Times</p>
-                      <div className="space-y-1">
+                      <div className="space-y-2 mt-2">
                         {departureDisplay && (
-                          <p className="text-slate-600 dark:text-slate-400">Departure: {departureDisplay}</p>
+                          <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-700">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide">Departure</p>
+                                <p className="text-sm font-medium text-slate-900 dark:text-white">{departureDisplay}</p>
+                                {departureDateDisplay && (
+                                  <p className="text-xs text-green-600 dark:text-green-400">{departureDateDisplay}</p>
+                                )}
+                              </div>
+                              <div className="text-green-600 dark:text-green-400">
+                                <span className="text-lg">🛫</span>
+                              </div>
+                            </div>
+                          </div>
                         )}
                         {arrivalDisplay && (
-                          <p className="text-slate-600 dark:text-slate-400">Arrival: {arrivalDisplay}</p>
+                          <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-700">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">Arrival</p>
+                                <p className="text-sm font-medium text-slate-900 dark:text-white">{arrivalDisplay}</p>
+                                {arrivalDateDisplay && (
+                                  <p className="text-xs text-red-600 dark:text-red-400">{arrivalDateDisplay}</p>
+                                )}
+                              </div>
+                              <div className="text-red-600 dark:text-red-400">
+                                <span className="text-lg">🛬</span>
+                              </div>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -364,45 +412,62 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
 
                   {!loadingFlights && !flightError && flightOptions.length > 0 && (
                     <div className="space-y-3">
-                      {flightOptions.slice(0, 3).map((flight, index) => (
-                        <div
-                          key={index}
-                          className={`p-4 rounded-lg border-2 ${
-                            flight.matchesSchedule 
-                              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700'
-                              : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600'
-                          }`}
-                        >
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <div className="font-semibold text-slate-900 dark:text-white">
-                                {flight.airline} {flight.flightNumber}
-                              </div>
-                              <div className="text-sm text-slate-600 dark:text-slate-400">
-                                {flight.departure} → {flight.arrival} ({flight.duration})
-                              </div>
-                              <div className="text-lg font-bold text-green-600 dark:text-green-400 mt-1">
-                                ¥{flight.price.toLocaleString()}
+                      {flightOptions.slice(0, 3).map((flight, index) => {
+                        // Format flight date for display
+                        const flightDate = fromActualDate || new Date();
+                        const flightDateStr = flightDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric'
+                        });
+                        
+                        return (
+                          <div
+                            key={index}
+                            className={`p-4 rounded-lg border-2 ${
+                              flight.matchesSchedule 
+                                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700'
+                                : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="font-bold text-slate-900 dark:text-white text-lg">
+                                    {flight.airline} {flight.flightNumber}
+                                  </div>
+                                  {flight.matchesSchedule && (
+                                    <div className="bg-green-600 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                                      MATCHES SCHEDULE
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                                  📅 {flightDateStr}
+                                </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                                  {flight.departure} → {flight.arrival} ({flight.duration})
+                                </div>
+                                <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                                  ¥{flight.price.toLocaleString()}
+                                </div>
                               </div>
                             </div>
-                            {flight.matchesSchedule && (
-                              <div className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">
-                                MATCHES SCHEDULE
-                              </div>
-                            )}
+                            <button
+                              onClick={() => handleBookFlight(flight.bookingUrl)}
+                              className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm"
+                            >
+                              Book Flight
+                            </button>
                           </div>
-                          <button
-                            onClick={() => handleBookFlight(flight.bookingUrl)}
-                            className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
-                          >
-                            Book Flight
-                          </button>
+                        );
+                      })}
+                      <div className="text-center text-xs text-slate-500 dark:text-slate-400 mt-4 pt-3 border-t border-slate-200 dark:border-slate-600">
+                        <div className="text-green-600 dark:text-green-400 font-medium">
+                          {flightOptions.some(f => f.source === 'WayAway') ? 'Real flight data from WayAway' : 'Mock data with WayAway booking links'}
                         </div>
-                      ))}
-                      <div className="text-center text-xs text-slate-500 dark:text-slate-400">
-                        {flightOptions.some(f => f.source === 'WayAway') ? 'Real flight data from WayAway' : 'Mock data with WayAway booking links'}
-                        <br />
-                        Powered by WayAway
+                        <div className="text-slate-400 dark:text-slate-500">
+                          Powered by WayAway
+                        </div>
                       </div>
                     </div>
                   )}
