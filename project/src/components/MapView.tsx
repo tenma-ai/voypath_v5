@@ -964,18 +964,31 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
         }
         
         if (dayIndex !== null && currentTrip) {
-          // Use EXACT ListView calculation: tripStartDate + dayIndex
-          const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
-          departureDate = new Date(tripStartDate);
-          departureDate.setDate(departureDate.getDate() + dayIndex);
+          // Check if daily_schedule already has the correct date
+          const scheduleDate = currentOptimizationResult?.optimization?.daily_schedules?.[dayIndex]?.date;
           
-          console.log('✅ Using EXACT ListView date calculation:', {
-            fromPlace: fromPlace.place_name || fromPlace.name,
-            dayIndex: dayIndex,
-            tripStartDate: tripStartDate,
-            calculatedDate: departureDate.toISOString().split('T')[0],
-            dateStrThatWillBeUsed: departureDate.toISOString().split('T')[0]
-          });
+          if (scheduleDate) {
+            // Use the date directly from the schedule (most reliable)
+            departureDate = new Date(scheduleDate);
+            console.log('✅ Using date directly from daily_schedule:', {
+              fromPlace: fromPlace.place_name || fromPlace.name,
+              dayIndex: dayIndex,
+              scheduleDate: scheduleDate,
+              calculatedDate: departureDate.toISOString().split('T')[0]
+            });
+          } else {
+            // Fallback: manual calculation (match ListView logic)
+            const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
+            departureDate = new Date(tripStartDate);
+            departureDate.setDate(departureDate.getDate() + dayIndex);
+            
+            console.log('✅ Using fallback date calculation:', {
+              fromPlace: fromPlace.place_name || fromPlace.name,
+              dayIndex: dayIndex,
+              tripStartDate: tripStartDate,
+              calculatedDate: departureDate.toISOString().split('T')[0]
+            });
+          }
         } else {
           // Fallback: use trip start date
           const tripStartDate = currentTrip?.startDate || currentTrip?.start_date || new Date().toISOString();
