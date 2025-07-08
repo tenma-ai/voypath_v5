@@ -180,23 +180,103 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
     window.open(url, '_blank');
   };
 
-  // Generate TravelPayouts widget HTML content
-  const generateWidgetHTML = (origin: string, destination: string) => {
-    const scriptSrc = `https://tpwdg.com/content?trs=434567&shmarker=649297&locale=en_us&powered_by=true&origin=${origin}&destination=${destination}&non_direct_flights=true&min_lines=5&border_radius=8&color_background=%23FFFFFF&color_text=%23000000&color_border=%23E5E7EB&promo_id=7281&campaign_id=200`;
-    
+  // Generate flight search widget that opens with specific date
+  const generateFlightSearchWidget = (origin: string, destination: string) => {
     return `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <style>
-          body { margin: 0; padding: 10px; font-family: Arial, sans-serif; }
-          .tp-widget { width: 100%; }
+          body { 
+            margin: 0; 
+            padding: 20px; 
+            font-family: Arial, sans-serif; 
+            background: #f8f9fa;
+          }
+          .search-container {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+          }
+          .route-info {
+            text-align: center;
+            margin-bottom: 20px;
+          }
+          .route-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 8px;
+          }
+          .date-info {
+            font-size: 16px;
+            color: #6b7280;
+            margin-bottom: 20px;
+          }
+          .search-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 20px;
+          }
+          .search-btn {
+            display: block;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.2s;
+          }
+          .primary-btn {
+            background: #2563eb;
+            color: white;
+          }
+          .secondary-btn {
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+          }
+          .search-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          }
+          .widget-container {
+            margin: 20px 0;
+            min-height: 200px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+          }
         </style>
       </head>
       <body>
-        <div class="tp-widget" id="tp-widget-container"></div>
-        <script async src="${scriptSrc}" charset="utf-8"></script>
+        <div class="search-container">
+          <div class="route-info">
+            <div class="route-title">${origin} → ${destination}</div>
+            <div class="date-info">Departure: ${departureDate.toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}</div>
+          </div>
+          
+          <div class="widget-container">
+            <script async src="https://tpwdg.com/content?trs=434567&shmarker=649297&locale=en_us&powered_by=true&origin=${origin}&destination=${destination}&non_direct_flights=true&min_lines=5&border_radius=8&color_background=%23FFFFFF&color_text=%23000000&color_border=%23E5E7EB&promo_id=7281&campaign_id=200" charset="utf-8"></script>
+          </div>
+          
+          <div class="search-buttons">
+            <a href="https://www.aviasales.com/search/${origin}${destination}?depart_date=${dateStr}" target="_parent" class="search-btn primary-btn">
+              Search with Date on Aviasales
+            </a>
+            <a href="https://www.skyscanner.com/flights/${origin}/${destination}/${dateStr.replace(/-/g, '')}" target="_parent" class="search-btn secondary-btn">
+              Search with Date on Skyscanner
+            </a>
+          </div>
+        </div>
       </body>
       </html>
     `;
@@ -309,14 +389,14 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                   <div className="mb-6">
                     <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden">
                       <iframe
-                        srcDoc={generateWidgetHTML(fromIATA, toIATA)}
+                        srcDoc={generateFlightSearchWidget(fromIATA, toIATA)}
                         width="100%"
-                        height="400"
+                        height="500"
                         frameBorder="0"
                         scrolling="yes"
                         className="w-full"
                         title={`Flight options from ${fromIATA} to ${toIATA}`}
-                        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation"
                       />
                     </div>
                   </div>
