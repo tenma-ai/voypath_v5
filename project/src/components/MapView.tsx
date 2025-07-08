@@ -426,18 +426,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
 
   // Handle marker click
   const handleMarkerClick = useCallback((place: any, index: number) => {
-    // Check if we're on mobile (screen width less than 768px)
-    const isMobile = window.innerWidth < 768;
-    
-    if (isMobile) {
-      // On mobile, show fullscreen modal
-      setSelectedPlaceForModal(place);
-      setShowPlaceModal(true);
-      return;
-    }
-
-    // On desktop, continue with InfoWindow
-    if (!map || !infoWindow) return;
+    // Always use the new modal for better UX
+    setSelectedPlaceForModal(place);
+    setShowPlaceModal(true);
+    return;
 
     // Get user information for the place
     const colorResult = getPlaceColor(place);
@@ -737,18 +729,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
 
   // Handle route click
   const handleRouteClick = useCallback((fromPlace: any, toPlace: any, event: google.maps.PolyMouseEvent) => {
-    // Check if we're on mobile (screen width less than 768px)
-    const isMobile = window.innerWidth < 768;
-    
-    if (isMobile) {
-      // On mobile, show fullscreen modal
-      setSelectedRouteForModal({ fromPlace, toPlace });
-      setShowRouteModal(true);
-      return;
-    }
-
-    // On desktop, continue with InfoWindow
-    if (!map || !infoWindow) return;
+    // Always use the new modal for better UX
+    setSelectedRouteForModal({ fromPlace, toPlace });
+    setShowRouteModal(true);
+    return;
 
     // The edge function sets transport_mode on the destination place
     let transport = toPlace.transport_mode || fromPlace.transport_mode || '';
