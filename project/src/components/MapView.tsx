@@ -733,18 +733,25 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
     setShowRouteModal(true);
   }, []);
 
-  // Update map bounds when places change
+  // Update map bounds when places change - only on initial load
   useEffect(() => {
     if (map && places.length > 0) {
-      const bounds = new google.maps.LatLngBounds();
-      places.forEach((place, index) => {
-        if (place.latitude && place.longitude) {
-          const position = new google.maps.LatLng(Number(place.latitude), Number(place.longitude));
-          bounds.extend(position);
-        }
-      });
+      // Check if this is the initial load (map hasn't been fitted yet)
+      const hasBeenFitted = (map as any).__boundsSet;
       
-      map.fitBounds(bounds);
+      if (!hasBeenFitted) {
+        const bounds = new google.maps.LatLngBounds();
+        places.forEach((place, index) => {
+          if (place.latitude && place.longitude) {
+            const position = new google.maps.LatLng(Number(place.latitude), Number(place.longitude));
+            bounds.extend(position);
+          }
+        });
+        
+        map.fitBounds(bounds);
+        // Mark that bounds have been set to prevent future resets
+        (map as any).__boundsSet = true;
+      }
     }
   }, [map, places]);
 

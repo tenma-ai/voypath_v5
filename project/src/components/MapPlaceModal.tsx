@@ -164,13 +164,15 @@ const MapPlaceModal: React.FC<MapPlaceModalProps> = ({ isOpen, onClose, place, i
               {isDeparture && (
                 <div className="space-y-4">
                   {departureDisplay && (
-                    <div className="flex items-start space-x-3">
-                      <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/20 flex items-center justify-center flex-shrink-0">
-                        <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">Departure</p>
-                        <p className="text-slate-600 dark:text-slate-400">{departureDisplay}</p>
+                    <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="text-lg">🛫</span>
+                            <p className="text-xs font-bold text-green-700 dark:text-green-300 uppercase tracking-wide">Departure Time</p>
+                          </div>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">{departureDisplay}</p>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -181,13 +183,15 @@ const MapPlaceModal: React.FC<MapPlaceModalProps> = ({ isOpen, onClose, place, i
               {isDestination && (
                 <div className="space-y-4">
                   {arrivalDisplay && (
-                    <div className="flex items-start space-x-3">
-                      <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
-                        <Calendar className="w-4 h-4 text-red-600 dark:text-red-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">Arrival</p>
-                        <p className="text-slate-600 dark:text-slate-400">{arrivalDisplay}</p>
+                    <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="text-lg">🛬</span>
+                            <p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase tracking-wide">Arrival Time</p>
+                          </div>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">{arrivalDisplay}</p>
+                        </div>
                       </div>
                     </div>
                   )}
