@@ -44,7 +44,24 @@ serve(async (req) => {
           success: false,
           error: 'No authentication token provided',
           tokenFromParam: !!url.searchParams.get('token'),
-          tokenFromEnv: !!Deno.env.get('TRAVELPAYOUTS_TOKEN')
+          tokenFromEnv: !!Deno.env.get('TRAVELPAYOUTS_TOKEN'),
+          hint: 'Please provide API token via token parameter or set TRAVELPAYOUTS_TOKEN environment variable'
+        }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Validate token format (TravelPayouts tokens are typically 32 character hex strings)
+    if (token.length !== 32 || !/^[a-f0-9]+$/i.test(token)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Invalid token format',
+          tokenLength: token.length,
+          hint: 'TravelPayouts tokens should be 32-character hexadecimal strings'
         }),
         { 
           status: 401,
@@ -67,20 +84,23 @@ serve(async (req) => {
     }
 
     // Call TravelPayouts Data API for flight prices
-    // Note: TravelPayouts prices/direct API expects YYYY-MM format for dates
+    // Documentation: https://travelpayouts.github.io/slate/#non-stop_tickets
     const apiUrl = `https://api.travelpayouts.com/v1/prices/direct`
-    const departDateFormatted = depart_date.substring(0, 7) // Convert YYYY-MM-DD to YYYY-MM
+    
+    // Test with minimal required parameters first
     const params = new URLSearchParams({
-      origin,
-      destination,
-      depart_date: departDateFormatted,
-      currency
-      // Don't include token in URL params - use header authentication only
+      origin: origin.toUpperCase(),
+      destination: destination.toUpperCase(),
+      currency: currency.toUpperCase()
     })
 
+    // Add dates if provided (API accepts both YYYY-MM-DD and YYYY-MM)
+    if (depart_date) {
+      params.append('depart_date', depart_date)
+    }
+    
     if (return_date) {
-      const returnDateFormatted = return_date.substring(0, 7) // Convert YYYY-MM-DD to YYYY-MM
-      params.append('return_date', returnDateFormatted)
+      params.append('return_date', return_date)
     }
     
     // Only log API calls in development mode, redact URL in production
@@ -95,20 +115,40 @@ serve(async (req) => {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'VoyPath/1.0',
-        'X-Access-Token': token  // Use proper header authentication as required
+        'User-Agent': 'VoyPath/1.0 (+https://voypath-v5.vercel.app)',
+        'X-Access-Token': token  // TravelPayouts requires this exact header name
       }
     })
 
     console.log('📥 TravelPayouts API Response Status:', response.status, response.statusText)
 
     if (!response.ok) {
+      // Get response body for detailed error information
+      const errorText = await response.text()
       console.error('❌ TravelPayouts API Error Details:', {
         status: response.status,
         statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
+        url: `${apiUrl}?${params.toString()}`,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: errorText,
+        tokenPresent: !!token,
+        tokenLength: token?.length
       })
-      throw new Error(`TravelPayouts API error: ${response.status} ${response.statusText}`)
+      
+      // Return detailed error response instead of throwing
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: `TravelPayouts API error: ${response.status} ${response.statusText}`,
+          details: errorText,
+          apiUrl: `${apiUrl}?${params.toString()}`,
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     const data = await response.json()

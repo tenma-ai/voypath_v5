@@ -64,14 +64,31 @@ export class TravelPayoutsService {
         });
 
         console.log('🔍 WayAway API Response:', wayawayData);
+        console.log('🔍 Response analysis:', {
+          success: wayawayData.success,
+          hasData: !!wayawayData.data,
+          dataType: typeof wayawayData.data,
+          dataKeys: wayawayData.data ? Object.keys(wayawayData.data) : [],
+          dataContent: wayawayData.data
+        });
 
-        if (wayawayData.success && wayawayData.data && Object.keys(wayawayData.data).length > 0) {
+        // Check if we have valid flight data (not error data)
+        const hasValidFlightData = wayawayData.success && 
+                                   wayawayData.data && 
+                                   typeof wayawayData.data === 'object' &&
+                                   !wayawayData.data.error &&  // No error field
+                                   Object.keys(wayawayData.data).length > 0;
+
+        if (hasValidFlightData) {
           console.log('✅ Real flight data received from WayAway, transforming to flight options...');
           const transformedFlights = WayAwayService.transformToFlightOptions(wayawayData, timePreferences);
           console.log('✅ Transformed flights:', transformedFlights);
           return transformedFlights;
         } else {
           console.warn('⚠️ WayAway returned empty or unsuccessful data:', wayawayData);
+          if (wayawayData.data?.error) {
+            console.error('❌ API Error Details:', wayawayData.data.error);
+          }
           console.warn('⚠️ Falling back to mock data');
         }
       } else {
