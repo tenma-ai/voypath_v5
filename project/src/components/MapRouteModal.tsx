@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
 import { X, Route, Clock, Calendar, Plane, Car, MapPin as WalkingIcon, ExternalLink } from 'lucide-react';
@@ -180,43 +180,10 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
     window.open(url, '_blank');
   };
 
-  // TravelPayouts widget container reference
-  const widgetContainerRef = useRef<HTMLDivElement>(null);
-
-  // Load TravelPayouts flight widget for flight routes
-  useEffect(() => {
-    if (!isOpen || transport.toLowerCase() !== 'flight' || !fromIATA || !toIATA) {
-      return;
-    }
-
-    const container = widgetContainerRef.current;
-    if (!container) return;
-
-    // Clear previous widget content
-    container.innerHTML = '';
-
-    // Create a unique container for this widget instance
-    const widgetId = `tp-widget-${Date.now()}`;
-    const widgetDiv = document.createElement('div');
-    widgetDiv.id = widgetId;
-    container.appendChild(widgetDiv);
-
-    // Create and load the script
-    const script = document.createElement('script');
-    script.async = true;
-    script.charset = 'utf-8';
-    script.src = `https://tpwdg.com/content?trs=434567&shmarker=649297&locale=en_us&powered_by=true&origin=${fromIATA}&destination=${toIATA}&non_direct_flights=true&min_lines=5&border_radius=8&color_background=%23FFFFFF&color_text=%23000000&color_border=%23E5E7EB&promo_id=7281&campaign_id=200&target_div=${widgetId}`;
-
-    // Append script to the widget container
-    widgetDiv.appendChild(script);
-
-    // Cleanup function
-    return () => {
-      if (container) {
-        container.innerHTML = '';
-      }
-    };
-  }, [isOpen, transport, fromIATA, toIATA]);
+  // Generate TravelPayouts widget URL for iframe
+  const generateWidgetUrl = (origin: string, destination: string) => {
+    return `https://tpwdg.com/content?trs=434567&shmarker=649297&locale=en_us&powered_by=true&origin=${origin}&destination=${destination}&non_direct_flights=true&min_lines=5&border_radius=8&color_background=%23FFFFFF&color_text=%23000000&color_border=%23E5E7EB&promo_id=7281&campaign_id=200`;
+  };
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-[9999]">
@@ -321,17 +288,18 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                     </h3>
                   </div>
 
-                  {/* TravelPayouts Widget Container */}
+                  {/* TravelPayouts Widget */}
                   <div className="mb-6">
-                    <div 
-                      ref={widgetContainerRef}
-                      className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden"
-                      style={{ minHeight: '300px' }}
-                    >
-                      <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-                        <span className="text-slate-600 dark:text-slate-400">Loading flight options...</span>
-                      </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden">
+                      <iframe
+                        src={generateWidgetUrl(fromIATA, toIATA)}
+                        width="100%"
+                        height="400"
+                        frameBorder="0"
+                        scrolling="no"
+                        className="w-full"
+                        title={`Flight options from ${fromIATA} to ${toIATA}`}
+                      />
                     </div>
                   </div>
 
