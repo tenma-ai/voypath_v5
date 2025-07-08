@@ -1,7 +1,7 @@
 import React from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
-import { X, Route, Clock, Calendar, Plane, Car, MapPin as WalkingIcon } from 'lucide-react';
+import { X, Route, Clock, Calendar, Plane, Car, MapPin as WalkingIcon, ExternalLink } from 'lucide-react';
 import { DateUtils } from '../utils/DateUtils';
 import { useStore } from '../store/useStore';
 
@@ -135,6 +135,37 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
   const departureInfo = formatDisplayTime(fromPlace.departure_time, fromActualDate);
   const arrivalInfo = formatDisplayTime(toPlace.arrival_time, toActualDate);
 
+  // Extract IATA codes for flight booking
+  const extractIATACode = (placeName: string): string | null => {
+    const match = placeName.match(/\(([A-Z]{3,4})\)/);
+    return match ? match[1] : null;
+  };
+
+  const fromIATA = extractIATACode(fromPlace.place_name || fromPlace.name || '');
+  const toIATA = extractIATACode(toPlace.place_name || toPlace.name || '');
+
+  // Generate WayAway booking URL
+  const generateWayAwayBookingUrl = (origin: string, destination: string) => {
+    const departureDate = fromActualDate || new Date();
+    const dateStr = departureDate.toISOString().split('T')[0];
+    
+    // WayAway affiliate booking URL
+    const wayAwayUrl = `https://wayaway.io/search?origin_iata=${origin}&destination_iata=${destination}&depart_date=${dateStr}&adults=1&children=0&infants=0&currency=JPY&marker=649297`;
+    
+    // Generate affiliate link through TravelPayouts
+    const marker = '649297';
+    const trs = '434567';
+    const p = '5976';
+    const campaignId = '200';
+    const encodedUrl = encodeURIComponent(wayAwayUrl);
+    
+    return `https://tp.media/r?marker=${marker}&trs=${trs}&p=${p}&u=${encodedUrl}&campaign_id=${campaignId}`;
+  };
+
+  const handleBookFlight = (url: string) => {
+    window.open(url, '_blank');
+  };
+
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-[9999]">
       <motion.div 
@@ -264,6 +295,80 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Flight Booking Section */}
+              {transport.toLowerCase() === 'flight' && fromIATA && toIATA && (
+                <div>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Plane className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <h3 className="font-semibold text-slate-900 dark:text-white">
+                      Flight Booking: {fromIATA} → {toIATA}
+                    </h3>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* Primary WayAway booking button */}
+                    <button
+                      onClick={() => handleBookFlight(generateWayAwayBookingUrl(fromIATA, toIATA))}
+                      className="w-full py-4 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-semibold text-sm shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
+                    >
+                      <Plane className="w-4 h-4" />
+                      <span>Book Flight on WayAway</span>
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+
+                    {/* Alternative booking options */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => handleBookFlight(`https://www.aviasales.com/search/${fromIATA}${toIATA}`)}
+                        className="py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-sm flex items-center justify-center space-x-2"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>Aviasales</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleBookFlight(`https://www.skyscanner.com/flights/${fromIATA}/${toIATA}`)}
+                        className="py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-sm flex items-center justify-center space-x-2"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>Skyscanner</span>
+                      </button>
+                    </div>
+
+                    {/* Flight info footer */}
+                    <div className="text-center py-3 border-t border-slate-200 dark:border-slate-600">
+                      <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
+                        ✓ WayAway Partner Booking
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        Compare prices across multiple airlines
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Alternative transport booking */}
+              {transport.toLowerCase() !== 'flight' && (fromPlace.place_name?.includes('Station') || toPlace.place_name?.includes('Station') || transport.toLowerCase().includes('train')) && (
+                <div>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Car className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    <h3 className="font-semibold text-slate-900 dark:text-white">Transportation Options</h3>
+                  </div>
+
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => handleBookFlight('https://www.hyperdia.com/en/')}
+                      className="w-full py-3 px-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 font-semibold text-sm shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
+                    >
+                      <Car className="w-4 h-4" />
+                      <span>Search Trains on Hyperdia</span>
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               )}
