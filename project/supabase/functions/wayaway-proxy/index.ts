@@ -19,16 +19,32 @@ serve(async (req) => {
     const depart_date = url.searchParams.get('depart_date')
     const return_date = url.searchParams.get('return_date')
     const currency = url.searchParams.get('currency') || 'JPY'
-    const token = url.searchParams.get('token')
+    const token = url.searchParams.get('token') || Deno.env.get('TRAVELPAYOUTS_TOKEN')
 
-    if (!origin || !destination || !depart_date || !token) {
+    if (!origin || !destination || !depart_date) {
       return new Response(
         JSON.stringify({ 
           success: false,
-          error: 'Missing required parameters: origin, destination, depart_date, token' 
+          error: 'Missing required parameters: origin, destination, depart_date',
+          received: { origin, destination, depart_date, hasToken: !!token }
         }),
         { 
           status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    if (!token) {
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'No authentication token provided',
+          tokenFromParam: !!url.searchParams.get('token'),
+          tokenFromEnv: !!Deno.env.get('TRAVELPAYOUTS_TOKEN')
+        }),
+        { 
+          status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
@@ -39,24 +55,30 @@ serve(async (req) => {
       destination, 
       depart_date,
       return_date,
-      currency
+      currency,
+      hasToken: !!token,
+      tokenLength: token?.length
     })
 
     // Call TravelPayouts Data API for flight prices
+    // Note: TravelPayouts prices/direct API expects YYYY-MM format for dates
     const apiUrl = `https://api.travelpayouts.com/v1/prices/direct`
+    const departDateFormatted = depart_date.substring(0, 7) // Convert YYYY-MM-DD to YYYY-MM
     const params = new URLSearchParams({
       origin,
       destination,
-      depart_date,
+      depart_date: departDateFormatted,
       currency
       // Don't include token in URL params - use header authentication only
     })
 
     if (return_date) {
-      params.append('return_date', return_date)
+      const returnDateFormatted = return_date.substring(0, 7) // Convert YYYY-MM-DD to YYYY-MM
+      params.append('return_date', returnDateFormatted)
     }
     
     console.log('🌐 Calling TravelPayouts API:', `${apiUrl}?${params.toString()}`)
+    console.log('🔑 Using authentication header with token length:', token?.length)
 
     const response = await fetch(`${apiUrl}?${params.toString()}`, {
       method: 'GET',
@@ -67,7 +89,14 @@ serve(async (req) => {
       }
     })
 
+    console.log('📥 TravelPayouts API Response Status:', response.status, response.statusText)
+
     if (!response.ok) {
+      console.error('❌ TravelPayouts API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      })
       throw new Error(`TravelPayouts API error: ${response.status} ${response.statusText}`)
     }
 
