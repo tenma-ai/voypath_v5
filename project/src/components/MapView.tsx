@@ -962,7 +962,6 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
                 console.log('🎯 Found matching place (will use latest):', {
                   dayIndex: idx,
                   date: daySchedule.date,
-                  placeName: placeName,
                   searchedFor: fromPlace.place_name || fromPlace.name
                 });
               }
