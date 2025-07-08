@@ -15,10 +15,10 @@ import { TravelPayoutsService, FlightOption } from '../services/TravelPayoutsSer
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
 interface MapViewProps {
-  optimizationResult?: any;
+  optimizationResultProp?: any;
 }
 
-const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
+const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
@@ -36,10 +36,11 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
 
   // Handle optimization success animation - only show when explicitly triggered
   useEffect(() => {
-    if (showOptimizationSuccess && optimizationResult) {
+    const currentOptimizationResult = optimizationResult || optimizationResultProp;
+    if (showOptimizationSuccess && currentOptimizationResult) {
       setShowSuccessOverlay(true);
     }
-  }, [showOptimizationSuccess, optimizationResult]);
+  }, [showOptimizationSuccess, optimizationResult, optimizationResultProp]);
 
   // Setup global flight booking function
   useEffect(() => {
@@ -71,14 +72,15 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   // Extract places from optimization result
   const getAllPlaces = useCallback(() => {
     // Log message
+    const currentOptimizationResult = optimizationResult || optimizationResultProp;
     
-    if (!hasUserOptimized || !optimizationResult?.optimization?.daily_schedules) {
+    if (!hasUserOptimized || !currentOptimizationResult?.optimization?.daily_schedules) {
       // Log message
       return [];
     }
     
     const places: any[] = [];
-    optimizationResult.optimization.daily_schedules.forEach((schedule: any) => {
+    currentOptimizationResult.optimization.daily_schedules.forEach((schedule: any) => {
       if (schedule.scheduled_places && Array.isArray(schedule.scheduled_places)) {
         places.push(...schedule.scheduled_places);
       }
@@ -86,7 +88,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
     
     // Log message
     return places;
-  }, [optimizationResult, currentTrip?.name, hasUserOptimized]);
+  }, [optimizationResult, optimizationResultProp, currentTrip?.name, hasUserOptimized]);
 
   const places = getAllPlaces();
 
@@ -924,10 +926,11 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         try {
           // Find the actual day index from optimization result like ListView.tsx does
           let dayIndex = null;
+          const currentOptimizationResult = optimizationResult || optimizationResultProp;
           
-          if (optimizationResult?.optimization?.daily_schedules) {
+          if (currentOptimizationResult?.optimization?.daily_schedules) {
             // Search through daily schedules to find the actual day index for these places
-            optimizationResult.optimization.daily_schedules.forEach((daySchedule, idx) => {
+            currentOptimizationResult.optimization.daily_schedules.forEach((daySchedule, idx) => {
               if (daySchedule.scheduled_places) {
                 const fromFound = daySchedule.scheduled_places.some(sp => {
                   const place = sp.place || sp;
