@@ -187,12 +187,11 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
       day: 'numeric'
     });
 
-    const basePrice = Math.floor(Math.random() * 20000) + 25000; // Base price 25,000-45,000 yen
+    const basePrice = Math.floor(Math.random() * 80) + 180; // Base price $180-260
     
     return [
       {
-        airline: 'ANA',
-        flightNumber: 'NH123',
+        flightNumber: 'FL123',
         departure: departureInfo.display ? formatTime(fromPlace.departure_time) : '13:45',
         arrival: arrivalInfo.display ? formatTime(toPlace.arrival_time) : '16:20',
         duration: '2h 35m',
@@ -200,21 +199,19 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
         direct: true
       },
       {
-        airline: 'JAL',
-        flightNumber: 'JL456',
+        flightNumber: 'FL456',
         departure: departureInfo.display ? formatTime(fromPlace.departure_time) : '14:30',
         arrival: arrivalInfo.display ? formatTime(toPlace.arrival_time) : '17:05',
         duration: '2h 35m',
-        price: basePrice + 3000,
+        price: basePrice + 20,
         direct: true
       },
       {
-        airline: 'Jetstar',
-        flightNumber: 'JQ789',
+        flightNumber: 'FL789',
         departure: '18:50',
         arrival: '21:25',
         duration: '2h 35m',
-        price: basePrice - 8000,
+        price: basePrice - 30,
         direct: true
       }
     ];
@@ -325,15 +322,6 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
 
                   {/* Mock Flight Options */}
                   <div className="mb-6">
-                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3 mb-4">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-amber-600 dark:text-amber-400">⚠️</span>
-                        <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                          Mock Data - For demonstration purposes only
-                        </span>
-                      </div>
-                    </div>
-
                     <div className="space-y-3">
                       {generateMockFlights(fromIATA, toIATA).map((flight, index) => (
                         <div
@@ -344,7 +332,7 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                             <div className="flex-1">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="font-bold text-slate-900 dark:text-white text-lg">
-                                  {flight.airline} {flight.flightNumber}
+                                  {flight.flightNumber}
                                 </div>
                                 {flight.direct && (
                                   <div className="bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-xs px-2 py-1 rounded-full font-semibold">
@@ -369,20 +357,30 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                                   {flight.departure} → {flight.arrival}
                                 </span>
                                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                  ¥{flight.price.toLocaleString()}
+                                  ${flight.price}
                                 </div>
                               </div>
                             </div>
                           </div>
                           
                           <button
-                            onClick={() => handleBookFlight(generateWayAwayBookingUrl(fromIATA, toIATA))}
+                            onClick={() => handleBookFlight(generateTripComUrl(fromIATA, toIATA))}
                             className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-semibold text-sm shadow-md hover:shadow-lg"
                           >
-                            Book Flight
+                            Book
                           </button>
                         </div>
                       ))}
+                    </div>
+
+                    {/* Mock data disclaimer */}
+                    <div className="mt-4 text-center">
+                      <div className="flex items-center justify-center space-x-2">
+                        <span className="text-amber-600 dark:text-amber-400 text-xs">⚠️</span>
+                        <span className="text-xs text-amber-700 dark:text-amber-300">
+                          Mock Data - For demonstration purposes only
+                        </span>
+                      </div>
                     </div>
                   </div>
 
