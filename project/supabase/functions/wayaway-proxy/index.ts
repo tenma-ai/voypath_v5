@@ -55,13 +55,14 @@ serve(async (req) => {
     }
 
     // Validate token format (TravelPayouts tokens are typically 32 character hex strings)
-    if (token.length !== 32 || !/^[a-f0-9]+$/i.test(token)) {
+    // Allow more flexible token format validation
+    if (token.length < 16 || token.length > 64) {
       return new Response(
         JSON.stringify({ 
           success: false,
           error: 'Invalid token format',
           tokenLength: token.length,
-          hint: 'TravelPayouts tokens should be 32-character hexadecimal strings'
+          hint: 'TravelPayouts tokens should be between 16-64 characters'
         }),
         { 
           status: 401,
