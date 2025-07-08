@@ -48,8 +48,8 @@ serve(async (req) => {
       origin,
       destination,
       depart_date,
-      currency,
-      token
+      currency
+      // Don't include token in URL params - use header authentication only
     })
 
     if (return_date) {
@@ -62,7 +62,8 @@ serve(async (req) => {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'VoyPath/1.0'
+        'User-Agent': 'VoyPath/1.0',
+        'X-Access-Token': token  // Use proper header authentication as required
       }
     })
 
