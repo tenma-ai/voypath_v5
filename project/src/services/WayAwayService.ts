@@ -34,6 +34,7 @@ export class WayAwayService {
   private static readonly API_TOKEN = import.meta.env.VITE_TRAVELPAYOUTS_API_KEY || import.meta.env.TRAVELPAYOUTS_TOKEN;
   private static readonly MARKER = import.meta.env.WAYAWAY_MARKER || import.meta.env.VITE_TRAVELPAYOUTS_MARKER || '649297';
   private static readonly BASE_URL = 'https://api.travelpayouts.com/v1';
+  private static readonly SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   /**
    * Search flight prices using WayAway Data API
@@ -69,13 +70,26 @@ export class WayAwayService {
 
       console.log('🔍 Calling WayAway via Supabase Edge Function (server-side only):', `${supabaseProxyUrl}?${searchParams.toString()}`);
 
-      const response = await fetch(`${supabaseProxyUrl}?${searchParams.toString()}`, {
+      // Try without authentication first (for public proxy)
+      let response = await fetch(`${supabaseProxyUrl}?${searchParams.toString()}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08'
         },
       });
+
+      // If 401, try with authentication
+      if (response.status === 401 && this.SUPABASE_ANON_KEY) {
+        console.log('🔄 Retrying with authentication...');
+        response = await fetch(`${supabaseProxyUrl}?${searchParams.toString()}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${this.SUPABASE_ANON_KEY}`,
+            'apikey': this.SUPABASE_ANON_KEY
+          },
+        });
+      }
       
       if (!response.ok) {
         throw new Error(`Supabase proxy error: ${response.status} - ${response.statusText}`);
