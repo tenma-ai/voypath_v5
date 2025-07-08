@@ -973,7 +973,8 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
             fromPlace: fromPlace.place_name || fromPlace.name,
             dayIndex: dayIndex,
             tripStartDate: tripStartDate,
-            calculatedDate: departureDate.toISOString().split('T')[0]
+            calculatedDate: departureDate.toISOString().split('T')[0],
+            dateStrThatWillBeUsed: departureDate.toISOString().split('T')[0]
           });
         } else {
           // Fallback: use trip start date
@@ -992,6 +993,14 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
         }
         
         const dateStr = departureDate.toISOString().split('T')[0];
+        
+        console.log('🔍 FINAL DATE CHECK before API call:', {
+          departureDate: departureDate,
+          dateStr: dateStr,
+          fromIATA: fromIATA,
+          toIATA: toIATA,
+          willCallAPIWith: `${fromIATA} → ${toIATA} on ${dateStr}`
+        });
         
         // Add loading placeholder first
         const loadingHTML = `
