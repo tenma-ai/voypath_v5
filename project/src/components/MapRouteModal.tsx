@@ -180,9 +180,26 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
     window.open(url, '_blank');
   };
 
-  // Generate TravelPayouts widget URL for iframe
-  const generateWidgetUrl = (origin: string, destination: string) => {
-    return `https://tpwdg.com/content?trs=434567&shmarker=649297&locale=en_us&powered_by=true&origin=${origin}&destination=${destination}&non_direct_flights=true&min_lines=5&border_radius=8&color_background=%23FFFFFF&color_text=%23000000&color_border=%23E5E7EB&promo_id=7281&campaign_id=200`;
+  // Generate TravelPayouts widget HTML content
+  const generateWidgetHTML = (origin: string, destination: string) => {
+    const scriptSrc = `https://tpwdg.com/content?trs=434567&shmarker=649297&locale=en_us&powered_by=true&origin=${origin}&destination=${destination}&non_direct_flights=true&min_lines=5&border_radius=8&color_background=%23FFFFFF&color_text=%23000000&color_border=%23E5E7EB&promo_id=7281&campaign_id=200`;
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { margin: 0; padding: 10px; font-family: Arial, sans-serif; }
+          .tp-widget { width: 100%; }
+        </style>
+      </head>
+      <body>
+        <div class="tp-widget" id="tp-widget-container"></div>
+        <script async src="${scriptSrc}" charset="utf-8"></script>
+      </body>
+      </html>
+    `;
   };
 
   return (
@@ -292,13 +309,14 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                   <div className="mb-6">
                     <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden">
                       <iframe
-                        src={generateWidgetUrl(fromIATA, toIATA)}
+                        srcDoc={generateWidgetHTML(fromIATA, toIATA)}
                         width="100%"
                         height="400"
                         frameBorder="0"
-                        scrolling="no"
+                        scrolling="yes"
                         className="w-full"
                         title={`Flight options from ${fromIATA} to ${toIATA}`}
+                        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
                       />
                     </div>
                   </div>
