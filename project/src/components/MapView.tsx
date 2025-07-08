@@ -924,6 +924,19 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
         // Find which dayIndex this route belongs to by searching optimization results
         const currentOptimizationResult = optimizationResult || optimizationResultProp;
         
+        console.log('🔍 Debug optimization result structure:', {
+          hasOptimizationResult: !!currentOptimizationResult,
+          hasOptimization: !!currentOptimizationResult?.optimization,
+          hasDailySchedules: !!currentOptimizationResult?.optimization?.daily_schedules,
+          dailySchedulesCount: currentOptimizationResult?.optimization?.daily_schedules?.length || 0,
+          dailySchedulesPreview: currentOptimizationResult?.optimization?.daily_schedules?.map((ds, idx) => ({
+            day: idx,
+            date: ds.date,
+            placesCount: ds.scheduled_places?.length || 0,
+            placeNames: ds.scheduled_places?.map(sp => sp.name || sp.place?.name || 'unnamed').slice(0, 3)
+          }))
+        });
+        
         if (currentOptimizationResult?.optimization?.daily_schedules) {
           // Search through daily_schedules to find the dayIndex for this route
           currentOptimizationResult.optimization.daily_schedules.forEach((daySchedule, idx) => {
@@ -931,7 +944,16 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
               const fromFound = daySchedule.scheduled_places.some(sp => {
                 const place = sp.place || sp;
                 const placeName = place.name || sp.name;
-                return placeName === (fromPlace.place_name || fromPlace.name);
+                const match = placeName === (fromPlace.place_name || fromPlace.name);
+                if (match) {
+                  console.log('🎯 Found matching place:', {
+                    dayIndex: idx,
+                    date: daySchedule.date,
+                    placeName: placeName,
+                    searchedFor: fromPlace.place_name || fromPlace.name
+                  });
+                }
+                return match;
               });
               
               if (fromFound && dayIndex === null) {
@@ -960,6 +982,10 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
           
           console.warn('⚠️ dayIndex not found, using trip start date:', {
             fromPlace: fromPlace.place_name || fromPlace.name,
+            searchedFor: fromPlace.place_name || fromPlace.name,
+            allPlaceNames: currentOptimizationResult?.optimization?.daily_schedules?.flatMap(ds => 
+              ds.scheduled_places?.map(sp => sp.name || sp.place?.name || 'unnamed') || []
+            ),
             tripStartDate: tripStartDate,
             calculatedDate: departureDate.toISOString().split('T')[0]
           });
