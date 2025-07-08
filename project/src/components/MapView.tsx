@@ -956,8 +956,15 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
                 return match;
               });
               
-              if (fromFound && dayIndex === null) {
-                dayIndex = idx; // Use first match found
+              if (fromFound) {
+                // Always use the latest/last match found (in case airport appears multiple times)
+                dayIndex = idx;
+                console.log('🎯 Found matching place (will use latest):', {
+                  dayIndex: idx,
+                  date: daySchedule.date,
+                  placeName: placeName,
+                  searchedFor: fromPlace.place_name || fromPlace.name
+                });
               }
             }
           });
