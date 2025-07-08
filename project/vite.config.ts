@@ -11,6 +11,7 @@ export default defineConfig({
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
     'import.meta.env.TRAVELPAYOUTS_TOKEN': JSON.stringify(process.env.TRAVELPAYOUTS_TOKEN),
     'import.meta.env.WAYAWAY_MARKER': JSON.stringify(process.env.WAYAWAY_MARKER),
+    'import.meta.env.VITE_LOG_LEVEL': JSON.stringify(process.env.VITE_LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'WARN' : 'DEBUG')),
   },
   optimizeDeps: {
     exclude: ['lucide-react'],

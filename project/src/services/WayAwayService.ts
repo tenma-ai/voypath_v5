@@ -3,6 +3,8 @@
  * Real-time flight data integration via TravelPayouts API
  */
 
+import { logger } from '../utils/logger';
+
 export interface WayAwayFlightParams {
   origin: string;
   destination: string;
@@ -42,9 +44,9 @@ export class WayAwayService {
   static async searchFlightPrices(params: WayAwayFlightParams): Promise<WayAwayAPIResponse> {
     const { origin, destination, departDate, returnDate, currency = 'JPY' } = params;
     
-    console.log('🔍 WayAway Search Config:', {
+    logger.config('WayAway Search Config', {
       hasToken: !!this.API_TOKEN,
-      token: this.API_TOKEN?.substring(0, 8) + '...',
+      token: this.API_TOKEN,
       marker: this.MARKER,
       params: { origin, destination, departDate, returnDate, currency }
     });
@@ -68,7 +70,7 @@ export class WayAwayService {
         searchParams.append('return_date', returnDate);
       }
 
-      console.log('🔍 Calling WayAway via Supabase Edge Function (server-side only):', `${supabaseProxyUrl}?${searchParams.toString()}`);
+      logger.apiCall('Calling WayAway via Supabase Edge Function (server-side only)', `${supabaseProxyUrl}?${searchParams.toString()}`);
 
       // Try without authentication first (for public proxy)
       let response = await fetch(`${supabaseProxyUrl}?${searchParams.toString()}`, {
@@ -80,7 +82,7 @@ export class WayAwayService {
 
       // If 401, try with authentication
       if (response.status === 401 && this.SUPABASE_ANON_KEY) {
-        console.log('🔄 Retrying with authentication...');
+        logger.debug('Retrying with authentication');
         response = await fetch(`${supabaseProxyUrl}?${searchParams.toString()}`, {
           method: 'GET',
           headers: {
@@ -102,11 +104,15 @@ export class WayAwayService {
         throw new Error('Supabase proxy returned HTML instead of JSON');
       }
       
-      console.log('✅ WayAway Supabase proxy response received:', result);
+      logger.info('WayAway Supabase proxy response received', { 
+        success: result.success,
+        dataKeys: result.data ? Object.keys(result.data) : [],
+        currency: result.currency 
+      });
       return result;
       
     } catch (error) {
-      console.error('WayAway flight search failed (Supabase server-side proxy):', error);
+      logger.error('WayAway flight search failed (Supabase server-side proxy)', error);
       throw error;
     }
   }
@@ -131,7 +137,7 @@ export class WayAwayService {
     
     const affiliateUrl = `https://tp.media/r?marker=${marker}&trs=${trs}&p=${p}&u=${encodedUrl}&campaign_id=${campaignId}`;
     
-    console.log('🔗 Generated WayAway affiliate link:', {
+    logger.debug('Generated WayAway affiliate link', {
       marker,
       trs,
       p,
@@ -183,7 +189,7 @@ export class WayAwayService {
     }
   ): Array<any> {
     if (!wayawayData.success || !wayawayData.data) {
-      console.warn('No WayAway data to transform');
+      logger.warn('No WayAway data to transform');
       return [];
     }
 
@@ -289,7 +295,7 @@ export class WayAwayService {
   static getConfig() {
     return {
       hasToken: !!this.API_TOKEN,
-      token: this.API_TOKEN?.substring(0, 8) + '...',
+      token: this.API_TOKEN,
       marker: this.MARKER,
       baseUrl: this.BASE_URL
     };

@@ -53,15 +53,18 @@ serve(async (req) => {
       )
     }
 
-    console.log('🔍 WayAway Proxy Request:', {
-      origin,
-      destination, 
-      depart_date,
-      return_date,
-      currency,
-      hasToken: !!token,
-      tokenLength: token?.length
-    })
+    // Only log request details in development mode
+    if (Deno.env.get('DENO_ENV') !== 'production') {
+      console.log('🔍 WayAway Proxy Request:', {
+        origin,
+        destination, 
+        depart_date,
+        return_date,
+        currency,
+        hasToken: !!token,
+        tokenLength: token?.length
+      })
+    }
 
     // Call TravelPayouts Data API for flight prices
     // Note: TravelPayouts prices/direct API expects YYYY-MM format for dates
@@ -80,8 +83,13 @@ serve(async (req) => {
       params.append('return_date', returnDateFormatted)
     }
     
-    console.log('🌐 Calling TravelPayouts API:', `${apiUrl}?${params.toString()}`)
-    console.log('🔑 Using authentication header with token length:', token?.length)
+    // Only log API calls in development mode, redact URL in production
+    if (Deno.env.get('DENO_ENV') !== 'production') {
+      console.log('🌐 Calling TravelPayouts API:', `${apiUrl}?${params.toString()}`)
+      console.log('🔑 Using authentication header with token length:', token?.length)
+    } else {
+      console.log('🌐 Calling TravelPayouts API: [URL_REDACTED]')
+    }
 
     const response = await fetch(`${apiUrl}?${params.toString()}`, {
       method: 'GET',
@@ -105,11 +113,14 @@ serve(async (req) => {
 
     const data = await response.json()
     
-    console.log('✅ TravelPayouts API Response:', {
-      success: data.success,
-      dataKeys: data.data ? Object.keys(data.data) : [],
-      currency: data.currency
-    })
+    // Only log response details in development mode
+    if (Deno.env.get('DENO_ENV') !== 'production') {
+      console.log('✅ TravelPayouts API Response:', {
+        success: data.success,
+        dataKeys: data.data ? Object.keys(data.data) : [],
+        currency: data.currency
+      })
+    }
 
     // Transform response to standardized format
     const transformedResponse = {
