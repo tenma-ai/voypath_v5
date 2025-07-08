@@ -25,7 +25,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
   const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
   const [placeImages, setPlaceImages] = useState<Map<string, string>>(new Map());
-  const { currentTrip, memberColors, tripMembers, hasUserOptimized, isOptimizing, showOptimizationSuccess, setShowOptimizationSuccess } = useStore();
+  const { currentTrip, memberColors, tripMembers, hasUserOptimized, isOptimizing, showOptimizationSuccess, setShowOptimizationSuccess, optimizationResult } = useStore();
 
   // Load Google Maps API
   const { isLoaded, loadError } = useJsApiLoader({
@@ -922,12 +922,49 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
         });
         
         try {
-          if (currentTrip && fromPlace.day_number) {
-            // Use ListView.tsx logic: trip start date + day offset
+          // Find the actual day index from optimization result like ListView.tsx does
+          let dayIndex = null;
+          
+          if (optimizationResult?.optimization?.daily_schedules) {
+            // Search through daily schedules to find the actual day index for these places
+            optimizationResult.optimization.daily_schedules.forEach((daySchedule, idx) => {
+              if (daySchedule.scheduled_places) {
+                const fromFound = daySchedule.scheduled_places.some(sp => {
+                  const place = sp.place || sp;
+                  const placeName = place.name || sp.name;
+                  return placeName === (fromPlace.place_name || fromPlace.name);
+                });
+                const toFound = daySchedule.scheduled_places.some(sp => {
+                  const place = sp.place || sp;
+                  const placeName = place.name || sp.name;
+                  return placeName === (toPlace.place_name || toPlace.name);
+                });
+                
+                if (fromFound || toFound) {
+                  dayIndex = idx;
+                }
+              }
+            });
+          }
+          
+          if (dayIndex !== null && currentTrip) {
+            // Use EXACT ListView.tsx logic: trip start date + dayIndex
+            const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
+            departureDate = new Date(tripStartDate);
+            departureDate.setDate(departureDate.getDate() + dayIndex);
+            console.log('✅ Using ListView.tsx exact logic for date calculation:', {
+              fromPlace: fromPlace.place_name || fromPlace.name,
+              toPlace: toPlace.place_name || toPlace.name,
+              dayIndex: dayIndex,
+              tripStartDate: tripStartDate,
+              calculatedDate: departureDate.toISOString().split('T')[0]
+            });
+          } else if (currentTrip && fromPlace.day_number) {
+            // Fallback: Use day_number if found
             const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
             departureDate = new Date(tripStartDate);
             departureDate.setDate(departureDate.getDate() + (fromPlace.day_number - 1)); // day_number is 1-based
-            console.log('✅ Using calculated trip date for departure (ListView approach):', {
+            console.log('✅ Using day_number fallback:', {
               fromPlace: fromPlace.place_name || fromPlace.name,
               dayNumber: fromPlace.day_number,
               tripStartDate: tripStartDate,
@@ -938,7 +975,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResult }) => {
             const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
             departureDate = new Date(tripStartDate);
             departureDate.setDate(departureDate.getDate() + (toPlace.day_number - 1)); // day_number is 1-based
-            console.log('✅ Using arrival day as reference for departure (ListView approach):', {
+            console.log('✅ Using toPlace day_number fallback:', {
               toPlace: toPlace.place_name || toPlace.name,
               dayNumber: toPlace.day_number,
               tripStartDate: tripStartDate,
