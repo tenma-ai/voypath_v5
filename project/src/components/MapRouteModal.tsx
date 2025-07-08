@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
 import { X, Route, Clock, Calendar, Plane, Car, MapPin as WalkingIcon, ExternalLink } from 'lucide-react';
@@ -180,6 +180,44 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
     window.open(url, '_blank');
   };
 
+  // TravelPayouts widget container reference
+  const widgetContainerRef = useRef<HTMLDivElement>(null);
+
+  // Load TravelPayouts flight widget for flight routes
+  useEffect(() => {
+    if (!isOpen || transport.toLowerCase() !== 'flight' || !fromIATA || !toIATA) {
+      return;
+    }
+
+    const container = widgetContainerRef.current;
+    if (!container) return;
+
+    // Clear previous widget content
+    container.innerHTML = '';
+
+    // Create a unique container for this widget instance
+    const widgetId = `tp-widget-${Date.now()}`;
+    const widgetDiv = document.createElement('div');
+    widgetDiv.id = widgetId;
+    container.appendChild(widgetDiv);
+
+    // Create and load the script
+    const script = document.createElement('script');
+    script.async = true;
+    script.charset = 'utf-8';
+    script.src = `https://tpwdg.com/content?trs=434567&shmarker=649297&locale=en_us&powered_by=true&origin=${fromIATA}&destination=${toIATA}&non_direct_flights=true&min_lines=5&border_radius=8&color_background=%23FFFFFF&color_text=%23000000&color_border=%23E5E7EB&promo_id=7281&campaign_id=200&target_div=${widgetId}`;
+
+    // Append script to the widget container
+    widgetDiv.appendChild(script);
+
+    // Cleanup function
+    return () => {
+      if (container) {
+        container.innerHTML = '';
+      }
+    };
+  }, [isOpen, transport, fromIATA, toIATA]);
+
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-[9999]">
       <motion.div 
@@ -273,42 +311,59 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                 </div>
               </div>
 
-              {/* Flight Booking Section */}
+              {/* Flight Options and Booking */}
               {transport.toLowerCase() === 'flight' && fromIATA && toIATA && (
                 <div>
                   <div className="flex items-center space-x-2 mb-4">
                     <Plane className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     <h3 className="font-semibold text-slate-900 dark:text-white">
-                      Flight Booking: {fromIATA} → {toIATA}
+                      Flight Options: {fromIATA} → {toIATA}
                     </h3>
                   </div>
 
-                  <div className="space-y-3">
-                    {/* Primary WayAway booking button */}
-                    <button
-                      onClick={() => handleBookFlight(generateWayAwayBookingUrl(fromIATA, toIATA))}
-                      className="w-full py-4 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-semibold text-sm shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
+                  {/* TravelPayouts Widget Container */}
+                  <div className="mb-6">
+                    <div 
+                      ref={widgetContainerRef}
+                      className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden"
+                      style={{ minHeight: '300px' }}
                     >
-                      <Plane className="w-4 h-4" />
-                      <span>Book Flight on WayAway</span>
-                      <ExternalLink className="w-4 h-4" />
-                    </button>
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+                        <span className="text-slate-600 dark:text-slate-400">Loading flight options...</span>
+                      </div>
+                    </div>
+                  </div>
 
-                    {/* Alternative booking options */}
-                    <div className="grid grid-cols-2 gap-3">
+                  {/* Booking Links */}
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                      Alternative booking platforms:
+                    </div>
+                    
+                    {/* Booking buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        onClick={() => handleBookFlight(generateWayAwayBookingUrl(fromIATA, toIATA))}
+                        className="py-3 px-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-xs flex items-center justify-center space-x-1"
+                      >
+                        <Plane className="w-3 h-3" />
+                        <span>WayAway</span>
+                      </button>
+
                       <button
                         onClick={() => handleBookFlight(generateAviasalesUrl(fromIATA, toIATA))}
-                        className="py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-sm flex items-center justify-center space-x-2"
+                        className="py-3 px-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-xs flex items-center justify-center space-x-1"
                       >
-                        <ExternalLink className="w-4 h-4" />
+                        <ExternalLink className="w-3 h-3" />
                         <span>Aviasales</span>
                       </button>
 
                       <button
                         onClick={() => handleBookFlight(generateTripComUrl(fromIATA, toIATA))}
-                        className="py-3 px-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-sm flex items-center justify-center space-x-2"
+                        className="py-3 px-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-medium text-xs flex items-center justify-center space-x-1"
                       >
-                        <ExternalLink className="w-4 h-4" />
+                        <ExternalLink className="w-3 h-3" />
                         <span>Trip.com</span>
                       </button>
                     </div>
@@ -316,10 +371,10 @@ const MapRouteModal: React.FC<MapRouteModalProps> = ({ isOpen, onClose, fromPlac
                     {/* Flight info footer */}
                     <div className="text-center py-3 border-t border-slate-200 dark:border-slate-600">
                       <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
-                        ✓ TravelPayouts Partner Network
+                        ✓ Real-time Flight Data
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">
-                        WayAway • Aviasales • Trip.com with affiliate tracking
+                        Powered by TravelPayouts Partner Network
                       </div>
                     </div>
                   </div>
