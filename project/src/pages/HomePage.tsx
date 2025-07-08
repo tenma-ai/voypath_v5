@@ -116,9 +116,13 @@ export function HomePage() {
   
   // Load user statistics
   useEffect(() => {
+    let cancelled = false;
+
     const loadUserStats = async () => {
       if (!user) {
-        setIsLoadingStats(false);
+        if (!cancelled) {
+          setIsLoadingStats(false);
+        }
         return;
       }
       
@@ -129,25 +133,35 @@ export function HomePage() {
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id);
         
-        // Get routes optimized (count of optimization results created by user)
-        const { count: optimizationCount } = await supabase
-          .from('optimization_results')
-          .select('*', { count: 'exact', head: true })
-          .eq('created_by', user.id);
-        
-        setUserStats({
-          placesVisited: placesCount || 0,
-          routesOptimized: optimizationCount || 0,
-          tripsPlanned: totalUserTrips
-        });
+        if (!cancelled) {
+          // Get routes optimized (count of optimization results created by user)
+          const { count: optimizationCount } = await supabase
+            .from('optimization_results')
+            .select('*', { count: 'exact', head: true })
+            .eq('created_by', user.id);
+          
+          if (!cancelled) {
+            setUserStats({
+              placesVisited: placesCount || 0,
+              routesOptimized: optimizationCount || 0,
+              tripsPlanned: totalUserTrips
+            });
+          }
+        }
       } catch (error) {
         // Failed to load user stats
       } finally {
-        setIsLoadingStats(false);
+        if (!cancelled) {
+          setIsLoadingStats(false);
+        }
       }
     };
     
     loadUserStats();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, totalUserTrips]);
 
   // Check if create trip button should blink

@@ -86,30 +86,44 @@ function TopAppBar() {
 
   // Load user's member color
   useEffect(() => {
+    let cancelled = false;
+
     const loadUserColor = async () => {
       if (!user?.id || !currentTrip?.id) {
-        setUserColor(null);
+        if (!cancelled) {
+          setUserColor(null);
+        }
         return;
       }
 
       try {
         const color = await MemberColorService.getMemberColor(currentTrip.id, user.id);
-        if (color) {
-          setUserColor(color.hex);
-        } else {
-          // Try to assign a color if not already assigned
-          const assignedColor = await MemberColorService.assignColorToMember(currentTrip.id, user.id);
-          setUserColor(assignedColor.hex);
+        if (!cancelled) {
+          if (color) {
+            setUserColor(color.hex);
+          } else {
+            // Try to assign a color if not already assigned
+            const assignedColor = await MemberColorService.assignColorToMember(currentTrip.id, user.id);
+            if (!cancelled) {
+              setUserColor(assignedColor.hex);
+            }
+          }
         }
       } catch (error) {
-        // Error occurred
-        // Fallback to deterministic color
-        const fallbackColor = MemberColorService.getColorForOptimization(user.id, {});
-        setUserColor(fallbackColor);
+        if (!cancelled) {
+          // Error occurred
+          // Fallback to deterministic color
+          const fallbackColor = MemberColorService.getColorForOptimization(user.id, {});
+          setUserColor(fallbackColor);
+        }
       }
     };
 
     loadUserColor();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id, currentTrip?.id]);
 
   // Close menus when clicking outside

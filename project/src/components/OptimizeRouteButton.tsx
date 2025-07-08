@@ -69,8 +69,28 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
   }, [tripId, places.length, tripPlaces.length, hasPlaces, currentUser, isOptimizing, isReady]);
 
   useEffect(() => {
-    checkConnectivity();
-    checkExistingOptimization();
+    let cancelled = false;
+
+    const runAsyncChecks = async () => {
+      try {
+        if (!cancelled) {
+          await checkConnectivity();
+        }
+        if (!cancelled) {
+          await checkExistingOptimization();
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Async checks failed:', error);
+        }
+      }
+    };
+
+    runAsyncChecks();
+
+    return () => {
+      cancelled = true;
+    };
   }, [tripId]);
 
   const checkConnectivity = async () => {

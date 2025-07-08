@@ -32,10 +32,28 @@ export function OptimizationModal({ isOpen, onClose, tripId }: OptimizationModal
 
   // Check Edge Functions connectivity on mount
   useEffect(() => {
-    if (isOpen) {
-      checkConnectivity();
-      checkExistingOptimization();
-    }
+    let cancelled = false;
+
+    const runConnectivityChecks = async () => {
+      if (isOpen && !cancelled) {
+        try {
+          await checkConnectivity();
+          if (!cancelled) {
+            await checkExistingOptimization();
+          }
+        } catch (error) {
+          if (!cancelled) {
+            console.warn('Connectivity checks failed:', error);
+          }
+        }
+      }
+    };
+
+    runConnectivityChecks();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, tripId]);
 
   // Cleanup subscription on unmount

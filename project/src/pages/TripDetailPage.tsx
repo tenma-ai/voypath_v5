@@ -81,34 +81,52 @@ export function TripDetailPage() {
 
   // Set the correct trip when tripId param is provided
   useEffect(() => {
+    let cancelled = false;
+
     const checkAndSetTrip = async () => {
-      if (tripId) {
+      if (tripId && !cancelled) {
         // If trips are not loaded yet, try loading them
         if (trips.length === 0) {
           await loadTripsFromDatabase();
           return; // Will re-run when trips update
         }
         
-        const targetTrip = trips.find(t => t.id === tripId);
-        if (targetTrip && (!currentTrip || currentTrip.id !== tripId)) {
-          await setCurrentTrip(targetTrip);
-        } else if (!targetTrip) {
-          // Try loading trips again in case it was just added
-          await loadTripsFromDatabase();
+        if (!cancelled) {
+          const targetTrip = trips.find(t => t.id === tripId);
+          if (targetTrip && (!currentTrip || currentTrip.id !== tripId)) {
+            await setCurrentTrip(targetTrip);
+          } else if (!targetTrip) {
+            // Try loading trips again in case it was just added
+            await loadTripsFromDatabase();
+          }
         }
       }
     };
     
     checkAndSetTrip();
+
+    return () => {
+      cancelled = true;
+    };
   }, [tripId, trips, currentTrip, setCurrentTrip, loadTripsFromDatabase]);
 
   // Load trip members when current trip changes
   useEffect(() => {
-    if (currentTrip?.id) {
-      loadTripMembers();
-    } else {
-      setMembers([]);
-    }
+    let cancelled = false;
+
+    const runMemberLoad = async () => {
+      if (currentTrip?.id && !cancelled) {
+        await loadTripMembers();
+      } else if (!cancelled) {
+        setMembers([]);
+      }
+    };
+
+    runMemberLoad();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentTrip?.id]);
 
   const loadTripMembers = async () => {
@@ -195,9 +213,11 @@ export function TripDetailPage() {
 
   // Load fresh data from database when page loads or trip changes
   useEffect(() => {
+    let cancelled = false;
+
     const loadData = async () => {
       try {
-        if (currentTrip) {
+        if (currentTrip && !cancelled) {
           await loadPlacesFromDatabase(currentTrip.id);
         }
       } catch (error) {
@@ -206,17 +226,39 @@ export function TripDetailPage() {
     };
 
     loadData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentTrip?.id, loadPlacesFromDatabase]);
 
   const trip = currentTrip;
 
   // Load places and optimization result on component mount
   useEffect(() => {
-    if (currentTrip?.id) { // Load for all real trips
-      createSystemPlaces?.(currentTrip.id); // Creates system places if they don't exist
-      loadPlacesFromAPI?.(currentTrip.id);
-      loadOptimizationResult?.(currentTrip.id);
-    }
+    let cancelled = false;
+
+    const loadTripData = async () => {
+      if (currentTrip?.id && !cancelled) { // Load for all real trips
+        try {
+          await createSystemPlaces?.(currentTrip.id); // Creates system places if they don't exist
+          if (!cancelled) {
+            await loadPlacesFromAPI?.(currentTrip.id);
+          }
+          if (!cancelled) {
+            await loadOptimizationResult?.(currentTrip.id);
+          }
+        } catch (error) {
+          // Failed to load trip data
+        }
+      }
+    };
+
+    loadTripData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentTrip?.id, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces]);
 
   // Get places for current trip

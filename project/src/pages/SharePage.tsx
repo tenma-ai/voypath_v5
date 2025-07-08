@@ -26,10 +26,28 @@ export function SharePage() {
   const [generatingLink, setGeneratingLink] = useState(false);
 
   useEffect(() => {
-    if (currentTrip) {
-      loadTripMembers();
-      loadExistingShareData();
-    }
+    let cancelled = false;
+
+    const loadShareData = async () => {
+      if (currentTrip && !cancelled) {
+        try {
+          await loadTripMembers();
+          if (!cancelled) {
+            await loadExistingShareData();
+          }
+        } catch (error) {
+          if (!cancelled) {
+            console.warn('Failed to load share data:', error);
+          }
+        }
+      }
+    };
+
+    loadShareData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentTrip]);
 
   const loadExistingShareData = async () => {

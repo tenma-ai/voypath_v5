@@ -51,14 +51,32 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
 
   // Load trip members when modal opens and currentTrip is available
   useEffect(() => {
-    // Log message
-    if (isOpen && currentTrip?.id) {
+    let cancelled = false;
+
+    const loadModalData = async () => {
       // Log message
-      loadTripMembers();
-      initializeTripData();
-    } else {
-      // Log message
-    }
+      if (isOpen && currentTrip?.id && !cancelled) {
+        // Log message
+        try {
+          await loadTripMembers();
+          if (!cancelled) {
+            initializeTripData();
+          }
+        } catch (error) {
+          if (!cancelled) {
+            console.warn('Failed to load modal data:', error);
+          }
+        }
+      } else {
+        // Log message
+      }
+    };
+
+    loadModalData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, currentTrip?.id]);
 
   // Initialize trip data for editing
