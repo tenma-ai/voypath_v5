@@ -172,10 +172,20 @@ export function ListView() {
 
   // Display schedule from optimization results ONLY
   const schedule = useMemo(() => {
-    if (!currentTrip) return [];
+    console.log('=== ListView Schedule Generation ===');
+    console.log('currentTrip:', currentTrip);
+    console.log('hasUserOptimized:', hasUserOptimized);
+    console.log('optimizationResult:', optimizationResult);
+    
+    if (!currentTrip) {
+      console.log('No current trip, returning empty schedule');
+      return [];
+    }
     
     // ONLY display results if user has optimized and we have optimization results with daily schedules
     if (hasUserOptimized && optimizationResult?.optimization?.daily_schedules?.length > 0) {
+      console.log('Processing optimization results...');
+      console.log('Daily schedules:', optimizationResult.optimization.daily_schedules);
       
       const scheduleDays: DaySchedule[] = [];
       
@@ -313,6 +323,7 @@ export function ListView() {
     }
     
     // NO optimization results - show message to optimize first
+    console.log('No optimization results available');
     return [];
   }, [currentTrip, optimizationResult, hasUserOptimized]);
 
