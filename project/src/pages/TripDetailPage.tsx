@@ -52,6 +52,8 @@ export function TripDetailPage() {
     };
   }, []);
 
+  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized, loadTripsFromDatabase, activeView, setActiveView, setupRealTimeSync } = useStore();
+
   // Setup real-time sync cleanup
   useEffect(() => {
     const cleanup = setupRealTimeSync();
@@ -98,8 +100,6 @@ export function TripDetailPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMemberPopup]);
   
-  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized, loadTripsFromDatabase, activeView, setActiveView, setupRealTimeSync } = useStore();
-
   // Set the correct trip when tripId param is provided
   useEffect(() => {
     let cancelled = false;

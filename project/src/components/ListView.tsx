@@ -57,7 +57,15 @@ export function ListView() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // 場所カードのスタイルとクラス名を取得する関数
-  const getPlaceCardStyle = (event: ScheduleEvent): { style: React.CSSProperties; className: string } => {
+  // Filter places for current trip - ensure we have valid trip ID
+  const tripPlaces = useMemo(() => {
+    if (!currentTrip?.id) return [];
+    return places.filter(place => 
+      place.trip_id === currentTrip.id || place.tripId === currentTrip.id
+    );
+  }, [places, currentTrip?.id]);
+
+  const getPlaceCardStyle = useCallback((event: ScheduleEvent): { style: React.CSSProperties; className: string } => {
     if (event.type !== 'place') return { style: {}, className: '' };
     
     // 対応する実際の場所オブジェクトを検索
@@ -70,15 +78,7 @@ export function ListView() {
       style: getCSSProperties(colorResult),
       className: colorResult.className || ''
     };
-  };
-
-  // Filter places for current trip - ensure we have valid trip ID
-  const tripPlaces = useMemo(() => {
-    if (!currentTrip?.id) return [];
-    return places.filter(place => 
-      place.trip_id === currentTrip.id || place.tripId === currentTrip.id
-    );
-  }, [places, currentTrip?.id]);
+  }, [tripPlaces, tripMembers, memberColors]);
   
   // Colors and trip members are now loaded centrally via store
 

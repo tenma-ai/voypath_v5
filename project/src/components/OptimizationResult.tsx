@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, MapPin, Users, TrendingUp, CheckCircle, X, Calendar, Map, List, Eye } from 'lucide-react';
 import MapViewModal from './MapViewModal';
@@ -74,7 +74,7 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
   }
   
   // Format optimization result for display
-  const formatOptimizationResult = (result: OptimizationResult) => {
+  const formatOptimizationResult = useCallback((result: OptimizationResult) => {
     // Extract daily_schedules directly from Edge Function response
     const dailySchedules = result?.optimization?.daily_schedules;
     
@@ -129,23 +129,23 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
       totalStats,
       summary: `Optimized ${totalStats.places} places across ${dailySchedules.length} days`
     };
-  };
+  }, []);
 
-  const formattedResult = formatOptimizationResult(result);
+  const formattedResult = useMemo(() => formatOptimizationResult(result), [formatOptimizationResult, result]);
   
-  const formatMinutes = (minutes: number): string => {
+  const formatMinutes = useCallback((minutes: number): string => {
     if (minutes < 60) return `${Math.round(minutes)}min`;
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = Math.round(minutes % 60);
     return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}min` : `${hours}h`;
-  };
+  }, []);
 
   // Use centralized transport utility
-  const getTransportIconLocal = (mode: string): string => {
+  const getTransportIconLocal = useCallback((mode: string): string => {
     return getTransportEmoji(mode);
-  };
+  }, []);
 
-  const formatTime = (timeString: string): string => {
+  const formatTime = useCallback((timeString: string): string => {
     if (!timeString) return 'Invalid Date';
     
     try {
@@ -182,7 +182,7 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
     } catch (error) {
       return 'Invalid Date';
     }
-  };
+  }, []);
 
   return (
     <motion.div

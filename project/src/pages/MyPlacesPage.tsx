@@ -97,7 +97,6 @@ export function MyPlacesPage() {
     const loadPlacesForCurrentTrip = async () => {
       if (currentTrip) {
         try {
-          const { loadPlacesFromDatabase } = useStore.getState();
           await loadPlacesFromDatabase(currentTrip.id);
         } catch (error) {
           // Failed to load places from database
@@ -107,7 +106,7 @@ export function MyPlacesPage() {
 
     // Always load places when currentTrip changes or when component mounts
     loadPlacesForCurrentTrip();
-  }, [currentTrip?.id]); // Re-run when currentTrip changes
+  }, [currentTrip?.id, loadPlacesFromDatabase]); // Re-run when currentTrip changes
 
   // Check if first time guidance should be shown
   useEffect(() => {
