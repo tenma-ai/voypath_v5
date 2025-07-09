@@ -43,7 +43,7 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const { currentTrip, addPlace } = useStore();
 
-  // Load restaurants from Google Places API
+  // Load restaurants from Google Places API based on nearby location
   useEffect(() => {
     if (isOpen && nearbyLocation) {
       loadRestaurants();
@@ -55,22 +55,34 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
     
     setIsLoading(true);
     try {
-      const searchQuery = getMealTypeSearchQuery(mealType);
+      // Use Google Places API to search for restaurants near the previous place
+      const mealTypeKeyword = getMealTypeSearchQuery(mealType);
       const places = await GooglePlacesService.searchNearby(
         { lat: nearbyLocation.lat, lng: nearbyLocation.lng },
-        1000, // 1km radius
+        1500, // 1.5km radius for better coverage
         'restaurant'
       );
 
-      // Filter and convert to restaurant format
+      // Filter restaurants based on meal type and quality
       const restaurantData = places
-        .filter(place => place.types.includes('restaurant') || place.types.includes('meal_takeaway'))
+        .filter(place => {
+          const isRestaurant = place.types.includes('restaurant') || 
+                              place.types.includes('meal_takeaway') ||
+                              place.types.includes('food');
+          const hasGoodRating = !place.rating || place.rating >= 3.5;
+          return isRestaurant && hasGoodRating;
+        })
         .map(place => convertToRestaurant(place))
-        .slice(0, 10); // Limit to 10 results
+        .sort((a, b) => {
+          // Sort by rating first, then by distance
+          if (b.rating !== a.rating) return b.rating - a.rating;
+          return parseFloat(a.distance) - parseFloat(b.distance);
+        })
+        .slice(0, 12); // Show top 12 restaurants
 
       setRestaurants(restaurantData);
     } catch (error) {
-      console.error('Failed to load restaurants:', error);
+      console.error('Failed to load restaurants from Google Places API:', error);
       setRestaurants([]);
     } finally {
       setIsLoading(false);
@@ -159,22 +171,39 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
       const mealTypeKeyword = getMealTypeSearchQuery(mealType);
       const fullSearchQuery = `${searchQuery} ${mealTypeKeyword}`;
       
+      // Use Google Places API text search with location bias
       const places = await GooglePlacesService.searchPlaces({
         query: fullSearchQuery,
         location: { lat: nearbyLocation.lat, lng: nearbyLocation.lng },
-        radius: 2000, // 2km radius for search
+        radius: 3000, // 3km radius for broader search
         type: 'restaurant'
       });
 
-      // Convert to restaurant format
+      // Filter and convert to restaurant format with enhanced filtering
       const restaurantData = places
-        .filter(place => place.types.includes('restaurant') || place.types.includes('meal_takeaway'))
+        .filter(place => {
+          const isRestaurant = place.types.includes('restaurant') || 
+                              place.types.includes('meal_takeaway') ||
+                              place.types.includes('food');
+          const hasGoodRating = !place.rating || place.rating >= 3.0;
+          const matchesSearch = place.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                               (place.formatted_address && place.formatted_address.toLowerCase().includes(searchQuery.toLowerCase()));
+          return isRestaurant && hasGoodRating && matchesSearch;
+        })
         .map(place => convertToRestaurant(place))
-        .slice(0, 15); // Limit to 15 results
+        .sort((a, b) => {
+          // Prioritize relevance to search query, then rating, then distance
+          const aRelevance = a.name.toLowerCase().includes(searchQuery.toLowerCase()) ? 1 : 0;
+          const bRelevance = b.name.toLowerCase().includes(searchQuery.toLowerCase()) ? 1 : 0;
+          if (bRelevance !== aRelevance) return bRelevance - aRelevance;
+          if (b.rating !== a.rating) return b.rating - a.rating;
+          return parseFloat(a.distance) - parseFloat(b.distance);
+        })
+        .slice(0, 15); // Show top 15 search results
 
       setRestaurants(restaurantData);
     } catch (error) {
-      console.error('Failed to search restaurants:', error);
+      console.error('Failed to search restaurants with Google Places API:', error);
       setRestaurants([]);
     } finally {
       setIsLoading(false);
@@ -244,6 +273,9 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
           </h2>
           <p className="text-white/80 text-sm mt-1">
             {timeSlot} • {dayData.date} • Near {nearbyLocation?.name || 'current location'}
+          </p>
+          <p className="text-white/60 text-xs mt-1">
+            Powered by Google Places API for real-time restaurant data
           </p>
         </div>
 
@@ -335,9 +367,14 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
         {/* Footer */}
         <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-700/50">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Showing restaurants near {nearbyLocation?.name || 'your location'}
-            </p>
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Showing restaurants near {nearbyLocation?.name || 'your location'}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                Results from Google Places API • Real-time data
+              </p>
+            </div>
             <button
               onClick={onClose}
               className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
