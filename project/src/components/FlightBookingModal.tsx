@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
-import { X, Plane, ExternalLink, Clock, Calendar, User, MapPin } from 'lucide-react';
+import { X, Plane, ExternalLink } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { DateUtils } from '../utils/DateUtils';
 
@@ -196,39 +196,6 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
             </button>
           </div>
 
-          {/* Flight Info */}
-          <div className="p-4 sm:p-6 border-b border-slate-200/50 dark:border-slate-700/50">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 dark:text-slate-400" />
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-white">Departure Date</p>
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                    {departureDate.toLocaleDateString('en-US', { 
-                      weekday: 'short', 
-                      year: 'numeric', 
-                      month: 'short', 
-                      day: 'numeric' 
-                    })}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <User className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 dark:text-slate-400" />
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-white">Passengers</p>
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">{tripMembers?.length || 1} adult{(tripMembers?.length || 1) > 1 ? 's' : ''}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 dark:text-slate-400" />
-                <div>
-                  <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-white">Time Slot</p>
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">{timeSlot}</p>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Tabs */}
           <div className="flex border-b border-slate-200/50 dark:border-slate-700/50">

@@ -99,9 +99,15 @@ interface StoreState {
 
   // Places
   places: Place[];
-  addPlace: (place: Place) => Promise<void>;
+  addPlace: (place: Place, options?: { skipDuplicateCheck?: boolean; autoMerge?: boolean }) => Promise<any>;
   updatePlace: (id: string, updates: Partial<Place>) => Promise<void>;
   deletePlace: (id: string) => Promise<void>;
+
+  // Duplicate management
+  findDuplicatesInTrip: (tripId?: string) => Promise<any[]>;
+  mergeDuplicateGroup: (duplicateGroup: any) => Promise<boolean>;
+  autoMergeAllDuplicates: (tripId?: string) => Promise<number>;
+  getDuplicateSummary: (tripId?: string) => Promise<any>;
 
   // Member Colors - Centralized color management
   memberColors: Record<string, string>;
@@ -146,6 +152,7 @@ interface StoreState {
   updateScheduleInRealTime: (updateData: any) => Promise<void>;
   broadcastScheduleUpdate: (updateData: any) => void;
   syncOptimizationResults: () => Promise<void>;
+  setupRealTimeSync: () => () => void;
   
   // Calendar edit functions
   movePlace: (placeId: string, sourceIndex: number, targetIndex: number, dayData: any) => Promise<void>;
@@ -159,6 +166,12 @@ interface StoreState {
   loadPlacesFromAPI: (tripId: string) => Promise<void>;
   loadOptimizationResult: (tripId: string) => Promise<void>;
   createSystemPlaces: (tripId: string) => Promise<void>;
+
+  // Database Integration
+  loadTripsFromDatabase: () => Promise<void>;
+  loadPlacesFromDatabase: (tripId?: string) => Promise<void>;
+  initializeFromDatabase: () => Promise<void>;
+  handlePendingTripJoin: () => Promise<void>;
 
   // Premium functions
   canCreateTrip: () => boolean;
