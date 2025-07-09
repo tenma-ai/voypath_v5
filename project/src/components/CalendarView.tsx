@@ -710,72 +710,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               );
                             })()}
 
-                            {/* Flight booking button for travel between places (only in edit mode and if transport is flight) */}
-                            {isEditMode && blockIndex > 0 && (() => {
-                              const prevBlock = getGroupedPlacesForDay(dayData)[blockIndex - 1];
-                              const currentBlock = block;
-                              const transportMode = currentBlock.place.transport_mode || 'walking';
-                              
-                              if (transportMode.toLowerCase().includes('flight') || transportMode.toLowerCase().includes('plane') || transportMode.toLowerCase().includes('air')) {
-                                // Calculate position between previous place end and current place start
-                                const prevEndHour = parseInt(prevBlock.endTime.split(':')[0]);
-                                const prevEndMinute = parseInt(prevBlock.endTime.split(':')[1]);
-                                const currentStartHour = parseInt(currentBlock.startTime.split(':')[0]);
-                                const currentStartMinute = parseInt(currentBlock.startTime.split(':')[1]);
-                                
-                                const calculatePosition = (hour: number, minute: number) => {
-                                  if (hour >= 6 && hour <= 23) {
-                                    return (hour - 6) * 60 + (minute / 60) * 60;
-                                  } else {
-                                    const nightHours = 18 * 60;
-                                    if (hour >= 0 && hour < 6) {
-                                      return nightHours + Math.floor(hour / 3) * 40 + (minute / 180) * 40;
-                                    }
-                                    return 0;
-                                  }
-                                };
-                                
-                                const prevEndPos = calculatePosition(prevEndHour, prevEndMinute);
-                                const currentStartPos = calculatePosition(currentStartHour, currentStartMinute);
-                                const middlePosition = prevEndPos + (currentStartPos - prevEndPos) / 2;
-                                
-                                return (
-                                  <button
-                                    className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg px-2 py-1 text-xs font-bold shadow-lg transition-all duration-200 z-20 flex items-center space-x-1"
-                                    style={{ top: `${middlePosition - 15}px` }}
-                                    onClick={() => {
-                                      setFlightModal({
-                                        isOpen: true,
-                                        routeData: {
-                                          from: prevBlock?.place?.place_name || prevBlock?.place?.name || 'Previous Location',
-                                          to: currentBlock.place.place_name || currentBlock.place.name || 'Current Location',
-                                          fromLat: prevBlock?.place?.latitude,
-                                          fromLng: prevBlock?.place?.longitude,
-                                          toLat: currentBlock.place.latitude,
-                                          toLng: currentBlock.place.longitude
-                                        },
-                                        dayData: dayData,
-                                        timeSlot: `${formatTime(currentBlock.startTime)} departure`
-                                      });
-                                    }}
-                                    title="Book flight"
-                                  >
-                                    <span>✈️</span>
-                                    <span>Flight</span>
-                                  </button>
-                                );
-                              }
-                              return null;
-                            })()}
 
-                            {/* Route line and transport info (for non-edit mode) - positioned between places */}
-                            {!isEditMode && blockIndex > 0 && (() => {
+                            {/* Route line and transport info - positioned between places (both edit and non-edit modes) */}
+                            {blockIndex > 0 && (() => {
                               const prevBlock = getGroupedPlacesForDay(dayData)[blockIndex - 1];
                               const currentBlock = block;
                               const transportMode = currentBlock.place.transport_mode || 'walking';
                               const travelTime = currentBlock.place.travel_time_from_previous || 0;
                               
-                              if (travelTime > 0) {
+                              // Only show lines for flights, not for walking or car
+                              const isFlight = transportMode.toLowerCase().includes('flight') || transportMode.toLowerCase().includes('plane') || transportMode.toLowerCase().includes('air');
+                              
+                              if (travelTime > 0 && isFlight) {
                                 // Calculate position between previous place end and current place start
                                 const prevEndHour = parseInt(prevBlock.endTime.split(':')[0]);
                                 const prevEndMinute = parseInt(prevBlock.endTime.split(':')[1]);
@@ -800,24 +746,43 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                 const middlePosition = prevEndPos + routeLength / 2;
                                 
                                 return (
-                                  <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10" style={{ top: `${middlePosition}px` }}>
-                                    {/* Dynamic route line */}
-                                    <div className="flex flex-col items-center">
+                                  <div 
+                                    className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 cursor-pointer" 
+                                    style={{ top: `${middlePosition}px` }}
+                                    onClick={() => {
+                                      setFlightModal({
+                                        isOpen: true,
+                                        routeData: {
+                                          from: prevBlock?.place?.place_name || prevBlock?.place?.name || 'Previous Location',
+                                          to: currentBlock.place.place_name || currentBlock.place.name || 'Current Location',
+                                          fromLat: prevBlock?.place?.latitude,
+                                          fromLng: prevBlock?.place?.longitude,
+                                          toLat: currentBlock.place.latitude,
+                                          toLng: currentBlock.place.longitude
+                                        },
+                                        dayData: dayData,
+                                        timeSlot: `${formatTime(currentBlock.startTime)} departure`
+                                      });
+                                    }}
+                                    title="Click to book flight"
+                                  >
+                                    {/* Dynamic flight route line */}
+                                    <div className="flex flex-col items-center hover:opacity-80 transition-opacity">
                                       <div 
-                                        className="w-px bg-gray-300 dark:bg-gray-600" 
+                                        className="w-px bg-blue-400 dark:bg-blue-500" 
                                         style={{ height: `${routeLength * 0.3}px` }}
                                       ></div>
                                       
-                                      {/* Transport info */}
-                                      <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm">
+                                      {/* Flight transport info */}
+                                      <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm">
                                         {getTransportIcon(transportMode)}
-                                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                                        <span className="text-xs text-blue-600 dark:text-blue-400">
                                           {formatTravelTime(travelTime)}
                                         </span>
                                       </div>
                                       
                                       <div 
-                                        className="w-px bg-gray-300 dark:bg-gray-600" 
+                                        className="w-px bg-blue-400 dark:bg-blue-500" 
                                         style={{ height: `${routeLength * 0.3}px` }}
                                       ></div>
                                     </div>
