@@ -821,7 +821,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               // Show lines for all transport modes
                               const isFlight = transportMode.toLowerCase().includes('flight') || transportMode.toLowerCase().includes('plane') || transportMode.toLowerCase().includes('air');
                               
-                              if (travelTime > 0 && isFlight) {
+                              if (travelTime > 0) {
                                 // Calculate position between previous place end and current place start
                                 const prevEndHour = parseInt(prevBlock.endTime.split(':')[0]);
                                 const prevEndMinute = parseInt(prevBlock.endTime.split(':')[1]);
@@ -853,7 +853,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                   // Base line length proportional to time gap (1 minute = 1 pixel)
                                   const baseLength = Math.max(timeGap * 1, 10); // Minimum 10px
                                   
-                                  // Flight: 60% of previous length
+                                  // All transport modes: 60% of previous length
                                   return Math.min(baseLength * 0.72, totalSpace * 0.36);
                                 };
                                 
