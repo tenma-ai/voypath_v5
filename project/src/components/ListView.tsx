@@ -245,6 +245,7 @@ export function ListView() {
             };
             
             console.log('Adding travel event:', travelEvent);
+            console.log('Raw transport_mode from backend:', scheduledPlace.transport_mode);
             events.push(travelEvent);
           }
           
@@ -620,7 +621,8 @@ export function ListView() {
                           {/* Trip.com Booking Buttons */}
                           {!isCollapsed && (
                             <div className="mt-1 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
-                              {/* Show transport info for all travel events */}
+                              
+                              {/* Transport mode display for all travel events */}
                               {event.type === 'travel' && (
                                 <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-xs sm:text-sm">
                                   <TransportIcon 
