@@ -8,6 +8,8 @@ import { TransportIcon } from '../utils/transportIcons';
 import CalendarGridView from './CalendarGridView';
 import MealInsertionModal from './MealInsertionModal';
 import PlaceInsertionModal from './PlaceInsertionModal';
+import HotelBookingModal from './HotelBookingModal';
+import FlightBookingModal from './FlightBookingModal';
 
 interface CalendarViewProps {
   optimizationResult?: any;
@@ -319,6 +321,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
            place.place_type === 'system_airport' ||
            (place.id && place.id.toString().startsWith('airport_')) ||
            (place.id && place.id.toString().startsWith('return_'));
+  }, []);
+
+  // Check if place is an airport (for insert button filtering)
+  const isAirport = useCallback((place: any) => {
+    return place.place_type === 'system_airport' ||
+           (place.id && place.id.toString().startsWith('airport_')) ||
+           (place.name && place.name.toLowerCase().includes('airport')) ||
+           (place.place_name && place.place_name.toLowerCase().includes('airport')) ||
+           place.category === 'airport';
   }, []);
 
   // Drag and drop handlers
@@ -635,6 +646,29 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                     
                     {/* Place blocks positioned on time grid */}
                     <div className="relative z-10">
+                      {/* Day start add button */}
+                      {isEditMode && (
+                        <button
+                          className="absolute left-1/2 transform -translate-x-1/2 bg-green-500 hover:bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold shadow-lg transition-all duration-200 z-30"
+                          style={{ top: '10px' }}
+                          onClick={() => {
+                            setPlaceInsertionModal({
+                              isOpen: true,
+                              insertionContext: {
+                                dayData: dayData,
+                                afterPlaceIndex: -1,
+                                beforePlaceIndex: 0,
+                                timeSlot: 'Day Start',
+                                nearbyLocation: undefined
+                              }
+                            });
+                          }}
+                          title="Add place at start of day"
+                        >
+                          +
+                        </button>
+                      )}
+                      
                       {getGroupedPlacesForDay(dayData).map((block, blockIndex) => {
                         const startHour = parseInt(block.startTime.split(':')[0]);
                         const startMinute = parseInt(block.startTime.split(':')[1]);
@@ -667,6 +701,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               const groupedPlaces = getGroupedPlacesForDay(dayData);
                               const prevBlock = groupedPlaces[blockIndex - 1];
                               const currentBlock = block;
+                              
+                              // Don't show insert button if either place is an airport
+                              if (isAirport(prevBlock.place) || isAirport(currentBlock.place)) {
+                                return null;
+                              }
                               
                               // Calculate position between previous place end and current place start
                               const prevEndHour = parseInt(prevBlock.endTime.split(':')[0]);
@@ -857,13 +896,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               {isEditMode && (
                                 <div className="absolute inset-0 bg-black bg-opacity-10 rounded-lg flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
                                   <div className="flex space-x-1">
-                                    <button
-                                      className="bg-white rounded-full p-1 shadow-md hover:shadow-lg transition-shadow"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        // Open place insertion modal for inserting after this place
-                                        const nextBlockIndex = blockIndex + 1;
-                                        const nextBlock = getGroupedPlacesForDay(dayData)[nextBlockIndex];
+                                    {/* Insert place button - only show if current place is not an airport */}
+                                    {!isAirport(block.place) && (
+                                      <button
+                                        className="bg-white rounded-full p-1 shadow-md hover:shadow-lg transition-shadow"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          // Open place insertion modal for inserting after this place
+                                          const nextBlockIndex = blockIndex + 1;
+                                          const nextBlock = getGroupedPlacesForDay(dayData)[nextBlockIndex];
                                         
                                         setPlaceInsertionModal({
                                           isOpen: true,
@@ -882,10 +923,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                       }}
                                       title="Add place after this"
                                     >
-                                      <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                      </svg>
-                                    </button>
+                                        <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                      </button>
+                                    )}
                                     <button
                                       className="bg-white rounded-full p-1 shadow-md hover:shadow-lg transition-shadow"
                                       onClick={async (e) => {
