@@ -43,6 +43,18 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const { currentTrip, addPlace } = useStore();
 
+  // Extract city name from location string
+  const extractCityName = (locationName: string): string => {
+    if (!locationName) return 'current location';
+    
+    // Remove common suffixes like "(Departure)", "(Destination)", etc.
+    let cityName = locationName.replace(/\s*\([^)]*\)\s*/g, '');
+    
+    // Split by comma and take the first part (usually the city)
+    const parts = cityName.split(',').map(part => part.trim());
+    return parts[0] || locationName;
+  };
+
   // Load restaurants from Google Places API based on nearby location
   useEffect(() => {
     if (isOpen && nearbyLocation) {
@@ -272,7 +284,7 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
             Add {mealType} Restaurant
           </h2>
           <p className="text-white/80 text-sm mt-1">
-            {timeSlot} • {dayData.date} • Near {nearbyLocation?.name || 'current location'}
+            {timeSlot} • {dayData.date} • Near {extractCityName(nearbyLocation?.name || 'current location')}
           </p>
           <p className="text-white/60 text-xs mt-1">
             Powered by Google Places API for real-time restaurant data
@@ -369,7 +381,7 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Showing restaurants near {nearbyLocation?.name || 'your location'}
+                Showing restaurants near {extractCityName(nearbyLocation?.name || 'your location')}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                 Results from Google Places API • Real-time data

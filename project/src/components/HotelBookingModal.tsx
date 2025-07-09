@@ -25,6 +25,18 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   nearbyLocation
 }) => {
   const { currentTrip, tripMembers, addPlace } = useStore();
+
+  // Extract city name from location string
+  const extractCityName = (locationName: string): string => {
+    if (!locationName) return 'Tokyo';
+    
+    // Remove common suffixes like "(Departure)", "(Destination)", etc.
+    let cityName = locationName.replace(/\s*\([^)]*\)\s*/g, '');
+    
+    // Split by comma and take the first part (usually the city)
+    const parts = cityName.split(',').map(part => part.trim());
+    return parts[0] || locationName;
+  };
   const [selectedTab, setSelectedTab] = useState<'search' | 'already'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     hotelName: '',
@@ -72,7 +84,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   // Generate mock hotel data
   const generateMockHotels = () => {
     const basePrice = Math.floor(Math.random() * 100) + 80;
-    const location = nearbyLocation?.name || 'Tokyo';
+    const location = extractCityName(nearbyLocation?.name || 'Tokyo');
     
     return [
       {
@@ -142,7 +154,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   };
 
   const mockHotels = generateMockHotels();
-  const city = nearbyLocation?.name || 'Tokyo';
+  const city = extractCityName(nearbyLocation?.name || 'Tokyo');
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-[9999]">
