@@ -25,7 +25,6 @@ interface TripMember {
 
 export function TripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>();
-  const [activeView, setActiveView] = useState<'map' | 'calendar'>('map');
   const [showOptimizationModal, setShowOptimizationModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showScorePopup, setShowScorePopup] = useState(false);
@@ -77,7 +76,7 @@ export function TripDetailPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMemberPopup]);
   
-  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized, loadTripsFromDatabase } = useStore();
+  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized, loadTripsFromDatabase, activeView, setActiveView } = useStore();
 
   // Set the correct trip when tripId param is provided
   useEffect(() => {

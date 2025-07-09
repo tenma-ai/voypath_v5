@@ -620,9 +620,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
             </div>
             
             {/* Days content area */}
-            <div className="ml-16 flex">
+            <div className="ml-16 flex md:flex-row flex-col">
               {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData], dayIndex) => (
-                <div key={dayKey} className="flex-1 min-w-0 border-r border-gray-200 last:border-r-0">
+                <div key={dayKey} className="md:flex-1 min-w-0 border-r md:border-r border-gray-200 md:last:border-r-0 border-b md:border-b-0 last:border-b-0">
                   {/* Day header */}
                   <div className="bg-blue-100 px-3 py-2 border-b border-gray-200 text-center">
                     <h4 className="text-sm font-semibold text-blue-900">
@@ -1298,40 +1298,105 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
         document.body
       )}
       
-      {/* Meal Insertion Modal */}
-      <MealInsertionModal
-        isOpen={mealModal.isOpen}
-        onClose={() => setMealModal({ ...mealModal, isOpen: false })}
-        mealType={mealModal.mealType}
-        dayData={mealModal.dayData}
-        timeSlot={mealModal.timeSlot}
-        nearbyLocation={mealModal.nearbyLocation}
-      />
+      {/* Meal Insertion Modal - Portal to ensure it's on top */}
+      {ReactDOM.createPortal(
+        <MealInsertionModal
+          isOpen={mealModal.isOpen}
+          onClose={() => setMealModal({ ...mealModal, isOpen: false })}
+          mealType={mealModal.mealType}
+          dayData={mealModal.dayData}
+          timeSlot={mealModal.timeSlot}
+          nearbyLocation={mealModal.nearbyLocation}
+        />,
+        document.body
+      )}
       
-      {/* Hotel Booking Modal */}
-      <HotelBookingModal
-        isOpen={hotelModal.isOpen}
-        onClose={() => setHotelModal({ ...hotelModal, isOpen: false })}
-        dayData={hotelModal.dayData}
-        timeSlot={hotelModal.timeSlot}
-        nearbyLocation={hotelModal.nearbyLocation}
-      />
+      {/* Hotel Booking Modal - Portal to ensure it's on top */}
+      {ReactDOM.createPortal(
+        <HotelBookingModal
+          isOpen={hotelModal.isOpen}
+          onClose={() => setHotelModal({ ...hotelModal, isOpen: false })}
+          dayData={hotelModal.dayData}
+          timeSlot={hotelModal.timeSlot}
+          nearbyLocation={hotelModal.nearbyLocation}
+        />,
+        document.body
+      )}
       
-      {/* Flight Booking Modal */}
-      <FlightBookingModal
-        isOpen={flightModal.isOpen}
-        onClose={() => setFlightModal({ ...flightModal, isOpen: false })}
-        routeData={flightModal.routeData}
-        dayData={flightModal.dayData}
-        timeSlot={flightModal.timeSlot}
-      />
+      {/* Flight Booking Modal - Portal to ensure it's on top */}
+      {ReactDOM.createPortal(
+        <FlightBookingModal
+          isOpen={flightModal.isOpen}
+          onClose={() => setFlightModal({ ...flightModal, isOpen: false })}
+          routeData={flightModal.routeData}
+          dayData={flightModal.dayData}
+          timeSlot={flightModal.timeSlot}
+        />,
+        document.body
+      )}
       
-      {/* Place Insertion Modal */}
-      <PlaceInsertionModal
-        isOpen={placeInsertionModal.isOpen}
-        onClose={() => setPlaceInsertionModal({ ...placeInsertionModal, isOpen: false })}
-        insertionContext={placeInsertionModal.insertionContext}
-      />
+      {/* Place Insertion Modal - Portal to ensure it's on top */}
+      {ReactDOM.createPortal(
+        <PlaceInsertionModal
+          isOpen={placeInsertionModal.isOpen}
+          onClose={() => setPlaceInsertionModal({ ...placeInsertionModal, isOpen: false })}
+          insertionContext={placeInsertionModal.insertionContext}
+        />,
+        document.body
+      )}
+
+      {/* Edit Mode Toggle Button */}
+      <div className="fixed bottom-20 right-4 z-50 flex flex-col items-center">
+        <button
+          onClick={() => {
+            setIsEditMode(!isEditMode);
+            setHasUserEditedSchedule(true);
+          }}
+          className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
+            isEditMode
+              ? 'bg-gradient-to-br from-green-500 via-emerald-500 to-green-600'
+              : 'bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600'
+          }`}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          
+          {/* Sparkle effects */}
+          <div className="absolute inset-0">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute w-0.5 h-0.5 bg-white rounded-full animate-pulse"
+                style={{
+                  left: `${25 + i * 25}%`,
+                  top: `${25 + i * 20}%`,
+                  animationDelay: `${i * 0.7}s`
+                }}
+              />
+            ))}
+          </div>
+
+          {isEditMode ? (
+            <Check className="w-6 h-6 text-white relative z-10" />
+          ) : (
+            <Edit3 className="w-6 h-6 text-white relative z-10" />
+          )}
+          
+          {/* Circular Text */}
+          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 56 56">
+            <defs>
+              <path
+                id="edit-circle-path"
+                d="M 28 28 m -20 0 a 20 20 0 1 1 40 0 a 20 20 0 1 1 -40 0"
+              />
+            </defs>
+            <text className="text-[6px] fill-white font-medium" style={{ letterSpacing: '0.5px' }}>
+              <textPath href="#edit-circle-path" startOffset="25%">
+                {isEditMode ? 'DONE' : 'EDIT'}
+              </textPath>
+            </text>
+          </svg>
+        </button>
+      </div>
     </div>
   );
 };

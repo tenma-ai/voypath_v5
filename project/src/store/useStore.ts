@@ -129,6 +129,10 @@ interface StoreState {
   showOptimizationSuccess: boolean;
   setShowOptimizationSuccess: (value: boolean) => void;
 
+  // Active view mode (for showing/hiding buttons)
+  activeView: 'map' | 'calendar';
+  setActiveView: (view: 'map' | 'calendar') => void;
+
   // Selected day for ListView/MapView synchronization
   selectedDay: string | null;
   setSelectedDay: (day: string | null) => void;
@@ -768,6 +772,12 @@ export const useStore = create<StoreState>()((set, get) => ({
       showOptimizationSuccess: false,
       setShowOptimizationSuccess: (value) => {
         set({ showOptimizationSuccess: value });
+      },
+
+      // Active view mode
+      activeView: 'map',
+      setActiveView: (view) => {
+        set({ activeView: view });
       },
 
       // Selected day for ListView/MapView synchronization
