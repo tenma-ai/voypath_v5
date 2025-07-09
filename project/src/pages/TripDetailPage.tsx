@@ -251,7 +251,7 @@ export function TripDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [currentTrip?.id, loadPlacesFromDatabase]);
+  }, [currentTrip?.id]);
 
   const trip = currentTrip;
 
