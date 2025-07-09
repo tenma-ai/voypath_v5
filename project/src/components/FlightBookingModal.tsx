@@ -111,23 +111,26 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     }, 1500);
   };
 
-  const handleWayAwayBooking = (flight?: Flight) => {
-    // Use WayAway affiliate link for flight booking
+  const handleTripComBooking = (flight?: Flight) => {
+    // Use Trip.com affiliate link for flight booking
     const departureDate = dayData?.date || new Date().toISOString().split('T')[0];
     const passengers = bookingDetails.passengers || 1;
     
-    // Build WayAway URL with pre-filled data
-    const wayAwayUrl = `https://tp.media/r?marker=649297&trs=434567&p=2819&u=https%3A%2F%2Fwayaway.io%2Fflights`;
+    // Build Trip.com URL with pre-filled data
+    const baseUrl = 'https://tp.media/r?marker=649297&trs=434567&p=8626&u=https%3A%2F%2Ftrip.com%2Fflights%2Fsearch';
     const params = new URLSearchParams({
       'from': routeData.from,
       'to': routeData.to,
-      'departure': departureDate,
+      'departure': departureDate.replace(/-/g, '%2F'),
       'passengers': passengers.toString(),
-      'class': 'economy'
+      'class': 'economy',
+      'type': 'oneway',
+      'locale': 'en-XX',
+      'curr': 'JPY'
     });
     
-    const fullUrl = `${wayAwayUrl}?${params.toString()}&campaign_id=121`;
-    window.open(fullUrl, '_blank');
+    const tripComUrl = `${baseUrl}?${params.toString()}&campaign_id=121`;
+    window.open(tripComUrl, '_blank');
   };
 
   const handleAddFlight = async (flight: Flight) => {
@@ -365,11 +368,11 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                             Add to Trip
                           </button>
                           <button
-                            onClick={() => handleWayAwayBooking(flight)}
+                            onClick={() => handleTripComBooking(flight)}
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center"
                           >
                             <ExternalLink className="w-3 h-3 mr-1" />
-                            Book on WayAway
+                            Book on Trip.com
                           </button>
                         </div>
                       </div>

@@ -4,6 +4,7 @@ import { Calendar, Clock, MapPin, List, Grid3X3, Edit3, Check, X, Move, ArrowUpD
 import { useStore } from '../store/useStore';
 import { getPlaceColor } from '../utils/ColorUtils';
 import { DateUtils } from '../utils/DateUtils';
+import { TransportIcon } from '../utils/transportIcons';
 import CalendarGridView from './CalendarGridView';
 import MealInsertionModal from './MealInsertionModal';
 import HotelBookingModal from './HotelBookingModal';
@@ -109,16 +110,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     setupRealTimeSync 
   } = useStore();
 
-  // Get transport mode icon
+  // Get transport mode icon using standardized component
   const getTransportIcon = useCallback((transportMode: string) => {
-    const mode = transportMode?.toLowerCase() || 'walking';
-    if (mode.includes('flight') || mode.includes('plane') || mode.includes('air')) {
-      return <Plane className="w-3 h-3 text-blue-500" />;
-    } else if (mode.includes('car') || mode.includes('drive')) {
-      return <Car className="w-3 h-3 text-green-500" />;
-    } else {
-      return <Navigation className="w-3 h-3 text-gray-500" />;
-    }
+    return <TransportIcon mode={transportMode} size={12} className="transport-icon" />;
   }, []);
 
   // Format travel time
@@ -656,41 +650,65 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                         
                         return (
                           <div key={blockIndex} className="relative">
-                            {/* Add Place button (only in edit mode) */}
-                            {isEditMode && blockIndex > 0 && (
-                              <button
-                                className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-500 hover:bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-lg transition-all duration-200 z-20"
-                                style={{ top: `${topPosition - 10}px` }}
-                                onClick={() => {
-                                  const groupedPlaces = getGroupedPlacesForDay(dayData);
-                                  const prevBlock = groupedPlaces[blockIndex - 1];
-                                  const currentBlock = block;
-                                  
-                                  // Calculate suggested time between places
-                                  const prevEndTime = prevBlock ? prevBlock.endTime : '09:00';
-                                  const currentStartTime = currentBlock.startTime;
-                                  const suggestedTime = `${prevEndTime} - ${currentStartTime}`;
-                                  
-                                  setPlaceInsertionModal({
-                                    isOpen: true,
-                                    insertionContext: {
-                                      dayData: dayData,
-                                      afterPlaceIndex: blockIndex - 1,
-                                      beforePlaceIndex: blockIndex,
-                                      timeSlot: suggestedTime,
-                                      nearbyLocation: prevBlock ? {
-                                        lat: prevBlock.place.latitude || 35.6812,
-                                        lng: prevBlock.place.longitude || 139.7671,
-                                        name: prevBlock.place.place_name || prevBlock.place.name
-                                      } : undefined
-                                    }
-                                  });
-                                }}
-                                title="Add place here"
-                              >
-                                +
-                              </button>
-                            )}
+                            {/* Add Place button (only in edit mode) - positioned between places */}
+                            {isEditMode && blockIndex > 0 && (() => {
+                              const groupedPlaces = getGroupedPlacesForDay(dayData);
+                              const prevBlock = groupedPlaces[blockIndex - 1];
+                              const currentBlock = block;
+                              
+                              // Calculate position between previous place end and current place start
+                              const prevEndHour = parseInt(prevBlock.endTime.split(':')[0]);
+                              const prevEndMinute = parseInt(prevBlock.endTime.split(':')[1]);
+                              const currentStartHour = parseInt(currentBlock.startTime.split(':')[0]);
+                              const currentStartMinute = parseInt(currentBlock.startTime.split(':')[1]);
+                              
+                              const calculatePosition = (hour: number, minute: number) => {
+                                if (hour >= 6 && hour <= 23) {
+                                  return (hour - 6) * 60 + (minute / 60) * 60;
+                                } else {
+                                  const nightHours = 18 * 60;
+                                  if (hour >= 0 && hour < 6) {
+                                    return nightHours + Math.floor(hour / 3) * 40 + (minute / 180) * 40;
+                                  }
+                                  return 0;
+                                }
+                              };
+                              
+                              const prevEndPos = calculatePosition(prevEndHour, prevEndMinute);
+                              const currentStartPos = calculatePosition(currentStartHour, currentStartMinute);
+                              const middlePosition = prevEndPos + (currentStartPos - prevEndPos) / 2;
+                              
+                              return (
+                                <button
+                                  className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-500 hover:bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-lg transition-all duration-200 z-20"
+                                  style={{ top: `${middlePosition}px` }}
+                                  onClick={() => {
+                                    // Calculate suggested time between places
+                                    const prevEndTime = prevBlock ? prevBlock.endTime : '09:00';
+                                    const currentStartTime = currentBlock.startTime;
+                                    const suggestedTime = `${prevEndTime} - ${currentStartTime}`;
+                                    
+                                    setPlaceInsertionModal({
+                                      isOpen: true,
+                                      insertionContext: {
+                                        dayData: dayData,
+                                        afterPlaceIndex: blockIndex - 1,
+                                        beforePlaceIndex: blockIndex,
+                                        timeSlot: suggestedTime,
+                                        nearbyLocation: prevBlock ? {
+                                          lat: prevBlock.place.latitude || 35.6812,
+                                          lng: prevBlock.place.longitude || 139.7671,
+                                          name: prevBlock.place.place_name || prevBlock.place.name
+                                        } : undefined
+                                      }
+                                    });
+                                  }}
+                                  title="Add place here"
+                                >
+                                  +
+                                </button>
+                              );
+                            })()}
 
                             {/* Flight booking button for travel between places (only in edit mode and if transport is flight) */}
                             {isEditMode && blockIndex > 0 && (() => {
@@ -699,10 +717,32 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               const transportMode = currentBlock.place.transport_mode || 'walking';
                               
                               if (transportMode.toLowerCase().includes('flight') || transportMode.toLowerCase().includes('plane') || transportMode.toLowerCase().includes('air')) {
+                                // Calculate position between previous place end and current place start
+                                const prevEndHour = parseInt(prevBlock.endTime.split(':')[0]);
+                                const prevEndMinute = parseInt(prevBlock.endTime.split(':')[1]);
+                                const currentStartHour = parseInt(currentBlock.startTime.split(':')[0]);
+                                const currentStartMinute = parseInt(currentBlock.startTime.split(':')[1]);
+                                
+                                const calculatePosition = (hour: number, minute: number) => {
+                                  if (hour >= 6 && hour <= 23) {
+                                    return (hour - 6) * 60 + (minute / 60) * 60;
+                                  } else {
+                                    const nightHours = 18 * 60;
+                                    if (hour >= 0 && hour < 6) {
+                                      return nightHours + Math.floor(hour / 3) * 40 + (minute / 180) * 40;
+                                    }
+                                    return 0;
+                                  }
+                                };
+                                
+                                const prevEndPos = calculatePosition(prevEndHour, prevEndMinute);
+                                const currentStartPos = calculatePosition(currentStartHour, currentStartMinute);
+                                const middlePosition = prevEndPos + (currentStartPos - prevEndPos) / 2;
+                                
                                 return (
                                   <button
                                     className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg px-2 py-1 text-xs font-bold shadow-lg transition-all duration-200 z-20 flex items-center space-x-1"
-                                    style={{ top: `${topPosition - 25}px` }}
+                                    style={{ top: `${middlePosition - 15}px` }}
                                     onClick={() => {
                                       setFlightModal({
                                         isOpen: true,
@@ -728,7 +768,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               return null;
                             })()}
 
-                            {/* Route line and transport info (for non-edit mode) */}
+                            {/* Route line and transport info (for non-edit mode) - positioned between places */}
                             {!isEditMode && blockIndex > 0 && (() => {
                               const prevBlock = getGroupedPlacesForDay(dayData)[blockIndex - 1];
                               const currentBlock = block;
@@ -736,11 +776,37 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               const travelTime = currentBlock.place.travel_time_from_previous || 0;
                               
                               if (travelTime > 0) {
+                                // Calculate position between previous place end and current place start
+                                const prevEndHour = parseInt(prevBlock.endTime.split(':')[0]);
+                                const prevEndMinute = parseInt(prevBlock.endTime.split(':')[1]);
+                                const currentStartHour = parseInt(currentBlock.startTime.split(':')[0]);
+                                const currentStartMinute = parseInt(currentBlock.startTime.split(':')[1]);
+                                
+                                const calculatePosition = (hour: number, minute: number) => {
+                                  if (hour >= 6 && hour <= 23) {
+                                    return (hour - 6) * 60 + (minute / 60) * 60;
+                                  } else {
+                                    const nightHours = 18 * 60;
+                                    if (hour >= 0 && hour < 6) {
+                                      return nightHours + Math.floor(hour / 3) * 40 + (minute / 180) * 40;
+                                    }
+                                    return 0;
+                                  }
+                                };
+                                
+                                const prevEndPos = calculatePosition(prevEndHour, prevEndMinute);
+                                const currentStartPos = calculatePosition(currentStartHour, currentStartMinute);
+                                const routeLength = Math.max(currentStartPos - prevEndPos, 40); // Minimum 40px
+                                const middlePosition = prevEndPos + routeLength / 2;
+                                
                                 return (
-                                  <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10" style={{ top: `${topPosition - 15}px` }}>
-                                    {/* Route line */}
+                                  <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10" style={{ top: `${middlePosition}px` }}>
+                                    {/* Dynamic route line */}
                                     <div className="flex flex-col items-center">
-                                      <div className="w-px h-8 bg-gray-300 dark:bg-gray-600"></div>
+                                      <div 
+                                        className="w-px bg-gray-300 dark:bg-gray-600" 
+                                        style={{ height: `${routeLength * 0.3}px` }}
+                                      ></div>
                                       
                                       {/* Transport info */}
                                       <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm">
@@ -750,7 +816,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                         </span>
                                       </div>
                                       
-                                      <div className="w-px h-8 bg-gray-300 dark:bg-gray-600"></div>
+                                      <div 
+                                        className="w-px bg-gray-300 dark:bg-gray-600" 
+                                        style={{ height: `${routeLength * 0.3}px` }}
+                                      ></div>
                                     </div>
                                   </div>
                                 );

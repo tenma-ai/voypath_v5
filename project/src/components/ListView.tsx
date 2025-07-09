@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Calendar, Clock, Star, Users, ChevronRight, Eye, EyeOff, Sparkles, AlertCircle, Navigation, Wand2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Calendar, Clock, Star, Users, ChevronRight, Eye, EyeOff, Sparkles, AlertCircle, Navigation, Wand2, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { Place } from '../types/optimization';
@@ -79,6 +79,66 @@ export function ListView() {
       className: colorResult.className || ''
     };
   }, [tripPlaces, tripMembers, memberColors]);
+
+  // Trip.com booking functions
+  const handleTripComFlightBooking = useCallback((event: ScheduleEvent) => {
+    if (event.type !== 'travel') return;
+    
+    const selectedSchedule = scheduleData.find(s => s.date === selectedDay);
+    if (!selectedSchedule) return;
+    
+    const departureDate = selectedSchedule.date;
+    const passengers = 1;
+    
+    // Build Trip.com URL with pre-filled data
+    const baseUrl = 'https://tp.media/r?marker=649297&trs=434567&p=8626&u=https%3A%2F%2Ftrip.com%2Fflights%2Fsearch';
+    const params = new URLSearchParams({
+      'from': event.from || 'Tokyo',
+      'to': event.to || 'Osaka',
+      'departure': departureDate.replace(/-/g, '%2F'),
+      'passengers': passengers.toString(),
+      'class': 'economy',
+      'type': 'oneway',
+      'locale': 'en-XX',
+      'curr': 'JPY'
+    });
+    
+    const tripComUrl = `${baseUrl}?${params.toString()}&campaign_id=121`;
+    window.open(tripComUrl, '_blank');
+  }, [selectedDay, scheduleData]);
+
+  const handleTripComHotelBooking = useCallback((event: ScheduleEvent) => {
+    if (event.type !== 'place') return;
+    
+    const selectedSchedule = scheduleData.find(s => s.date === selectedDay);
+    if (!selectedSchedule) return;
+    
+    const checkInDate = selectedSchedule.date;
+    const checkOutDate = new Date(checkInDate);
+    checkOutDate.setDate(checkOutDate.getDate() + 1);
+    
+    const city = event.name || 'Tokyo';
+    const guests = 1;
+    
+    // Build Trip.com URL with pre-filled data
+    const baseUrl = 'https://tp.media/r?marker=649297&trs=434567&p=8626&u=https%3A%2F%2Ftrip.com%2Fhotels%2Flist';
+    const params = new URLSearchParams({
+      city: city,
+      cityName: city,
+      checkin: checkInDate.replace(/-/g, '%2F'),
+      checkout: checkOutDate.toISOString().split('T')[0].replace(/-/g, '%2F'),
+      adult: guests.toString(),
+      children: '0',
+      crn: '1',
+      searchType: 'CT',
+      searchWord: city,
+      'locale': 'en-XX',
+      'curr': 'JPY'
+    });
+    
+    const tripComUrl = `${baseUrl}?${params.toString()}&campaign_id=121`;
+    window.open(tripComUrl, '_blank');
+  }, [selectedDay, scheduleData]);
   
   // Colors and trip members are now loaded centrally via store
 
@@ -525,6 +585,33 @@ export function ListView() {
                           {event.type === 'place' && !isCollapsed && event.description && (
                             <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                               {event.description}
+                            </div>
+                          )}
+                          
+                          {/* Trip.com Booking Buttons */}
+                          {!isCollapsed && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {/* Flight booking for travel events */}
+                              {event.type === 'travel' && event.mode?.toLowerCase().includes('flight') && (
+                                <button
+                                  onClick={() => handleTripComFlightBooking(event)}
+                                  className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>Book Flight on Trip.com</span>
+                                </button>
+                              )}
+                              
+                              {/* Hotel booking for place events */}
+                              {event.type === 'place' && event.category !== 'departure' && event.category !== 'destination' && event.category !== 'airport' && (
+                                <button
+                                  onClick={() => handleTripComHotelBooking(event)}
+                                  className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-xs"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>Book Hotel on Trip.com</span>
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
