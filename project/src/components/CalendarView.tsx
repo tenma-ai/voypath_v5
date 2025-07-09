@@ -842,21 +842,27 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                 
                                 const prevEndPos = calculatePosition(prevEndHour, prevEndMinute);
                                 const currentStartPos = calculatePosition(currentStartHour, currentStartMinute);
-                                const routeLength = Math.max(currentStartPos - prevEndPos, 40); // Minimum 40px
-                                const middlePosition = prevEndPos + routeLength / 2;
+                                const totalGapLength = currentStartPos - prevEndPos;
+                                const middlePosition = prevEndPos + totalGapLength / 2;
                                 
-                                // Calculate line length based on transport mode
-                                const getLineLength = (transportMode: string, totalLength: number) => {
+                                // Calculate actual time gap in minutes
+                                const timeGapMinutes = (currentStartHour - prevEndHour) * 60 + (currentStartMinute - prevEndMinute);
+                                
+                                // Calculate line length based on time gap and transport mode
+                                const getLineLength = (transportMode: string, timeGap: number, totalSpace: number) => {
+                                  // Base line length proportional to time gap (1 minute = 1 pixel)
+                                  const baseLength = Math.max(timeGap * 1, 10); // Minimum 10px
+                                  
                                   if (isFlight) {
-                                    // Flight: longer lines that almost connect the boxes
-                                    return Math.max(totalLength * 0.8, 60);
+                                    // Flight: longer lines, but respect time spacing
+                                    return Math.min(baseLength * 1.2, totalSpace * 0.6);
                                   } else {
-                                    // Car/Walking: shorter lines that don't touch the boxes
-                                    return Math.max(totalLength * 0.4, 20);
+                                    // Car/Walking: shorter lines based on time gap
+                                    return Math.min(baseLength * 0.6, totalSpace * 0.3);
                                   }
                                 };
                                 
-                                const lineLength = getLineLength(transportMode, routeLength);
+                                const lineLength = getLineLength(transportMode, timeGapMinutes, totalGapLength);
                                 
                                 return (
                                   <div 
