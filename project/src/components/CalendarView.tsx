@@ -148,23 +148,35 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   }, []);
 
   const handleDirectFlightBooking = useCallback((fromPlace: any, toPlace: any, dayData: any) => {
-    const dateStr = dayData?.date || new Date().toISOString().split('T')[0];
-    const fromCity = fromPlace?.place_name || fromPlace?.name || 'Tokyo';
-    const toCity = toPlace?.place_name || toPlace?.name || 'Osaka';
-    
-    const url = generateTripComFlightUrl(fromCity, toCity, dateStr.replace(/-/g, ''));
-    window.open(url, '_blank');
-  }, [generateTripComFlightUrl]);
+    // Open FlightBookingModal instead of direct trip.com redirect
+    setFlightModal({
+      isOpen: true,
+      routeData: {
+        from: fromPlace?.place_name || fromPlace?.name || 'Tokyo',
+        to: toPlace?.place_name || toPlace?.name || 'Osaka',
+        fromLat: fromPlace?.latitude,
+        fromLng: fromPlace?.longitude,
+        toLat: toPlace?.latitude,
+        toLng: toPlace?.longitude
+      },
+      dayData: dayData,
+      timeSlot: `Flight from ${fromPlace?.place_name || fromPlace?.name} to ${toPlace?.place_name || toPlace?.name}`
+    });
+  }, []);
 
   const handleDirectHotelBooking = useCallback((place: any, dayData: any) => {
-    const checkIn = dayData?.date || new Date().toISOString().split('T')[0];
-    const checkOut = new Date(checkIn);
-    checkOut.setDate(checkOut.getDate() + 1);
-    
-    const city = place?.place_name || place?.name || 'Tokyo';
-    const url = generateTripComHotelUrl(city, checkIn, checkOut.toISOString().split('T')[0]);
-    window.open(url, '_blank');
-  }, [generateTripComHotelUrl]);
+    // Open HotelBookingModal instead of direct trip.com redirect
+    setHotelModal({
+      isOpen: true,
+      dayData: dayData,
+      timeSlot: `Hotel near ${place?.place_name || place?.name}`,
+      nearbyLocation: {
+        lat: place?.latitude || 35.6812,
+        lng: place?.longitude || 139.7671,
+        name: place?.place_name || place?.name || 'Current Location'
+      }
+    });
+  }, []);
 
   // Format travel time
   const formatTravelTime = useCallback((minutes: number) => {
