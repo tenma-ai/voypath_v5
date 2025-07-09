@@ -1456,58 +1456,61 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
         document.body
       )}
 
-      {/* Edit Mode Toggle Button */}
-      <div className="fixed bottom-20 right-4 z-50 flex flex-col items-center">
-        <button
-          onClick={() => {
-            setIsEditMode(!isEditMode);
-            setHasUserEditedSchedule(true);
-          }}
-          className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
-            isEditMode
-              ? 'bg-gradient-to-br from-green-500 via-emerald-500 to-green-600'
-              : 'bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600'
-          }`}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          
-          {/* Sparkle effects */}
-          <div className="absolute inset-0">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="absolute w-0.5 h-0.5 bg-white rounded-full animate-pulse"
-                style={{
-                  left: `${25 + i * 25}%`,
-                  top: `${25 + i * 20}%`,
-                  animationDelay: `${i * 0.7}s`
-                }}
-              />
-            ))}
-          </div>
+      {/* Edit Mode Toggle Button - Rendered using Portal to escape stacking context */}
+      {ReactDOM.createPortal(
+        <div className="fixed bottom-20 right-4 z-[99999] flex flex-col items-center">
+          <button
+            onClick={() => {
+              setIsEditMode(!isEditMode);
+              setHasUserEditedSchedule(true);
+            }}
+            className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
+              isEditMode
+                ? 'bg-gradient-to-br from-green-500 via-emerald-500 to-green-600'
+                : 'bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600'
+            }`}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            
+            {/* Sparkle effects */}
+            <div className="absolute inset-0">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-0.5 h-0.5 bg-white rounded-full animate-pulse"
+                  style={{
+                    left: `${25 + i * 25}%`,
+                    top: `${25 + i * 20}%`,
+                    animationDelay: `${i * 0.7}s`
+                  }}
+                />
+              ))}
+            </div>
 
-          {isEditMode ? (
-            <Check className="w-6 h-6 text-white relative z-10" />
-          ) : (
-            <Edit3 className="w-6 h-6 text-white relative z-10" />
-          )}
-          
-          {/* Circular Text */}
-          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 56 56">
-            <defs>
-              <path
-                id="edit-circle-path"
-                d="M 28 28 m -20 0 a 20 20 0 1 1 40 0 a 20 20 0 1 1 -40 0"
-              />
-            </defs>
-            <text className="text-[6px] fill-white font-medium" style={{ letterSpacing: '0.5px' }}>
-              <textPath href="#edit-circle-path" startOffset="25%">
-                {isEditMode ? 'DONE' : 'EDIT'}
-              </textPath>
-            </text>
-          </svg>
-        </button>
-      </div>
+            {isEditMode ? (
+              <Check className="w-6 h-6 text-white relative z-10" />
+            ) : (
+              <Edit3 className="w-6 h-6 text-white relative z-10" />
+            )}
+            
+            {/* Circular Text */}
+            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 56 56">
+              <defs>
+                <path
+                  id="edit-circle-path"
+                  d="M 28 28 m -20 0 a 20 20 0 1 1 40 0 a 20 20 0 1 1 -40 0"
+                />
+              </defs>
+              <text className="text-[6px] fill-white font-medium" style={{ letterSpacing: '0.5px' }}>
+                <textPath href="#edit-circle-path" startOffset="25%">
+                  {isEditMode ? 'DONE' : 'EDIT'}
+                </textPath>
+              </text>
+            </svg>
+          </button>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

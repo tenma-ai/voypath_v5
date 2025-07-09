@@ -133,13 +133,13 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
           onBlur={handleInputBlur}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full pl-12 pr-12 py-3 border-2 border-slate-200/50 dark:border-slate-600/50 rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full pl-10 sm:pl-12 pr-10 sm:pr-12 py-2 sm:py-3 text-sm sm:text-base border-2 border-slate-200/50 dark:border-slate-600/50 rounded-xl sm:rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         />
         
-        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+        <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
         
         {isLoading && (
-          <Loader2 className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-blue-500 animate-spin" />
+          <Loader2 className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-blue-500 animate-spin" />
         )}
       </div>
 
@@ -154,7 +154,7 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
 
       {/* Search results dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute top-full mt-2 left-0 w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden z-50 max-h-96 overflow-y-auto">
+        <div className="absolute top-full mt-2 left-0 w-full bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-xl sm:rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 overflow-hidden z-50 max-h-80 sm:max-h-96 overflow-y-auto">
           {suggestions.map((place) => (
             <button
               key={place.place_id}
@@ -193,7 +193,7 @@ export const PlaceSearchInput: React.FC<PlaceSearchInputProps> = ({
 
       {/* No results case */}
       {showSuggestions && suggestions.length === 0 && !isLoading && value.length >= 2 && (
-        <div className="absolute top-full mt-2 left-0 w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 p-3 sm:p-4 z-50">
+        <div className="absolute top-full mt-2 left-0 w-full bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-xl sm:rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 p-3 sm:p-4 z-50">
           <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
             No places found for "{value}"
           </p>

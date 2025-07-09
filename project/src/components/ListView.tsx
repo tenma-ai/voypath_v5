@@ -357,11 +357,13 @@ export function ListView() {
 
   const selectedSchedule = schedule.find(s => s.date === selectedDay) || schedule[0];
 
+  const [placeSearchValue, setPlaceSearchValue] = useState('');
+
   const handleAddPlace = (place: GooglePlace) => {
-    useStore.getState().handleAddPlace({
+    useStore.getState().addPlace({
       id: crypto.randomUUID(),
       name: place.name,
-      address: place.address,
+      address: place.formatted_address,
       latitude: place.location.lat,
       longitude: place.location.lng,
       notes: '',
@@ -380,6 +382,7 @@ export function ListView() {
       rating: place.rating,
       photos: place.photos
     });
+    setPlaceSearchValue(''); // Clear search after adding
   };
 
   if (!currentTrip) {
@@ -406,27 +409,35 @@ export function ListView() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       {/* Search and Add Place */}
-      <div className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft p-4">
+      <div className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft p-3 sm:p-4">
         <div className="flex items-center space-x-2 mb-3">
-          <Navigation className="w-5 h-5 text-blue-600" />
-          <h3 className="font-semibold text-gray-800 dark:text-white">場所を追加</h3>
+          <Navigation className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+          <h3 className="text-sm sm:text-base font-semibold text-gray-800 dark:text-white">場所を追加</h3>
         </div>
-        <PlaceSearchInput onSelectPlace={handleAddPlace} />
+        <div className="w-full">
+          <PlaceSearchInput 
+            value={placeSearchValue}
+            onChange={setPlaceSearchValue}
+            onPlaceSelect={handleAddPlace}
+            placeholder="Search for places to add to your trip..."
+            className="w-full"
+          />
+        </div>
       </div>
 
       {/* Date Selector */}
-      <div className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft p-4">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft p-3 sm:p-4">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center space-x-2">
-            <Calendar className="w-5 h-5 text-blue-600" />
-            <h3 className="font-semibold text-gray-800 dark:text-white">Itinerary</h3>
+            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+            <h3 className="text-sm sm:text-base font-semibold text-gray-800 dark:text-white">Itinerary</h3>
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
             {optimizationResult ? 'Optimized' : 'Not optimized'}
           </div>
         </div>
         
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex gap-1 sm:gap-2 overflow-x-auto pb-2">
           {schedule.map((day) => (
             <button
               key={day.date}
@@ -434,14 +445,14 @@ export function ListView() {
                 setSelectedDay(day.date);
                 setStoreSelectedDay(day.date);
               }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+              className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
                 selectedDay === day.date
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
-              <div>{day.day}</div>
-              <div className="text-xs opacity-75">{day.dayName}</div>
+              <div className="text-xs sm:text-sm">{day.day}</div>
+              <div className="text-xs opacity-75 hidden sm:block">{day.dayName}</div>
             </button>
           ))}
         </div>
@@ -449,8 +460,8 @@ export function ListView() {
 
       {/* Schedule Timeline */}
       {selectedSchedule && selectedSchedule.events.length > 0 ? (
-        <div className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft p-6">
-          <div className="space-y-3">
+        <div className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft p-3 sm:p-6">
+          <div className="space-y-2 sm:space-y-3">
               {selectedSchedule.events.map((event, index) => {
                 const isCollapsed = collapsedEvents.has(event.id);
                 const memberDisplay = event.type === 'place' && event.assignedTo?.length ? 
@@ -463,19 +474,19 @@ export function ListView() {
                   >
                     {/* Timeline Line */}
                     {index < selectedSchedule.events.length - 1 && (
-                      <div className="absolute left-5 top-12 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700 -z-10" />
+                      <div className="absolute left-4 sm:left-5 top-10 sm:top-12 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700 -z-10" />
                     )}
                     
                     {/* Event Card */}
                     <div
-                      className={`flex items-start space-x-3 p-3 rounded-lg transition-all cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                        event.type === 'travel' ? 'pl-8' : ''
+                      className={`flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg transition-all cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                        event.type === 'travel' ? 'pl-6 sm:pl-8' : ''
                       } ${event.type === 'place' ? `place-card ${getPlaceCardStyle(event).className}` : ''}`}
                       style={event.type === 'place' ? getPlaceCardStyle(event).style : undefined}
                       onClick={() => event.type === 'place' && toggleEventCollapse(event.id)}
                     >
                       {/* Icon */}
-                      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg ${
+                      <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm sm:text-lg ${
                         event.type === 'travel' 
                           ? 'bg-gray-100 dark:bg-gray-700' 
                           : event.category === 'departure' || event.category === 'destination'
@@ -488,18 +499,18 @@ export function ListView() {
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h4 className={`font-medium text-gray-800 dark:text-white ${
-                            event.type === 'travel' ? 'text-sm' : ''
+                          <h4 className={`font-medium text-gray-800 dark:text-white text-sm sm:text-base ${
+                            event.type === 'travel' ? 'text-xs sm:text-sm' : ''
                           }`}>
                             {event.name}
                             {event.type === 'travel' && event.from && event.to && (
-                              <span className="text-gray-500 dark:text-gray-400 text-xs ml-2">
+                              <span className="text-gray-500 dark:text-gray-400 text-xs ml-1 sm:ml-2 block sm:inline">
                                 {event.from} → {event.to}
                               </span>
                             )}
                           </h4>
                           {event.time && (
-                            <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                            <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex items-center">
                               <Clock className="w-3 h-3 mr-1" />
                               {event.time}
                             </span>
@@ -509,15 +520,15 @@ export function ListView() {
                         {/* Event Details */}
                         <div className="mt-1 space-y-1">
                           {event.duration && (
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                               {event.duration}
                             </span>
                           )}
                           
                           {event.rating && (
                             <div className="flex items-center space-x-1">
-                              <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                              <span className="text-sm text-gray-600 dark:text-gray-400">{event.rating}</span>
+                              <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 fill-current" />
+                              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{event.rating}</span>
                             </div>
                           )}
                           
@@ -585,25 +596,40 @@ export function ListView() {
                           {/* Trip.com Booking Buttons */}
                           {!isCollapsed && (
                             <div className="mt-2 flex flex-wrap gap-2">
-                              {/* Flight booking for travel events */}
-                              {event.type === 'travel' && event.mode?.toLowerCase().includes('flight') && (
+                              {/* Flight booking for travel events - only show for flights */}
+                              {event.type === 'travel' && (event.mode === 'flight' || event.mode === 'plane' || event.mode?.toLowerCase().includes('flight')) && (
                                 <button
                                   onClick={() => handleTripComFlightBooking(event)}
-                                  className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs"
+                                  className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs sm:text-sm"
                                 >
                                   <ExternalLink className="w-3 h-3" />
-                                  <span>Book Flight on Trip.com</span>
+                                  <span className="hidden sm:inline">Book Flight on Trip.com</span>
+                                  <span className="sm:hidden">Flight</span>
                                 </button>
+                              )}
+                              
+                              {/* Show transport info for all travel events */}
+                              {event.type === 'travel' && (
+                                <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-xs sm:text-sm">
+                                  <TransportIcon 
+                                    mode={event.mode || 'car'} 
+                                    className="w-3 h-3" 
+                                    color={getTransportColor(event.mode || 'car')} 
+                                  />
+                                  <span className="hidden sm:inline">{event.mode || 'car'} - {event.duration}</span>
+                                  <span className="sm:hidden">{event.duration}</span>
+                                </div>
                               )}
                               
                               {/* Hotel booking for place events */}
                               {event.type === 'place' && event.category !== 'departure' && event.category !== 'destination' && event.category !== 'airport' && (
                                 <button
                                   onClick={() => handleTripComHotelBooking(event)}
-                                  className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-xs"
+                                  className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-xs sm:text-sm"
                                 >
                                   <ExternalLink className="w-3 h-3" />
-                                  <span>Book Hotel on Trip.com</span>
+                                  <span className="hidden sm:inline">Book Hotel on Trip.com</span>
+                                  <span className="sm:hidden">Hotel</span>
                                 </button>
                               )}
                             </div>
@@ -613,7 +639,7 @@ export function ListView() {
                       
                       {/* Chevron for places */}
                       {event.type === 'place' && (
-                        <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform ${
+                        <ChevronRight className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-400 transition-transform ${
                           !isCollapsed ? 'rotate-90' : ''
                         }`} />
                       )}
