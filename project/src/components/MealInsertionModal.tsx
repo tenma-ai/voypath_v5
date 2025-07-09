@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Search, MapPin, Clock, Star } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { GooglePlacesService } from '../services/GooglePlacesService';
@@ -38,7 +38,7 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
   timeSlot,
   nearbyLocation
 }) => {
-  const [searchQuery, setSearchQuery] = useState(extractCityName(nearbyLocation?.name || ''));
+  const [searchQuery, setSearchQuery] = useState('');
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { currentTrip, addPlace } = useStore();
@@ -55,8 +55,16 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
     return parts[0] || locationName;
   };
 
-  // Define handleSearchRestaurants with useCallback to avoid hoisting issues
-  const handleSearchRestaurants = useCallback(async () => {
+  // Set default search query when modal opens
+  useEffect(() => {
+    if (isOpen && nearbyLocation) {
+      const defaultQuery = extractCityName(nearbyLocation?.name || '');
+      setSearchQuery(defaultQuery);
+    }
+  }, [isOpen, nearbyLocation]);
+
+  // Handle search function
+  const handleSearchRestaurants = async () => {
     if (!nearbyLocation || !searchQuery.trim()) return;
     
     setIsLoading(true);
@@ -95,30 +103,11 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
       setRestaurants(restaurantData);
     } catch (error) {
       console.error('Failed to search restaurants with Google Places API:', error);
-      // Don't set restaurants to empty array, just log error
       setRestaurants([]);
     } finally {
       setIsLoading(false);
     }
-  }, [nearbyLocation, searchQuery, mealType]);
-
-  // Set default search query when modal opens
-  useEffect(() => {
-    if (isOpen && nearbyLocation) {
-      const defaultQuery = extractCityName(nearbyLocation?.name || '');
-      setSearchQuery(defaultQuery);
-    }
-  }, [isOpen, nearbyLocation, mealType]);
-
-  // Auto-search whenever search query changes
-  useEffect(() => {
-    if (searchQuery && nearbyLocation) {
-      const timer = setTimeout(() => {
-        handleSearchRestaurants();
-      }, 500); // Debounce search
-      return () => clearTimeout(timer);
-    }
-  }, [searchQuery, handleSearchRestaurants]);
+  };
 
 
   const getMealTypeSearchQuery = (mealType: 'breakfast' | 'lunch' | 'dinner'): string => {
