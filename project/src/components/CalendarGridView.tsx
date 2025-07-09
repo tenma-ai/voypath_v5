@@ -21,7 +21,7 @@ interface CalendarPlace {
 }
 
 const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult }) => {
-  const { currentTrip, memberColors, tripMembers } = useStore();
+  const { currentTrip, memberColors, tripMembers, setupRealTimeSync } = useStore();
   const [currentDate, setCurrentDate] = useState(() => {
     // Initialize with trip start date if available, otherwise use first day of current month
     const tripStartDate = PlaceDateUtils.getCalendarInitialDate(currentTrip);
@@ -33,6 +33,28 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
   });
   const [monthSchedule, setMonthSchedule] = useState<Record<string, CalendarPlace[]>>({});
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
+  const [forceUpdate, setForceUpdate] = useState(0);
+
+  // Setup real-time sync for schedule updates
+  useEffect(() => {
+    const handleScheduleUpdate = (event: CustomEvent) => {
+      console.log('CalendarGridView: Received schedule update:', event.detail);
+      // Force re-render by updating forceUpdate state
+      setForceUpdate(prev => prev + 1);
+    };
+
+    window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    };
+  }, []);
+
+  // Setup real-time sync cleanup
+  useEffect(() => {
+    const cleanup = setupRealTimeSync();
+    return cleanup;
+  }, [setupRealTimeSync]);
 
   // Time formatting function
   const formatTime = (timeString: string) => {
@@ -142,7 +164,7 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
 
     // Log message
     setMonthSchedule(schedule);
-  }, [optimizationResult, currentTrip]);
+  }, [optimizationResult, currentTrip, forceUpdate]);
 
   // Initialize calendar to start from trip start date instead of today
   useEffect(() => {

@@ -881,34 +881,39 @@ export const useStore = create<StoreState>()((set, get) => ({
           const updates = [...scheduleUpdateQueue];
           set({ scheduleUpdateQueue: [] });
           
-          // Call edge function to process updates
-          const { supabase } = await import('../lib/supabase');
-          
-          for (const update of updates) {
-            try {
-              const { data, error } = await supabase.functions.invoke('edit-schedule', {
-                body: {
-                  trip_id: currentTrip.id,
-                  action: update.action,
-                  data: update.data,
-                  update_id: update.id,
-                  user_id: useStore.getState().user?.id
+          // Try to call edge function for background processing
+          try {
+            const { supabase } = await import('../lib/supabase');
+            
+            for (const update of updates) {
+              try {
+                const { data, error } = await supabase.functions.invoke('edit-schedule', {
+                  body: {
+                    trip_id: currentTrip.id,
+                    action: update.action,
+                    data: update.data,
+                    update_id: update.id,
+                    user_id: useStore.getState().user?.id
+                  }
+                });
+                
+                if (error) {
+                  console.warn('Schedule update failed (UI already updated):', error);
+                  continue;
                 }
-              });
-              
-              if (error) {
-                console.error('Schedule update failed:', error);
-                continue;
+                
+                // Update optimization result with server response if available
+                if (data?.updated_schedule) {
+                  set({ optimizationResult: data.updated_schedule });
+                }
+                
+              } catch (error) {
+                console.warn('Failed to process individual schedule update (UI already updated):', error);
               }
-              
-              // Update optimization result with server response
-              if (data?.updated_schedule) {
-                set({ optimizationResult: data.updated_schedule });
-              }
-              
-            } catch (error) {
-              console.error('Failed to process schedule update:', error);
             }
+          } catch (error) {
+            // Edge function not available or failed - this is okay, UI is already updated
+            console.warn('Edge function not available for background processing:', error);
           }
           
         } catch (error) {

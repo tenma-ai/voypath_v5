@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, MapPin, Clock, Star, ExternalLink } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { GooglePlacesService } from '../services/GooglePlacesService';
 
 interface MealInsertionModalProps {
   isOpen: boolean;
@@ -16,16 +17,17 @@ interface MealInsertionModalProps {
 }
 
 interface Restaurant {
-  id: string;
+  place_id: string;
   name: string;
   address: string;
   rating: number;
-  priceLevel: number;
+  price_level: number;
   cuisine: string;
   distance: string;
   latitude: number;
   longitude: number;
   photos?: string[];
+  types: string[];
 }
 
 const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
@@ -41,70 +43,142 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const { currentTrip, addPlace } = useStore();
 
-  // Mock restaurant data - in real implementation, this would come from Google Places API
-  const mockRestaurants: Restaurant[] = [
-    {
-      id: '1',
-      name: 'Sunrise Café',
-      address: '123 Main St, Downtown',
-      rating: 4.5,
-      priceLevel: 2,
-      cuisine: 'American',
-      distance: '0.2 miles',
-      latitude: 35.6812,
-      longitude: 139.7671,
-      photos: ['https://example.com/photo1.jpg']
-    },
-    {
-      id: '2',
-      name: 'Tokyo Ramen House',
-      address: '456 Food Ave, Central',
-      rating: 4.8,
-      priceLevel: 1,
-      cuisine: 'Japanese',
-      distance: '0.4 miles',
-      latitude: 35.6815,
-      longitude: 139.7675,
-      photos: ['https://example.com/photo2.jpg']
-    },
-    {
-      id: '3',
-      name: 'Bella Italia',
-      address: '789 Pasta Blvd, Little Italy',
-      rating: 4.3,
-      priceLevel: 3,
-      cuisine: 'Italian',
-      distance: '0.6 miles',
-      latitude: 35.6820,
-      longitude: 139.7680,
-      photos: ['https://example.com/photo3.jpg']
-    }
-  ];
-
+  // Load restaurants from Google Places API
   useEffect(() => {
-    if (isOpen) {
-      // Filter restaurants based on meal type
-      const filteredRestaurants = mockRestaurants.filter(restaurant => {
-        if (mealType === 'breakfast' && restaurant.cuisine === 'American') return true;
-        if (mealType === 'lunch' && ['Japanese', 'Italian'].includes(restaurant.cuisine)) return true;
-        if (mealType === 'dinner' && restaurant.cuisine === 'Italian') return true;
-        return true; // Show all for now
-      });
-      setRestaurants(filteredRestaurants);
+    if (isOpen && nearbyLocation) {
+      loadRestaurants();
     }
-  }, [isOpen, mealType]);
+  }, [isOpen, nearbyLocation, mealType]);
+
+  const loadRestaurants = async () => {
+    if (!nearbyLocation) return;
+    
+    setIsLoading(true);
+    try {
+      const searchQuery = getMealTypeSearchQuery(mealType);
+      const places = await GooglePlacesService.searchNearby(
+        { lat: nearbyLocation.lat, lng: nearbyLocation.lng },
+        1000, // 1km radius
+        'restaurant'
+      );
+
+      // Filter and convert to restaurant format
+      const restaurantData = places
+        .filter(place => place.types.includes('restaurant') || place.types.includes('meal_takeaway'))
+        .map(place => convertToRestaurant(place))
+        .slice(0, 10); // Limit to 10 results
+
+      setRestaurants(restaurantData);
+    } catch (error) {
+      console.error('Failed to load restaurants:', error);
+      setRestaurants([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getMealTypeSearchQuery = (mealType: 'breakfast' | 'lunch' | 'dinner'): string => {
+    switch (mealType) {
+      case 'breakfast':
+        return 'breakfast restaurant cafe';
+      case 'lunch':
+        return 'lunch restaurant';
+      case 'dinner':
+        return 'dinner restaurant';
+      default:
+        return 'restaurant';
+    }
+  };
+
+  const convertToRestaurant = (place: any): Restaurant => {
+    const distance = nearbyLocation ? 
+      calculateDistance(nearbyLocation.lat, nearbyLocation.lng, place.geometry.location.lat, place.geometry.location.lng) : 0;
+    
+    return {
+      place_id: place.place_id,
+      name: place.name,
+      address: place.formatted_address || place.vicinity || '',
+      rating: place.rating || 0,
+      price_level: place.price_level || 0,
+      cuisine: inferCuisineFromTypes(place.types),
+      distance: formatDistance(distance),
+      latitude: place.geometry.location.lat,
+      longitude: place.geometry.location.lng,
+      photos: place.photos || [],
+      types: place.types || []
+    };
+  };
+
+  const inferCuisineFromTypes = (types: string[]): string => {
+    const cuisineMapping: { [key: string]: string } = {
+      'japanese_restaurant': 'Japanese',
+      'italian_restaurant': 'Italian',
+      'chinese_restaurant': 'Chinese',
+      'american_restaurant': 'American',
+      'french_restaurant': 'French',
+      'indian_restaurant': 'Indian',
+      'mexican_restaurant': 'Mexican',
+      'thai_restaurant': 'Thai',
+      'korean_restaurant': 'Korean',
+      'cafe': 'Cafe',
+      'bakery': 'Bakery',
+      'fast_food': 'Fast Food'
+    };
+
+    for (const type of types) {
+      if (cuisineMapping[type]) {
+        return cuisineMapping[type];
+      }
+    }
+    return 'Restaurant';
+  };
+
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const formatDistance = (distance: number): string => {
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)}m`;
+    }
+    return `${distance.toFixed(1)}km`;
+  };
 
   const handleSearchRestaurants = async () => {
+    if (!nearbyLocation || !searchQuery.trim()) return;
+    
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      const filtered = mockRestaurants.filter(restaurant =>
-        restaurant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        restaurant.cuisine.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setRestaurants(filtered);
+    try {
+      const mealTypeKeyword = getMealTypeSearchQuery(mealType);
+      const fullSearchQuery = `${searchQuery} ${mealTypeKeyword}`;
+      
+      const places = await GooglePlacesService.searchPlaces({
+        query: fullSearchQuery,
+        location: { lat: nearbyLocation.lat, lng: nearbyLocation.lng },
+        radius: 2000, // 2km radius for search
+        type: 'restaurant'
+      });
+
+      // Convert to restaurant format
+      const restaurantData = places
+        .filter(place => place.types.includes('restaurant') || place.types.includes('meal_takeaway'))
+        .map(place => convertToRestaurant(place))
+        .slice(0, 15); // Limit to 15 results
+
+      setRestaurants(restaurantData);
+    } catch (error) {
+      console.error('Failed to search restaurants:', error);
+      setRestaurants([]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleAddRestaurant = async (restaurant: Restaurant) => {
@@ -132,7 +206,12 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
         is_selected_for_optimization: true,
         normalized_wish_level: 0.5,
         rating: restaurant.rating,
-        photos: restaurant.photos
+        photos: restaurant.photos,
+        google_place_id: restaurant.place_id,
+        google_rating: restaurant.rating,
+        google_price_level: restaurant.price_level,
+        google_place_types: restaurant.types,
+        source: 'google_places'
       });
 
       onClose();
@@ -205,7 +284,7 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {restaurants.map((restaurant) => (
-                <div key={restaurant.id} className="p-6 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                <div key={restaurant.place_id} className="p-6 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -218,14 +297,16 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
                         <span>{restaurant.distance}</span>
                       </div>
                       <div className="flex items-center mt-2 space-x-4">
-                        <div className="flex items-center">
-                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                          <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">
-                            {restaurant.rating}
-                          </span>
-                        </div>
+                        {restaurant.rating > 0 && (
+                          <div className="flex items-center">
+                            <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                            <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">
+                              {restaurant.rating.toFixed(1)}
+                            </span>
+                          </div>
+                        )}
                         <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {'$'.repeat(restaurant.priceLevel)} • {restaurant.cuisine}
+                          {restaurant.price_level > 0 && `${'$'.repeat(restaurant.price_level)} • `}{restaurant.cuisine}
                         </div>
                       </div>
                     </div>

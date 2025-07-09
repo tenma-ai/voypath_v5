@@ -31,7 +31,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
   const [showRouteModal, setShowRouteModal] = useState(false);
   const [selectedPlaceForModal, setSelectedPlaceForModal] = useState<any>(null);
   const [selectedRouteForModal, setSelectedRouteForModal] = useState<{ fromPlace: any; toPlace: any } | null>(null);
-  const { currentTrip, memberColors, tripMembers, hasUserOptimized, isOptimizing, showOptimizationSuccess, setShowOptimizationSuccess, optimizationResult, selectedDay } = useStore();
+  const { currentTrip, memberColors, tripMembers, hasUserOptimized, isOptimizing, showOptimizationSuccess, setShowOptimizationSuccess, optimizationResult, selectedDay, setupRealTimeSync } = useStore();
 
   // Load Google Maps API
   const { isLoaded, loadError } = useJsApiLoader({
@@ -39,6 +39,27 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
     libraries: libraries
   });
+
+  // Setup real-time sync for schedule updates
+  useEffect(() => {
+    const handleScheduleUpdate = (event: CustomEvent) => {
+      console.log('MapView: Received schedule update:', event.detail);
+      // Force re-render by updating a state that triggers place recalculation
+      setShowSuccessOverlay(false);
+    };
+
+    window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    };
+  }, []);
+
+  // Setup real-time sync cleanup
+  useEffect(() => {
+    const cleanup = setupRealTimeSync();
+    return cleanup;
+  }, [setupRealTimeSync]);
 
   // Handle optimization success animation - only show when explicitly triggered
   useEffect(() => {

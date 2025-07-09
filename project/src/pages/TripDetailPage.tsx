@@ -35,6 +35,28 @@ export function TripDetailPage() {
   const [members, setMembers] = useState<TripMember[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [memberColors, setMemberColors] = useState<Record<string, string>>({});
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
+  // Setup real-time sync for schedule updates
+  useEffect(() => {
+    const handleScheduleUpdate = (event: CustomEvent) => {
+      console.log('TripDetailPage: Received schedule update:', event.detail);
+      // Force re-render by updating forceUpdate state
+      setForceUpdate(prev => prev + 1);
+    };
+
+    window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    };
+  }, []);
+
+  // Setup real-time sync cleanup
+  useEffect(() => {
+    const cleanup = setupRealTimeSync();
+    return cleanup;
+  }, [setupRealTimeSync]);
   
   // Auto-clear error after 5 seconds
   useEffect(() => {
@@ -76,7 +98,7 @@ export function TripDetailPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMemberPopup]);
   
-  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized, loadTripsFromDatabase, activeView, setActiveView } = useStore();
+  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized, loadTripsFromDatabase, activeView, setActiveView, setupRealTimeSync } = useStore();
 
   // Set the correct trip when tripId param is provided
   useEffect(() => {

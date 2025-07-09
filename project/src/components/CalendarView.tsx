@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { Calendar, Clock, MapPin, List, Grid3X3, Edit3, Check, X, Move, ArrowUpDown } from 'lucide-react';
+import { Calendar, Clock, MapPin, List, Grid3X3, Edit3, Check, X, Move, ArrowUpDown, Plane, Car, Navigation } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getPlaceColor } from '../utils/ColorUtils';
 import { DateUtils } from '../utils/DateUtils';
@@ -96,6 +96,29 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
   const { currentTrip, memberColors, tripMembers, hasUserOptimized, setHasUserOptimized, hasUserEditedSchedule, setHasUserEditedSchedule, movePlace, resizePlaceDuration, deleteScheduledPlace, setupRealTimeSync } = useStore();
+
+  // Get transport mode icon
+  const getTransportIcon = (transportMode: string) => {
+    const mode = transportMode?.toLowerCase() || 'walking';
+    if (mode.includes('flight') || mode.includes('plane') || mode.includes('air')) {
+      return <Plane className="w-3 h-3 text-blue-500" />;
+    } else if (mode.includes('car') || mode.includes('drive')) {
+      return <Car className="w-3 h-3 text-green-500" />;
+    } else {
+      return <Navigation className="w-3 h-3 text-gray-500" />;
+    }
+  };
+
+  // Format travel time
+  const formatTravelTime = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes}min`;
+    } else {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+    }
+  };
 
   // Generate gradient style for multiple contributors using centralized color logic
   const getPlaceStyle = (place: any) => {
@@ -475,48 +498,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
 
   // Render toggle buttons using Portal to ensure they appear above all other elements
   const renderToggleButtons = () => {
-    return ReactDOM.createPortal(
-      <div className="fixed top-[5.5rem] right-4 z-[99999] bg-slate-100/95 dark:bg-slate-700/95 rounded-lg p-0.5 flex backdrop-blur-sm border border-slate-200/50 dark:border-slate-600/50 shadow-lg">
-        <button
-          onClick={() => setViewMode('timeline')}
-          className={`relative p-2 rounded-md text-xs font-medium transition-all duration-300 flex items-center justify-center ${
-            viewMode === 'timeline' 
-              ? 'text-white shadow-soft bg-orange-500' 
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-          title="Timeline View"
-        >
-          <List className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => setViewMode('grid')}
-          className={`relative p-2 rounded-md text-xs font-medium transition-all duration-300 flex items-center justify-center ${
-            viewMode === 'grid' 
-              ? 'text-white shadow-soft bg-orange-500' 
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-          title="Grid View"
-        >
-          <Grid3X3 className="w-4 h-4" />
-        </button>
-      </div>,
-      document.body
-    );
+    // Grid view toggle disabled - only show timeline view
+    return null;
   };
 
 
-  // If grid mode, use the grid calendar component
-  if (viewMode === 'grid') {
-    return (
-      <div className="h-full relative">
-        {/* View Toggle - Rendered via Portal */}
-        {renderToggleButtons()}
-        <div className="mt-12">
-          <CalendarGridView optimizationResult={optimizationResult} />
-        </div>
-      </div>
-    );
-  }
+  // Grid view disabled - always use timeline view
 
   if (Object.keys(formattedResult.schedulesByDay).length === 0) {
     return (
@@ -534,8 +521,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 relative">
-      {/* View Toggle - Rendered via Portal */}
-      {renderToggleButtons()}
+      {/* Grid view toggle disabled */}
       
       <div className="p-6 pt-16">
         {/* Unified Calendar View */}
@@ -745,6 +731,36 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                     <span>✈️</span>
                                     <span>Flight</span>
                                   </button>
+                                );
+                              }
+                              return null;
+                            })()}
+
+                            {/* Route line and transport info (for non-edit mode) */}
+                            {!isEditMode && blockIndex > 0 && (() => {
+                              const prevBlock = getGroupedPlacesForDay(dayData)[blockIndex - 1];
+                              const currentBlock = block;
+                              const transportMode = currentBlock.place.transport_mode || 'walking';
+                              const travelTime = currentBlock.place.travel_time_from_previous || 0;
+                              
+                              if (travelTime > 0) {
+                                return (
+                                  <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10" style={{ top: `${topPosition - 15}px` }}>
+                                    {/* Route line */}
+                                    <div className="flex flex-col items-center">
+                                      <div className="w-px h-8 bg-gray-300 dark:bg-gray-600"></div>
+                                      
+                                      {/* Transport info */}
+                                      <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm">
+                                        {getTransportIcon(transportMode)}
+                                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                                          {formatTravelTime(travelTime)}
+                                        </span>
+                                      </div>
+                                      
+                                      <div className="w-px h-8 bg-gray-300 dark:bg-gray-600"></div>
+                                    </div>
+                                  </div>
                                 );
                               }
                               return null;

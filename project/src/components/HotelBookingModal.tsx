@@ -250,7 +250,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
             </button>
           </div>
 
-        {/* Option Tabs */}
+        {/* Option Tabs - Search hotels with Trip.com booking */}
         <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setSelectedOption('search')}
@@ -261,16 +261,6 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
             }`}
           >
             Search Hotels
-          </button>
-          <button
-            onClick={() => setSelectedOption('book')}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              selectedOption === 'book'
-                ? 'border-b-2 border-purple-500 text-purple-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Book on Trip.com
           </button>
           <button
             onClick={() => setSelectedOption('already')}
@@ -359,7 +349,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                           className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center"
                         >
                           <ExternalLink className="w-3 h-3 mr-1" />
-                          Book
+                          Book on Trip.com
                         </button>
                       </div>
                     </div>
@@ -369,26 +359,6 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
             </>
           )}
 
-          {selectedOption === 'book' && (
-            <div className="p-6 text-center">
-              <div className="mb-6">
-                <Bed className="w-16 h-16 text-purple-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  Book on Trip.com
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Search and book hotels directly on Trip.com with pre-filled location and dates.
-                </p>
-              </div>
-              <button
-                onClick={() => handleTripComBooking()}
-                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors inline-flex items-center"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Open Trip.com
-              </button>
-            </div>
-          )}
 
           {selectedOption === 'already' && (
             <div className="p-6">

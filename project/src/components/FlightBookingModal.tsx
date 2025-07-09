@@ -236,7 +236,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
             </button>
           </div>
 
-        {/* Option Tabs */}
+        {/* Option Tabs - Search flights with WayAway booking */}
         <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setSelectedOption('search')}
@@ -247,16 +247,6 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
             }`}
           >
             Search Flights
-          </button>
-          <button
-            onClick={() => setSelectedOption('book')}
-            className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
-              selectedOption === 'book'
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Book on WayAway
           </button>
           <button
             onClick={() => setSelectedOption('already')}
@@ -379,7 +369,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center"
                           >
                             <ExternalLink className="w-3 h-3 mr-1" />
-                            Book
+                            Book on WayAway
                           </button>
                         </div>
                       </div>
@@ -390,37 +380,6 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
             </>
           )}
 
-          {selectedOption === 'book' && (
-            <div className="p-6 text-center">
-              <div className="mb-6">
-                <Plane className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  Book on WayAway
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Search and book flights directly on WayAway with pre-filled route and dates.
-                </p>
-              </div>
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4 mb-6">
-                <div className="flex items-center justify-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-                  <span className="font-medium">{routeData.from}</span>
-                  <Plane className="w-4 h-4" />
-                  <span className="font-medium">{routeData.to}</span>
-                  <span>•</span>
-                  <span>{dayData?.date}</span>
-                  <span>•</span>
-                  <span>{bookingDetails.passengers} passenger{bookingDetails.passengers > 1 ? 's' : ''}</span>
-                </div>
-              </div>
-              <button
-                onClick={() => handleWayAwayBooking()}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Open WayAway
-              </button>
-            </div>
-          )}
 
           {selectedOption === 'already' && (
             <div className="p-6">

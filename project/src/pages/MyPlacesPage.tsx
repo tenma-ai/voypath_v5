@@ -13,6 +13,7 @@ export function MyPlacesPage() {
   const [editingPlace, setEditingPlace] = useState<string | null>(null);
   const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
   const [showFirstTimeGuidance, setShowFirstTimeGuidance] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
   const [editForm, setEditForm] = useState({
     name: '',
     category: '',
@@ -20,7 +21,7 @@ export function MyPlacesPage() {
     stayDuration: 2,
     notes: ''
   });
-  const { places, currentTrip, trips, initializeFromDatabase, updatePlace, deletePlace, hasUserOptimized, tripMembers, user, memberColors } = useStore();
+  const { places, currentTrip, trips, initializeFromDatabase, updatePlace, deletePlace, hasUserOptimized, tripMembers, user, memberColors, setupRealTimeSync } = useStore();
 
   // Check if deadline has passed
   const isDeadlinePassed = () => {
@@ -60,6 +61,27 @@ export function MyPlacesPage() {
     
     return false;
   };
+
+  // Setup real-time sync for schedule updates
+  useEffect(() => {
+    const handleScheduleUpdate = (event: CustomEvent) => {
+      console.log('MyPlacesPage: Received schedule update:', event.detail);
+      // Force re-render by updating forceUpdate state
+      setForceUpdate(prev => prev + 1);
+    };
+
+    window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    };
+  }, []);
+
+  // Setup real-time sync cleanup
+  useEffect(() => {
+    const cleanup = setupRealTimeSync();
+    return cleanup;
+  }, [setupRealTimeSync]);
 
   // Hide first time guidance and mark as seen
   const hideFirstTimeGuidance = () => {
