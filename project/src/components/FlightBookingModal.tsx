@@ -40,9 +40,6 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   dayData,
   timeSlot
 }) => {
-  const [flights, setFlights] = useState<Flight[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<'search' | 'book' | 'already'>('search');
   const [bookingDetails, setBookingDetails] = useState({
     flightNumber: '',
     airline: '',
@@ -102,35 +99,18 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     }
   }, [isOpen, routeData]);
 
-  const handleSearchFlights = async () => {
-    setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setFlights(mockFlights);
-      setIsLoading(false);
-    }, 1500);
+  // MapView Trip.com booking function (direct reuse)
+  const generateTripComFlightUrl = (origin: string, destination: string, dateStr: string) => {
+    const tripComUrl = `https://trip.com/flights/booking?flightType=ow&dcity=${origin}&acity=${destination}&ddate=${dateStr}&adult=1&child=0&infant=0`;
+    const encodedUrl = encodeURIComponent(tripComUrl);
+    return `https://tp.media/r?marker=649297&trs=434567&p=8626&u=${encodedUrl}&campaign_id=121`;
   };
 
-  const handleTripComBooking = (flight?: Flight) => {
-    // Use Trip.com affiliate link for flight booking
+  const handleTripComBooking = () => {
     const departureDate = dayData?.date || new Date().toISOString().split('T')[0];
-    const passengers = bookingDetails.passengers || 1;
-    
-    // Build Trip.com URL with pre-filled data
-    const baseUrl = 'https://tp.media/r?marker=649297&trs=434567&p=8626&u=https%3A%2F%2Ftrip.com%2Fflights%2Fsearch';
-    const params = new URLSearchParams({
-      'from': routeData.from,
-      'to': routeData.to,
-      'departure': departureDate.replace(/-/g, '%2F'),
-      'passengers': passengers.toString(),
-      'class': 'economy',
-      'type': 'oneway',
-      'locale': 'en-XX',
-      'curr': 'JPY'
-    });
-    
-    const tripComUrl = `${baseUrl}?${params.toString()}&campaign_id=121`;
-    window.open(tripComUrl, '_blank');
+    const dateStr = departureDate.replace(/-/g, '');
+    const url = generateTripComFlightUrl(routeData.from, routeData.to, dateStr);
+    window.open(url, '_blank');
   };
 
   const handleAddFlight = async (flight: Flight) => {

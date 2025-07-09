@@ -7,8 +7,6 @@ import { DateUtils } from '../utils/DateUtils';
 import { TransportIcon } from '../utils/transportIcons';
 import CalendarGridView from './CalendarGridView';
 import MealInsertionModal from './MealInsertionModal';
-import HotelBookingModal from './HotelBookingModal';
-import FlightBookingModal from './FlightBookingModal';
 import PlaceInsertionModal from './PlaceInsertionModal';
 
 interface CalendarViewProps {
@@ -33,36 +31,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     nearbyLocation: undefined
   });
   
-  const [hotelModal, setHotelModal] = useState<{
-    isOpen: boolean;
-    dayData: any;
-    timeSlot: string;
-    nearbyLocation?: { lat: number; lng: number; name: string };
-  }>({
-    isOpen: false,
-    dayData: null,
-    timeSlot: '',
-    nearbyLocation: undefined
-  });
-
-  const [flightModal, setFlightModal] = useState<{
-    isOpen: boolean;
-    routeData: {
-      from: string;
-      to: string;
-      fromLat?: number;
-      fromLng?: number;
-      toLat?: number;
-      toLng?: number;
-    };
-    dayData: any;
-    timeSlot: string;
-  }>({
-    isOpen: false,
-    routeData: { from: '', to: '' },
-    dayData: null,
-    timeSlot: ''
-  });
 
   const [placeInsertionModal, setPlaceInsertionModal] = useState<{
     isOpen: boolean;
@@ -114,6 +82,50 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   const getTransportIcon = useCallback((transportMode: string) => {
     return <TransportIcon mode={transportMode} size={12} className="transport-icon" />;
   }, []);
+
+  // MapView Trip.com booking functions (direct reuse)
+  const generateTripComFlightUrl = useCallback((origin: string, destination: string, dateStr: string) => {
+    const tripComUrl = `https://trip.com/flights/booking?flightType=ow&dcity=${origin}&acity=${destination}&ddate=${dateStr}&adult=1&child=0&infant=0`;
+    const encodedUrl = encodeURIComponent(tripComUrl);
+    return `https://tp.media/r?marker=649297&trs=434567&p=8626&u=${encodedUrl}&campaign_id=121`;
+  }, []);
+
+  const generateTripComHotelUrl = useCallback((city: string, checkIn: string, checkOut: string) => {
+    const baseUrl = 'https://tp.media/r?marker=649297&trs=434567&p=8626&u=https%3A%2F%2Ftrip.com%2Fhotels%2Flist';
+    const params = new URLSearchParams({
+      city: city,
+      cityName: city,
+      checkin: checkIn.replace(/-/g, '%2F'),
+      checkout: checkOut.replace(/-/g, '%2F'),
+      adult: '1',
+      children: '0',
+      crn: '1',
+      searchType: 'CT',
+      searchWord: city,
+      'locale': 'en-XX',
+      'curr': 'JPY'
+    });
+    return `${baseUrl}?${params.toString()}&campaign_id=121`;
+  }, []);
+
+  const handleDirectFlightBooking = useCallback((fromPlace: any, toPlace: any, dayData: any) => {
+    const dateStr = dayData?.date || new Date().toISOString().split('T')[0];
+    const fromCity = fromPlace?.place_name || fromPlace?.name || 'Tokyo';
+    const toCity = toPlace?.place_name || toPlace?.name || 'Osaka';
+    
+    const url = generateTripComFlightUrl(fromCity, toCity, dateStr.replace(/-/g, ''));
+    window.open(url, '_blank');
+  }, [generateTripComFlightUrl]);
+
+  const handleDirectHotelBooking = useCallback((place: any, dayData: any) => {
+    const checkIn = dayData?.date || new Date().toISOString().split('T')[0];
+    const checkOut = new Date(checkIn);
+    checkOut.setDate(checkOut.getDate() + 1);
+    
+    const city = place?.place_name || place?.name || 'Tokyo';
+    const url = generateTripComHotelUrl(city, checkIn, checkOut.toISOString().split('T')[0]);
+    window.open(url, '_blank');
+  }, [generateTripComHotelUrl]);
 
   // Format travel time
   const formatTravelTime = useCallback((minutes: number) => {
@@ -750,19 +762,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                     className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 cursor-pointer" 
                                     style={{ top: `${middlePosition}px` }}
                                     onClick={() => {
-                                      setFlightModal({
-                                        isOpen: true,
-                                        routeData: {
-                                          from: prevBlock?.place?.place_name || prevBlock?.place?.name || 'Previous Location',
-                                          to: currentBlock.place.place_name || currentBlock.place.name || 'Current Location',
-                                          fromLat: prevBlock?.place?.latitude,
-                                          fromLng: prevBlock?.place?.longitude,
-                                          toLat: currentBlock.place.latitude,
-                                          toLng: currentBlock.place.longitude
-                                        },
-                                        dayData: dayData,
-                                        timeSlot: `${formatTime(currentBlock.startTime)} departure`
-                                      });
+                                      handleDirectFlightBooking(
+                                        prevBlock?.place,
+                                        currentBlock.place,
+                                        dayData
+                                      );
                                     }}
                                     title="Click to book flight"
                                   >

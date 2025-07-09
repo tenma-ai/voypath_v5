@@ -80,54 +80,21 @@ export function ListView() {
     };
   }, [tripPlaces, tripMembers, memberColors]);
 
-  // Trip.com booking functions
-  const handleTripComFlightBooking = useCallback((event: ScheduleEvent) => {
-    if (event.type !== 'travel') return;
-    
-    const selectedSchedule = scheduleData.find(s => s.date === selectedDay);
-    if (!selectedSchedule) return;
-    
-    const departureDate = selectedSchedule.date;
-    const passengers = 1;
-    
-    // Build Trip.com URL with pre-filled data
-    const baseUrl = 'https://tp.media/r?marker=649297&trs=434567&p=8626&u=https%3A%2F%2Ftrip.com%2Fflights%2Fsearch';
-    const params = new URLSearchParams({
-      'from': event.from || 'Tokyo',
-      'to': event.to || 'Osaka',
-      'departure': departureDate.replace(/-/g, '%2F'),
-      'passengers': passengers.toString(),
-      'class': 'economy',
-      'type': 'oneway',
-      'locale': 'en-XX',
-      'curr': 'JPY'
-    });
-    
-    const tripComUrl = `${baseUrl}?${params.toString()}&campaign_id=121`;
-    window.open(tripComUrl, '_blank');
-  }, [selectedDay, scheduleData]);
+  // MapView Trip.com booking functions (direct reuse)
+  const generateTripComFlightUrl = useCallback((origin: string, destination: string, dateStr: string) => {
+    const tripComUrl = `https://trip.com/flights/booking?flightType=ow&dcity=${origin}&acity=${destination}&ddate=${dateStr}&adult=1&child=0&infant=0`;
+    const encodedUrl = encodeURIComponent(tripComUrl);
+    return `https://tp.media/r?marker=649297&trs=434567&p=8626&u=${encodedUrl}&campaign_id=121`;
+  }, []);
 
-  const handleTripComHotelBooking = useCallback((event: ScheduleEvent) => {
-    if (event.type !== 'place') return;
-    
-    const selectedSchedule = scheduleData.find(s => s.date === selectedDay);
-    if (!selectedSchedule) return;
-    
-    const checkInDate = selectedSchedule.date;
-    const checkOutDate = new Date(checkInDate);
-    checkOutDate.setDate(checkOutDate.getDate() + 1);
-    
-    const city = event.name || 'Tokyo';
-    const guests = 1;
-    
-    // Build Trip.com URL with pre-filled data
+  const generateTripComHotelUrl = useCallback((city: string, checkIn: string, checkOut: string) => {
     const baseUrl = 'https://tp.media/r?marker=649297&trs=434567&p=8626&u=https%3A%2F%2Ftrip.com%2Fhotels%2Flist';
     const params = new URLSearchParams({
       city: city,
       cityName: city,
-      checkin: checkInDate.replace(/-/g, '%2F'),
-      checkout: checkOutDate.toISOString().split('T')[0].replace(/-/g, '%2F'),
-      adult: guests.toString(),
+      checkin: checkIn.replace(/-/g, '%2F'),
+      checkout: checkOut.replace(/-/g, '%2F'),
+      adult: '1',
       children: '0',
       crn: '1',
       searchType: 'CT',
@@ -135,10 +102,37 @@ export function ListView() {
       'locale': 'en-XX',
       'curr': 'JPY'
     });
+    return `${baseUrl}?${params.toString()}&campaign_id=121`;
+  }, []);
+
+  const handleTripComFlightBooking = useCallback((event: ScheduleEvent) => {
+    if (event.type !== 'travel') return;
     
-    const tripComUrl = `${baseUrl}?${params.toString()}&campaign_id=121`;
-    window.open(tripComUrl, '_blank');
-  }, [selectedDay, scheduleData]);
+    const selectedSchedule = scheduleData.find(s => s.date === selectedDay);
+    if (!selectedSchedule) return;
+    
+    const dateStr = selectedSchedule.date.replace(/-/g, '');
+    const fromCity = event.from || 'Tokyo';
+    const toCity = event.to || 'Osaka';
+    
+    const url = generateTripComFlightUrl(fromCity, toCity, dateStr);
+    window.open(url, '_blank');
+  }, [selectedDay, scheduleData, generateTripComFlightUrl]);
+
+  const handleTripComHotelBooking = useCallback((event: ScheduleEvent) => {
+    if (event.type !== 'place') return;
+    
+    const selectedSchedule = scheduleData.find(s => s.date === selectedDay);
+    if (!selectedSchedule) return;
+    
+    const checkIn = selectedSchedule.date;
+    const checkOut = new Date(checkIn);
+    checkOut.setDate(checkOut.getDate() + 1);
+    
+    const city = event.name || 'Tokyo';
+    const url = generateTripComHotelUrl(city, checkIn, checkOut.toISOString().split('T')[0]);
+    window.open(url, '_blank');
+  }, [selectedDay, scheduleData, generateTripComHotelUrl]);
   
   // Colors and trip members are now loaded centrally via store
 
