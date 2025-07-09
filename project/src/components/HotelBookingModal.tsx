@@ -258,7 +258,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto max-h-[500px]">
+          <div className="flex-1 overflow-y-auto max-h-[60vh]">
             {selectedTab === 'search' ? (
               <div className="p-6">
                 {/* Mock Hotels */}
@@ -269,25 +269,22 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                       <div key={hotel.id} className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center space-x-4 mb-2">
-                              <div className="text-2xl">{hotel.image}</div>
-                              <div>
-                                <h4 className="font-bold text-slate-900 dark:text-white">
-                                  {hotel.name}
-                                </h4>
-                                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
-                                  {hotel.address}
-                                </p>
-                                <div className="flex items-center space-x-2">
-                                  <div className="flex items-center">
-                                    {[...Array(Math.floor(hotel.rating))].map((_, i) => (
-                                      <Star key={i} className="w-3 h-3 text-yellow-400 fill-current" />
-                                    ))}
-                                  </div>
-                                  <span className="text-sm text-slate-600 dark:text-slate-400">
-                                    {hotel.rating}
-                                  </span>
+                            <div className="mb-2">
+                              <h4 className="font-bold text-slate-900 dark:text-white">
+                                {hotel.name}
+                              </h4>
+                              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
+                                {hotel.address}
+                              </p>
+                              <div className="flex items-center space-x-2">
+                                <div className="flex items-center">
+                                  {[...Array(Math.floor(hotel.rating))].map((_, i) => (
+                                    <Star key={i} className="w-3 h-3 text-yellow-400 fill-current" />
+                                  ))}
                                 </div>
+                                <span className="text-sm text-slate-600 dark:text-slate-400">
+                                  {hotel.rating}
+                                </span>
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-1 mt-2">

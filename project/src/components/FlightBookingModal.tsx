@@ -324,6 +324,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                     </button>
                   </div>
                 </div>
+                <div className="pb-6"></div>
               </div>
             ) : (
               <div className="p-6">
@@ -403,6 +404,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                     Add Flight to Trip
                   </button>
                 </div>
+                <div className="pb-6"></div>
               </div>
             )}
           </div>
