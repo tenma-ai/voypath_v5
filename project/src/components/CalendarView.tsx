@@ -292,26 +292,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     return groupedBlocks;
   };
 
-  // Get transport icon and color
-  const getTransportIcon = (mode: string) => {
-    const modeLower = mode.toLowerCase();
-    if (modeLower.includes('flight') || modeLower.includes('plane') || modeLower.includes('air')) {
-      return { 
-        color: '#2563EB', 
-        icon: <img src="/icons8-plane-24.png" className="w-3 h-3" alt="Flight" />
-      };
-    } else if (modeLower.includes('car') || modeLower.includes('drive') || modeLower.includes('taxi')) {
-      return { 
-        color: '#92400E', 
-        icon: <img src="/icons8-car-24.png" className="w-3 h-3" alt="Car" />
-      };
-    } else {
-      return { 
-        color: '#6B7280', 
-        icon: <img src="/icons8-walking-50.png" className="w-3 h-3" alt="Walking" />
-      };
-    }
-  };
 
   // Check if place is a system place (not draggable)
   const isSystemPlace = useCallback((place: any) => {
