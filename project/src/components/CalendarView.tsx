@@ -33,6 +33,43 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     nearbyLocation: undefined
   });
   
+  const [hotelModal, setHotelModal] = useState<{
+    isOpen: boolean;
+    dayData: any;
+    timeSlot: string;
+    nearbyLocation?: { lat: number; lng: number; name: string };
+  }>({
+    isOpen: false,
+    dayData: null,
+    timeSlot: '',
+    nearbyLocation: undefined
+  });
+
+  const [flightModal, setFlightModal] = useState<{
+    isOpen: boolean;
+    routeData: {
+      from: string;
+      to: string;
+      fromLat?: number;
+      fromLng?: number;
+      toLat?: number;
+      toLng?: number;
+    };
+    dayData: any;
+    timeSlot: string;
+  }>({
+    isOpen: false,
+    routeData: {
+      from: '',
+      to: '',
+      fromLat: undefined,
+      fromLng: undefined,
+      toLat: undefined,
+      toLng: undefined
+    },
+    dayData: null,
+    timeSlot: ''
+  });
 
   const [placeInsertionModal, setPlaceInsertionModal] = useState<{
     isOpen: boolean;
