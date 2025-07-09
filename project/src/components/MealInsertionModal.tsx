@@ -228,20 +228,20 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100000] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-700/50 p-0 max-w-2xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100000] flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-700/50 p-0 max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-orange-500 to-red-500 p-6 pb-4">
+        <div className="relative bg-gradient-to-r from-orange-500 to-red-500 p-4 sm:p-6 pb-3 sm:pb-4">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-200"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-200"
           >
             <X className="w-4 h-4 text-white" />
           </button>
-          <h2 className="text-2xl font-bold text-white capitalize pr-8">
+          <h2 className="text-lg sm:text-2xl font-bold text-white capitalize pr-8 sm:pr-10">
             Add {mealType} Restaurant
           </h2>
-          <p className="text-white/80 text-sm mt-1">
+          <p className="text-white/80 text-xs sm:text-sm mt-1">
             {timeSlot} • {dayData.date} • Near {extractCityName(nearbyLocation?.name || 'current location')}
           </p>
           <p className="text-white/60 text-xs mt-1">
@@ -250,8 +250,8 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
         </div>
 
         {/* Search */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex space-x-2">
+        <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:space-x-2">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
@@ -259,14 +259,14 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
                 placeholder={`Search ${mealType} restaurants...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                 onKeyPress={(e) => e.key === 'Enter' && handleSearchRestaurants()}
               />
             </div>
             <button
               onClick={handleSearchRestaurants}
               disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
             >
               {isLoading ? 'Searching...' : 'Search'}
             </button>
@@ -274,48 +274,48 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
         </div>
 
         {/* Restaurant List */}
-        <div className="flex-1 overflow-y-auto max-h-[400px]">
+        <div className="flex-1 overflow-y-auto max-h-[350px] sm:max-h-[400px]">
           {restaurants.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="w-8 h-8 text-gray-400" />
+            <div className="text-center py-8 sm:py-12">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <Search className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
               </div>
-              <p className="text-gray-600 dark:text-gray-400">No restaurants found</p>
-              <p className="text-sm text-gray-500 mt-2">Try adjusting your search terms</p>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">No restaurants found</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-2">Try adjusting your search terms</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {restaurants.map((restaurant) => (
-                <div key={restaurant.place_id} className="p-6 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                  <div className="flex items-start justify-between">
+                <div key={restaurant.place_id} className="p-4 sm:p-6 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                         {restaurant.name}
                       </h3>
-                      <div className="flex items-center mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        <span>{restaurant.address}</span>
+                      <div className="flex items-center mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mr-1 flex-shrink-0" />
+                        <span className="truncate">{restaurant.address}</span>
                         <span className="mx-2">•</span>
-                        <span>{restaurant.distance}</span>
+                        <span className="whitespace-nowrap">{restaurant.distance}</span>
                       </div>
-                      <div className="flex items-center mt-2 space-x-4">
+                      <div className="flex items-center mt-2 space-x-3 sm:space-x-4">
                         {restaurant.rating > 0 && (
                           <div className="flex items-center">
-                            <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                            <span className="text-sm text-gray-600 dark:text-gray-400 ml-1">
+                            <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 fill-current" />
+                            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 ml-1">
                               {restaurant.rating.toFixed(1)}
                             </span>
                           </div>
                         )}
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                           {restaurant.price_level > 0 && `${'$'.repeat(restaurant.price_level)} • `}{restaurant.cuisine}
                         </div>
                       </div>
                     </div>
-                    <div className="ml-4">
+                    <div className="ml-0 sm:ml-4">
                       <button
                         onClick={() => handleAddRestaurant(restaurant)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                        className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs sm:text-sm font-medium"
                       >
                         Add to Trip
                       </button>
@@ -328,10 +328,10 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-700/50">
-          <div className="flex items-center justify-between">
+        <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-700/50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 Showing restaurants near {extractCityName(nearbyLocation?.name || 'your location')}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
@@ -340,7 +340,7 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               Cancel
             </button>

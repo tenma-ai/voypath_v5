@@ -170,43 +170,43 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel
           as={motion.div}
-          className="w-full max-w-4xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 overflow-hidden max-h-[90vh]"
+          className="w-full max-w-4xl mx-2 sm:mx-4 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl sm:rounded-3xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 overflow-hidden max-h-[95vh] sm:max-h-[90vh]"
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-slate-200/50 dark:border-slate-700/50">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
-                <Bed className="w-5 h-5 text-white" />
+          <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200/50 dark:border-slate-700/50">
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                <Bed className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
               <div>
-                <Dialog.Title className="text-lg font-bold text-slate-900 dark:text-white">
+                <Dialog.Title className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
                   Hotel Booking
                 </Dialog.Title>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
                   Near {city}
                 </p>
               </div>
             </div>
             <button 
               onClick={onClose}
-              className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
             >
-              <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 dark:text-slate-400" />
             </button>
           </div>
 
           {/* Hotel Info */}
-          <div className="p-6 border-b border-slate-200/50 dark:border-slate-700/50">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center space-x-3">
-                <Calendar className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+          <div className="p-4 sm:p-6 border-b border-slate-200/50 dark:border-slate-700/50">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 dark:text-slate-400" />
                 <div>
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">Check-in Date</p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                  <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-white">Check-in Date</p>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
                     {checkInDate.toLocaleDateString('en-US', { 
                       weekday: 'short', 
                       year: 'numeric', 
@@ -216,18 +216,18 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <User className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <User className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 dark:text-slate-400" />
                 <div>
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">Guests</p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">{tripMembers?.length || 1} guest{(tripMembers?.length || 1) > 1 ? 's' : ''}</p>
+                  <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-white">Guests</p>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">{tripMembers?.length || 1} guest{(tripMembers?.length || 1) > 1 ? 's' : ''}</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <MapPin className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 dark:text-slate-400" />
                 <div>
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">Location</p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">{city}</p>
+                  <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-white">Location</p>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">{city}</p>
                 </div>
               </div>
             </div>
@@ -237,7 +237,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
           <div className="flex border-b border-slate-200/50 dark:border-slate-700/50">
             <button
               onClick={() => setSelectedTab('search')}
-              className={`flex-1 py-4 px-6 text-sm font-medium transition-colors ${
+              className={`flex-1 py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-medium transition-colors ${
                 selectedTab === 'search'
                   ? 'border-b-2 border-purple-500 text-purple-600 bg-purple-50 dark:bg-purple-900/20'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -247,7 +247,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
             </button>
             <button
               onClick={() => setSelectedTab('already')}
-              className={`flex-1 py-4 px-6 text-sm font-medium transition-colors ${
+              className={`flex-1 py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-medium transition-colors ${
                 selectedTab === 'already'
                   ? 'border-b-2 border-purple-500 text-purple-600 bg-purple-50 dark:bg-purple-900/20'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -260,20 +260,20 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
           {/* Content */}
           <div className="flex-1 overflow-y-auto max-h-[70vh]">
             {selectedTab === 'search' ? (
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 {/* Mock Hotels */}
-                <div className="space-y-4 mb-6">
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Available Hotels</h3>
-                  <div className="grid gap-4">
+                <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Available Hotels</h3>
+                  <div className="grid gap-3 sm:gap-4">
                     {mockHotels.map((hotel) => (
-                      <div key={hotel.id} className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
-                        <div className="flex items-center justify-between">
+                      <div key={hotel.id} className="bg-slate-50 dark:bg-slate-700/50 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-600">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
                           <div className="flex-1">
                             <div className="mb-2">
-                              <h4 className="font-bold text-slate-900 dark:text-white">
+                              <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
                                 {hotel.name}
                               </h4>
-                              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
+                              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-1">
                                 {hotel.address}
                               </p>
                               <div className="flex items-center space-x-2">
@@ -282,7 +282,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                                     <Star key={i} className="w-3 h-3 text-yellow-400 fill-current" />
                                   ))}
                                 </div>
-                                <span className="text-sm text-slate-600 dark:text-slate-400">
+                                <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
                                   {hotel.rating}
                                 </span>
                               </div>
@@ -295,14 +295,14 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                               ))}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
+                          <div className="text-left sm:text-right">
+                            <div className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
                               ${hotel.pricePerNight}
                             </div>
-                            <div className="text-sm text-slate-600 dark:text-slate-400 mb-2">per night</div>
+                            <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-2">per night</div>
                             <button
                               onClick={() => handleBookHotel(generateTripComHotelUrl(city, checkInDateStr, checkOutDateStr, tripMembers?.length || 1))}
-                              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                              className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs sm:text-sm font-medium"
                             >
                               Book on Trip.com
                             </button>
@@ -314,88 +314,88 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                 </div>
 
                 {/* Direct Trip.com Link */}
-                <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Search All Hotels</h3>
-                  <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-xl">
-                    <p className="text-sm text-purple-700 dark:text-purple-300 mb-4">
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-4 sm:pt-6">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3 sm:mb-4">Search All Hotels</h3>
+                  <div className="bg-purple-50 dark:bg-purple-900/20 p-3 sm:p-4 rounded-xl">
+                    <p className="text-xs sm:text-sm text-purple-700 dark:text-purple-300 mb-3 sm:mb-4">
                       Browse all available hotels in {city} for your dates
                     </p>
                     <button
                       onClick={() => handleBookHotel(generateTripComHotelUrl(city, checkInDateStr, checkOutDateStr, tripMembers?.length || 1))}
-                      className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                      className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs sm:text-sm font-medium"
                     >
-                      <ExternalLink className="w-5 h-5" />
+                      <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5" />
                       <span>Search Hotels on Trip.com</span>
                     </button>
                   </div>
                 </div>
-                <div className="pb-12"></div>
+                <div className="pb-8 sm:pb-12"></div>
               </div>
             ) : (
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+              <div className="p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3 sm:mb-4">
                   Already Booked a Hotel?
                 </h3>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Hotel Name
                       </label>
                       <input
                         type="text"
                         value={alreadyBookedData.hotelName}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, hotelName: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         placeholder="e.g., Grand Tokyo Hotel"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Address
                       </label>
                       <input
                         type="text"
                         value={alreadyBookedData.address}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, address: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         placeholder="e.g., 123 Business District, Tokyo"
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Check-in Date
                       </label>
                       <input
                         type="date"
                         value={alreadyBookedData.checkIn}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, checkIn: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Check-out Date
                       </label>
                       <input
                         type="date"
                         value={alreadyBookedData.checkOut}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, checkOut: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Guests
                       </label>
                       <select
                         value={alreadyBookedData.guests}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, guests: parseInt(e.target.value) })}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       >
                         {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
                           <option key={num} value={num}>{num} guest{num > 1 ? 's' : ''}</option>
@@ -403,25 +403,25 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Price per Night (USD)
                       </label>
                       <input
                         type="number"
                         value={alreadyBookedData.pricePerNight}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, pricePerNight: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         placeholder="e.g., 150"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                         Rating
                       </label>
                       <select
                         value={alreadyBookedData.rating}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, rating: parseInt(e.target.value) })}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       >
                         {[1, 2, 3, 4, 5].map(num => (
                           <option key={num} value={num}>{num} star{num > 1 ? 's' : ''}</option>
@@ -432,12 +432,12 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                   <button
                     onClick={handleAddAlreadyBooked}
                     disabled={!alreadyBookedData.hotelName}
-                    className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                   >
                     Add Hotel to Trip
                   </button>
                 </div>
-                <div className="pb-12"></div>
+                <div className="pb-8 sm:pb-12"></div>
               </div>
             )}
           </div>
