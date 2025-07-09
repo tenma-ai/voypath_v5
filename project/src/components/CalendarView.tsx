@@ -504,53 +504,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     );
   };
 
-  // Render edit button using Portal (replaces optimize button in calendar view)
-  const renderEditButton = () => {
-    if (!hasUserOptimized || viewMode === 'grid') return null;
-    
-    return ReactDOM.createPortal(
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={() => {
-            setIsEditMode(!isEditMode);
-            if (!isEditMode) {
-              // Mark that user has used edit mode - this disables optimize functionality
-              setHasUserEditedSchedule(true);
-            }
-          }}
-          className={`
-            relative px-6 py-4 rounded-2xl font-semibold text-white shadow-2xl 
-            ${isEditMode 
-              ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' 
-              : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
-            }
-            hover:shadow-3xl hover:scale-105 active:scale-95
-            transition-all duration-300 ease-out
-            flex items-center space-x-3
-            min-w-[160px] justify-center
-          `}
-          title={isEditMode ? "Exit Edit Mode" : "Edit Schedule"}
-        >
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-white/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
-          
-          <div className="relative z-10 flex items-center space-x-3">
-            {isEditMode ? (
-              <>
-                <Check className="w-5 h-5" />
-                <span>Done</span>
-              </>
-            ) : (
-              <>
-                <Edit3 className="w-5 h-5" />
-                <span>Edit</span>
-              </>
-            )}
-          </div>
-        </button>
-      </div>,
-      document.body
-    );
-  };
 
   // If grid mode, use the grid calendar component
   if (viewMode === 'grid') {
@@ -584,9 +537,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       {/* View Toggle - Rendered via Portal */}
       {renderToggleButtons()}
       
-      {/* Edit Button - Rendered via Portal */}
-      {renderEditButton()}
-      
       <div className="p-6 pt-16">
         {/* Unified Calendar View */}
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
@@ -602,32 +552,40 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
           
           {/* Unified Time Grid */}
           <div className="relative">
-            {/* Time axis (left side) */}
-            <div className="absolute left-0 top-0 bottom-0 w-16 bg-gray-50 border-r border-gray-200">
+            {/* Time axis (left side) - Hidden on mobile */}
+            <div className="absolute left-0 top-0 bottom-0 w-16 bg-gray-50 border-r border-gray-200 hidden md:block">
               {(() => {
                 const timeSlots = [];
+                let currentHeight = 0;
                 // Day hours (6 AM to 11 PM) - 1 hour intervals
                 for (let hour = 6; hour <= 23; hour++) {
                   timeSlots.push({
                     time: `${hour.toString().padStart(2, '0')}:00`,
                     isNight: false,
-                    height: 60 // 60px per hour
+                    height: 60,
+                    top: currentHeight
                   });
+                  currentHeight += 60;
                 }
                 // Night hours (12 AM to 5 AM) - 3 hour intervals
                 for (let hour = 0; hour < 6; hour += 3) {
                   timeSlots.push({
                     time: `${hour.toString().padStart(2, '0')}:00`,
                     isNight: true,
-                    height: 40 // 40px per 3-hour block
+                    height: 40,
+                    top: currentHeight
                   });
+                  currentHeight += 40;
                 }
                 
                 return timeSlots.map((slot, index) => (
                   <div
                     key={slot.time}
-                    className="flex items-center justify-center text-xs text-gray-500 border-b border-gray-200"
-                    style={{ height: `${slot.height}px` }}
+                    className="absolute w-full flex items-center justify-center text-xs text-gray-500 border-b border-gray-200"
+                    style={{ 
+                      height: `${slot.height}px`,
+                      top: `${slot.top}px`
+                    }}
                   >
                     {slot.time}
                   </div>
@@ -636,7 +594,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
             </div>
             
             {/* Days content area */}
-            <div className="ml-16 flex md:flex-row flex-col">
+            <div className="md:ml-16 flex md:flex-row flex-col">
               {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData], dayIndex) => (
                 <div key={dayKey} className="md:flex-1 min-w-0 border-r md:border-r border-gray-200 md:last:border-r-0 border-b md:border-b-0 last:border-b-0">
                   {/* Day header */}
