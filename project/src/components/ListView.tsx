@@ -315,6 +315,16 @@ export function ListView() {
         date.setDate(date.getDate() + dayIndex);
         
         console.log(`Day ${dayIndex + 1} final events:`, events);
+        console.log(`Day ${dayIndex + 1} travel events:`, events.filter(e => e.type === 'travel'));
+        events.filter(e => e.type === 'travel').forEach((travelEvent, idx) => {
+          console.log(`Travel event ${idx}:`, {
+            mode: travelEvent.mode,
+            from: travelEvent.from,
+            to: travelEvent.to,
+            duration: travelEvent.duration,
+            name: travelEvent.name
+          });
+        });
         
         scheduleDays.push({
           date: date.toISOString().split('T')[0],
@@ -512,6 +522,16 @@ export function ListView() {
                   duration: event.duration
                 });
                 
+                // Debug transport mode matching for each event
+                if (event.type === 'travel') {
+                  console.log(`Travel event ${index} mode checks:`, {
+                    mode: event.mode,
+                    isCar: event.mode === 'car' || event.mode === 'driving',
+                    isWalking: event.mode === 'walking' || event.mode === 'walk',
+                    isFlight: event.mode === 'flight' || event.mode === 'plane' || event.mode?.toLowerCase().includes('flight')
+                  });
+                }
+                
                 const isCollapsed = collapsedEvents.has(event.id);
                 const memberDisplay = event.type === 'place' && event.assignedTo?.length ? 
                   getMemberDisplay(tripPlaces.find(p => p.id === event.id) || {} as Place) : null;
@@ -646,20 +666,29 @@ export function ListView() {
                           {!isCollapsed && (
                             <div className="mt-1 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
                               
-                              {/* Transport mode display for all travel events - using MapView legend icons */}
-                              {event.type === 'travel' && (
-                                <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-xs sm:text-sm">
+                              {/* Car transport display - using exact flight logic */}
+                              {event.type === 'travel' && (event.mode === 'car' || event.mode === 'driving') && (
+                                <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-amber-700 text-white rounded-md text-xs sm:text-sm">
                                   <TransportIcon 
-                                    mode={event.mode || 'car'} 
-                                    className="w-4 h-4" 
-                                    size={16}
+                                    mode="car" 
+                                    className="w-3 h-3" 
+                                    size={12}
                                   />
-                                  <div 
-                                    className="w-4 h-0.5 rounded-full"
-                                    style={{ backgroundColor: getTransportColor(event.mode || 'car') }}
+                                  <span className="hidden sm:inline">Car - {event.duration}</span>
+                                  <span className="sm:hidden">Car</span>
+                                </div>
+                              )}
+                              
+                              {/* Walking transport display - using exact flight logic */}
+                              {event.type === 'travel' && (event.mode === 'walking' || event.mode === 'walk') && (
+                                <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-gray-600 text-white rounded-md text-xs sm:text-sm">
+                                  <TransportIcon 
+                                    mode="walking" 
+                                    className="w-3 h-3" 
+                                    size={12}
                                   />
-                                  <span className="hidden sm:inline">{event.mode || 'car'} - {event.duration}</span>
-                                  <span className="sm:hidden">{event.duration}</span>
+                                  <span className="hidden sm:inline">Walking - {event.duration}</span>
+                                  <span className="sm:hidden">Walk</span>
                                 </div>
                               )}
                               
