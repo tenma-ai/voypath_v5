@@ -258,7 +258,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto max-h-[60vh]">
+          <div className="flex-1 overflow-y-auto max-h-[70vh]">
             {selectedTab === 'search' ? (
               <div className="p-6">
                 {/* Mock Hotels */}
@@ -329,6 +329,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                     </button>
                   </div>
                 </div>
+                <div className="pb-12"></div>
               </div>
             ) : (
               <div className="p-6">
@@ -436,6 +437,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                     Add Hotel to Trip
                   </button>
                 </div>
+                <div className="pb-12"></div>
               </div>
             )}
           </div>

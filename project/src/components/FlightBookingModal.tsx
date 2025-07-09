@@ -255,7 +255,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto max-h-[60vh]">
+          <div className="flex-1 overflow-y-auto max-h-[70vh]">
             {selectedTab === 'search' ? (
               <div className="p-6">
                 {/* Mock Flights */}
@@ -324,7 +324,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                     </button>
                   </div>
                 </div>
-                <div className="pb-6"></div>
+                <div className="pb-12"></div>
               </div>
             ) : (
               <div className="p-6">
@@ -404,7 +404,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                     Add Flight to Trip
                   </button>
                 </div>
-                <div className="pb-6"></div>
+                <div className="pb-12"></div>
               </div>
             )}
           </div>
