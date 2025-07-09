@@ -879,22 +879,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                         </div>
                                       )}
                                       
-                                      {/* Car transport info */}
-                                      {(transportMode.toLowerCase().includes('car') || transportMode.toLowerCase().includes('drive') || transportMode.toLowerCase().includes('taxi')) && (
+                                      {/* Car transport info - test with loose condition */}
+                                      {(transportMode === 'car' || transportMode.includes('car') || !transportMode.includes('flight')) && (
                                         <div className="bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm">
-                                          {getTransportIcon(transportMode)}
+                                          {getTransportIcon('car')}
                                           <span className="text-xs text-amber-600 dark:text-amber-400">
-                                            {formatTravelTime(travelTime)}
+                                            CAR - {formatTravelTime(travelTime)}
                                           </span>
                                         </div>
                                       )}
                                       
-                                      {/* Walking transport info */}
-                                      {(transportMode.toLowerCase().includes('walk') || transportMode.toLowerCase().includes('foot') || transportMode === 'walking') && (
+                                      {/* Walking transport info - test with loose condition */}
+                                      {(transportMode === 'walking' || transportMode.includes('walk') || true) && (
                                         <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm">
-                                          {getTransportIcon(transportMode)}
+                                          {getTransportIcon('walking')}
                                           <span className="text-xs text-gray-600 dark:text-gray-400">
-                                            {formatTravelTime(travelTime)}
+                                            WALK - {formatTravelTime(travelTime)}
                                           </span>
                                         </div>
                                       )}
