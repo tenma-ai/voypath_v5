@@ -501,7 +501,7 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
                           <TransportIcon 
                             mode={scheduledPlace?.transport_mode || 'car'} 
                             size={14}
-                            className="filter brightness-0 dark:brightness-100 opacity-70"
+                            className="opacity-70"
                           />
                         </div>
                         {(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0) > 0 && (

@@ -384,7 +384,7 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
                             <TransportIcon 
                               mode={item.transportMode || 'car'} 
                               size={16}
-                              className="filter brightness-0 dark:brightness-100 opacity-70"
+                              className="opacity-70"
                             />
                           </div>
                           <div className="text-sm text-slate-500 dark:text-slate-400">

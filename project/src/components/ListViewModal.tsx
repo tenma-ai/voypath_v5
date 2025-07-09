@@ -244,11 +244,14 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
                     {/* Places for this day */}
                     <div className="p-4 space-y-4">
                       {dayData.places.map((place: any, index: number) => {
-                        console.log(`🔍 Place ${index} data:`, {
+                        console.log(`🔍 Place ${index} data:`, place);
+                        console.log(`🔍 Place ${index} transport details:`, {
                           name: place.place_name || place.name,
                           transport_mode: place.transport_mode,
                           travel_time_from_previous: place.travel_time_from_previous,
-                          travel_to_next: place.travel_to_next
+                          travel_to_next: place.travel_to_next,
+                          'travel_to_next.transport_mode': place.travel_to_next?.transport_mode,
+                          'travel_to_next.duration_minutes': place.travel_to_next?.duration_minutes
                         });
                         return (
                         <div key={place.place_id || place.id || index} className="relative">
