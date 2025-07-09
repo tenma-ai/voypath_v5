@@ -646,13 +646,17 @@ export function ListView() {
                           {!isCollapsed && (
                             <div className="mt-1 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
                               
-                              {/* Transport mode display for all travel events */}
+                              {/* Transport mode display for all travel events - using MapView legend icons */}
                               {event.type === 'travel' && (
                                 <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-xs sm:text-sm">
                                   <TransportIcon 
                                     mode={event.mode || 'car'} 
                                     className="w-4 h-4" 
-                                    color={getTransportColor(event.mode || 'car')} 
+                                    size={16}
+                                  />
+                                  <div 
+                                    className="w-4 h-0.5 rounded-full"
+                                    style={{ backgroundColor: getTransportColor(event.mode || 'car') }}
                                   />
                                   <span className="hidden sm:inline">{event.mode || 'car'} - {event.duration}</span>
                                   <span className="sm:hidden">{event.duration}</span>

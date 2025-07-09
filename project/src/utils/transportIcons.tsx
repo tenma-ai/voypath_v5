@@ -64,24 +64,23 @@ const getTransportColor = (mode: string): string => {
   switch (normalizedMode) {
     case 'walking':
     case 'walk':
-      return '#10B981'; // Green
+      return '#6B7280'; // Gray - matches MapView legend
     case 'car':
     case 'driving':
     case 'travel':
-      return '#6B7280'; // Gray
+      return '#92400E'; // Brown - matches MapView legend
     case 'flight':
-      return '#EC4899'; // Pink
+      return '#2563EB'; // Blue - matches MapView legend
     case 'public_transport':
     case 'bus':
-      return '#3B82F6'; // Blue
     case 'train':
-      return '#8B5CF6'; // Purple
+      return '#6B7280'; // Gray - matches MapView legend walking/transit
     case 'bicycle':
       return '#F59E0B'; // Yellow
     case 'taxi':
       return '#EF4444'; // Red
     default:
-      return '#6B7280'; // Gray default
+      return '#6B7280'; // Gray default - matches MapView legend
   }
 };
 
