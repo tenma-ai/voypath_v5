@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, MapPin, Clock, Star, ExternalLink } from 'lucide-react';
+import { X, Search, MapPin, Clock, Star } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { GooglePlacesService } from '../services/GooglePlacesService';
 
@@ -38,7 +38,7 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
   timeSlot,
   nearbyLocation
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(extractCityName(nearbyLocation?.name || ''));
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { currentTrip, addPlace } = useStore();
@@ -55,104 +55,28 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
     return parts[0] || locationName;
   };
 
-  // Load restaurants from Google Places API based on nearby location
+  // Set default search query when modal opens
   useEffect(() => {
     if (isOpen && nearbyLocation) {
-      loadRestaurants();
+      const defaultQuery = extractCityName(nearbyLocation?.name || '');
+      setSearchQuery(defaultQuery);
+      // Auto-search with default query
+      if (defaultQuery) {
+        handleSearchRestaurants();
+      }
     }
   }, [isOpen, nearbyLocation, mealType]);
 
-  const loadRestaurants = async () => {
-    if (!nearbyLocation) return;
-    
-    setIsLoading(true);
-    try {
-      // Try Google Places API first
-      const places = await GooglePlacesService.searchNearby(
-        { lat: nearbyLocation.lat, lng: nearbyLocation.lng },
-        1500, // 1.5km radius for better coverage
-        'restaurant'
-      );
-
-      // Filter restaurants based on meal type and quality
-      const restaurantData = places
-        .filter(place => {
-          const isRestaurant = place.types.includes('restaurant') || 
-                              place.types.includes('meal_takeaway') ||
-                              place.types.includes('food');
-          const hasGoodRating = !place.rating || place.rating >= 3.5;
-          return isRestaurant && hasGoodRating;
-        })
-        .map(place => convertToRestaurant(place))
-        .sort((a, b) => {
-          // Sort by rating first, then by distance
-          if (b.rating !== a.rating) return b.rating - a.rating;
-          return parseFloat(a.distance) - parseFloat(b.distance);
-        })
-        .slice(0, 12); // Show top 12 restaurants
-
-      if (restaurantData.length === 0) {
-        // Fallback: Generate mock restaurants if no results
-        setRestaurants(generateMockRestaurants());
-      } else {
-        setRestaurants(restaurantData);
-      }
-    } catch (error) {
-      console.error('Failed to load restaurants from Google Places API:', error);
-      // Fallback: Generate mock restaurants on error
-      setRestaurants(generateMockRestaurants());
-    } finally {
-      setIsLoading(false);
+  // Auto-search whenever search query changes
+  useEffect(() => {
+    if (searchQuery && nearbyLocation) {
+      const timer = setTimeout(() => {
+        handleSearchRestaurants();
+      }, 500); // Debounce search
+      return () => clearTimeout(timer);
     }
-  };
+  }, [searchQuery]);
 
-  // Generate mock restaurants as fallback
-  const generateMockRestaurants = (): Restaurant[] => {
-    const cityName = extractCityName(nearbyLocation?.name || 'Current Location');
-    const baseRating = 3.5 + Math.random() * 1.5; // 3.5-5.0
-    
-    return [
-      {
-        place_id: 'mock_1',
-        name: `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} Spot`,
-        address: `Near ${cityName}`,
-        rating: Number((baseRating + 0.5).toFixed(1)),
-        price_level: 2,
-        cuisine: 'Local Cuisine',
-        distance: '200m',
-        latitude: nearbyLocation?.lat || 0,
-        longitude: nearbyLocation?.lng || 0,
-        photos: [],
-        types: ['restaurant', 'food', 'establishment']
-      },
-      {
-        place_id: 'mock_2',
-        name: `Cozy ${mealType.charAt(0).toUpperCase() + mealType.slice(1)} Cafe`,
-        address: `${cityName} Center`,
-        rating: Number(baseRating.toFixed(1)),
-        price_level: 1,
-        cuisine: 'Cafe',
-        distance: '350m',
-        latitude: nearbyLocation?.lat || 0,
-        longitude: nearbyLocation?.lng || 0,
-        photos: [],
-        types: ['restaurant', 'cafe', 'establishment']
-      },
-      {
-        place_id: 'mock_3',
-        name: `${cityName} ${mealType.charAt(0).toUpperCase() + mealType.slice(1)} House`,
-        address: `Traditional District, ${cityName}`,
-        rating: Number((baseRating + 0.2).toFixed(1)),
-        price_level: 3,
-        cuisine: 'Traditional',
-        distance: '500m',
-        latitude: nearbyLocation?.lat || 0,
-        longitude: nearbyLocation?.lng || 0,
-        photos: [],
-        types: ['restaurant', 'food', 'establishment']
-      }
-    ];
-  };
 
   const getMealTypeSearchQuery = (mealType: 'breakfast' | 'lunch' | 'dinner'): string => {
     switch (mealType) {
@@ -236,7 +160,7 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
       const mealTypeKeyword = getMealTypeSearchQuery(mealType);
       const fullSearchQuery = `${searchQuery} ${mealTypeKeyword}`;
       
-      // Use Google Places API text search with location bias
+      // Try Google Places API text search with location bias
       const places = await GooglePlacesService.searchPlaces({
         query: fullSearchQuery,
         location: { lat: nearbyLocation.lat, lng: nearbyLocation.lng },
@@ -251,9 +175,7 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
                               place.types.includes('meal_takeaway') ||
                               place.types.includes('food');
           const hasGoodRating = !place.rating || place.rating >= 3.0;
-          const matchesSearch = place.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                               (place.formatted_address && place.formatted_address.toLowerCase().includes(searchQuery.toLowerCase()));
-          return isRestaurant && hasGoodRating && matchesSearch;
+          return isRestaurant && hasGoodRating;
         })
         .map(place => convertToRestaurant(place))
         .sort((a, b) => {
@@ -266,54 +188,14 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
         })
         .slice(0, 15); // Show top 15 search results
 
-      if (restaurantData.length === 0) {
-        // Fallback: Generate search-based mock restaurants
-        setRestaurants(generateSearchMockRestaurants(searchQuery));
-      } else {
-        setRestaurants(restaurantData);
-      }
+      setRestaurants(restaurantData);
     } catch (error) {
       console.error('Failed to search restaurants with Google Places API:', error);
-      // Fallback: Generate search-based mock restaurants
-      setRestaurants(generateSearchMockRestaurants(searchQuery));
+      // Don't set restaurants to empty array, just log error
+      setRestaurants([]);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Generate mock restaurants based on search query
-  const generateSearchMockRestaurants = (query: string): Restaurant[] => {
-    const cityName = extractCityName(nearbyLocation?.name || 'Current Location');
-    const baseRating = 3.5 + Math.random() * 1.5; // 3.5-5.0
-    
-    return [
-      {
-        place_id: 'search_mock_1',
-        name: `${query} Restaurant`,
-        address: `${cityName} Downtown`,
-        rating: Number((baseRating + 0.3).toFixed(1)),
-        price_level: 2,
-        cuisine: 'International',
-        distance: '300m',
-        latitude: nearbyLocation?.lat || 0,
-        longitude: nearbyLocation?.lng || 0,
-        photos: [],
-        types: ['restaurant', 'food', 'establishment']
-      },
-      {
-        place_id: 'search_mock_2',
-        name: `${query} Bistro`,
-        address: `Near ${cityName} Station`,
-        rating: Number(baseRating.toFixed(1)),
-        price_level: 2,
-        cuisine: 'Bistro',
-        distance: '450m',
-        latitude: nearbyLocation?.lat || 0,
-        longitude: nearbyLocation?.lng || 0,
-        photos: [],
-        types: ['restaurant', 'food', 'establishment']
-      }
-    ];
   };
 
   const handleAddRestaurant = async (restaurant: Restaurant) => {
@@ -355,11 +237,6 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
     }
   };
 
-  const handleTripComRedirect = () => {
-    // Use the provided trip.com referral link
-    const tripComUrl = `https://tp.media/r?marker=649297&trs=434567&p=8626&u=https%3A%2F%2Ftrip.com&campaign_id=121`;
-    window.open(tripComUrl, '_blank');
-  };
 
   if (!isOpen) return null;
 
@@ -448,19 +325,12 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-col space-y-2 ml-4">
+                    <div className="ml-4">
                       <button
                         onClick={() => handleAddRestaurant(restaurant)}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
                       >
                         Add to Trip
-                      </button>
-                      <button
-                        onClick={handleTripComRedirect}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center"
-                      >
-                        <ExternalLink className="w-3 h-3 mr-1" />
-                        Book
                       </button>
                     </div>
                   </div>
