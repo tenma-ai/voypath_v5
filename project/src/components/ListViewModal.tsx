@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Clock, MapPin, Navigation } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useStore } from '../store/useStore';
+import { TransportIcon, getTransportColor } from '../utils/transportIcons';
 
 interface Place {
   id: string;
@@ -63,10 +64,10 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
     const dailySchedules = result?.optimization?.daily_schedules;
     
     // Debug logging
-    // Log message
-    // Log message
-    // Log message
-    // Checking array type
+    console.log('🔍 ListViewModal - formatOptimizationResult called with:', result);
+    console.log('🔍 Daily schedules:', dailySchedules);
+    console.log('🔍 Daily schedules type:', typeof dailySchedules);
+    console.log('🔍 Is array:', Array.isArray(dailySchedules));
     
     // Safety check for required properties
     if (!result?.optimization || !dailySchedules || !Array.isArray(dailySchedules)) {
@@ -242,7 +243,14 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
                     
                     {/* Places for this day */}
                     <div className="p-4 space-y-4">
-                      {dayData.places.map((place: any, index: number) => (
+                      {dayData.places.map((place: any, index: number) => {
+                        console.log(`🔍 Place ${index} data:`, {
+                          name: place.place_name || place.name,
+                          transport_mode: place.transport_mode,
+                          travel_time_from_previous: place.travel_time_from_previous,
+                          travel_to_next: place.travel_to_next
+                        });
+                        return (
                         <div key={place.place_id || place.id || index} className="relative">
                           {/* Timeline connector */}
                           {index < dayData.places.length - 1 && (
@@ -280,16 +288,84 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
                                     </div>
                                   </div>
                                   
-                                  {/* Travel info to next place */}
-                                  {place.travel_to_next && (
-                                    <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
-                                      <div className="flex items-center text-gray-600">
-                                        <Navigation className="w-4 h-4 mr-1" />
-                                        <span>
-                                          次のスポットまで: {formatDuration(place.travel_to_next.duration_minutes)}
-                                          ({place.travel_to_next.transport_mode})
-                                        </span>
-                                      </div>
+                                  {/* Travel info to next place - using MapView legend icons and flight-style UI */}
+                                  {(place.travel_to_next || place.travel_time_from_previous) && (
+                                    <div className="mt-2 space-y-2">
+                                      {/* Display transport mode from travel_to_next */}
+                                      {place.travel_to_next?.transport_mode && (
+                                        <div className="flex items-center space-x-2">
+                                          {/* Flight display - using exact flight logic */}
+                                          {(place.travel_to_next.transport_mode === 'flight' || place.travel_to_next.transport_mode === 'plane' || place.travel_to_next.transport_mode?.toLowerCase().includes('flight')) && (
+                                            <div className="flex items-center space-x-1 px-2 py-1 bg-blue-600 text-white rounded text-xs">
+                                              <TransportIcon mode="flight" className="w-3 h-3" size={12} />
+                                              <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: getTransportColor('flight') }} />
+                                              <span>Flight - {formatDuration(place.travel_to_next.duration_minutes)}</span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Car display - using exact flight logic */}
+                                          {(place.travel_to_next.transport_mode === 'car' || place.travel_to_next.transport_mode === 'driving') && (
+                                            <div className="flex items-center space-x-1 px-2 py-1 bg-amber-700 text-white rounded text-xs">
+                                              <TransportIcon mode="car" className="w-3 h-3" size={12} />
+                                              <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: getTransportColor('car') }} />
+                                              <span>Car - {formatDuration(place.travel_to_next.duration_minutes)}</span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Walking display - using exact flight logic */}
+                                          {(place.travel_to_next.transport_mode === 'walking' || place.travel_to_next.transport_mode === 'walk') && (
+                                            <div className="flex items-center space-x-1 px-2 py-1 bg-gray-600 text-white rounded text-xs">
+                                              <TransportIcon mode="walking" className="w-3 h-3" size={12} />
+                                              <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: getTransportColor('walking') }} />
+                                              <span>Walking - {formatDuration(place.travel_to_next.duration_minutes)}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                      
+                                      {/* Also check for transport mode in current place */}
+                                      {place.transport_mode && (
+                                        <div className="flex items-center space-x-2">
+                                          {/* Flight display - using exact flight logic */}
+                                          {(place.transport_mode === 'flight' || place.transport_mode === 'plane' || place.transport_mode?.toLowerCase().includes('flight')) && (
+                                            <div className="flex items-center space-x-1 px-2 py-1 bg-blue-600 text-white rounded text-xs">
+                                              <TransportIcon mode="flight" className="w-3 h-3" size={12} />
+                                              <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: getTransportColor('flight') }} />
+                                              <span>Flight - {formatDuration(place.travel_time_from_previous || 0)}</span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Car display - using exact flight logic */}
+                                          {(place.transport_mode === 'car' || place.transport_mode === 'driving') && (
+                                            <div className="flex items-center space-x-1 px-2 py-1 bg-amber-700 text-white rounded text-xs">
+                                              <TransportIcon mode="car" className="w-3 h-3" size={12} />
+                                              <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: getTransportColor('car') }} />
+                                              <span>Car - {formatDuration(place.travel_time_from_previous || 0)}</span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Walking display - using exact flight logic */}
+                                          {(place.transport_mode === 'walking' || place.transport_mode === 'walk') && (
+                                            <div className="flex items-center space-x-1 px-2 py-1 bg-gray-600 text-white rounded text-xs">
+                                              <TransportIcon mode="walking" className="w-3 h-3" size={12} />
+                                              <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: getTransportColor('walking') }} />
+                                              <span>Walking - {formatDuration(place.travel_time_from_previous || 0)}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                      
+                                      {/* Fallback: Original travel info display */}
+                                      {place.travel_to_next && !place.travel_to_next.transport_mode && (
+                                        <div className="p-2 bg-gray-50 rounded text-sm">
+                                          <div className="flex items-center text-gray-600">
+                                            <Navigation className="w-4 h-4 mr-1" />
+                                            <span>
+                                              次のスポットまで: {formatDuration(place.travel_to_next.duration_minutes)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -307,7 +383,8 @@ const ListViewModal: React.FC<ListViewModalProps> = ({
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
