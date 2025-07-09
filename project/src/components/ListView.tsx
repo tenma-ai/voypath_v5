@@ -620,6 +620,19 @@ export function ListView() {
                           {/* Trip.com Booking Buttons */}
                           {!isCollapsed && (
                             <div className="mt-1 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
+                              {/* Show transport info for all travel events */}
+                              {event.type === 'travel' && (
+                                <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-xs sm:text-sm">
+                                  <TransportIcon 
+                                    mode={event.mode || 'car'} 
+                                    className="w-4 h-4" 
+                                    color={getTransportColor(event.mode || 'car')} 
+                                  />
+                                  <span className="hidden sm:inline">{event.mode || 'car'} - {event.duration}</span>
+                                  <span className="sm:hidden">{event.duration}</span>
+                                </div>
+                              )}
+                              
                               {/* Flight booking for travel events - only show for flights */}
                               {event.type === 'travel' && (event.mode === 'flight' || event.mode === 'plane' || event.mode?.toLowerCase().includes('flight')) && (
                                 <button
@@ -630,19 +643,6 @@ export function ListView() {
                                   <span className="hidden sm:inline">Book Flight on Trip.com</span>
                                   <span className="sm:hidden">Flight</span>
                                 </button>
-                              )}
-                              
-                              {/* Show transport info for all travel events */}
-                              {event.type === 'travel' && (
-                                <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-md text-xs sm:text-sm border border-blue-200 dark:border-blue-800">
-                                  <TransportIcon 
-                                    mode={event.mode || 'car'} 
-                                    className="w-4 h-4" 
-                                    color={getTransportColor(event.mode || 'car')} 
-                                  />
-                                  <span className="hidden sm:inline">{event.mode || 'car'} - {event.duration}</span>
-                                  <span className="sm:hidden">{event.duration}</span>
-                                </div>
                               )}
                               
                               {/* Hotel booking for place events */}
