@@ -818,10 +818,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               const transportMode = currentBlock.place.transport_mode || 'walking';
                               const travelTime = currentBlock.place.travel_time_from_previous || 0;
                               
-                              // Only show lines for flights, not for walking or car
+                              // Show lines for all transport modes
                               const isFlight = transportMode.toLowerCase().includes('flight') || transportMode.toLowerCase().includes('plane') || transportMode.toLowerCase().includes('air');
                               
-                              if (travelTime > 0 && isFlight) {
+                              if (travelTime > 0) {
                                 // Calculate position between previous place end and current place start
                                 const prevEndHour = parseInt(prevBlock.endTime.split(':')[0]);
                                 const prevEndMinute = parseInt(prevBlock.endTime.split(':')[1]);
@@ -879,22 +879,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                         </div>
                                       )}
                                       
-                                      {/* Car transport info - test with loose condition */}
-                                      {(transportMode === 'car' || transportMode.includes('car') || !transportMode.includes('flight')) && (
+                                      {/* Car transport info */}
+                                      {(transportMode.toLowerCase().includes('car') || transportMode.toLowerCase().includes('drive') || transportMode.toLowerCase().includes('taxi')) && (
                                         <div className="bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm">
-                                          {getTransportIcon('car')}
+                                          {getTransportIcon(transportMode)}
                                           <span className="text-xs text-amber-600 dark:text-amber-400">
-                                            CAR - {formatTravelTime(travelTime)}
+                                            {formatTravelTime(travelTime)}
                                           </span>
                                         </div>
                                       )}
                                       
-                                      {/* Walking transport info - test with loose condition */}
-                                      {(transportMode === 'walking' || transportMode.includes('walk') || true) && (
+                                      {/* Walking transport info */}
+                                      {(transportMode.toLowerCase().includes('walk') || transportMode.toLowerCase().includes('foot') || transportMode === 'walking') && (
                                         <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm">
-                                          {getTransportIcon('walking')}
+                                          {getTransportIcon(transportMode)}
                                           <span className="text-xs text-gray-600 dark:text-gray-400">
-                                            WALK - {formatTravelTime(travelTime)}
+                                            {formatTravelTime(travelTime)}
                                           </span>
                                         </div>
                                       )}
