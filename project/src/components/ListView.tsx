@@ -461,7 +461,7 @@ export function ListView() {
       {/* Schedule Timeline */}
       {selectedSchedule && selectedSchedule.events.length > 0 ? (
         <div className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft p-3 sm:p-6">
-          <div className="space-y-2 sm:space-y-3">
+          <div className="space-y-1 sm:space-y-2">
               {selectedSchedule.events.map((event, index) => {
                 const isCollapsed = collapsedEvents.has(event.id);
                 const memberDisplay = event.type === 'place' && event.assignedTo?.length ? 
@@ -474,13 +474,13 @@ export function ListView() {
                   >
                     {/* Timeline Line */}
                     {index < selectedSchedule.events.length - 1 && (
-                      <div className="absolute left-4 sm:left-5 top-10 sm:top-12 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700 -z-10" />
+                      <div className="absolute left-4 sm:left-5 top-4 sm:top-10 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700 -z-10" />
                     )}
                     
                     {/* Event Card */}
                     <div
-                      className={`flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg transition-all cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                        event.type === 'travel' ? 'pl-6 sm:pl-8' : ''
+                      className={`flex items-start space-x-2 sm:space-x-3 p-1 sm:p-3 rounded-lg transition-all cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                        event.type === 'travel' ? 'pl-4 sm:pl-8' : ''
                       } ${event.type === 'place' ? `place-card ${getPlaceCardStyle(event).className}` : ''}`}
                       style={event.type === 'place' ? getPlaceCardStyle(event).style : undefined}
                       onClick={() => event.type === 'place' && toggleEventCollapse(event.id)}
@@ -518,7 +518,7 @@ export function ListView() {
                         </div>
                         
                         {/* Event Details */}
-                        <div className="mt-1 space-y-1">
+                        <div className="mt-0.5 sm:mt-1 space-y-0.5 sm:space-y-1">
                           {event.duration && (
                             <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                               {event.duration}
@@ -534,7 +534,7 @@ export function ListView() {
                           
                           {/* Member Assignment Display */}
                           {memberDisplay && (
-                            <div className="mt-2 flex flex-wrap gap-2">
+                            <div className="mt-1 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
                               {memberDisplay.displayType === 'gold' ? (
                                 <div
                                   className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-white text-xs font-semibold shadow-md"
@@ -575,7 +575,7 @@ export function ListView() {
                             
                             if (timeIcon && timeLabel) {
                               return (
-                                <div className="mt-1 flex items-center space-x-1">
+                                <div className="mt-0.5 sm:mt-1 flex items-center space-x-1">
                                   <img src={timeIcon} alt={timeLabel} className="w-3 h-3" />
                                   <span className="text-xs text-gray-500 dark:text-gray-400">
                                     {timeLabel}
@@ -588,14 +588,14 @@ export function ListView() {
                           
                           {/* Expandable Details */}
                           {event.type === 'place' && !isCollapsed && event.description && (
-                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                            <div className="mt-1 sm:mt-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-2 sm:p-3 rounded-lg">
                               {event.description}
                             </div>
                           )}
                           
                           {/* Trip.com Booking Buttons */}
                           {!isCollapsed && (
-                            <div className="mt-2 flex flex-wrap gap-2">
+                            <div className="mt-1 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
                               {/* Flight booking for travel events - only show for flights */}
                               {event.type === 'travel' && (event.mode === 'flight' || event.mode === 'plane' || event.mode?.toLowerCase().includes('flight')) && (
                                 <button
