@@ -845,18 +845,33 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                 const routeLength = Math.max(currentStartPos - prevEndPos, 40); // Minimum 40px
                                 const middlePosition = prevEndPos + routeLength / 2;
                                 
+                                // Calculate line length based on transport mode
+                                const getLineLength = (transportMode: string, totalLength: number) => {
+                                  if (isFlight) {
+                                    // Flight: longer lines that almost connect the boxes
+                                    return Math.max(totalLength * 0.8, 60);
+                                  } else {
+                                    // Car/Walking: shorter lines that don't touch the boxes
+                                    return Math.max(totalLength * 0.4, 20);
+                                  }
+                                };
+                                
+                                const lineLength = getLineLength(transportMode, routeLength);
+                                
                                 return (
                                   <div 
-                                    className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 cursor-pointer" 
+                                    className={`absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 ${
+                                      isFlight ? 'cursor-pointer' : 'cursor-default'
+                                    }`}
                                     style={{ top: `${middlePosition}px` }}
-                                    onClick={() => {
+                                    onClick={isFlight ? () => {
                                       handleDirectFlightBooking(
                                         prevBlock?.place,
                                         currentBlock.place,
                                         dayData
                                       );
-                                    }}
-                                    title="Click to book flight"
+                                    } : undefined}
+                                    title={isFlight ? "Click to book flight" : undefined}
                                   >
                                     {/* Dynamic route line */}
                                     <div className="flex flex-col items-center hover:opacity-80 transition-opacity">
@@ -866,7 +881,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                           transportMode.toLowerCase().includes('car') || transportMode.toLowerCase().includes('drive') || transportMode.toLowerCase().includes('taxi') ? 'bg-amber-400 dark:bg-amber-500' :
                                           'bg-gray-400 dark:bg-gray-500'
                                         }`}
-                                        style={{ height: `${routeLength * 0.3}px` }}
+                                        style={{ height: `${lineLength}px` }}
                                       ></div>
                                       
                                       {/* Flight transport info */}
@@ -905,7 +920,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                           transportMode.toLowerCase().includes('car') || transportMode.toLowerCase().includes('drive') || transportMode.toLowerCase().includes('taxi') ? 'bg-amber-400 dark:bg-amber-500' :
                                           'bg-gray-400 dark:bg-gray-500'
                                         }`}
-                                        style={{ height: `${routeLength * 0.3}px` }}
+                                        style={{ height: `${lineLength}px` }}
                                       ></div>
                                     </div>
                                   </div>
