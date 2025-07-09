@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { Calendar, Clock, MapPin, List, Grid3X3 } from 'lucide-react';
+import { Calendar, Clock, MapPin, List, Grid3X3, Edit3, Check, X, Move, ArrowUpDown } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getPlaceColor } from '../utils/ColorUtils';
 import { DateUtils } from '../utils/DateUtils';
 import CalendarGridView from './CalendarGridView';
+import MealInsertionModal from './MealInsertionModal';
+import HotelBookingModal from './HotelBookingModal';
+import FlightBookingModal from './FlightBookingModal';
+import PlaceInsertionModal from './PlaceInsertionModal';
 
 interface CalendarViewProps {
   optimizationResult?: any;
@@ -13,7 +17,85 @@ interface CalendarViewProps {
 const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
-  const { currentTrip, memberColors, tripMembers, hasUserOptimized } = useStore();
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [mealModal, setMealModal] = useState<{
+    isOpen: boolean;
+    mealType: 'breakfast' | 'lunch' | 'dinner';
+    dayData: any;
+    timeSlot: string;
+    nearbyLocation?: { lat: number; lng: number; name: string };
+  }>({
+    isOpen: false,
+    mealType: 'breakfast',
+    dayData: null,
+    timeSlot: '',
+    nearbyLocation: undefined
+  });
+  
+  const [hotelModal, setHotelModal] = useState<{
+    isOpen: boolean;
+    dayData: any;
+    timeSlot: string;
+    nearbyLocation?: { lat: number; lng: number; name: string };
+  }>({
+    isOpen: false,
+    dayData: null,
+    timeSlot: '',
+    nearbyLocation: undefined
+  });
+
+  const [flightModal, setFlightModal] = useState<{
+    isOpen: boolean;
+    routeData: {
+      from: string;
+      to: string;
+      fromLat?: number;
+      fromLng?: number;
+      toLat?: number;
+      toLng?: number;
+    };
+    dayData: any;
+    timeSlot: string;
+  }>({
+    isOpen: false,
+    routeData: { from: '', to: '' },
+    dayData: null,
+    timeSlot: ''
+  });
+
+  const [placeInsertionModal, setPlaceInsertionModal] = useState<{
+    isOpen: boolean;
+    insertionContext: {
+      dayData: any;
+      afterPlaceIndex: number;
+      beforePlaceIndex: number;
+      timeSlot: string;
+      nearbyLocation?: {
+        lat: number;
+        lng: number;
+        name: string;
+      };
+    };
+  }>({
+    isOpen: false,
+    insertionContext: {
+      dayData: null,
+      afterPlaceIndex: -1,
+      beforePlaceIndex: -1,
+      timeSlot: '',
+      nearbyLocation: undefined
+    }
+  });
+  
+  // Drag and drop state
+  const [draggedPlace, setDraggedPlace] = useState<any>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number>(-1);
+  const [isResizing, setIsResizing] = useState<string | null>(null);
+  const [resizeStartY, setResizeStartY] = useState<number>(0);
+  const [resizeStartDuration, setResizeStartDuration] = useState<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  const { currentTrip, memberColors, tripMembers, hasUserOptimized, setHasUserOptimized, hasUserEditedSchedule, setHasUserEditedSchedule, movePlace, resizePlaceDuration, deleteScheduledPlace, setupRealTimeSync } = useStore();
 
   // Generate gradient style for multiple contributors using centralized color logic
   const getPlaceStyle = (place: any) => {
@@ -208,6 +290,173 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     }
   };
 
+  // Drag and drop handlers
+  const handleDragStart = useCallback((e: React.DragEvent, place: any, blockIndex: number) => {
+    setDraggedPlace({ place, blockIndex });
+    e.dataTransfer.effectAllowed = 'move';
+    // Set hasUserEditedSchedule immediately on drag start
+    setHasUserEditedSchedule(true);
+  }, [setHasUserEditedSchedule]);
+
+  const handleDragOver = useCallback((e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(targetIndex);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverIndex(-1);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent, targetIndex: number, dayData: any) => {
+    e.preventDefault();
+    if (!draggedPlace) return;
+
+    const sourceIndex = draggedPlace.blockIndex;
+    if (sourceIndex === targetIndex) {
+      setDraggedPlace(null);
+      setDragOverIndex(-1);
+      return;
+    }
+
+    // Use real-time sync system for immediate UI feedback
+    await movePlace(
+      draggedPlace.place.id || draggedPlace.place.place_name,
+      sourceIndex,
+      targetIndex,
+      dayData
+    );
+
+    setDraggedPlace(null);
+    setDragOverIndex(-1);
+  }, [draggedPlace, movePlace]);
+
+  // Resize handlers
+  const handleResizeStart = useCallback((e: React.MouseEvent, placeId: string, currentDuration: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(placeId);
+    setResizeStartY(e.clientY);
+    setResizeStartDuration(currentDuration);
+    setHasUserEditedSchedule(true);
+  }, [setHasUserEditedSchedule]);
+
+  const handleResizeMove = useCallback(async (e: MouseEvent) => {
+    if (!isResizing) return;
+
+    const deltaY = e.clientY - resizeStartY;
+    const pixelsPerMinute = 1; // 1px = 1 minute
+    const durationChange = Math.round(deltaY / pixelsPerMinute);
+    const newDuration = Math.max(15, resizeStartDuration + durationChange); // Minimum 15 minutes
+
+    // Use specialized duration-change edge function for maximum UX responsiveness
+    if (currentTrip) {
+      try {
+        // Find the day data for the resizing place
+        const dayData = Object.values(formattedResult.schedulesByDay).find((schedule: any) => 
+          schedule.places.some((place: any) => (place.id || place.place_name) === isResizing)
+        );
+        
+        if (dayData) {
+          const { supabase } = await import('../lib/supabase');
+          
+          // Call optimized duration-change edge function
+          const { data, error } = await supabase.functions.invoke('duration-change', {
+            body: {
+              trip_id: currentTrip.id,
+              place_id: isResizing,
+              new_duration: newDuration,
+              old_duration: resizeStartDuration,
+              day_data: dayData,
+              user_id: useStore.getState().user?.id
+            }
+          });
+          
+          if (error) {
+            console.error('Duration change failed:', error);
+            return;
+          }
+          
+          // Update UI immediately with the response
+          if (data?.updated_day_schedule) {
+            const { broadcastScheduleUpdate } = useStore.getState();
+            broadcastScheduleUpdate({
+              action: 'duration_change_fast',
+              data: {
+                placeId: isResizing,
+                newDuration,
+                daySchedule: data.updated_day_schedule,
+                requiresManualAdjustment: data.requires_manual_adjustment,
+                adjustmentMessage: data.adjustment_message
+              }
+            });
+          }
+          
+          // Show user notification if manual adjustment is required
+          if (data?.requires_manual_adjustment) {
+            console.warn('Manual adjustment required:', data.adjustment_message);
+            // You could show a toast notification here
+          }
+        }
+      } catch (error) {
+        console.error('Failed to call duration-change function:', error);
+        // Fallback to regular resize function
+        await resizePlaceDuration(isResizing, newDuration, resizeStartDuration);
+      }
+    }
+  }, [isResizing, resizeStartY, resizeStartDuration, resizePlaceDuration, currentTrip, formattedResult]);
+
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(null);
+  }, []);
+
+  // Legacy edge function caller (kept for compatibility)
+  const callEditScheduleEdgeFunction = useCallback(async (action: string, data: any) => {
+    if (!currentTrip) return;
+
+    try {
+      // Use the new real-time sync system instead
+      const { updateScheduleInRealTime } = useStore.getState();
+      await updateScheduleInRealTime({ action, data });
+    } catch (error) {
+      console.error('Failed to call edit-schedule function:', error);
+    }
+  }, [currentTrip]);
+
+  // Mouse event listeners for resize
+  React.useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('mouseup', handleResizeEnd);
+      };
+    }
+  }, [isResizing, handleResizeMove, handleResizeEnd]);
+  
+  // Setup real-time sync system
+  React.useEffect(() => {
+    const cleanup = setupRealTimeSync();
+    
+    // Listen for data changes from other views
+    const handleDataChange = (event: CustomEvent) => {
+      const { type, data } = event.detail;
+      if (type === 'schedule') {
+        // Force re-render when schedule updates come from other views
+        // The store will already be updated, this just ensures UI refresh
+        console.log('Calendar view received schedule update:', data);
+      }
+    };
+    
+    window.addEventListener('voypath-data-changed', handleDataChange as EventListener);
+    
+    return () => {
+      cleanup();
+      window.removeEventListener('voypath-data-changed', handleDataChange as EventListener);
+    };
+  }, [setupRealTimeSync]);
+
   // Render toggle buttons using Portal to ensure they appear above all other elements
   const renderToggleButtons = () => {
     return ReactDOM.createPortal(
@@ -233,6 +482,54 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
           title="Grid View"
         >
           <Grid3X3 className="w-4 h-4" />
+        </button>
+      </div>,
+      document.body
+    );
+  };
+
+  // Render edit button using Portal (replaces optimize button in calendar view)
+  const renderEditButton = () => {
+    if (!hasUserOptimized || viewMode === 'grid') return null;
+    
+    return ReactDOM.createPortal(
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={() => {
+            setIsEditMode(!isEditMode);
+            if (!isEditMode) {
+              // Mark that user has used edit mode - this disables optimize functionality
+              setHasUserEditedSchedule(true);
+            }
+          }}
+          className={`
+            relative px-6 py-4 rounded-2xl font-semibold text-white shadow-2xl 
+            ${isEditMode 
+              ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' 
+              : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
+            }
+            hover:shadow-3xl hover:scale-105 active:scale-95
+            transition-all duration-300 ease-out
+            flex items-center space-x-3
+            min-w-[160px] justify-center
+          `}
+          title={isEditMode ? "Exit Edit Mode" : "Edit Schedule"}
+        >
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-white/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
+          
+          <div className="relative z-10 flex items-center space-x-3">
+            {isEditMode ? (
+              <>
+                <Check className="w-5 h-5" />
+                <span>Done</span>
+              </>
+            ) : (
+              <>
+                <Edit3 className="w-5 h-5" />
+                <span>Edit</span>
+              </>
+            )}
+          </div>
         </button>
       </div>,
       document.body
@@ -271,134 +568,511 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       {/* View Toggle - Rendered via Portal */}
       {renderToggleButtons()}
       
+      {/* Edit Button - Rendered via Portal */}
+      {renderEditButton()}
+      
       <div className="p-6 pt-16">
-        <div className="space-y-0">
-          {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData], dayIndex, daysArray) => (
-            <div key={dayKey} className="relative">
-              {/* Connection from previous day */}
-              {dayIndex > 0 && (() => {
-                const prevDayData = daysArray[dayIndex - 1][1];
-                const prevDayPlaces = getGroupedPlacesForDay(prevDayData);
-                const currentDayPlaces = getGroupedPlacesForDay(dayData);
-                
-                if (prevDayPlaces.length > 0 && currentDayPlaces.length > 0) {
-                  const lastPlaceOfPrevDay = prevDayPlaces[prevDayPlaces.length - 1].place;
-                  const firstPlaceOfCurrentDay = currentDayPlaces[0].place;
-                  const transport = firstPlaceOfCurrentDay.transport_mode || 'walking';
-                  const duration = firstPlaceOfCurrentDay.travel_time_from_previous || 0;
-                  const transportInfo = getTransportIcon(transport);
-                  
-                  return duration > 0 ? (
-                    <div className="relative h-12 mb-2">
-                      {/* Vertical connection line */}
-                      <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 h-full" style={{ backgroundColor: transportInfo.color }}></div>
-                      
-                      {/* Transport info */}
-                      <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700 flex items-center space-x-2 text-xs shadow-sm">
-                        <div style={{ color: transportInfo.color }}>
-                          {transportInfo.icon}
-                        </div>
-                        <span className="text-gray-600 dark:text-gray-400">
-                          {formatDuration(duration)}
-                        </span>
-                      </div>
-                    </div>
-                  ) : null;
+        {/* Unified Calendar View */}
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+          {/* Combined Header */}
+          <div className="bg-blue-50 px-4 py-3 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-blue-900">
+              Trip Schedule - {currentTrip?.name || 'Unnamed Trip'}
+            </h3>
+            <p className="text-sm text-blue-700 mt-1">
+              {Object.keys(formattedResult.schedulesByDay).length} day{Object.keys(formattedResult.schedulesByDay).length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          
+          {/* Unified Time Grid */}
+          <div className="relative">
+            {/* Time axis (left side) */}
+            <div className="absolute left-0 top-0 bottom-0 w-16 bg-gray-50 border-r border-gray-200">
+              {(() => {
+                const timeSlots = [];
+                // Day hours (6 AM to 11 PM) - 1 hour intervals
+                for (let hour = 6; hour <= 23; hour++) {
+                  timeSlots.push({
+                    time: `${hour.toString().padStart(2, '0')}:00`,
+                    isNight: false,
+                    height: 60 // 60px per hour
+                  });
                 }
-                return null;
+                // Night hours (12 AM to 5 AM) - 3 hour intervals
+                for (let hour = 0; hour < 6; hour += 3) {
+                  timeSlots.push({
+                    time: `${hour.toString().padStart(2, '0')}:00`,
+                    isNight: true,
+                    height: 40 // 40px per 3-hour block
+                  });
+                }
+                
+                return timeSlots.map((slot, index) => (
+                  <div
+                    key={slot.time}
+                    className="flex items-center justify-center text-xs text-gray-500 border-b border-gray-200"
+                    style={{ height: `${slot.height}px` }}
+                  >
+                    {slot.time}
+                  </div>
+                ));
               })()}
-              
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm mb-8">
-              {/* Day Header */}
-              <div className="bg-blue-50 px-3 py-1.5 sm:py-2 border-b border-gray-200">
-                <h3 className="text-xs sm:text-sm font-semibold text-blue-900">
-                  Day {dayData.day} - {formatDate(dayData.actualDate || calculateActualDate(dayData.day))}
-                </h3>
-              </div>
-              
-              {/* Grouped place blocks for this day */}
-              <div className="p-2 sm:p-4">
-                <div className="space-y-2 sm:space-y-3">
-                  {getGroupedPlacesForDay(dayData).map((block, blockIndex) => (
-                    <div key={blockIndex} className="relative">
-                      {/* Time indicator on the left */}
-                      <div className="flex items-start space-x-3 sm:space-x-4">
-                        <div className="w-16 sm:w-20 text-xs text-gray-600 pt-1 flex-shrink-0">
-                          <div className="font-semibold">{formatTime(block.startTime)}</div>
-                          <div className="text-gray-500">to</div>
-                          <div className="font-semibold">{formatTime(block.endTime)}</div>
-                        </div>
+            </div>
+            
+            {/* Days content area */}
+            <div className="ml-16 flex">
+              {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData], dayIndex) => (
+                <div key={dayKey} className="flex-1 min-w-0 border-r border-gray-200 last:border-r-0">
+                  {/* Day header */}
+                  <div className="bg-blue-100 px-3 py-2 border-b border-gray-200 text-center">
+                    <h4 className="text-sm font-semibold text-blue-900">
+                      Day {dayData.day}
+                    </h4>
+                    <p className="text-xs text-blue-700">
+                      {formatDate(dayData.actualDate || calculateActualDate(dayData.day))}
+                    </p>
+                  </div>
+                  
+                  {/* Time slots content */}
+                  <div className="relative">
+                    {/* Background time grid */}
+                    <div className="absolute inset-0">
+                      {(() => {
+                        const timeSlots = [];
+                        let currentHeight = 0;
+                        // Day hours (6 AM to 11 PM) - 1 hour intervals
+                        for (let hour = 6; hour <= 23; hour++) {
+                          timeSlots.push({
+                            time: `${hour.toString().padStart(2, '0')}:00`,
+                            isNight: false,
+                            height: 60,
+                            top: currentHeight
+                          });
+                          currentHeight += 60;
+                        }
+                        // Night hours (12 AM to 5 AM) - 3 hour intervals
+                        for (let hour = 0; hour < 6; hour += 3) {
+                          timeSlots.push({
+                            time: `${hour.toString().padStart(2, '0')}:00`,
+                            isNight: true,
+                            height: 40,
+                            top: currentHeight
+                          });
+                          currentHeight += 40;
+                        }
                         
-                        {/* Place block */}
-                        <div className="flex-1">
-                          <div 
-                            className="border-l-4 border border-gray-200 rounded-lg p-3 sm:p-4 cursor-pointer hover:shadow-md transition-shadow duration-200"
-                            style={getPlaceStyle(block.place)}
-                            onClick={() => {
-                              setSelectedPlace(block.place);
+                        return timeSlots.map((slot, index) => (
+                          <div
+                            key={slot.time}
+                            className="absolute w-full border-b border-gray-100"
+                            style={{ 
+                              height: `${slot.height}px`,
+                              top: `${slot.top}px`,
+                              backgroundColor: slot.isNight ? '#f8fafc' : '#ffffff'
                             }}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <h4 className="text-sm sm:text-base font-semibold text-gray-900 leading-tight mb-2">
-                                  {block.place.place_name || block.place.name}
-                                </h4>
-                                
-                                <div className="flex items-center text-gray-600 text-xs sm:text-sm">
-                                  <Clock className="w-3 h-3 mr-2 flex-shrink-0" />
-                                  <span>
-                                    {formatDuration(block.duration)}
-                                  </span>
-                                </div>
-                              </div>
-                              
-                              <div className="ml-3 text-xs text-gray-500">
-                                Click for details
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Travel connection to next place */}
-                      {blockIndex < getGroupedPlacesForDay(dayData).length - 1 && (() => {
-                        const nextBlock = getGroupedPlacesForDay(dayData)[blockIndex + 1];
-                        const transport = nextBlock.place.transport_mode || 'walking';
-                        const duration = nextBlock.place.travel_time_from_previous || 0;
-                        const transportInfo = getTransportIcon(transport);
-                        
-                        return duration > 0 ? (
-                          <div className="relative h-8 -mb-1">
-                            {/* Vertical connection line */}
-                            <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 h-full" style={{ backgroundColor: transportInfo.color }}></div>
-                            
-                            {/* Transport info */}
-                            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 flex items-center space-x-1 text-xs">
-                              <div style={{ color: transportInfo.color }}>
-                                {transportInfo.icon}
-                              </div>
-                              <span className="text-gray-600 dark:text-gray-400">
-                                {formatDuration(duration)}
-                              </span>
-                            </div>
-                          </div>
-                        ) : null;
+                          />
+                        ));
                       })()}
                     </div>
-                  ))}
-                  
-                  {/* Show message if no places */}
-                  {getGroupedPlacesForDay(dayData).length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No scheduled places for this day</p>
+                    
+                    {/* Place blocks positioned on time grid */}
+                    <div className="relative z-10">
+                      {getGroupedPlacesForDay(dayData).map((block, blockIndex) => {
+                        const startHour = parseInt(block.startTime.split(':')[0]);
+                        const startMinute = parseInt(block.startTime.split(':')[1]);
+                        const endHour = parseInt(block.endTime.split(':')[0]);
+                        const endMinute = parseInt(block.endTime.split(':')[1]);
+                        
+                        // Calculate position and height
+                        const calculatePosition = (hour: number, minute: number) => {
+                          if (hour >= 6 && hour <= 23) {
+                            // Day hours: 6 AM to 11 PM
+                            return (hour - 6) * 60 + (minute / 60) * 60;
+                          } else {
+                            // Night hours: 12 AM to 5 AM
+                            const nightHours = 18 * 60; // 6 AM to 11 PM = 18 hours * 60px
+                            if (hour >= 0 && hour < 6) {
+                              return nightHours + Math.floor(hour / 3) * 40 + (minute / 180) * 40;
+                            }
+                            return 0;
+                          }
+                        };
+                        
+                        const topPosition = calculatePosition(startHour, startMinute);
+                        const endPosition = calculatePosition(endHour, endMinute);
+                        const height = Math.max(endPosition - topPosition, 40); // Minimum 40px height
+                        
+                        return (
+                          <div key={blockIndex} className="relative">
+                            {/* Add Place button (only in edit mode) */}
+                            {isEditMode && blockIndex > 0 && (
+                              <button
+                                className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-500 hover:bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-lg transition-all duration-200 z-20"
+                                style={{ top: `${topPosition - 10}px` }}
+                                onClick={() => {
+                                  const groupedPlaces = getGroupedPlacesForDay(dayData);
+                                  const prevBlock = groupedPlaces[blockIndex - 1];
+                                  const currentBlock = block;
+                                  
+                                  // Calculate suggested time between places
+                                  const prevEndTime = prevBlock ? prevBlock.endTime : '09:00';
+                                  const currentStartTime = currentBlock.startTime;
+                                  const suggestedTime = `${prevEndTime} - ${currentStartTime}`;
+                                  
+                                  setPlaceInsertionModal({
+                                    isOpen: true,
+                                    insertionContext: {
+                                      dayData: dayData,
+                                      afterPlaceIndex: blockIndex - 1,
+                                      beforePlaceIndex: blockIndex,
+                                      timeSlot: suggestedTime,
+                                      nearbyLocation: prevBlock ? {
+                                        lat: prevBlock.place.latitude || 35.6812,
+                                        lng: prevBlock.place.longitude || 139.7671,
+                                        name: prevBlock.place.place_name || prevBlock.place.name
+                                      } : undefined
+                                    }
+                                  });
+                                }}
+                                title="Add place here"
+                              >
+                                +
+                              </button>
+                            )}
+
+                            {/* Flight booking button for travel between places (only in edit mode and if transport is flight) */}
+                            {isEditMode && blockIndex > 0 && (() => {
+                              const prevBlock = getGroupedPlacesForDay(dayData)[blockIndex - 1];
+                              const currentBlock = block;
+                              const transportMode = currentBlock.place.transport_mode || 'walking';
+                              
+                              if (transportMode.toLowerCase().includes('flight') || transportMode.toLowerCase().includes('plane') || transportMode.toLowerCase().includes('air')) {
+                                return (
+                                  <button
+                                    className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg px-2 py-1 text-xs font-bold shadow-lg transition-all duration-200 z-20 flex items-center space-x-1"
+                                    style={{ top: `${topPosition - 25}px` }}
+                                    onClick={() => {
+                                      setFlightModal({
+                                        isOpen: true,
+                                        routeData: {
+                                          from: prevBlock?.place?.place_name || prevBlock?.place?.name || 'Previous Location',
+                                          to: currentBlock.place.place_name || currentBlock.place.name || 'Current Location',
+                                          fromLat: prevBlock?.place?.latitude,
+                                          fromLng: prevBlock?.place?.longitude,
+                                          toLat: currentBlock.place.latitude,
+                                          toLng: currentBlock.place.longitude
+                                        },
+                                        dayData: dayData,
+                                        timeSlot: `${formatTime(currentBlock.startTime)} departure`
+                                      });
+                                    }}
+                                    title="Book flight"
+                                  >
+                                    <span>✈️</span>
+                                    <span>Flight</span>
+                                  </button>
+                                );
+                              }
+                              return null;
+                            })()}
+                            
+                            <div
+                              className={`absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 ${
+                                isEditMode ? 'ring-2 ring-blue-300 ring-opacity-50 cursor-move' : 'cursor-pointer'
+                              } ${
+                                dragOverIndex === blockIndex ? 'ring-4 ring-blue-500 ring-opacity-50' : ''
+                              }`}
+                              style={{
+                                top: `${topPosition}px`,
+                                height: `${height}px`,
+                                ...getPlaceStyle(block.place)
+                              }}
+                              onClick={() => setSelectedPlace(block.place)}
+                              draggable={isEditMode}
+                              onDragStart={(e) => handleDragStart(e, block.place, blockIndex)}
+                              onDragOver={(e) => handleDragOver(e, blockIndex)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, blockIndex, dayData)}
+                            >
+                              <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
+                                {block.place.place_name || block.place.name}
+                              </div>
+                              <div className="text-xs text-gray-600 flex items-center">
+                                <Clock className="w-3 h-3 mr-1" />
+                                <span>{formatTime(block.startTime)} - {formatTime(block.endTime)}</span>
+                              </div>
+                              
+                              {/* Resize handles */}
+                              {isEditMode && (
+                                <>
+                                  {/* Top resize handle */}
+                                  <div
+                                    className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-8 h-2 bg-blue-500 rounded-full cursor-ns-resize hover:bg-blue-600 transition-colors opacity-0 hover:opacity-100 flex items-center justify-center"
+                                    onMouseDown={(e) => handleResizeStart(e, `${block.place.id || block.place.place_name}-top`, block.duration)}
+                                    title="Drag to extend/shorten duration"
+                                  >
+                                    <ArrowUpDown className="w-3 h-3 text-white" />
+                                  </div>
+                                  
+                                  {/* Bottom resize handle */}
+                                  <div
+                                    className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-2 bg-blue-500 rounded-full cursor-ns-resize hover:bg-blue-600 transition-colors opacity-0 hover:opacity-100 flex items-center justify-center"
+                                    onMouseDown={(e) => handleResizeStart(e, `${block.place.id || block.place.place_name}-bottom`, block.duration)}
+                                    title="Drag to extend/shorten duration"
+                                  >
+                                    <ArrowUpDown className="w-3 h-3 text-white" />
+                                  </div>
+                                  
+                                  {/* Drag handle for reordering */}
+                                  <div
+                                    className="absolute top-1 right-1 w-6 h-6 bg-blue-500 rounded-full cursor-move hover:bg-blue-600 transition-colors opacity-0 hover:opacity-100 flex items-center justify-center"
+                                    title="Drag to reorder places"
+                                  >
+                                    <Move className="w-3 h-3 text-white" />
+                                  </div>
+                                </>
+                              )}
+                              
+                              {/* Edit mode controls */}
+                              {isEditMode && (
+                                <div className="absolute inset-0 bg-black bg-opacity-10 rounded-lg flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
+                                  <div className="flex space-x-1">
+                                    <button
+                                      className="bg-white rounded-full p-1 shadow-md hover:shadow-lg transition-shadow"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Open place insertion modal for inserting after this place
+                                        const nextBlockIndex = blockIndex + 1;
+                                        const nextBlock = getGroupedPlacesForDay(dayData)[nextBlockIndex];
+                                        
+                                        setPlaceInsertionModal({
+                                          isOpen: true,
+                                          insertionContext: {
+                                            dayData: dayData,
+                                            afterPlaceIndex: blockIndex,
+                                            beforePlaceIndex: nextBlockIndex,
+                                            timeSlot: `${formatTime(block.endTime)} - ${nextBlock ? formatTime(nextBlock.startTime) : '23:59'}`,
+                                            nearbyLocation: {
+                                              lat: block.place.latitude || 35.6812,
+                                              lng: block.place.longitude || 139.7671,
+                                              name: block.place.place_name || block.place.name
+                                            }
+                                          }
+                                        });
+                                      }}
+                                      title="Add place after this"
+                                    >
+                                      <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      className="bg-white rounded-full p-1 shadow-md hover:shadow-lg transition-shadow"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Show duration extension options
+                                        const newDuration = prompt(`Current duration: ${formatDuration(block.duration)}\nEnter new duration in minutes:`, block.duration.toString());
+                                        if (newDuration && !isNaN(parseInt(newDuration))) {
+                                          // Use optimized duration change for manual input
+                                          const newDur = parseInt(newDuration);
+                                          try {
+                                            const { supabase } = await import('../lib/supabase');
+                                            
+                                            const { data, error } = await supabase.functions.invoke('duration-change', {
+                                              body: {
+                                                trip_id: currentTrip?.id,
+                                                place_id: block.place.id || block.place.place_name,
+                                                new_duration: newDur,
+                                                old_duration: block.duration,
+                                                day_data: dayData,
+                                                user_id: useStore.getState().user?.id
+                                              }
+                                            });
+                                            
+                                            if (error) {
+                                              console.error('Duration change failed:', error);
+                                              return;
+                                            }
+                                            
+                                            // Update UI with response
+                                            if (data?.updated_day_schedule) {
+                                              const { broadcastScheduleUpdate } = useStore.getState();
+                                              broadcastScheduleUpdate({
+                                                action: 'duration_change_manual',
+                                                data: {
+                                                  placeId: block.place.id || block.place.place_name,
+                                                  newDuration: newDur,
+                                                  daySchedule: data.updated_day_schedule
+                                                }
+                                              });
+                                            }
+                                            
+                                            if (data?.requires_manual_adjustment) {
+                                              alert(data.adjustment_message);
+                                            }
+                                          } catch (error) {
+                                            console.error('Failed to call duration-change function:', error);
+                                            // Fallback
+                                            await resizePlaceDuration(
+                                              block.place.id || block.place.place_name,
+                                              newDur,
+                                              block.duration
+                                            );
+                                          }
+                                        }
+                                      }}
+                                      title="Change duration"
+                                    >
+                                      <Clock className="w-3 h-3 text-gray-600" />
+                                    </button>
+                                    {/* Add flight booking button for any place */}
+                                    {blockIndex > 0 && (
+                                      <button
+                                        className="bg-cyan-500 text-white rounded-full p-1 shadow-md hover:shadow-lg transition-shadow"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const prevBlock = getGroupedPlacesForDay(dayData)[blockIndex - 1];
+                                          setFlightModal({
+                                            isOpen: true,
+                                            routeData: {
+                                              from: prevBlock?.place?.place_name || prevBlock?.place?.name || 'Previous Location',
+                                              to: block.place.place_name || block.place.name || 'Current Location',
+                                              fromLat: prevBlock?.place?.latitude,
+                                              fromLng: prevBlock?.place?.longitude,
+                                              toLat: block.place.latitude,
+                                              toLng: block.place.longitude
+                                            },
+                                            dayData: dayData,
+                                            timeSlot: `${formatTime(block.startTime)} departure`
+                                          });
+                                        }}
+                                        title="Book flight to here"
+                                      >
+                                        <span className="text-xs">✈️</span>
+                                      </button>
+                                    )}
+                                    
+                                    {/* Delete place button */}
+                                    <button
+                                      className="bg-red-500 text-white rounded-full p-1 shadow-md hover:shadow-lg transition-shadow"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (confirm(`Are you sure you want to remove ${block.place.place_name || block.place.name} from your schedule?`)) {
+                                          await deleteScheduledPlace(
+                                            block.place.id || block.place.place_name,
+                                            dayData,
+                                            blockIndex
+                                          );
+                                        }
+                                      }}
+                                      title="Remove from schedule"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Edit mode: Meal insertion buttons */}
+                      {isEditMode && (
+                        <>
+                          {/* Breakfast time (7-9 AM) */}
+                          <button
+                            className="absolute left-2 bg-orange-100 hover:bg-orange-200 text-orange-700 text-xs px-2 py-1 rounded-md shadow-sm transition-all duration-200 border border-orange-300"
+                            style={{ top: `${(7 - 6) * 60 + 15}px` }}
+                            onClick={() => {
+                              setMealModal({
+                                isOpen: true,
+                                mealType: 'breakfast',
+                                dayData: dayData,
+                                timeSlot: '07:00 - 09:00',
+                                nearbyLocation: dayData.places.length > 0 ? {
+                                  lat: dayData.places[0].latitude || 35.6812,
+                                  lng: dayData.places[0].longitude || 139.7671,
+                                  name: dayData.places[0].place_name || dayData.places[0].name
+                                } : undefined
+                              });
+                            }}
+                          >
+                            + breakfast
+                          </button>
+                          
+                          {/* Lunch time (12-2 PM) */}
+                          <button
+                            className="absolute left-2 bg-green-100 hover:bg-green-200 text-green-700 text-xs px-2 py-1 rounded-md shadow-sm transition-all duration-200 border border-green-300"
+                            style={{ top: `${(12 - 6) * 60 + 15}px` }}
+                            onClick={() => {
+                              setMealModal({
+                                isOpen: true,
+                                mealType: 'lunch',
+                                dayData: dayData,
+                                timeSlot: '12:00 - 14:00',
+                                nearbyLocation: dayData.places.length > 0 ? {
+                                  lat: dayData.places[0].latitude || 35.6812,
+                                  lng: dayData.places[0].longitude || 139.7671,
+                                  name: dayData.places[0].place_name || dayData.places[0].name
+                                } : undefined
+                              });
+                            }}
+                          >
+                            + lunch
+                          </button>
+                          
+                          {/* Dinner time (6-8 PM) */}
+                          <button
+                            className="absolute left-2 bg-red-100 hover:bg-red-200 text-red-700 text-xs px-2 py-1 rounded-md shadow-sm transition-all duration-200 border border-red-300"
+                            style={{ top: `${(18 - 6) * 60 + 15}px` }}
+                            onClick={() => {
+                              setMealModal({
+                                isOpen: true,
+                                mealType: 'dinner',
+                                dayData: dayData,
+                                timeSlot: '18:00 - 20:00',
+                                nearbyLocation: dayData.places.length > 0 ? {
+                                  lat: dayData.places[0].latitude || 35.6812,
+                                  lng: dayData.places[0].longitude || 139.7671,
+                                  name: dayData.places[0].place_name || dayData.places[0].name
+                                } : undefined
+                              });
+                            }}
+                          >
+                            + dinner
+                          </button>
+                          
+                          {/* Hotel booking button (night time) */}
+                          <button
+                            className="absolute left-2 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs px-2 py-1 rounded-md shadow-sm transition-all duration-200 border border-purple-300"
+                            style={{ top: `${(22 - 6) * 60 + 15}px` }}
+                            onClick={() => {
+                              setHotelModal({
+                                isOpen: true,
+                                dayData: dayData,
+                                timeSlot: '22:00 - 08:00',
+                                nearbyLocation: dayData.places.length > 0 ? {
+                                  lat: dayData.places[0].latitude || 35.6812,
+                                  lng: dayData.places[0].longitude || 139.7671,
+                                  name: dayData.places[0].place_name || dayData.places[0].name
+                                } : undefined
+                              });
+                            }}
+                          >
+                            + hotel
+                          </button>
+                        </>
+                      )}
                     </div>
-                  )}
+                    
+                    {/* Ensure minimum height for the day column */}
+                    <div style={{ height: '1320px' }} /> {/* 18 hours * 60px + 2 night blocks * 40px */}
+                  </div>
                 </div>
-              </div>
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
       
@@ -623,6 +1297,41 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
         </div>,
         document.body
       )}
+      
+      {/* Meal Insertion Modal */}
+      <MealInsertionModal
+        isOpen={mealModal.isOpen}
+        onClose={() => setMealModal({ ...mealModal, isOpen: false })}
+        mealType={mealModal.mealType}
+        dayData={mealModal.dayData}
+        timeSlot={mealModal.timeSlot}
+        nearbyLocation={mealModal.nearbyLocation}
+      />
+      
+      {/* Hotel Booking Modal */}
+      <HotelBookingModal
+        isOpen={hotelModal.isOpen}
+        onClose={() => setHotelModal({ ...hotelModal, isOpen: false })}
+        dayData={hotelModal.dayData}
+        timeSlot={hotelModal.timeSlot}
+        nearbyLocation={hotelModal.nearbyLocation}
+      />
+      
+      {/* Flight Booking Modal */}
+      <FlightBookingModal
+        isOpen={flightModal.isOpen}
+        onClose={() => setFlightModal({ ...flightModal, isOpen: false })}
+        routeData={flightModal.routeData}
+        dayData={flightModal.dayData}
+        timeSlot={flightModal.timeSlot}
+      />
+      
+      {/* Place Insertion Modal */}
+      <PlaceInsertionModal
+        isOpen={placeInsertionModal.isOpen}
+        onClose={() => setPlaceInsertionModal({ ...placeInsertionModal, isOpen: false })}
+        insertionContext={placeInsertionModal.insertionContext}
+      />
     </div>
   );
 };

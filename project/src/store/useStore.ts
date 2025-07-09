@@ -121,6 +121,10 @@ interface StoreState {
   hasUserOptimized: boolean;
   setHasUserOptimized: (value: boolean) => void;
   
+  // Edit mode control - when true, optimization is disabled
+  hasUserEditedSchedule: boolean;
+  setHasUserEditedSchedule: (value: boolean) => void;
+  
   // Success animation control
   showOptimizationSuccess: boolean;
   setShowOptimizationSuccess: (value: boolean) => void;
@@ -128,6 +132,22 @@ interface StoreState {
   // Selected day for ListView/MapView synchronization
   selectedDay: string | null;
   setSelectedDay: (day: string | null) => void;
+
+  // Real-time sync system for calendar edits
+  scheduleUpdateQueue: any[];
+  isProcessingScheduleUpdates: boolean;
+  lastScheduleUpdateId: string | null;
+  
+  // Real-time schedule update functions
+  updateScheduleInRealTime: (updateData: any) => Promise<void>;
+  broadcastScheduleUpdate: (updateData: any) => void;
+  syncOptimizationResults: () => Promise<void>;
+  
+  // Calendar edit functions
+  movePlace: (placeId: string, sourceIndex: number, targetIndex: number, dayData: any) => Promise<void>;
+  resizePlaceDuration: (placeId: string, newDuration: number, oldDuration: number) => Promise<void>;
+  insertPlace: (placeData: any, insertionContext: any) => Promise<void>;
+  deleteScheduledPlace: (placeId: string, dayData: any, blockIndex: number) => Promise<void>;
 
   // API Integration
   createTripWithAPI: (tripData: TripCreateData) => Promise<Trip>;
@@ -738,6 +758,12 @@ export const useStore = create<StoreState>()((set, get) => ({
         set({ hasUserOptimized: value });
       },
       
+      // Edit mode control - when true, optimization is disabled
+      hasUserEditedSchedule: false,
+      setHasUserEditedSchedule: (value) => {
+        set({ hasUserEditedSchedule: value });
+      },
+      
       // Success animation control - only triggers once per optimization
       showOptimizationSuccess: false,
       setShowOptimizationSuccess: (value) => {
@@ -748,6 +774,192 @@ export const useStore = create<StoreState>()((set, get) => ({
       selectedDay: null,
       setSelectedDay: (day) => {
         set({ selectedDay: day });
+      },
+      
+      // Real-time sync system
+      scheduleUpdateQueue: [],
+      isProcessingScheduleUpdates: false,
+      lastScheduleUpdateId: null,
+      
+      // Real-time schedule update functions
+      updateScheduleInRealTime: async (updateData: any) => {
+        const { currentTrip, isProcessingScheduleUpdates } = get();
+        if (!currentTrip || isProcessingScheduleUpdates) return;
+        
+        try {
+          set({ isProcessingScheduleUpdates: true });
+          
+          // Add to update queue
+          const updateId = crypto.randomUUID();
+          const queuedUpdate = { ...updateData, id: updateId, timestamp: Date.now() };
+          
+          set(state => ({
+            scheduleUpdateQueue: [...state.scheduleUpdateQueue, queuedUpdate],
+            lastScheduleUpdateId: updateId
+          }));
+          
+          // Broadcast to other views immediately (optimistic UI)
+          get().broadcastScheduleUpdate(queuedUpdate);
+          
+          // Process through edge function in background
+          await get().processScheduleUpdateQueue();
+          
+        } catch (error) {
+          console.error('Failed to update schedule in real-time:', error);
+        } finally {
+          set({ isProcessingScheduleUpdates: false });
+        }
+      },
+      
+      broadcastScheduleUpdate: (updateData: any) => {
+        // Emit custom event for real-time sync between views
+        window.dispatchEvent(new CustomEvent('voypath-schedule-update', {
+          detail: updateData
+        }));
+        
+        // Update optimization result immediately for UI responsiveness
+        const { optimizationResult } = get();
+        if (optimizationResult?.optimization?.daily_schedules) {
+          const updatedSchedules = get().applyUpdateToSchedules(optimizationResult.optimization.daily_schedules, updateData);
+          set({
+            optimizationResult: {
+              ...optimizationResult,
+              optimization: {
+                ...optimizationResult.optimization,
+                daily_schedules: updatedSchedules
+              }
+            }
+          });
+        }
+      },
+      
+      applyUpdateToSchedules: (schedules: any[], updateData: any) => {
+        // Apply the update to the current schedules for immediate UI feedback
+        return schedules.map(schedule => {
+          if (updateData.action === 'reorder' && schedule.day === updateData.data?.dayData?.day) {
+            const places = [...schedule.scheduled_places];
+            const [movedPlace] = places.splice(updateData.data.sourceIndex, 1);
+            places.splice(updateData.data.targetIndex, 0, movedPlace);
+            return { ...schedule, scheduled_places: places };
+          }
+          
+          if (updateData.action === 'resize' && schedule.scheduled_places) {
+            return {
+              ...schedule,
+              scheduled_places: schedule.scheduled_places.map((place: any) => {
+                if ((place.id || place.place_name) === updateData.data.placeId) {
+                  return {
+                    ...place,
+                    stay_duration_minutes: updateData.data.newDuration
+                  };
+                }
+                return place;
+              })
+            };
+          }
+          
+          return schedule;
+        });
+      },
+      
+      processScheduleUpdateQueue: async () => {
+        const { scheduleUpdateQueue, currentTrip } = get();
+        if (scheduleUpdateQueue.length === 0 || !currentTrip) return;
+        
+        try {
+          // Process updates in batches
+          const updates = [...scheduleUpdateQueue];
+          set({ scheduleUpdateQueue: [] });
+          
+          // Call edge function to process updates
+          const { supabase } = await import('../lib/supabase');
+          
+          for (const update of updates) {
+            try {
+              const { data, error } = await supabase.functions.invoke('edit-schedule', {
+                body: {
+                  trip_id: currentTrip.id,
+                  action: update.action,
+                  data: update.data,
+                  update_id: update.id,
+                  user_id: useStore.getState().user?.id
+                }
+              });
+              
+              if (error) {
+                console.error('Schedule update failed:', error);
+                continue;
+              }
+              
+              // Update optimization result with server response
+              if (data?.updated_schedule) {
+                set({ optimizationResult: data.updated_schedule });
+              }
+              
+            } catch (error) {
+              console.error('Failed to process schedule update:', error);
+            }
+          }
+          
+        } catch (error) {
+          console.error('Failed to process schedule update queue:', error);
+        }
+      },
+      
+      syncOptimizationResults: async () => {
+        const { currentTrip } = get();
+        if (!currentTrip) return;
+        
+        try {
+          await get().loadOptimizationResult(currentTrip.id);
+        } catch (error) {
+          console.error('Failed to sync optimization results:', error);
+        }
+      },
+      
+      // Calendar edit functions
+      movePlace: async (placeId: string, sourceIndex: number, targetIndex: number, dayData: any) => {
+        await get().updateScheduleInRealTime({
+          action: 'reorder',
+          data: {
+            placeId,
+            sourceIndex,
+            targetIndex,
+            dayData
+          }
+        });
+      },
+      
+      resizePlaceDuration: async (placeId: string, newDuration: number, oldDuration: number) => {
+        await get().updateScheduleInRealTime({
+          action: 'resize',
+          data: {
+            placeId,
+            newDuration,
+            oldDuration
+          }
+        });
+      },
+      
+      insertPlace: async (placeData: any, insertionContext: any) => {
+        await get().updateScheduleInRealTime({
+          action: 'insert',
+          data: {
+            placeData,
+            insertionContext
+          }
+        });
+      },
+      
+      deleteScheduledPlace: async (placeId: string, dayData: any, blockIndex: number) => {
+        await get().updateScheduleInRealTime({
+          action: 'delete',
+          data: {
+            placeId,
+            dayData,
+            blockIndex
+          }
+        });
       },
 
       // Premium functions
@@ -1420,6 +1632,26 @@ export const useStore = create<StoreState>()((set, get) => ({
         }
       },
 
+      // Real-time event listener setup
+      setupRealTimeSync: () => {
+        // Listen for schedule updates from other views
+        const handleScheduleUpdate = (event: CustomEvent) => {
+          const updateData = event.detail;
+          console.log('Received schedule update:', updateData);
+          
+          // Trigger re-render in listening components
+          window.dispatchEvent(new CustomEvent('voypath-data-changed', {
+            detail: { type: 'schedule', data: updateData }
+          }));
+        };
+        
+        window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+        
+        return () => {
+          window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+        };
+      },
+      
       // Handle pending trip join after authentication
       handlePendingTripJoin: async (): Promise<void> => {
         try {
