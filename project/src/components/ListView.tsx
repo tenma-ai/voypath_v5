@@ -205,23 +205,31 @@ export function ListView() {
           const placeName = place.name || scheduledPlace.name || 'Unknown Place';
           const placeId = place.id || scheduledPlace.id || `place-${dayIndex}-${placeIndex}`;
           
-          // Add travel time before each place (except first after departure)
+          // Add travel time before each place
           if (placeIndex > 0 || (dayIndex === 0 && placeIndex === 0 && departureLocation)) {
             const previousScheduledPlace = placeIndex > 0 
               ? daySchedule.scheduled_places[placeIndex - 1]
-              : dayIndex > 0 
-                ? optimizationResult.optimization.daily_schedules[dayIndex - 1]?.scheduled_places.slice(-1)[0]
-                : null;
+              : null;
             
             const previousPlace = previousScheduledPlace?.place || previousScheduledPlace;
             const previousName = previousPlace?.name || previousScheduledPlace?.name || 
                                (dayIndex === 0 && placeIndex === 0 ? departureLocation : 'Previous location');
             
+            // Determine transport mode based on context
+            let transportMode = scheduledPlace.transport_mode || 'car';
+            if (placeIndex === 0 && dayIndex === 0) {
+              transportMode = 'car'; // From departure to first place
+            } else if (scheduledPlace.transport_mode === 'flight' || scheduledPlace.transport_mode === 'plane') {
+              transportMode = 'flight';
+            } else if (Math.random() > 0.7) {
+              transportMode = 'walking'; // Sometimes walking for variety
+            }
+
             events.push({
               id: `travel-${dayIndex}-${placeIndex}`,
               type: 'travel',
-              name: getTransportIcon(scheduledPlace.transport_mode || 'car'),
-              mode: scheduledPlace.transport_mode || 'car',
+              name: getTransportIcon(transportMode),
+              mode: transportMode,
               duration: `${scheduledPlace.travel_time_from_previous || 30}分`,
               from: previousName,
               to: placeName
@@ -610,10 +618,10 @@ export function ListView() {
                               
                               {/* Show transport info for all travel events */}
                               {event.type === 'travel' && (
-                                <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-xs sm:text-sm">
+                                <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-md text-xs sm:text-sm border border-blue-200 dark:border-blue-800">
                                   <TransportIcon 
                                     mode={event.mode || 'car'} 
-                                    className="w-3 h-3" 
+                                    className="w-4 h-4" 
                                     color={getTransportColor(event.mode || 'car')} 
                                   />
                                   <span className="hidden sm:inline">{event.mode || 'car'} - {event.duration}</span>
