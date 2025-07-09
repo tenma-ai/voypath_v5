@@ -381,11 +381,32 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
                           className="relative flex items-center space-x-4 ml-8"
                         >
                           <div className="w-8 h-8 bg-slate-300 dark:bg-slate-600 rounded-lg flex items-center justify-center">
-                            <TransportIcon 
-                              mode={item.transportMode || 'car'} 
-                              size={16}
-                              className="opacity-70"
-                            />
+                            {/* Flight transport display */}
+                            {(item.transportMode === 'flight' || item.transportMode === 'plane') && (
+                              <TransportIcon 
+                                mode="flight" 
+                                size={16}
+                                className="opacity-70"
+                              />
+                            )}
+                            
+                            {/* Car transport display */}
+                            {(item.transportMode === 'car' || item.transportMode === 'driving') && (
+                              <TransportIcon 
+                                mode="car" 
+                                size={16}
+                                className="opacity-70"
+                              />
+                            )}
+                            
+                            {/* Walking transport display */}
+                            {(item.transportMode === 'walking' || item.transportMode === 'walk') && (
+                              <TransportIcon 
+                                mode="walking" 
+                                size={16}
+                                className="opacity-70"
+                              />
+                            )}
                           </div>
                           <div className="text-sm text-slate-500 dark:text-slate-400">
                             {formatDuration(item.travelTimeToNext!)} travel time

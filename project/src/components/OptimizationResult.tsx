@@ -497,17 +497,52 @@ export function OptimizationResult({ optimizationResult: result, onClose }: Opti
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 text-slate-500 dark:text-slate-400">
-                        <div className="flex items-center">
-                          <TransportIcon 
-                            mode={scheduledPlace?.transport_mode || 'car'} 
-                            size={14}
-                            className="opacity-70"
-                          />
-                        </div>
-                        {(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0) > 0 && (
-                          <span className="text-xs">
-                            {formatMinutes(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0)}
-                          </span>
+                        {/* Flight transport display */}
+                        {(scheduledPlace?.transport_mode === 'flight' || scheduledPlace?.transport_mode === 'plane') && (
+                          <div className="flex items-center space-x-1">
+                            <TransportIcon 
+                              mode="flight" 
+                              size={14}
+                              className="opacity-70"
+                            />
+                            {(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0) > 0 && (
+                              <span className="text-xs">
+                                {formatMinutes(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Car transport display */}
+                        {(scheduledPlace?.transport_mode === 'car' || scheduledPlace?.transport_mode === 'driving') && (
+                          <div className="flex items-center space-x-1">
+                            <TransportIcon 
+                              mode="car" 
+                              size={14}
+                              className="opacity-70"
+                            />
+                            {(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0) > 0 && (
+                              <span className="text-xs">
+                                {formatMinutes(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Walking transport display */}
+                        {(scheduledPlace?.transport_mode === 'walking' || scheduledPlace?.transport_mode === 'walk') && (
+                          <div className="flex items-center space-x-1">
+                            <TransportIcon 
+                              mode="walking" 
+                              size={14}
+                              className="opacity-70"
+                            />
+                            {(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0) > 0 && (
+                              <span className="text-xs">
+                                {formatMinutes(scheduledPlace?.travel_time_from_previous || scheduledPlace?.travel_time_minutes || 0)}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
