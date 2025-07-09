@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, MapPin, Clock, Plane, ExternalLink, Calendar, Users } from 'lucide-react';
+import { Dialog } from '@headlessui/react';
+import { motion } from 'framer-motion';
+import { X, Search, MapPin, Clock, Plane, ExternalLink, Calendar, Users, Route } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 interface FlightBookingModalProps {
@@ -191,26 +193,48 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     return icons[airline] || icons['Default'];
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100000] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200/50 dark:border-slate-700/50 p-0 max-w-3xl w-full max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="relative bg-gradient-to-r from-blue-500 to-cyan-500 p-6 pb-4">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-200"
-          >
-            <X className="w-4 h-4 text-white" />
-          </button>
-          <h2 className="text-2xl font-bold text-white pr-8">
-            Flight Booking
-          </h2>
-          <p className="text-white/80 text-sm mt-1">
-            {routeData.from} → {routeData.to} • {dayData?.date}
-          </p>
-        </div>
+    <Dialog open={isOpen} onClose={onClose} className="relative z-[9999]">
+      {/* Backdrop */}
+      <motion.div 
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm" 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      />
+      
+      {/* Modal Container */}
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel
+          as={motion.div}
+          className="w-full max-w-3xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 overflow-hidden max-h-[90vh]"
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-slate-200/50 dark:border-slate-700/50">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+                <Plane className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <Dialog.Title className="text-lg font-bold text-slate-900 dark:text-white">
+                  Flight Booking
+                </Dialog.Title>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  {routeData.from} → {routeData.to}
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={onClose}
+              className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+            >
+              <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            </button>
+          </div>
 
         {/* Option Tabs */}
         <div className="flex border-b border-gray-200 dark:border-gray-700">
@@ -494,8 +518,9 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
             </button>
           </div>
         </div>
+        </Dialog.Panel>
       </div>
-    </div>
+    </Dialog>
   );
 };
 

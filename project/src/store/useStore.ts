@@ -929,26 +929,113 @@ export const useStore = create<StoreState>()((set, get) => ({
       
       // Calendar edit functions
       movePlace: async (placeId: string, sourceIndex: number, targetIndex: number, dayData: any) => {
-        await get().updateScheduleInRealTime({
-          action: 'reorder',
-          data: {
-            placeId,
-            sourceIndex,
-            targetIndex,
-            dayData
-          }
-        });
+        // First, immediately update the UI for responsiveness
+        const { optimizationResult, setOptimizationResult } = get();
+        
+        if (optimizationResult && optimizationResult.optimization?.daily_schedules) {
+          const updatedSchedules = optimizationResult.optimization.daily_schedules.map((schedule: any) => {
+            if (schedule.day === dayData.day) {
+              const places = [...schedule.scheduled_places];
+              const [movedPlace] = places.splice(sourceIndex, 1);
+              places.splice(targetIndex, 0, movedPlace);
+              
+              // Update order_in_day for all places
+              const reorderedPlaces = places.map((place: any, index: number) => ({
+                ...place,
+                order_in_day: index + 1
+              }));
+              
+              return { ...schedule, scheduled_places: reorderedPlaces };
+            }
+            return schedule;
+          });
+          
+          // Update the optimization result immediately
+          setOptimizationResult({
+            ...optimizationResult,
+            optimization: {
+              ...optimizationResult.optimization,
+              daily_schedules: updatedSchedules
+            }
+          });
+        }
+        
+        // Then update via real-time sync system (background)
+        try {
+          await get().updateScheduleInRealTime({
+            action: 'reorder',
+            data: {
+              placeId,
+              sourceIndex,
+              targetIndex,
+              dayData
+            }
+          });
+        } catch (error) {
+          console.warn('Background reorder update failed:', error);
+          // UI already updated, so this is just a warning
+        }
       },
       
       resizePlaceDuration: async (placeId: string, newDuration: number, oldDuration: number) => {
-        await get().updateScheduleInRealTime({
-          action: 'resize',
-          data: {
-            placeId,
-            newDuration,
-            oldDuration
-          }
-        });
+        // First, immediately update the UI for responsiveness
+        const { optimizationResult, setOptimizationResult } = get();
+        
+        if (optimizationResult && optimizationResult.optimization?.daily_schedules) {
+          const updatedSchedules = optimizationResult.optimization.daily_schedules.map((daySchedule: any) => {
+            const updatedPlaces = daySchedule.scheduled_places.map((place: any) => {
+              if ((place.id || place.place_name) === placeId) {
+                const updatedPlace = { ...place, stay_duration_minutes: newDuration };
+                
+                // Recalculate departure time
+                if (place.arrival_time) {
+                  const [hours, minutes] = place.arrival_time.split(':').map(Number);
+                  const arrivalMinutes = hours * 60 + minutes;
+                  const departureMinutes = arrivalMinutes + newDuration;
+                  
+                  const formatTime = (totalMinutes: number): string => {
+                    const cappedMinutes = Math.min(totalMinutes, 23 * 60 + 59);
+                    const h = Math.floor(cappedMinutes / 60);
+                    const m = cappedMinutes % 60;
+                    const validH = Math.max(8, Math.min(23, h));
+                    return `${validH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:00`;
+                  };
+                  
+                  updatedPlace.departure_time = formatTime(departureMinutes);
+                }
+                
+                return updatedPlace;
+              }
+              return place;
+            });
+            
+            return { ...daySchedule, scheduled_places: updatedPlaces };
+          });
+          
+          // Update the optimization result immediately
+          setOptimizationResult({
+            ...optimizationResult,
+            optimization: {
+              ...optimizationResult.optimization,
+              daily_schedules: updatedSchedules
+            }
+          });
+        }
+        
+        // Then update via real-time sync system (background)
+        try {
+          await get().updateScheduleInRealTime({
+            action: 'resize',
+            data: {
+              placeId,
+              newDuration,
+              oldDuration
+            }
+          });
+        } catch (error) {
+          console.warn('Background duration update failed:', error);
+          // UI already updated, so this is just a warning
+        }
       },
       
       insertPlace: async (placeData: any, insertionContext: any) => {

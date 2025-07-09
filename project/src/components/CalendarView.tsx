@@ -290,13 +290,29 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     }
   };
 
+  // Check if place is a system place (not draggable)
+  const isSystemPlace = useCallback((place: any) => {
+    return place.source === 'system' || 
+           place.category === 'departure_point' || 
+           place.category === 'final_destination' ||
+           place.place_type === 'system_airport' ||
+           (place.id && place.id.toString().startsWith('airport_')) ||
+           (place.id && place.id.toString().startsWith('return_'));
+  }, []);
+
   // Drag and drop handlers
   const handleDragStart = useCallback((e: React.DragEvent, place: any, blockIndex: number) => {
+    // Prevent dragging system places
+    if (isSystemPlace(place)) {
+      e.preventDefault();
+      return;
+    }
+    
     setDraggedPlace({ place, blockIndex });
     e.dataTransfer.effectAllowed = 'move';
     // Set hasUserEditedSchedule immediately on drag start
     setHasUserEditedSchedule(true);
-  }, [setHasUserEditedSchedule]);
+  }, [setHasUserEditedSchedule, isSystemPlace]);
 
   const handleDragOver = useCallback((e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
@@ -788,7 +804,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                 ...getPlaceStyle(block.place)
                               }}
                               onClick={() => setSelectedPlace(block.place)}
-                              draggable={isEditMode}
+                              draggable={isEditMode && !isSystemPlace(block.place)}
                               onDragStart={(e) => handleDragStart(e, block.place, blockIndex)}
                               onDragOver={(e) => handleDragOver(e, blockIndex)}
                               onDragLeave={handleDragLeave}

@@ -6,7 +6,7 @@ import { useStore } from '../store/useStore';
 
 export function FloatingActionButtons() {
   const location = useLocation();
-  const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult, setHasUserOptimized, setShowOptimizationSuccess, hasUserOptimized, activeView } = useStore();
+  const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult, setHasUserOptimized, setShowOptimizationSuccess, hasUserOptimized, activeView, hasUserEditedSchedule } = useStore();
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
   const [shouldBlinkPlusButton, setShouldBlinkPlusButton] = useState(false);
   const [shouldBlinkOptimizeButton, setShouldBlinkOptimizeButton] = useState(false);
@@ -87,6 +87,16 @@ export function FloatingActionButtons() {
 
     setIsOptimizing(true);
     setOptimizationError(null);
+
+    // Check if user has edited the schedule - if so, show animation but don't actually optimize
+    if (hasUserEditedSchedule) {
+      // Simulate optimization animation without actually optimizing
+      setTimeout(() => {
+        setIsOptimizing(false);
+        setOptimizationError('Schedule has been manually edited. Optimization is disabled to preserve your changes.');
+      }, 3000);
+      return;
+    }
 
     try {
       // Log message
