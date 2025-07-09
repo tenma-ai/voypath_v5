@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Search, MapPin, Clock, Star } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { GooglePlacesService } from '../services/GooglePlacesService';
@@ -55,15 +55,58 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
     return parts[0] || locationName;
   };
 
+  // Define handleSearchRestaurants with useCallback to avoid hoisting issues
+  const handleSearchRestaurants = useCallback(async () => {
+    if (!nearbyLocation || !searchQuery.trim()) return;
+    
+    setIsLoading(true);
+    try {
+      const mealTypeKeyword = getMealTypeSearchQuery(mealType);
+      const fullSearchQuery = `${searchQuery} ${mealTypeKeyword}`;
+      
+      // Try Google Places API text search with location bias
+      const places = await GooglePlacesService.searchPlaces({
+        query: fullSearchQuery,
+        location: { lat: nearbyLocation.lat, lng: nearbyLocation.lng },
+        radius: 3000, // 3km radius for broader search
+        type: 'restaurant'
+      });
+
+      // Filter and convert to restaurant format with enhanced filtering
+      const restaurantData = places
+        .filter(place => {
+          const isRestaurant = place.types.includes('restaurant') || 
+                              place.types.includes('meal_takeaway') ||
+                              place.types.includes('food');
+          const hasGoodRating = !place.rating || place.rating >= 3.0;
+          return isRestaurant && hasGoodRating;
+        })
+        .map(place => convertToRestaurant(place))
+        .sort((a, b) => {
+          // Prioritize relevance to search query, then rating, then distance
+          const aRelevance = a.name.toLowerCase().includes(searchQuery.toLowerCase()) ? 1 : 0;
+          const bRelevance = b.name.toLowerCase().includes(searchQuery.toLowerCase()) ? 1 : 0;
+          if (bRelevance !== aRelevance) return bRelevance - aRelevance;
+          if (b.rating !== a.rating) return b.rating - a.rating;
+          return parseFloat(a.distance) - parseFloat(b.distance);
+        })
+        .slice(0, 15); // Show top 15 search results
+
+      setRestaurants(restaurantData);
+    } catch (error) {
+      console.error('Failed to search restaurants with Google Places API:', error);
+      // Don't set restaurants to empty array, just log error
+      setRestaurants([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [nearbyLocation, searchQuery, mealType]);
+
   // Set default search query when modal opens
   useEffect(() => {
     if (isOpen && nearbyLocation) {
       const defaultQuery = extractCityName(nearbyLocation?.name || '');
       setSearchQuery(defaultQuery);
-      // Auto-search with default query
-      if (defaultQuery) {
-        handleSearchRestaurants();
-      }
     }
   }, [isOpen, nearbyLocation, mealType]);
 
@@ -75,7 +118,7 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
       }, 500); // Debounce search
       return () => clearTimeout(timer);
     }
-  }, [searchQuery]);
+  }, [searchQuery, handleSearchRestaurants]);
 
 
   const getMealTypeSearchQuery = (mealType: 'breakfast' | 'lunch' | 'dinner'): string => {
@@ -152,51 +195,6 @@ const MealInsertionModal: React.FC<MealInsertionModalProps> = ({
     return `${distance.toFixed(1)}km`;
   };
 
-  const handleSearchRestaurants = async () => {
-    if (!nearbyLocation || !searchQuery.trim()) return;
-    
-    setIsLoading(true);
-    try {
-      const mealTypeKeyword = getMealTypeSearchQuery(mealType);
-      const fullSearchQuery = `${searchQuery} ${mealTypeKeyword}`;
-      
-      // Try Google Places API text search with location bias
-      const places = await GooglePlacesService.searchPlaces({
-        query: fullSearchQuery,
-        location: { lat: nearbyLocation.lat, lng: nearbyLocation.lng },
-        radius: 3000, // 3km radius for broader search
-        type: 'restaurant'
-      });
-
-      // Filter and convert to restaurant format with enhanced filtering
-      const restaurantData = places
-        .filter(place => {
-          const isRestaurant = place.types.includes('restaurant') || 
-                              place.types.includes('meal_takeaway') ||
-                              place.types.includes('food');
-          const hasGoodRating = !place.rating || place.rating >= 3.0;
-          return isRestaurant && hasGoodRating;
-        })
-        .map(place => convertToRestaurant(place))
-        .sort((a, b) => {
-          // Prioritize relevance to search query, then rating, then distance
-          const aRelevance = a.name.toLowerCase().includes(searchQuery.toLowerCase()) ? 1 : 0;
-          const bRelevance = b.name.toLowerCase().includes(searchQuery.toLowerCase()) ? 1 : 0;
-          if (bRelevance !== aRelevance) return bRelevance - aRelevance;
-          if (b.rating !== a.rating) return b.rating - a.rating;
-          return parseFloat(a.distance) - parseFloat(b.distance);
-        })
-        .slice(0, 15); // Show top 15 search results
-
-      setRestaurants(restaurantData);
-    } catch (error) {
-      console.error('Failed to search restaurants with Google Places API:', error);
-      // Don't set restaurants to empty array, just log error
-      setRestaurants([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleAddRestaurant = async (restaurant: Restaurant) => {
     if (!currentTrip) return;
