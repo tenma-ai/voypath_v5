@@ -160,40 +160,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       return;
     }
 
-    // Check if user has edited the schedule - if so, show animation but don't actually optimize
-    if (hasUserEditedSchedule) {
-      setIsOptimizing(true);
-      setShowProgress(true);
-      setError(null);
-      setProgress({ stage: 'collecting', progress: 0, message: 'Starting optimization...' });
-      
-      // Simulate optimization animation
-      setTimeout(() => {
-        setProgress({ stage: 'normalizing', progress: 25, message: 'Normalizing preferences...' });
-      }, 1000);
-      
-      setTimeout(() => {
-        setProgress({ stage: 'selecting', progress: 50, message: 'Selecting places...' });
-      }, 2000);
-      
-      setTimeout(() => {
-        setProgress({ stage: 'routing', progress: 75, message: 'Optimizing route...' });
-      }, 3000);
-      
-      setTimeout(() => {
-        setProgress({ stage: 'complete', progress: 100, message: 'Optimization complete! ✨' });
-        setShowSuccess(true);
-        
-        setTimeout(() => {
-          setIsOptimizing(false);
-          setShowProgress(false);
-          setProgress(null);
-          setShowSuccess(false);
-        }, 2500);
-      }, 4000);
-      
-      return; // Don't actually optimize
-    }
+    // Always allow optimization - removed manual edit check
 
     // Remove the places requirement - allow optimization even without places
     // The backend will handle cases with no places appropriately

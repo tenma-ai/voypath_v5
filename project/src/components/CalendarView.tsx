@@ -1462,7 +1462,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
           <button
             onClick={() => {
               setIsEditMode(!isEditMode);
-              setHasUserEditedSchedule(true);
             }}
             className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
               isEditMode
