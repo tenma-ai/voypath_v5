@@ -868,7 +868,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                     </button>
                                     <button
                                       className="bg-white rounded-full p-1 shadow-md hover:shadow-lg transition-shadow"
-                                      onClick={(e) => {
+                                      onClick={async (e) => {
                                         e.stopPropagation();
                                         // Show duration extension options
                                         const newDuration = prompt(`Current duration: ${formatDuration(block.duration)}\nEnter new duration in minutes:`, block.duration.toString());
