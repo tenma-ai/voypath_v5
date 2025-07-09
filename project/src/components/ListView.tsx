@@ -205,6 +205,15 @@ export function ListView() {
           const placeName = place.name || scheduledPlace.name || 'Unknown Place';
           const placeId = place.id || scheduledPlace.id || `place-${dayIndex}-${placeIndex}`;
           
+          // Debug: log travel event conditions
+          console.log(`Day ${dayIndex}, Place ${placeIndex}: ${placeName}`, {
+            shouldAddTravel: placeIndex > 0 || (dayIndex === 0 && placeIndex === 0 && departureLocation),
+            placeIndex,
+            dayIndex,
+            departureLocation,
+            transportMode: scheduledPlace.transport_mode
+          });
+          
           // Add travel time before each place
           if (placeIndex > 0 || (dayIndex === 0 && placeIndex === 0 && departureLocation)) {
             const previousScheduledPlace = placeIndex > 0 
@@ -225,7 +234,7 @@ export function ListView() {
               transportMode = 'walking'; // Sometimes walking for variety
             }
 
-            events.push({
+            const travelEvent = {
               id: `travel-${dayIndex}-${placeIndex}`,
               type: 'travel',
               name: getTransportIcon(transportMode),
@@ -233,7 +242,10 @@ export function ListView() {
               duration: `${scheduledPlace.travel_time_from_previous || 30}分`,
               from: previousName,
               to: placeName
-            });
+            };
+            
+            console.log('Adding travel event:', travelEvent);
+            events.push(travelEvent);
           }
           
           events.push({
@@ -285,6 +297,8 @@ export function ListView() {
         const tripStartDate = currentTrip.startDate || currentTrip.start_date || new Date().toISOString();
         const date = new Date(tripStartDate);
         date.setDate(date.getDate() + dayIndex);
+        
+        console.log(`Day ${dayIndex + 1} final events:`, events);
         
         scheduleDays.push({
           date: date.toISOString().split('T')[0],
@@ -471,6 +485,8 @@ export function ListView() {
         <div className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft p-3 sm:p-6">
           <div className="space-y-1 sm:space-y-2">
               {selectedSchedule.events.map((event, index) => {
+                console.log(`Rendering event ${index}:`, { type: event.type, name: event.name, mode: event.mode });
+                
                 const isCollapsed = collapsedEvents.has(event.id);
                 const memberDisplay = event.type === 'place' && event.assignedTo?.length ? 
                   getMemberDisplay(tripPlaces.find(p => p.id === event.id) || {} as Place) : null;
