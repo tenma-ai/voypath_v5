@@ -30,7 +30,6 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   const { currentTrip, tripMembers, addPlace } = useStore();
   const [selectedTab, setSelectedTab] = useState<'search' | 'already'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
-    airline: '',
     flightNumber: '',
     departureTime: '',
     arrivalTime: '',
@@ -84,14 +83,13 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     return `https://tp.media/r?marker=649297&trs=434567&p=4114&u=${encodedUrl}&campaign_id=100`;
   };
 
-  // Generate mock flight data (from MapRouteModal)
+  // Generate mock flight data (simplified without airline names)
   const generateMockFlights = (origin: string, destination: string) => {
     const basePrice = Math.floor(Math.random() * 80) + 180;
     
     return [
       {
         flightNumber: 'FL123',
-        airline: 'Japan Airlines',
         departure: '13:45',
         arrival: '16:20',
         duration: '2h 35m',
@@ -100,7 +98,6 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
       },
       {
         flightNumber: 'FL456',
-        airline: 'ANA',
         departure: '14:30',
         arrival: '17:05',
         duration: '2h 35m',
@@ -109,7 +106,6 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
       },
       {
         flightNumber: 'FL789',
-        airline: 'Skymark',
         departure: '18:50',
         arrival: '21:25',
         duration: '2h 35m',
@@ -124,12 +120,12 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   };
 
   const handleAddAlreadyBooked = async () => {
-    if (!currentTrip || !alreadyBookedData.airline || !alreadyBookedData.flightNumber) return;
+    if (!currentTrip || !alreadyBookedData.flightNumber) return;
 
     try {
       await addPlace({
         id: crypto.randomUUID(),
-        name: `Flight ${alreadyBookedData.flightNumber} (${alreadyBookedData.airline})`,
+        name: `Flight ${alreadyBookedData.flightNumber}`,
         address: `${routeData.from} → ${routeData.to}`,
         latitude: routeData.fromLat || 35.6812,
         longitude: routeData.fromLng || 139.7671,
@@ -259,7 +255,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto max-h-[500px]">
+          <div className="flex-1 overflow-y-auto max-h-[60vh]">
             {selectedTab === 'search' ? (
               <div className="p-6">
                 {/* Mock Flights */}
@@ -270,16 +266,13 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                       <div key={index} className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center space-x-4 mb-2">
-                              <div className="text-2xl">✈️</div>
-                              <div>
-                                <h4 className="font-bold text-slate-900 dark:text-white">
-                                  {flight.airline} {flight.flightNumber}
-                                </h4>
-                                <p className="text-sm text-slate-600 dark:text-slate-400">
-                                  {flight.direct ? 'Direct' : '1 stop'} • {flight.duration}
-                                </p>
-                              </div>
+                            <div className="mb-2">
+                              <h4 className="font-bold text-slate-900 dark:text-white">
+                                {flight.flightNumber}
+                              </h4>
+                              <p className="text-sm text-slate-600 dark:text-slate-400">
+                                {flight.direct ? 'Direct' : '1 stop'} • {flight.duration}
+                              </p>
                             </div>
                             <div className="flex items-center space-x-4 text-sm">
                               <span className="font-medium">{flight.departure}</span>
@@ -338,31 +331,17 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                   Already Booked a Flight?
                 </h3>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Airline
-                      </label>
-                      <input
-                        type="text"
-                        value={alreadyBookedData.airline}
-                        onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, airline: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-                        placeholder="e.g., Japan Airlines"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Flight Number
-                      </label>
-                      <input
-                        type="text"
-                        value={alreadyBookedData.flightNumber}
-                        onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, flightNumber: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-                        placeholder="e.g., JL123"
-                      />
-                    </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Flight Number
+                    </label>
+                    <input
+                      type="text"
+                      value={alreadyBookedData.flightNumber}
+                      onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, flightNumber: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                      placeholder="e.g., FL123"
+                    />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -418,7 +397,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                   </div>
                   <button
                     onClick={handleAddAlreadyBooked}
-                    disabled={!alreadyBookedData.airline || !alreadyBookedData.flightNumber}
+                    disabled={!alreadyBookedData.flightNumber}
                     className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                   >
                     Add Flight to Trip
