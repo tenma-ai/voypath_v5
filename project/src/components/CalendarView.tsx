@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { Calendar, Clock, MapPin, List, Grid3X3, Edit3, Check, X, Move, ArrowUpDown, Plane, Car, Navigation } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -95,10 +95,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   const [resizeStartDuration, setResizeStartDuration] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const { currentTrip, memberColors, tripMembers, hasUserOptimized, setHasUserOptimized, hasUserEditedSchedule, setHasUserEditedSchedule, movePlace, resizePlaceDuration, deleteScheduledPlace, setupRealTimeSync } = useStore();
+  const { 
+    currentTrip, 
+    memberColors, 
+    tripMembers, 
+    hasUserOptimized, 
+    setHasUserOptimized, 
+    hasUserEditedSchedule, 
+    setHasUserEditedSchedule, 
+    movePlace, 
+    resizePlaceDuration, 
+    deleteScheduledPlace, 
+    setupRealTimeSync 
+  } = useStore();
 
   // Get transport mode icon
-  const getTransportIcon = (transportMode: string) => {
+  const getTransportIcon = useCallback((transportMode: string) => {
     const mode = transportMode?.toLowerCase() || 'walking';
     if (mode.includes('flight') || mode.includes('plane') || mode.includes('air')) {
       return <Plane className="w-3 h-3 text-blue-500" />;
@@ -107,10 +119,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     } else {
       return <Navigation className="w-3 h-3 text-gray-500" />;
     }
-  };
+  }, []);
 
   // Format travel time
-  const formatTravelTime = (minutes: number) => {
+  const formatTravelTime = useCallback((minutes: number) => {
     if (minutes < 60) {
       return `${minutes}min`;
     } else {
@@ -118,10 +130,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       const mins = minutes % 60;
       return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
     }
-  };
+  }, []);
 
   // Generate gradient style for multiple contributors using centralized color logic
-  const getPlaceStyle = (place: any) => {
+  const getPlaceStyle = useCallback((place: any) => {
     // Log message
     
     // Use centralized color utility
@@ -155,10 +167,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       // Log message
       return { borderLeftColor: color, backgroundColor: `${color}10` };
     }
-  };
+  }, []);
 
   // Extract places from optimization result with consistent date formatting
-  const formatOptimizationResult = (result: any) => {
+  const formatOptimizationResult = useCallback((result: any) => {
     if (!hasUserOptimized || !result?.optimization?.daily_schedules || !currentTrip) {
       return { schedulesByDay: {} };
     }
@@ -179,36 +191,36 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     });
 
     return { schedulesByDay };
-  };
+  }, [hasUserOptimized, currentTrip]);
 
-  const formattedResult = formatOptimizationResult(optimizationResult);
+  const formattedResult = useMemo(() => formatOptimizationResult(optimizationResult), [formatOptimizationResult, optimizationResult]);
 
   // Calculate actual date based on trip start date and day number using DateUtils
-  const calculateActualDate = (dayNumber: number): Date => {
+  const calculateActualDate = useCallback((dayNumber: number): Date => {
     return DateUtils.calculateTripDate(currentTrip, dayNumber);
-  };
+  }, [currentTrip]);
 
-  const formatTime = (timeString: string) => {
+  const formatTime = useCallback((timeString: string) => {
     if (!timeString) return '';
     return new Date(`1970-01-01T${timeString}`).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     });
-  };
+  }, []);
 
   // Use consistent date formatting across calendar views
-  const formatDate = (date: Date) => {
+  const formatDate = useCallback((date: Date) => {
     return DateUtils.formatCalendarDate(date);
-  };
+  }, []);
 
-  const formatDuration = (minutes: number) => {
+  const formatDuration = useCallback((minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
-  };
+  }, []);
 
-  const generateTimeSlots = () => {
+  const generateTimeSlots = useCallback(() => {
     const slots = [];
     for (let hour = 6; hour <= 23; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
@@ -217,11 +229,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       }
     }
     return slots;
-  };
+  }, []);
 
-  const timeSlots = generateTimeSlots();
+  const timeSlots = useMemo(() => generateTimeSlots(), [generateTimeSlots]);
 
-  const getPlaceForTimeSlot = (time: string, targetDate: string) => {
+  const getPlaceForTimeSlot = useCallback((time: string, targetDate: string) => {
     // Find the schedule for the target date
     const daySchedule = Object.values(formattedResult.schedulesByDay).find((schedule: any) => 
       schedule.date === targetDate
@@ -233,10 +245,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       if (!place.arrival_time || !place.departure_time) return false;
       return time >= place.arrival_time && time < place.departure_time;
     });
-  };
+  }, [formattedResult.schedulesByDay]);
 
   // New function to group consecutive places into blocks
-  const getGroupedPlacesForDay = (dayData: any) => {
+  const getGroupedPlacesForDay = useCallback((dayData: any) => {
     if (!dayData.places || dayData.places.length === 0) return [];
 
     const groupedBlocks: Array<{
@@ -290,7 +302,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     }
 
     return groupedBlocks;
-  };
+  }, []);
 
 
   // Check if place is a system place (not draggable)
