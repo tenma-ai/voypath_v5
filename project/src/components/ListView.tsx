@@ -37,7 +37,7 @@ interface DaySchedule {
 }
 
 // Use centralized transport utilities from utils/transportIcons.tsx
-// Legacy function for backward compatibility
+// Legacy function for backward compatibility - ensure we use emoji for display
 const getTransportIcon = (mode?: string): string => {
   return getTransportEmoji(mode || 'car');
 };
@@ -108,7 +108,7 @@ export function ListView() {
   const handleTripComFlightBooking = useCallback((event: ScheduleEvent) => {
     if (event.type !== 'travel') return;
     
-    const selectedSchedule = scheduleData.find(s => s.date === selectedDay);
+    const selectedSchedule = schedule.find(s => s.date === selectedDay);
     if (!selectedSchedule) return;
     
     const dateStr = selectedSchedule.date.replace(/-/g, '');
@@ -117,12 +117,12 @@ export function ListView() {
     
     const url = generateTripComFlightUrl(fromCity, toCity, dateStr);
     window.open(url, '_blank');
-  }, [selectedDay, scheduleData, generateTripComFlightUrl]);
+  }, [selectedDay, schedule, generateTripComFlightUrl]);
 
   const handleTripComHotelBooking = useCallback((event: ScheduleEvent) => {
     if (event.type !== 'place') return;
     
-    const selectedSchedule = scheduleData.find(s => s.date === selectedDay);
+    const selectedSchedule = schedule.find(s => s.date === selectedDay);
     if (!selectedSchedule) return;
     
     const checkIn = selectedSchedule.date;
@@ -132,7 +132,7 @@ export function ListView() {
     const city = event.name || 'Tokyo';
     const url = generateTripComHotelUrl(city, checkIn, checkOut.toISOString().split('T')[0]);
     window.open(url, '_blank');
-  }, [selectedDay, scheduleData, generateTripComHotelUrl]);
+  }, [selectedDay, schedule, generateTripComHotelUrl]);
   
   // Colors and trip members are now loaded centrally via store
 
@@ -176,6 +176,10 @@ export function ListView() {
     console.log('currentTrip:', currentTrip);
     console.log('hasUserOptimized:', hasUserOptimized);
     console.log('optimizationResult:', optimizationResult);
+    console.log('optimizationResult exists:', !!optimizationResult);
+    console.log('optimization exists:', !!optimizationResult?.optimization);
+    console.log('daily_schedules exists:', !!optimizationResult?.optimization?.daily_schedules);
+    console.log('daily_schedules length:', optimizationResult?.optimization?.daily_schedules?.length);
     
     if (!currentTrip) {
       console.log('No current trip, returning empty schedule');
@@ -186,6 +190,19 @@ export function ListView() {
     if (hasUserOptimized && optimizationResult?.optimization?.daily_schedules?.length > 0) {
       console.log('Processing optimization results...');
       console.log('Daily schedules:', optimizationResult.optimization.daily_schedules);
+      console.log('Daily schedules length:', optimizationResult.optimization.daily_schedules.length);
+      
+      // Debug first day's scheduled places
+      if (optimizationResult.optimization.daily_schedules[0]?.scheduled_places) {
+        console.log('First day scheduled places:', optimizationResult.optimization.daily_schedules[0].scheduled_places);
+        optimizationResult.optimization.daily_schedules[0].scheduled_places.forEach((place, index) => {
+          console.log(`Place ${index}:`, {
+            name: place.name || place.place?.name,
+            transport_mode: place.transport_mode,
+            travel_time_from_previous: place.travel_time_from_previous
+          });
+        });
+      }
       
       const scheduleDays: DaySchedule[] = [];
       
@@ -215,47 +232,35 @@ export function ListView() {
           const placeName = place.name || scheduledPlace.name || 'Unknown Place';
           const placeId = place.id || scheduledPlace.id || `place-${dayIndex}-${placeIndex}`;
           
-          // Debug: log travel event conditions
-          console.log(`Day ${dayIndex}, Place ${placeIndex}: ${placeName}`, {
-            shouldAddTravel: placeIndex > 0 || (dayIndex === 0 && placeIndex === 0 && departureLocation),
-            placeIndex,
-            dayIndex,
-            departureLocation,
-            transportMode: scheduledPlace.transport_mode
-          });
+          console.log(`=== Processing place ${placeIndex} on day ${dayIndex} ===`);
+          console.log('scheduledPlace:', scheduledPlace);
+          console.log('place:', place);
+          console.log('placeName:', placeName);
+          console.log('transport_mode:', scheduledPlace.transport_mode);
+          console.log('travel_time_from_previous:', scheduledPlace.travel_time_from_previous);
           
-          // Add travel time before each place
-          if (placeIndex > 0 || (dayIndex === 0 && placeIndex === 0 && departureLocation)) {
-            const previousScheduledPlace = placeIndex > 0 
-              ? daySchedule.scheduled_places[placeIndex - 1]
-              : null;
-            
+          // Add travel time before each place (except first place on first day)
+          if (placeIndex > 0) {
+            const previousScheduledPlace = daySchedule.scheduled_places[placeIndex - 1];
             const previousPlace = previousScheduledPlace?.place || previousScheduledPlace;
-            const previousName = previousPlace?.name || previousScheduledPlace?.name || 
-                               (dayIndex === 0 && placeIndex === 0 ? departureLocation : 'Previous location');
+            const previousName = previousPlace?.name || previousScheduledPlace?.name || 'Previous location';
             
-            // Determine transport mode based on context
-            let transportMode = scheduledPlace.transport_mode || 'car';
-            if (placeIndex === 0 && dayIndex === 0) {
-              transportMode = 'car'; // From departure to first place
-            } else if (scheduledPlace.transport_mode === 'flight' || scheduledPlace.transport_mode === 'plane') {
-              transportMode = 'flight';
-            } else if (Math.random() > 0.7) {
-              transportMode = 'walking'; // Sometimes walking for variety
-            }
+            // Use transport mode directly from backend
+            const transportMode = scheduledPlace.transport_mode || 'car';
+            const travelTime = scheduledPlace.travel_time_from_previous || 30;
 
             const travelEvent = {
               id: `travel-${dayIndex}-${placeIndex}`,
               type: 'travel',
               name: getTransportIcon(transportMode),
               mode: transportMode,
-              duration: `${scheduledPlace.travel_time_from_previous || 30}分`,
+              duration: `${travelTime}分`,
               from: previousName,
               to: placeName
             };
             
-            console.log('Adding travel event:', travelEvent);
-            console.log('Raw transport_mode from backend:', scheduledPlace.transport_mode);
+            console.log('✅ Adding travel event:', travelEvent);
+            console.log('Transport mode:', transportMode, 'Icon:', getTransportIcon(transportMode));
             events.push(travelEvent);
           }
           
@@ -314,7 +319,7 @@ export function ListView() {
         scheduleDays.push({
           date: date.toISOString().split('T')[0],
           day: `Day ${dayIndex + 1}`,
-          dayName: DateUtils.formatCalendarDate(date),
+          dayName: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
           events
         });
       });
@@ -497,7 +502,15 @@ export function ListView() {
         <div className="bg-white dark:bg-dark-secondary rounded-xl shadow-soft p-3 sm:p-6">
           <div className="space-y-1 sm:space-y-2">
               {selectedSchedule.events.map((event, index) => {
-                console.log(`Rendering event ${index}:`, { type: event.type, name: event.name, mode: event.mode });
+                console.log(`Rendering event ${index}:`, { 
+                  type: event.type, 
+                  name: event.name, 
+                  mode: event.mode,
+                  id: event.id,
+                  from: event.from,
+                  to: event.to,
+                  duration: event.duration
+                });
                 
                 const isCollapsed = collapsedEvents.has(event.id);
                 const memberDisplay = event.type === 'place' && event.assignedTo?.length ? 
