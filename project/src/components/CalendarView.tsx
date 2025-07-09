@@ -866,7 +866,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                 
                                 return (
                                   <div 
-                                    className={`absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 ${
+                                    className={`absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-0 ${
                                       isFlight ? 'cursor-pointer' : 'cursor-default'
                                     }`}
                                     style={{ top: `${middlePosition}px` }}
@@ -936,7 +936,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                             })()}
                             
                             <div
-                              className={`absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 ${
+                              className={`absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 ${
                                 isEditMode ? 'ring-2 ring-blue-300 ring-opacity-50 cursor-move' : 'cursor-pointer'
                               } ${
                                 dragOverIndex === blockIndex ? 'ring-4 ring-blue-500 ring-opacity-50' : ''
