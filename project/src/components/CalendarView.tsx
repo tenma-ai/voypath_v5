@@ -110,6 +110,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   
   const { 
     currentTrip, 
+    user: currentUser,
     memberColors, 
     tripMembers, 
     hasUserOptimized, 
@@ -437,19 +438,43 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     // Async backend call
     try {
       const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      const { data: response } = await supabase.functions.invoke('edit-schedule', {
+      
+      // Prepare proper day data structure for edge function
+      const dayDataForBackend = {
+        day: dayData.day,
+        date: dayData.actualDate || dayData.date,
+        scheduled_places: groupedPlaces.map(block => ({
+          ...block.place,
+          order_in_day: block.blockIndex + 1,
+          arrival_time: block.startTime,
+          departure_time: block.endTime,
+          stay_duration_minutes: block.duration
+        }))
+      };
+      
+      const { data: response, error } = await supabase.functions.invoke('edit-schedule', {
         body: {
+          trip_id: currentTrip?.id,
           action: 'reorder',
           data: {
-            dayData,
+            dayData: dayDataForBackend,
             sourceIndex: draggedPlace.blockIndex,
             targetIndex
-          }
+          },
+          user_id: currentUser?.id
         }
       });
       
+      if (error) {
+        throw new Error(`Edge function error: ${error.message}`);
+      }
+      
       // Update local state with backend response
-      updateScheduleFromBackend(response.updated_schedule);
+      if (response && response.updated_schedule) {
+        updateScheduleFromBackend(response.updated_schedule);
+      } else {
+        console.warn('Backend reorder succeeded but no updated schedule returned');
+      }
     } catch (error) {
       console.error('Backend reorder failed:', error);
       alert('Failed to sync reordering with backend. Changes may not persist.');
