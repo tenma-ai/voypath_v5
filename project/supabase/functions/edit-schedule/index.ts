@@ -162,12 +162,6 @@ function createDailySchedule(places: any[], tripStartDate: string | null = null,
       }
     }
     
-    // Time constraint check for non-system places
-    if (!isSystemPlace && availableDays !== null && currentDay > availableDays) {
-      console.log(`⚠️ Reached trip duration limit (${availableDays} days). Skipping non-system place: ${place.name}`);
-      continue;
-    }
-    
     // Time setting
     if (place.travel_time_from_previous && !isFinalDestination) {
       timeCounter += place.travel_time_from_previous;
@@ -478,7 +472,7 @@ async function handleDeletePlace(data: any, supabase: any): Promise<any> {
   };
 }
 
-// Main handler
+// @ts-ignore: Deno is available in Edge Functions
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -506,7 +500,9 @@ Deno.serve(async (req) => {
     console.log(`📋 Processing ${action} for trip ${trip_id}`);
     
     // Initialize Supabase client
+    // @ts-ignore: Deno.env is available in Edge Functions
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    // @ts-ignore: Deno.env is available in Edge Functions
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!supabaseUrl || !supabaseKey) {

@@ -10,6 +10,11 @@ import MealInsertionModal from './MealInsertionModal';
 import PlaceInsertionModal from './PlaceInsertionModal';
 import HotelBookingModal from './HotelBookingModal';
 import FlightBookingModal from './FlightBookingModal';
+import { createClient } from '@supabase/supabase-js';
+
+// Define constants directly (replace with actual values or env)
+const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
 
 interface CalendarViewProps {
   optimizationResult?: any;
@@ -114,7 +119,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     movePlace, 
     resizePlaceDuration, 
     deleteScheduledPlace, 
-    setupRealTimeSync 
+    setupRealTimeSync,
+    updateScheduleFromBackend,
+    updateDayPlaces
   } = useStore();
 
   // Get transport mode icon using standardized component
@@ -407,36 +414,67 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
 
   const handleDrop = useCallback(async (e: React.DragEvent, targetIndex: number, dayData: any) => {
     e.preventDefault();
-    if (!draggedPlace) return;
-
-    const sourceIndex = draggedPlace.blockIndex;
-    if (sourceIndex === targetIndex) {
-      setDraggedPlace(null);
-      setDragOverIndex(-1);
+    setDragOverIndex(-1);
+    
+    if (!draggedPlace || targetIndex === draggedPlace.blockIndex) return;
+    
+    // Prevent dropping on system places
+    const groupedPlaces = getGroupedPlacesForDay(dayData);
+    const targetPlace = groupedPlaces[targetIndex];
+    if (isSystemPlace(targetPlace.place)) {
+      alert('Cannot reorder onto system places.');
       return;
     }
-
-    // Use real-time sync system for immediate UI feedback
-    await movePlace(
-      draggedPlace.place.id || draggedPlace.place.place_name,
-      sourceIndex,
-      targetIndex,
-      dayData
-    );
-
+    
+    // Frontend reordering (for immediate UI feedback)
+    const places = [...groupedPlaces];
+    const [movedBlock] = places.splice(draggedPlace.blockIndex, 1);
+    places.splice(targetIndex, 0, movedBlock);
+    
+    // Update local state
+    updateDayPlaces(dayData.day, places.map(p => p.place));
+    
+    // Async backend call
+    try {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data: response } = await supabase.functions.invoke('edit-schedule', {
+        body: {
+          action: 'reorder',
+          data: {
+            dayData,
+            sourceIndex: draggedPlace.blockIndex,
+            targetIndex
+          }
+        }
+      });
+      
+      // Update local state with backend response
+      updateScheduleFromBackend(response.updated_schedule);
+    } catch (error) {
+      console.error('Backend reorder failed:', error);
+      alert('Failed to sync reordering with backend. Changes may not persist.');
+      // Optionally revert frontend changes
+    }
+    
     setDraggedPlace(null);
-    setDragOverIndex(-1);
-  }, [draggedPlace, movePlace]);
+    setHasUserEditedSchedule(true);
+  }, [draggedPlace, getGroupedPlacesForDay, isSystemPlace, updateDayPlaces, updateScheduleFromBackend, setHasUserEditedSchedule]);
 
   // Resize handlers
-  const handleResizeStart = useCallback((e: React.MouseEvent, placeId: string, currentDuration: number) => {
+  const handleResizeStart = useCallback((e: React.MouseEvent, placeId: string, currentDuration: number, place: any) => {
+    // Prevent resizing system places
+    if (isSystemPlace(place)) {
+      e.preventDefault();
+      return;
+    }
+    
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(placeId);
     setResizeStartY(e.clientY);
     setResizeStartDuration(currentDuration);
     setHasUserEditedSchedule(true);
-  }, [setHasUserEditedSchedule]);
+  }, [setHasUserEditedSchedule, isSystemPlace]);
 
   const handleResizeMove = useCallback(async (e: MouseEvent) => {
     if (!isResizing) return;
@@ -503,9 +541,41 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     }
   }, [isResizing, resizeStartY, resizeStartDuration, resizePlaceDuration, currentTrip, formattedResult]);
 
-  const handleResizeEnd = useCallback(() => {
+  // Updated resize end handler with backend integration
+  const handleResizeEnd = useCallback(async (blockIndex: number, newHeight: number, direction: 'top' | 'bottom') => {
+    // Existing frontend logic
     setIsResizing(null);
-  }, []);
+    setDragOverIndex(-1);
+    const groupedPlaces = getGroupedPlacesForDay(currentDayData);
+    const block = groupedPlaces[blockIndex];
+    const newDuration = Math.round(newHeight / pixelsPerMinute);
+    const oldDuration = block.duration;
+    
+    // Call backend Edge Function
+    try {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data: response } = await supabase.functions.invoke('edit-schedule', {
+        body: {
+          action: 'resize',
+          data: {
+            placeId: block.place.id || block.place.place_name,
+            newDuration,
+            oldDuration
+          }
+        }
+      });
+      
+      if (response.requires_manual_adjustment) {
+        alert('Duration change exceeds day limit. Please use drag-and-drop to adjust subsequent places.');
+      }
+      
+      // Update local state with backend response
+      updateScheduleFromBackend(response.updated_schedule);
+    } catch (error) {
+      console.error('Backend duration adjust failed:', error);
+      alert('Failed to sync duration change with backend. Changes may not persist.');
+    }
+  }, [currentDayData, pixelsPerMinute, updateScheduleFromBackend]);
 
   // Legacy edge function caller (kept for compatibility)
   const callEditScheduleEdgeFunction = useCallback(async (action: string, data: any) => {
@@ -957,12 +1027,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               </div>
                               
                               {/* Resize handles */}
-                              {isEditMode && (
+                              {isEditMode && !isSystemPlace(block.place) && (
                                 <>
                                   {/* Top resize handle */}
                                   <div
                                     className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-8 h-2 bg-blue-500 rounded-full cursor-ns-resize hover:bg-blue-600 transition-colors opacity-0 hover:opacity-100 flex items-center justify-center"
-                                    onMouseDown={(e) => handleResizeStart(e, `${block.place.id || block.place.place_name}-top`, block.duration)}
+                                    onMouseDown={(e) => handleResizeStart(e, `${block.place.id || block.place.place_name}-top`, block.duration, block.place)}
                                     title="Drag to extend/shorten duration"
                                   >
                                     <ArrowUpDown className="w-3 h-3 text-white" />
@@ -971,7 +1041,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                   {/* Bottom resize handle */}
                                   <div
                                     className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-2 bg-blue-500 rounded-full cursor-ns-resize hover:bg-blue-600 transition-colors opacity-0 hover:opacity-100 flex items-center justify-center"
-                                    onMouseDown={(e) => handleResizeStart(e, `${block.place.id || block.place.place_name}-bottom`, block.duration)}
+                                    onMouseDown={(e) => handleResizeStart(e, `${block.place.id || block.place.place_name}-bottom`, block.duration, block.place)}
                                     title="Drag to extend/shorten duration"
                                   >
                                     <ArrowUpDown className="w-3 h-3 text-white" />

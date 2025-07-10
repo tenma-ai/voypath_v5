@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { OptimizationResult } from '../types/optimization';
 import { supabase, callSupabaseFunction } from '../lib/supabase';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface User {
   id: string;
@@ -159,6 +160,8 @@ interface StoreState {
   resizePlaceDuration: (placeId: string, newDuration: number, oldDuration: number) => Promise<void>;
   insertPlace: (placeData: any, insertionContext: any) => Promise<void>;
   deleteScheduledPlace: (placeId: string, dayData: any, blockIndex: number) => Promise<void>;
+  updateDayPlaces: (day: number, places: any[]) => void;
+  updateScheduleFromBackend: (schedule: any) => void;
 
   // API Integration
   createTripWithAPI: (tripData: TripCreateData) => Promise<Trip>;
@@ -180,6 +183,10 @@ interface StoreState {
   canAddPlace: (userId: string, tripId?: string) => boolean;
   getUserPlaceCount: (userId: string, tripId?: string) => number;
   upgradeToPremium: () => void;
+
+  // Supabase real-time subscriptions
+  realtimeChannels: RealtimeChannel[];
+  setupSupabaseRealtime: () => void;
 }
 
 export interface TripCreateData {
@@ -1845,6 +1852,80 @@ export const useStore = create<StoreState>()((set, get) => ({
 
         } catch (error) {
           // Error processing pending trip join
+        }
+      },
+
+      // Supabase real-time subscriptions
+      realtimeChannels: [],
+      setupSupabaseRealtime: () => {
+        const { currentTrip, loadPlacesFromDatabase, loadOptimizationResult } = get();
+        if (!currentTrip?.id) return;
+        
+        // Cleanup existing channels
+        get().realtimeChannels.forEach(channel => supabase.removeChannel(channel));
+        set({ realtimeChannels: [] });
+        
+        // Subscribe to places
+        const placesChannel = supabase
+          .channel(`places:${currentTrip.id}`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'places',
+            filter: `trip_id=eq.${currentTrip.id}`
+          }, async (payload) => {
+            await loadPlacesFromDatabase(currentTrip.id);
+            await loadOptimizationResult(currentTrip.id);
+          })
+          .subscribe();
+        
+        // Subscribe to optimization_results
+        const optChannel = supabase
+          .channel(`optimization_results:${currentTrip.id}`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'optimization_results',
+            filter: `trip_id=eq.${currentTrip.id}`
+          }, async (payload) => {
+            await loadOptimizationResult(currentTrip.id);
+          })
+          .subscribe();
+        
+        set({ realtimeChannels: [placesChannel, optChannel] });
+      },
+
+      // Calendar edit helper functions
+      updateDayPlaces: (day: number, places: any[]) => {
+        const { optimizationResult, setOptimizationResult } = get();
+        
+        if (optimizationResult?.optimization?.daily_schedules) {
+          const updatedSchedules = optimizationResult.optimization.daily_schedules.map((schedule: any) => {
+            if (schedule.day === day) {
+              return {
+                ...schedule,
+                scheduled_places: places.map((place: any, index: number) => ({
+                  ...place,
+                  order_in_day: index + 1
+                }))
+              };
+            }
+            return schedule;
+          });
+          
+          setOptimizationResult({
+            ...optimizationResult,
+            optimization: {
+              ...optimizationResult.optimization,
+              daily_schedules: updatedSchedules
+            }
+          });
+        }
+      },
+
+      updateScheduleFromBackend: (schedule: any) => {
+        if (schedule) {
+          set({ optimizationResult: schedule });
         }
       },
     }));
