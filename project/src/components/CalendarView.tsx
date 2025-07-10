@@ -542,40 +542,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   }, [isResizing, resizeStartY, resizeStartDuration, resizePlaceDuration, currentTrip, formattedResult]);
 
   // Updated resize end handler with backend integration
-  const handleResizeEnd = useCallback(async (blockIndex: number, newHeight: number, direction: 'top' | 'bottom') => {
-    // Existing frontend logic
+  const handleResizeEnd = useCallback(async () => {
+    // Simply end the resize operation
     setIsResizing(null);
     setDragOverIndex(-1);
-    const groupedPlaces = getGroupedPlacesForDay(currentDayData);
-    const block = groupedPlaces[blockIndex];
-    const newDuration = Math.round(newHeight / pixelsPerMinute);
-    const oldDuration = block.duration;
+    setHasUserEditedSchedule(true);
     
-    // Call backend Edge Function
-    try {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      const { data: response } = await supabase.functions.invoke('edit-schedule', {
-        body: {
-          action: 'resize',
-          data: {
-            placeId: block.place.id || block.place.place_name,
-            newDuration,
-            oldDuration
-          }
-        }
-      });
-      
-      if (response.requires_manual_adjustment) {
-        alert('Duration change exceeds day limit. Please use drag-and-drop to adjust subsequent places.');
-      }
-      
-      // Update local state with backend response
-      updateScheduleFromBackend(response.updated_schedule);
-    } catch (error) {
-      console.error('Backend duration adjust failed:', error);
-      alert('Failed to sync duration change with backend. Changes may not persist.');
-    }
-  }, [currentDayData, pixelsPerMinute, updateScheduleFromBackend]);
+    // The backend processing already happens in handleResizeMove
+  }, [setHasUserEditedSchedule]);
 
   // Legacy edge function caller (kept for compatibility)
   const callEditScheduleEdgeFunction = useCallback(async (action: string, data: any) => {
