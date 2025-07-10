@@ -216,13 +216,13 @@ export const useStore = create<StoreState>()((set, get) => ({
         const currentOptimizationResult = get().optimizationResult;
         const currentTripId = get().currentTrip?.id;
         const currentHasUserOptimized = get().hasUserOptimized;
+        const currentHasUserEditedSchedule = get().hasUserEditedSchedule;
         
-        // Only reset hasUserOptimized when actually switching to a different trip
-        const isNewTrip = currentTripId !== trip.id;
-        const newHasUserOptimized = isNewTrip ? false : currentHasUserOptimized;
+        // Check if this is truly a different trip vs. navigation return
+        const isActuallyNewTrip = currentTripId !== trip.id;
+        
         set({ 
           currentTrip: trip, 
-          hasUserOptimized: newHasUserOptimized,
           showOptimizationSuccess: false  // Reset success animation when switching trips
         });
         
@@ -233,29 +233,31 @@ export const useStore = create<StoreState>()((set, get) => ({
         
         if (trip) {
           try {
-            // Only reload data if switching to a different trip
-            if (currentTripId !== trip.id) {
-              // Reset hasUserOptimized when switching to a different trip
-              // This ensures places appear as pending until user explicitly optimizes
-              // But will be set back to true if optimization results are found
-              set({ hasUserOptimized: false });
+            // Always reload member colors
+            await get().loadMemberColorsForTrip(trip.id);
+            
+            if (isActuallyNewTrip) {
+              // Switching to a completely different trip
+              set({ 
+                hasUserOptimized: false,
+                hasUserEditedSchedule: false,
+                optimizationResult: null
+              });
               
-              await get().loadMemberColorsForTrip(trip.id); // Load colors first
               await get().loadPlacesFromDatabase(trip.id);
               await get().loadOptimizationResult(trip.id);
             } else {
-              // Still reload colors to ensure consistency
-              await get().loadMemberColorsForTrip(trip.id);
-              // Preserve optimization results if staying on same trip
-              if (currentOptimizationResult) {
-                set({ 
-                  optimizationResult: currentOptimizationResult,
-                  hasUserOptimized: true // Preserve the optimization state
-                });
+              // Returning to same trip - preserve states and reload data from database
+              await get().loadPlacesFromDatabase(trip.id);
+              await get().loadOptimizationResult(trip.id);
+              
+              // Preserve edit state if it was set before
+              if (currentHasUserEditedSchedule) {
+                set({ hasUserEditedSchedule: true });
               }
             }
           } catch (error) {
-            // Failed to load data for new trip
+            console.error('Failed to load trip data:', error);
           }
         }
       },
@@ -1619,11 +1621,15 @@ export const useStore = create<StoreState>()((set, get) => ({
             };
 
 
+            // Check if this is an edited schedule (created by edit-schedule edge function)
+            const isEditedSchedule = result.algorithm_version === 'edit-schedule-v1' || result.edit_action;
+            
             set({ 
               optimizationResult: optimizationResult,
               // Set hasUserOptimized to true when we have valid optimization results
-              // This ensures the UI displays the optimization even after page reload
-              hasUserOptimized: true
+              hasUserOptimized: true,
+              // Set hasUserEditedSchedule if this was created by editing
+              hasUserEditedSchedule: isEditedSchedule || get().hasUserEditedSchedule
             });
           } else {
             // No results found in database, preserve existing if available
@@ -1924,7 +1930,37 @@ export const useStore = create<StoreState>()((set, get) => ({
       },
 
       updateScheduleFromBackend: (schedule: any) => {
-        if (schedule) {
+        const { optimizationResult } = get();
+        
+        if (schedule && optimizationResult) {
+          if (schedule.optimization?.daily_schedules) {
+            const existingSchedules = optimizationResult.optimization?.daily_schedules || [];
+            const newSchedules = schedule.optimization.daily_schedules;
+            
+            const scheduleMap = new Map();
+            existingSchedules.forEach((daySchedule: any) => {
+              scheduleMap.set(daySchedule.day, daySchedule);
+            });
+            
+            newSchedules.forEach((daySchedule: any) => {
+              scheduleMap.set(daySchedule.day, daySchedule);
+            });
+            
+            const mergedSchedules = Array.from(scheduleMap.values()).sort((a: any, b: any) => a.day - b.day);
+            
+            set({
+              optimizationResult: {
+                ...optimizationResult,
+                optimization: {
+                  ...optimizationResult.optimization,
+                  daily_schedules: mergedSchedules
+                }
+              }
+            });
+          } else {
+            set({ optimizationResult: schedule });
+          }
+        } else if (schedule && !optimizationResult) {
           set({ optimizationResult: schedule });
         }
       },

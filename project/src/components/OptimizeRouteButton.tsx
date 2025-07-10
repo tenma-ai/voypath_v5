@@ -160,33 +160,18 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       return;
     }
 
-    // Check if user has edited schedule - if so, only show animation but don't actually optimize
+    // Check if user has edited schedule - if so, show confirmation dialog
     if (hasUserEditedSchedule) {
-      // Show fake animation to maintain UX consistency
-      setIsOptimizing(true);
-      setShowProgress(true);
-      setError(null);
-      setProgress({ stage: 'collecting', progress: 0, message: 'Starting optimization...' });
+      const confirmOptimization = window.confirm(
+        'Optimizing the schedule may discard manually edited content. Do you want to continue?'
+      );
       
-      // Simulate progress without actual optimization
-      const simulateProgress = () => {
-        setTimeout(() => setProgress({ stage: 'normalizing', progress: 25, message: 'Normalizing preferences...' }), 500);
-        setTimeout(() => setProgress({ stage: 'selecting', progress: 50, message: 'Selecting places...' }), 1000);
-        setTimeout(() => setProgress({ stage: 'routing', progress: 75, message: 'Optimizing route...' }), 1500);
-        setTimeout(() => {
-          setProgress({ stage: 'complete', progress: 100, message: 'Optimization complete! ✨' });
-          setShowSuccess(true);
-          setTimeout(() => {
-            setIsOptimizing(false);
-            setShowProgress(false);
-            setProgress(null);
-            setShowSuccess(false);
-          }, 2500);
-        }, 2000);
-      };
+      if (!confirmOptimization) {
+        return; // User cancelled - don't proceed with optimization
+      }
       
-      simulateProgress();
-      return;
+      // User confirmed - proceed with actual optimization and reset edit flag
+      setHasUserEditedSchedule(false);
     }
 
     // Remove the places requirement - allow optimization even without places
