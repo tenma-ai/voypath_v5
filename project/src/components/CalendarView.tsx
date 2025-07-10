@@ -509,60 +509,68 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     const durationChange = Math.round(deltaY / pixelsPerMinute);
     const newDuration = Math.max(15, resizeStartDuration + durationChange); // Minimum 15 minutes
 
-    // Use specialized duration-change edge function for maximum UX responsiveness
+    // Frontend-first approach: Update UI immediately
+    try {
+      await resizePlaceDuration(isResizing, newDuration, resizeStartDuration);
+    } catch (error) {
+      console.warn('Frontend resize update failed:', error);
+    }
+
+    // Background edge function call (non-blocking)
     if (currentTrip) {
-      try {
-        // Find the day data for the resizing place
-        const dayData = Object.values(formattedResult.schedulesByDay).find((schedule: any) => 
-          schedule.places.some((place: any) => (place.id || place.place_name) === isResizing)
-        );
-        
-        if (dayData) {
-          const { supabase } = await import('../lib/supabase');
+      // Don't await - run in background
+      (async () => {
+        try {
+          // Find the day data for the resizing place
+          const dayData = Object.values(formattedResult.schedulesByDay).find((schedule: any) => 
+            schedule.places.some((place: any) => (place.id || place.place_name) === isResizing)
+          );
           
-          // Call optimized duration-change edge function
-          const { data, error } = await supabase.functions.invoke('duration-change', {
-            body: {
-              trip_id: currentTrip.id,
-              place_id: isResizing,
-              new_duration: newDuration,
-              old_duration: resizeStartDuration,
-              day_data: dayData,
-              user_id: useStore.getState().user?.id
-            }
-          });
-          
-          if (error) {
-            console.error('Duration change failed:', error);
-            return;
-          }
-          
-          // Update UI immediately with the response
-          if (data?.updated_day_schedule) {
-            const { broadcastScheduleUpdate } = useStore.getState();
-            broadcastScheduleUpdate({
-              action: 'duration_change_fast',
-              data: {
-                placeId: isResizing,
-                newDuration,
-                daySchedule: data.updated_day_schedule,
-                requiresManualAdjustment: data.requires_manual_adjustment,
-                adjustmentMessage: data.adjustment_message
+          if (dayData) {
+            const { supabase } = await import('../lib/supabase');
+            
+            // Call optimized duration-change edge function
+            const { data, error } = await supabase.functions.invoke('duration-change', {
+              body: {
+                trip_id: currentTrip.id,
+                place_id: isResizing,
+                new_duration: newDuration,
+                old_duration: resizeStartDuration,
+                day_data: dayData,
+                user_id: useStore.getState().user?.id
               }
             });
+            
+            if (error) {
+              console.warn('Duration change edge function failed (UI already updated):', error);
+              return;
+            }
+            
+            // Update with more detailed backend response if available
+            if (data?.updated_day_schedule) {
+              const { broadcastScheduleUpdate } = useStore.getState();
+              broadcastScheduleUpdate({
+                action: 'duration_change_backend',
+                data: {
+                  placeId: isResizing,
+                  newDuration,
+                  daySchedule: data.updated_day_schedule,
+                  requiresManualAdjustment: data.requires_manual_adjustment,
+                  adjustmentMessage: data.adjustment_message
+                }
+              });
+            }
+            
+            // Show user notification if manual adjustment is required
+            if (data?.requires_manual_adjustment) {
+              console.warn('Manual adjustment required:', data.adjustment_message);
+              // You could show a toast notification here
+            }
           }
-          
-          // Show user notification if manual adjustment is required
-          if (data?.requires_manual_adjustment) {
-            console.warn('Manual adjustment required:', data.adjustment_message);
-            // You could show a toast notification here
-          }
+        } catch (error) {
+          console.warn('Background duration-change function failed (UI already updated):', error);
         }
-      } catch (error) {
-        console.error('Failed to call duration-change function:', error);
-        // Fallback to regular resize function
-        await resizePlaceDuration(isResizing, newDuration, resizeStartDuration);
-      }
+      })();
     }
   }, [isResizing, resizeStartY, resizeStartDuration, resizePlaceDuration, currentTrip, formattedResult]);
 
