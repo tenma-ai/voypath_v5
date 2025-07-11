@@ -1278,28 +1278,28 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                           >
                             + dinner
                           </button>
-                          
-                          {/* Hotel booking button (night time) */}
-                          <button
-                            className="absolute left-2 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs px-2 py-1 rounded-md shadow-sm transition-all duration-200 border border-purple-300"
-                            style={{ top: `${(22 - 6) * 60 + 15}px` }}
-                            onClick={() => {
-                              setHotelModal({
-                                isOpen: true,
-                                dayData: dayData,
-                                timeSlot: '22:00 - 08:00',
-                                nearbyLocation: dayData.places.length > 0 ? {
-                                  lat: dayData.places[0].latitude || 35.6812,
-                                  lng: dayData.places[0].longitude || 139.7671,
-                                  name: dayData.places[0].place_name || dayData.places[0].name
-                                } : undefined
-                              });
-                            }}
-                          >
-                            + hotel
-                          </button>
                         </>
                       )}
+                      
+                      {/* Hotel booking button (night time) - Always visible */}
+                      <button
+                        className="absolute left-2 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs px-2 py-1 rounded-md shadow-sm transition-all duration-200 border border-purple-300"
+                        style={{ top: `${(22 - 6) * 60 + 15}px` }}
+                        onClick={() => {
+                          setHotelModal({
+                            isOpen: true,
+                            dayData: dayData,
+                            timeSlot: '22:00 - 08:00',
+                            nearbyLocation: dayData.places.length > 0 ? {
+                              lat: dayData.places[0].latitude || 35.6812,
+                              lng: dayData.places[0].longitude || 139.7671,
+                              name: dayData.places[0].place_name || dayData.places[0].name
+                            } : undefined
+                          });
+                        }}
+                      >
+                        + hotel
+                      </button>
                     </div>
                     
                     {/* Ensure minimum height for the day column */}

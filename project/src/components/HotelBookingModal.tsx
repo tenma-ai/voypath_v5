@@ -151,7 +151,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
         trip_id: currentTrip.id,
         tripId: currentTrip.id,
         user_id: useStore.getState().user?.id || '',
-        place_type: 'hotel',
+        place_type: 'group_selected',
         wish_level: 5,
         stay_duration_minutes: 8 * 60,
         is_user_location: true,
@@ -324,13 +324,23 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                     <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Booking Link
                     </label>
-                    <input
-                      type="url"
-                      value={alreadyBookedData.bookingLink}
-                      onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, bookingLink: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-                      placeholder="e.g., https://trip.com/booking/12345"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={alreadyBookedData.bookingLink}
+                        onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, bookingLink: e.target.value })}
+                        className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        placeholder="e.g., https://trip.com/booking/12345"
+                      />
+                      <button
+                        onClick={() => alreadyBookedData.bookingLink && window.open(alreadyBookedData.bookingLink, '_blank')}
+                        disabled={!alreadyBookedData.bookingLink}
+                        className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Book
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
