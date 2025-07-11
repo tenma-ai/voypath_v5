@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
-import { X, Plane, ExternalLink } from 'lucide-react';
+import { X, Plane, ExternalLink, Trash2, Edit } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { DateUtils } from '../utils/DateUtils';
+import { BookingService } from '../services/BookingService';
+import type { FlightBooking } from '../types/booking';
 
 interface FlightBookingModalProps {
   isOpen: boolean;
@@ -27,8 +29,8 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   dayData,
   timeSlot
 }) => {
-  const { currentTrip, tripMembers, addPlace } = useStore();
-  const [selectedTab, setSelectedTab] = useState<'search' | 'already'>('search');
+  const { currentTrip, tripMembers, addPlace, user } = useStore();
+  const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     bookingLink: '',
     flightNumber: '',
@@ -37,6 +39,9 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     price: '',
     passengers: tripMembers?.length || 1
   });
+  const [savedBookings, setSavedBookings] = useState<FlightBooking[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<FlightBooking | null>(null);
 
   // Calculate actual departure date
   const getDepartureDate = () => {
@@ -120,25 +125,129 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     window.open(url, '_blank');
   };
 
-  const handleAddAlreadyBooked = async () => {
-    if (!currentTrip || !alreadyBookedData.departureTime) {
+  // Load saved bookings when modal opens
+  useEffect(() => {
+    if (isOpen && currentTrip?.id) {
+      loadSavedBookings();
+    }
+  }, [isOpen, currentTrip?.id]);
+
+  const loadSavedBookings = async () => {
+    if (!currentTrip?.id) return;
+    
+    setLoading(true);
+    try {
+      const bookings = await BookingService.getBookingsByType(currentTrip.id, 'flight');
+      setSavedBookings(bookings as FlightBooking[]);
+    } catch (error) {
+      console.error('Failed to load saved bookings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveBooking = async () => {
+    if (!currentTrip?.id || !user?.id) {
+      alert('Please login to save booking information');
+      return;
+    }
+
+    if (!alreadyBookedData.departureTime) {
       alert('Please specify departure time');
       return;
     }
 
-    const notesArray = [];
-    if (alreadyBookedData.departureTime && alreadyBookedData.arrivalTime) {
-      notesArray.push(`${alreadyBookedData.departureTime} - ${alreadyBookedData.arrivalTime}`);
+    setLoading(true);
+    try {
+      const flightData = {
+        booking_link: alreadyBookedData.bookingLink || undefined,
+        flight_number: alreadyBookedData.flightNumber || undefined,
+        departure_time: alreadyBookedData.departureTime,
+        arrival_time: alreadyBookedData.arrivalTime || undefined,
+        price: alreadyBookedData.price || undefined,
+        passengers: alreadyBookedData.passengers,
+        route: `${routeData.from} → ${routeData.to}`,
+        departure_date: dateStr,
+        notes: `Flight booking for ${routeData.from} to ${routeData.to}`
+      };
+
+      if (editingBooking) {
+        await BookingService.updateBooking(editingBooking.id!, {
+          ...editingBooking,
+          ...flightData
+        });
+        setEditingBooking(null);
+      } else {
+        await BookingService.saveFlightBooking(currentTrip.id, user.id, flightData);
+      }
+
+      // Reload bookings
+      await loadSavedBookings();
+      
+      // Reset form
+      setAlreadyBookedData({
+        bookingLink: '',
+        flightNumber: '',
+        departureTime: '09:00',
+        arrivalTime: '11:00',
+        price: '',
+        passengers: tripMembers?.length || 1
+      });
+
+      // Switch to saved tab to show the saved booking
+      setSelectedTab('saved');
+    } catch (error) {
+      console.error('Failed to save booking:', error);
+      alert('Failed to save booking. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    if (alreadyBookedData.passengers) notesArray.push(`${alreadyBookedData.passengers} passengers`);
-    if (alreadyBookedData.price) notesArray.push(`$${alreadyBookedData.price}`);
-    if (alreadyBookedData.bookingLink) notesArray.push(`Booking: ${alreadyBookedData.bookingLink}`);
+  };
+
+  const handleEditBooking = (booking: FlightBooking) => {
+    setEditingBooking(booking);
+    setAlreadyBookedData({
+      bookingLink: booking.booking_link || '',
+      flightNumber: booking.flight_number || '',
+      departureTime: booking.departure_time || '09:00',
+      arrivalTime: booking.arrival_time || '11:00',
+      price: booking.price || '',
+      passengers: booking.passengers || tripMembers?.length || 1
+    });
+    setSelectedTab('already');
+  };
+
+  const handleDeleteBooking = async (bookingId: string) => {
+    if (!confirm('Are you sure you want to delete this booking?')) return;
+
+    setLoading(true);
+    try {
+      await BookingService.deleteBooking(bookingId);
+      await loadSavedBookings();
+    } catch (error) {
+      console.error('Failed to delete booking:', error);
+      alert('Failed to delete booking. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddToTrip = async (booking: FlightBooking) => {
+    if (!currentTrip) return;
+
+    const notesArray = [];
+    if (booking.departure_time && booking.arrival_time) {
+      notesArray.push(`${booking.departure_time} - ${booking.arrival_time}`);
+    }
+    if (booking.passengers) notesArray.push(`${booking.passengers} passengers`);
+    if (booking.price) notesArray.push(`$${booking.price}`);
+    if (booking.booking_link) notesArray.push(`Booking: ${booking.booking_link}`);
 
     try {
       await addPlace({
         id: crypto.randomUUID(),
-        name: alreadyBookedData.flightNumber ? `Flight ${alreadyBookedData.flightNumber}` : 'Booked Flight',
-        address: `${routeData.from} → ${routeData.to}`,
+        name: booking.flight_number ? `Flight ${booking.flight_number}` : 'Booked Flight',
+        address: booking.route || `${routeData.from} → ${routeData.to}`,
         latitude: routeData.fromLat || 35.6812,
         longitude: routeData.fromLng || 139.7671,
         notes: notesArray.join(' • '),
@@ -147,7 +256,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
         updatedAt: new Date().toISOString(),
         trip_id: currentTrip.id,
         tripId: currentTrip.id,
-        user_id: useStore.getState().user?.id || '',
+        user_id: user?.id || '',
         place_type: 'group_selected',
         wish_level: 5,
         stay_duration_minutes: 180,
@@ -155,12 +264,12 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
         is_selected_for_optimization: true,
         normalized_wish_level: 0.5,
         rating: 4.0,
-        booking_url: alreadyBookedData.bookingLink
+        booking_url: booking.booking_link
       });
 
       onClose();
     } catch (error) {
-      console.error('Failed to add flight:', error);
+      console.error('Failed to add flight to trip:', error);
       alert('Failed to add flight to trip. Please try again.');
     }
   };
@@ -231,7 +340,17 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Already Booked
+              {editingBooking ? 'Edit Booking' : 'Add Booking'}
+            </button>
+            <button
+              onClick={() => setSelectedTab('saved')}
+              className={`flex-1 py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-medium transition-colors ${
+                selectedTab === 'saved'
+                  ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Saved ({savedBookings.length})
             </button>
           </div>
 
@@ -307,10 +426,10 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                 </div>
                 <div className="pb-8 sm:pb-12"></div>
               </div>
-            ) : (
+            ) : selectedTab === 'already' ? (
               <div className="p-4 sm:p-6">
                 <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3 sm:mb-4">
-                  Already Booked a Flight?
+                  {editingBooking ? 'Edit Flight Booking' : 'Add Flight Booking'}
                 </h3>
                 <div className="space-y-3 sm:space-y-4">
                   {/* Booking Link Field */}
@@ -405,14 +524,122 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                       </select>
                     </div>
                   </div>
-                  <button
-                    onClick={handleAddAlreadyBooked}
-                    disabled={!alreadyBookedData.departureTime}
-                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                  >
-                    Add Flight to Trip
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleSaveBooking}
+                      disabled={!alreadyBookedData.departureTime || loading}
+                      className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                    >
+                      {loading ? 'Saving...' : editingBooking ? 'Update Booking' : 'Save Booking'}
+                    </button>
+                    {editingBooking && (
+                      <button
+                        onClick={() => {
+                          setEditingBooking(null);
+                          setAlreadyBookedData({
+                            bookingLink: '',
+                            flightNumber: '',
+                            departureTime: '09:00',
+                            arrivalTime: '11:00',
+                            price: '',
+                            passengers: tripMembers?.length || 1
+                          });
+                        }}
+                        className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </div>
+                <div className="pb-8 sm:pb-12"></div>
+              </div>
+            ) : (
+              <div className="p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3 sm:mb-4">
+                  Saved Flight Bookings
+                </h3>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : savedBookings.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-slate-600 dark:text-slate-400 mb-4">No saved flight bookings yet.</p>
+                    <button
+                      onClick={() => setSelectedTab('already')}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      Add Your First Booking
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 sm:space-y-4">
+                    {savedBookings.map((booking) => (
+                      <div key={booking.id} className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="mb-2">
+                              <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                                {booking.flight_number ? `Flight ${booking.flight_number}` : 'Flight Booking'}
+                              </h4>
+                              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                                {booking.route} • {booking.departure_date}
+                              </p>
+                            </div>
+                            <div className="space-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                              {booking.departure_time && (
+                                <div>Departure: {booking.departure_time}</div>
+                              )}
+                              {booking.arrival_time && (
+                                <div>Arrival: {booking.arrival_time}</div>
+                              )}
+                              {booking.passengers && (
+                                <div>Passengers: {booking.passengers}</div>
+                              )}
+                              {booking.price && (
+                                <div>Price: ${booking.price}</div>
+                              )}
+                              {booking.booking_link && (
+                                <div className="flex items-center gap-1">
+                                  <span>Booking:</span>
+                                  <a 
+                                    href={booking.booking_link} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                                  >
+                                    Link <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-row sm:flex-col gap-2">
+                            <button
+                              onClick={() => handleAddToTrip(booking)}
+                              className="flex-1 sm:flex-none px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
+                            >
+                              Add to Trip
+                            </button>
+                            <button
+                              onClick={() => handleEditBooking(booking)}
+                              className="flex-1 sm:flex-none px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
+                            >
+                              <Edit className="w-3 h-3" /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBooking(booking.id!)}
+                              className="flex-1 sm:flex-none px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
+                            >
+                              <Trash2 className="w-3 h-3" /> Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="pb-8 sm:pb-12"></div>
               </div>
             )}

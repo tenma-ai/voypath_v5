@@ -38,7 +38,7 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
   const [showSuccess, setShowSuccess] = useState(false);
   const [connectivity, setConnectivity] = useState({ normalize: false, select: false, route: false });
   
-  const { user: currentUser, places, setOptimizationResult, setUser, loadPlacesFromAPI, setHasUserOptimized, hasUserEditedSchedule } = useStore();
+  const { user: currentUser, places, setOptimizationResult, setUser, loadPlacesFromAPI, setHasUserOptimized } = useStore();
 
   // Create a guest user if none exists (for testing)
   React.useEffect(() => {
@@ -67,12 +67,11 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       placesLength: places.length,
       tripPlacesLength: tripPlaces.length,
       hasPlaces,
-      hasUserEditedSchedule,
       currentUser: !!currentUser,
       isOptimizing,
       isReady
     });
-  }, [tripId, places.length, tripPlaces.length, hasPlaces, hasUserEditedSchedule, currentUser, isOptimizing, isReady]);
+  }, [tripId, places.length, tripPlaces.length, hasPlaces, currentUser, isOptimizing, isReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,8 +166,6 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
     }
 
     // Edit state checking disabled - optimization always available
-    // Reset edit flag when optimizing
-    setHasUserEditedSchedule(false);
 
     // Remove the places requirement - allow optimization even without places
     // The backend will handle cases with no places appropriately
@@ -296,16 +293,6 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
         <>
           <Wand2 className="w-5 h-5" />
           <span>Add Places First</span>
-        </>
-      );
-    }
-
-    // Show different text based on edit state
-    if (hasUserEditedSchedule) {
-      return (
-        <>
-          <Wand2 className="w-5 h-5" />
-          <span>やり直し</span>
         </>
       );
     }

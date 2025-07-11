@@ -111,8 +111,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     tripMembers, 
     hasUserOptimized, 
     setHasUserOptimized, 
-    hasUserEditedSchedule, 
-    setHasUserEditedSchedule, 
     movePlace, 
     resizePlaceDuration, 
     deleteScheduledPlace, 
@@ -400,9 +398,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     
     setDraggedPlace({ place, blockIndex });
     e.dataTransfer.effectAllowed = 'move';
-    // Set hasUserEditedSchedule immediately on drag start
-    setHasUserEditedSchedule(true);
-  }, [setHasUserEditedSchedule, isSystemPlace]);
+  }, [isSystemPlace]);
 
   const handleDragOver = useCallback((e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
@@ -481,8 +477,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     }
     
     setDraggedPlace(null);
-    setHasUserEditedSchedule(true);
-  }, [draggedPlace, getGroupedPlacesForDay, isSystemPlace, updateDayPlaces, updateScheduleFromBackend, setHasUserEditedSchedule]);
+  }, [draggedPlace, getGroupedPlacesForDay, isSystemPlace, updateDayPlaces, updateScheduleFromBackend]);
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent, placeId: string, currentDuration: number, place: any) => {
@@ -500,8 +495,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     setIsResizing(basePlaceId);
     setResizeStartY(e.clientY);
     setResizeStartDuration(currentDuration);
-    setHasUserEditedSchedule(true);
-  }, [setHasUserEditedSchedule, isSystemPlace]);
+  }, [isSystemPlace]);
 
   const handleResizeMove = useCallback(async (e: MouseEvent) => {
     if (!isResizing) return;
@@ -581,10 +575,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     // Simply end the resize operation
     setIsResizing(null);
     setDragOverIndex(-1);
-    setHasUserEditedSchedule(true);
     
     // The backend processing already happens in handleResizeMove
-  }, [setHasUserEditedSchedule]);
+  }, []);
 
   // Legacy edge function caller (kept for compatibility)
   const callEditScheduleEdgeFunction = useCallback(async (action: string, data: any) => {

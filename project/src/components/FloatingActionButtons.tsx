@@ -6,7 +6,7 @@ import { useStore } from '../store/useStore';
 
 export function FloatingActionButtons() {
   const location = useLocation();
-  const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult, setHasUserOptimized, setShowOptimizationSuccess, hasUserOptimized, activeView, hasUserEditedSchedule } = useStore();
+  const { currentTrip, places, user, isOptimizing, setIsOptimizing, setOptimizationResult, setHasUserOptimized, setShowOptimizationSuccess, hasUserOptimized, activeView } = useStore();
   const [optimizationError, setOptimizationError] = useState<string | null>(null);
   const [shouldBlinkPlusButton, setShouldBlinkPlusButton] = useState(false);
   const [shouldBlinkOptimizeButton, setShouldBlinkOptimizeButton] = useState(false);
@@ -89,8 +89,6 @@ export function FloatingActionButtons() {
     setOptimizationError(null);
 
     // Edit state checking disabled - optimization always available
-    // Reset edit flag when optimizing
-    setHasUserEditedSchedule(false);
 
     try {
       // Log message

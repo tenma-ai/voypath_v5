@@ -67,8 +67,6 @@ const PlaceInsertionModal: React.FC<PlaceInsertionModalProps> = ({
         estimated_cost: place.price_level ? place.price_level * 1000 : 2000
       });
 
-      // Mark that user has edited the schedule
-      useStore.getState().setHasUserEditedSchedule(true);
       
       onClose();
       

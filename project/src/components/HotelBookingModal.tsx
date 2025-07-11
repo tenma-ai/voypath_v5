@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
-import { X, ExternalLink, Bed, Star } from 'lucide-react';
+import { X, ExternalLink, Bed, Star, Trash2, Edit } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { DateUtils } from '../utils/DateUtils';
+import { BookingService } from '../services/BookingService';
+import type { HotelBooking } from '../types/booking';
 
 interface HotelBookingModalProps {
   isOpen: boolean;
@@ -24,7 +26,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   timeSlot,
   nearbyLocation
 }) => {
-  const { currentTrip, tripMembers, addPlace } = useStore();
+  const { currentTrip, tripMembers, addPlace, user } = useStore();
 
   // Extract city name from location string
   const extractCityName = (locationName: string): string => {
@@ -37,7 +39,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     const parts = cityName.split(',').map(part => part.trim());
     return parts[0] || locationName;
   };
-  const [selectedTab, setSelectedTab] = useState<'search' | 'already'>('search');
+  const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     bookingLink: '',
     hotelName: '',
@@ -50,6 +52,9 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     pricePerNight: '',
     rating: 4
   });
+  const [savedBookings, setSavedBookings] = useState<HotelBooking[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<HotelBooking | null>(null);
 
   // Calculate actual check-in date
   const getCheckInDate = () => {
@@ -124,24 +129,139 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     window.open(url, '_blank');
   };
 
-  const handleAddAlreadyBooked = async () => {
-    if (!currentTrip || !alreadyBookedData.checkInTime) {
-      alert('Please specify check-in time');
+  // Load saved bookings when modal opens
+  useEffect(() => {
+    if (isOpen && currentTrip?.id) {
+      loadSavedBookings();
+    }
+  }, [isOpen, currentTrip?.id]);
+
+  const loadSavedBookings = async () => {
+    if (!currentTrip?.id) return;
+    
+    setLoading(true);
+    try {
+      const bookings = await BookingService.getBookingsByType(currentTrip.id, 'hotel');
+      setSavedBookings(bookings as HotelBooking[]);
+    } catch (error) {
+      console.error('Failed to load saved bookings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveBooking = async () => {
+    if (!currentTrip?.id || !user?.id) {
+      alert('Please login to save booking information');
       return;
     }
 
+    if (!alreadyBookedData.checkInTime || !alreadyBookedData.checkOutTime) {
+      alert('Please specify check-in and check-out times');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const hotelData = {
+        booking_link: alreadyBookedData.bookingLink || undefined,
+        hotel_name: alreadyBookedData.hotelName || undefined,
+        address: alreadyBookedData.address || undefined,
+        check_in_time: alreadyBookedData.checkInTime,
+        check_out_time: alreadyBookedData.checkOutTime,
+        check_in_date: alreadyBookedData.checkIn || checkInDateStr,
+        check_out_date: alreadyBookedData.checkOut || checkOutDateStr,
+        guests: alreadyBookedData.guests,
+        price_per_night: alreadyBookedData.pricePerNight || undefined,
+        rating: alreadyBookedData.rating,
+        location: extractCityName(nearbyLocation?.name || 'Unknown'),
+        notes: `Hotel booking in ${extractCityName(nearbyLocation?.name || 'Unknown')}`
+      };
+
+      if (editingBooking) {
+        await BookingService.updateBooking(editingBooking.id!, {
+          ...editingBooking,
+          ...hotelData
+        });
+        setEditingBooking(null);
+      } else {
+        await BookingService.saveHotelBooking(currentTrip.id, user.id, hotelData);
+      }
+
+      // Reload bookings
+      await loadSavedBookings();
+      
+      // Reset form
+      setAlreadyBookedData({
+        bookingLink: '',
+        hotelName: '',
+        address: '',
+        checkIn: dayData?.date || '',
+        checkOut: '',
+        checkInTime: '15:00',
+        checkOutTime: '11:00',
+        guests: tripMembers?.length || 1,
+        pricePerNight: '',
+        rating: 4
+      });
+
+      // Switch to saved tab to show the saved booking
+      setSelectedTab('saved');
+    } catch (error) {
+      console.error('Failed to save booking:', error);
+      alert('Failed to save booking. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditBooking = (booking: HotelBooking) => {
+    setEditingBooking(booking);
+    setAlreadyBookedData({
+      bookingLink: booking.booking_link || '',
+      hotelName: booking.hotel_name || '',
+      address: booking.address || '',
+      checkIn: booking.check_in_date || checkInDateStr,
+      checkOut: booking.check_out_date || checkOutDateStr,
+      checkInTime: booking.check_in_time || '15:00',
+      checkOutTime: booking.check_out_time || '11:00',
+      guests: booking.guests || tripMembers?.length || 1,
+      pricePerNight: booking.price_per_night || '',
+      rating: booking.rating || 4
+    });
+    setSelectedTab('already');
+  };
+
+  const handleDeleteBooking = async (bookingId: string) => {
+    if (!confirm('Are you sure you want to delete this booking?')) return;
+
+    setLoading(true);
+    try {
+      await BookingService.deleteBooking(bookingId);
+      await loadSavedBookings();
+    } catch (error) {
+      console.error('Failed to delete booking:', error);
+      alert('Failed to delete booking. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddToTrip = async (booking: HotelBooking) => {
+    if (!currentTrip) return;
+
     const notesArray = [];
-    if (alreadyBookedData.checkIn) notesArray.push(`Check-in: ${alreadyBookedData.checkIn} at ${alreadyBookedData.checkInTime}`);
-    if (alreadyBookedData.checkOut) notesArray.push(`Check-out: ${alreadyBookedData.checkOut} at ${alreadyBookedData.checkOutTime}`);
-    if (alreadyBookedData.guests) notesArray.push(`${alreadyBookedData.guests} guests`);
-    if (alreadyBookedData.pricePerNight) notesArray.push(`$${alreadyBookedData.pricePerNight}/night`);
-    if (alreadyBookedData.bookingLink) notesArray.push(`Booking: ${alreadyBookedData.bookingLink}`);
+    if (booking.check_in_date) notesArray.push(`Check-in: ${booking.check_in_date} at ${booking.check_in_time}`);
+    if (booking.check_out_date) notesArray.push(`Check-out: ${booking.check_out_date} at ${booking.check_out_time}`);
+    if (booking.guests) notesArray.push(`${booking.guests} guests`);
+    if (booking.price_per_night) notesArray.push(`$${booking.price_per_night}/night`);
+    if (booking.booking_link) notesArray.push(`Booking: ${booking.booking_link}`);
 
     try {
       await addPlace({
         id: crypto.randomUUID(),
-        name: alreadyBookedData.hotelName || 'Booked Hotel',
-        address: alreadyBookedData.address || nearbyLocation?.name || 'Hotel Location',
+        name: booking.hotel_name || 'Booked Hotel',
+        address: booking.address || nearbyLocation?.name || 'Hotel Location',
         latitude: nearbyLocation?.lat || 35.6812,
         longitude: nearbyLocation?.lng || 139.7671,
         notes: notesArray.join(' • '),
@@ -150,20 +270,20 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
         updatedAt: new Date().toISOString(),
         trip_id: currentTrip.id,
         tripId: currentTrip.id,
-        user_id: useStore.getState().user?.id || '',
+        user_id: user?.id || '',
         place_type: 'group_selected',
         wish_level: 5,
         stay_duration_minutes: 8 * 60,
         is_user_location: true,
         is_selected_for_optimization: true,
         normalized_wish_level: 0.5,
-        rating: alreadyBookedData.rating,
-        booking_url: alreadyBookedData.bookingLink
+        rating: booking.rating || 4,
+        booking_url: booking.booking_link
       });
 
       onClose();
     } catch (error) {
-      console.error('Failed to add hotel:', error);
+      console.error('Failed to add hotel to trip:', error);
       alert('Failed to add hotel to trip. Please try again.');
     }
   };
@@ -235,7 +355,17 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Already Booked
+              {editingBooking ? 'Edit Booking' : 'Add Booking'}
+            </button>
+            <button
+              onClick={() => setSelectedTab('saved')}
+              className={`flex-1 py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-medium transition-colors ${
+                selectedTab === 'saved'
+                  ? 'border-b-2 border-purple-500 text-purple-600 bg-purple-50 dark:bg-purple-900/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Saved ({savedBookings.length})
             </button>
           </div>
 
@@ -313,10 +443,10 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                 </div>
                 <div className="pb-8 sm:pb-12"></div>
               </div>
-            ) : (
+            ) : selectedTab === 'already' ? (
               <div className="p-4 sm:p-6">
                 <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3 sm:mb-4">
-                  Already Booked a Hotel?
+                  {editingBooking ? 'Edit Hotel Booking' : 'Add Hotel Booking'}
                 </h3>
                 <div className="space-y-3 sm:space-y-4">
                   {/* Booking Link Field */}
@@ -464,14 +594,143 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                       </select>
                     </div>
                   </div>
-                  <button
-                    onClick={handleAddAlreadyBooked}
-                    disabled={!alreadyBookedData.checkInTime}
-                    className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                  >
-                    Add Hotel to Trip
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleSaveBooking}
+                      disabled={!alreadyBookedData.checkInTime || !alreadyBookedData.checkOutTime || loading}
+                      className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                    >
+                      {loading ? 'Saving...' : editingBooking ? 'Update Booking' : 'Save Booking'}
+                    </button>
+                    {editingBooking && (
+                      <button
+                        onClick={() => {
+                          setEditingBooking(null);
+                          setAlreadyBookedData({
+                            bookingLink: '',
+                            hotelName: '',
+                            address: '',
+                            checkIn: dayData?.date || '',
+                            checkOut: '',
+                            checkInTime: '15:00',
+                            checkOutTime: '11:00',
+                            guests: tripMembers?.length || 1,
+                            pricePerNight: '',
+                            rating: 4
+                          });
+                        }}
+                        className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </div>
+                <div className="pb-8 sm:pb-12"></div>
+              </div>
+            ) : (
+              <div className="p-4 sm:p-6">
+                <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-3 sm:mb-4">
+                  Saved Hotel Bookings
+                </h3>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  </div>
+                ) : savedBookings.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-slate-600 dark:text-slate-400 mb-4">No saved hotel bookings yet.</p>
+                    <button
+                      onClick={() => setSelectedTab('already')}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                    >
+                      Add Your First Booking
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 sm:space-y-4">
+                    {savedBookings.map((booking) => (
+                      <div key={booking.id} className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="mb-2">
+                              <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                                {booking.hotel_name || 'Hotel Booking'}
+                              </h4>
+                              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                                {booking.address} • {booking.location}
+                              </p>
+                            </div>
+                            <div className="space-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                              {booking.check_in_date && (
+                                <div>Check-in: {booking.check_in_date} at {booking.check_in_time}</div>
+                              )}
+                              {booking.check_out_date && (
+                                <div>Check-out: {booking.check_out_date} at {booking.check_out_time}</div>
+                              )}
+                              {booking.guests && (
+                                <div>Guests: {booking.guests}</div>
+                              )}
+                              {booking.price_per_night && (
+                                <div>Price: ${booking.price_per_night}/night</div>
+                              )}
+                              {booking.rating && (
+                                <div className="flex items-center gap-1">
+                                  <span>Rating:</span>
+                                  <div className="flex">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <Star
+                                        key={star}
+                                        className={`w-3 h-3 ${
+                                          star <= (booking.rating || 0)
+                                            ? 'text-yellow-400 fill-current'
+                                            : 'text-gray-300'
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {booking.booking_link && (
+                                <div className="flex items-center gap-1">
+                                  <span>Booking:</span>
+                                  <a 
+                                    href={booking.booking_link} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-purple-600 hover:text-purple-800 underline flex items-center gap-1"
+                                  >
+                                    Link <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-row sm:flex-col gap-2">
+                            <button
+                              onClick={() => handleAddToTrip(booking)}
+                              className="flex-1 sm:flex-none px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
+                            >
+                              Add to Trip
+                            </button>
+                            <button
+                              onClick={() => handleEditBooking(booking)}
+                              className="flex-1 sm:flex-none px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
+                            >
+                              <Edit className="w-3 h-3" /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBooking(booking.id!)}
+                              className="flex-1 sm:flex-none px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
+                            >
+                              <Trash2 className="w-3 h-3" /> Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="pb-8 sm:pb-12"></div>
               </div>
             )}
