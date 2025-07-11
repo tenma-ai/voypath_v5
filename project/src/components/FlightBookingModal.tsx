@@ -462,21 +462,21 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                     <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Booking Link
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="url"
                         value={alreadyBookedData.bookingLink}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, bookingLink: e.target.value })}
-                        className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="flex-1 px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         placeholder="e.g., https://trip.com/booking/flight/12345"
                       />
                       <button
                         onClick={() => alreadyBookedData.bookingLink && window.open(alreadyBookedData.bookingLink, '_blank')}
                         disabled={!alreadyBookedData.bookingLink}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center gap-1"
+                        className="w-full sm:w-auto px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center gap-2"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        Book
+                        Open Booking
                       </button>
                     </div>
                   </div>
@@ -489,7 +489,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                       type="text"
                       value={alreadyBookedData.flightNumber}
                       onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, flightNumber: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                      className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       placeholder="e.g., FL123"
                     />
                   </div>
@@ -503,7 +503,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                         type="time"
                         value={alreadyBookedData.departureTime}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, departureTime: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         required
                       />
                     </div>
@@ -515,7 +515,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                         type="time"
                         value={alreadyBookedData.arrivalTime}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, arrivalTime: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       />
                     </div>
                   </div>
@@ -530,7 +530,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                         type="number"
                         value={alreadyBookedData.price}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, price: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         placeholder="e.g., 250"
                       />
                     </div>
@@ -541,7 +541,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                       <select
                         value={alreadyBookedData.passengers}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, passengers: parseInt(e.target.value) })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       >
                         {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
                           <option key={num} value={num}>{num} passenger{num > 1 ? 's' : ''}</option>
@@ -549,11 +549,11 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                       </select>
                     </div>
                   </div>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={handleSaveBooking}
                       disabled={!alreadyBookedData.departureTime || loading}
-                      className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                      className="flex-1 px-4 py-4 sm:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
                       {loading ? 'Saving...' : editingBooking ? 'Update Booking' : 'Save Booking'}
                     </button>
@@ -570,7 +570,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                             passengers: tripMembers?.length || 1
                           });
                         }}
-                        className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                        className="w-full sm:w-auto px-4 py-4 sm:py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
                       >
                         Cancel
                       </button>
@@ -640,25 +640,27 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                               )}
                             </div>
                           </div>
-                          <div className="flex flex-row sm:flex-col gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <button
                               onClick={() => handleAddToTrip(booking)}
-                              className="flex-1 sm:flex-none px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
+                              className="w-full sm:w-auto px-4 py-3 sm:px-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-xs font-medium"
                             >
                               Add to Trip
                             </button>
-                            <button
-                              onClick={() => handleEditBooking(booking)}
-                              className="flex-1 sm:flex-none px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
-                            >
-                              <Edit className="w-3 h-3" /> Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteBooking(booking.id!)}
-                              className="flex-1 sm:flex-none px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
-                            >
-                              <Trash2 className="w-3 h-3" /> Delete
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditBooking(booking)}
+                                className="flex-1 sm:flex-none px-4 py-3 sm:px-3 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm sm:text-xs font-medium flex items-center justify-center gap-1"
+                              >
+                                <Edit className="w-4 h-4 sm:w-3 sm:h-3" /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBooking(booking.id!)}
+                                className="flex-1 sm:flex-none px-4 py-3 sm:px-3 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm sm:text-xs font-medium flex items-center justify-center gap-1"
+                              >
+                                <Trash2 className="w-4 h-4 sm:w-3 sm:h-3" /> Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>

@@ -478,21 +478,21 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                     <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                       Booking Link
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="url"
                         value={alreadyBookedData.bookingLink}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, bookingLink: e.target.value })}
-                        className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="flex-1 px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         placeholder="e.g., https://trip.com/booking/12345"
                       />
                       <button
                         onClick={() => alreadyBookedData.bookingLink && window.open(alreadyBookedData.bookingLink, '_blank')}
                         disabled={!alreadyBookedData.bookingLink}
-                        className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center gap-1"
+                        className="w-full sm:w-auto px-4 py-3 sm:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center justify-center gap-2"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        Book
+                        Open Booking
                       </button>
                     </div>
                   </div>
@@ -506,7 +506,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                         type="text"
                         value={alreadyBookedData.hotelName}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, hotelName: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         placeholder="e.g., Grand Tokyo Hotel"
                       />
                     </div>
@@ -518,7 +518,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                         type="text"
                         value={alreadyBookedData.address}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, address: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         placeholder="e.g., 123 Business District, Tokyo"
                       />
                     </div>
@@ -533,7 +533,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                         type="time"
                         value={alreadyBookedData.checkInTime}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, checkInTime: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         required
                       />
                     </div>
@@ -545,7 +545,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                         type="time"
                         value={alreadyBookedData.checkOutTime}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, checkOutTime: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         required
                       />
                     </div>
@@ -561,7 +561,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                         type="date"
                         value={alreadyBookedData.checkIn}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, checkIn: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       />
                     </div>
                     <div>
@@ -572,7 +572,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                         type="date"
                         value={alreadyBookedData.checkOut}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, checkOut: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       />
                     </div>
                   </div>
@@ -584,7 +584,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                       <select
                         value={alreadyBookedData.guests}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, guests: parseInt(e.target.value) })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       >
                         {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
                           <option key={num} value={num}>{num} guest{num > 1 ? 's' : ''}</option>
@@ -599,7 +599,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                         type="number"
                         value={alreadyBookedData.pricePerNight}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, pricePerNight: e.target.value })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                         placeholder="e.g., 150"
                       />
                     </div>
@@ -610,7 +610,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                       <select
                         value={alreadyBookedData.rating}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, rating: parseInt(e.target.value) })}
-                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                       >
                         {[1, 2, 3, 4, 5].map(num => (
                           <option key={num} value={num}>{num} star{num > 1 ? 's' : ''}</option>
@@ -618,11 +618,11 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                       </select>
                     </div>
                   </div>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={handleSaveBooking}
                       disabled={!alreadyBookedData.checkInTime || !alreadyBookedData.checkOutTime || loading}
-                      className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                      className="flex-1 px-4 py-4 sm:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
                       {loading ? 'Saving...' : editingBooking ? 'Update Booking' : 'Save Booking'}
                     </button>
@@ -643,7 +643,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                             rating: 4
                           });
                         }}
-                        className="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                        className="w-full sm:w-auto px-4 py-4 sm:py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
                       >
                         Cancel
                       </button>
@@ -730,25 +730,27 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                               )}
                             </div>
                           </div>
-                          <div className="flex flex-row sm:flex-col gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <button
                               onClick={() => handleAddToTrip(booking)}
-                              className="flex-1 sm:flex-none px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
+                              className="w-full sm:w-auto px-4 py-3 sm:px-3 sm:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm sm:text-xs font-medium"
                             >
                               Add to Trip
                             </button>
-                            <button
-                              onClick={() => handleEditBooking(booking)}
-                              className="flex-1 sm:flex-none px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
-                            >
-                              <Edit className="w-3 h-3" /> Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteBooking(booking.id!)}
-                              className="flex-1 sm:flex-none px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
-                            >
-                              <Trash2 className="w-3 h-3" /> Delete
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditBooking(booking)}
+                                className="flex-1 sm:flex-none px-4 py-3 sm:px-3 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm sm:text-xs font-medium flex items-center justify-center gap-1"
+                              >
+                                <Edit className="w-4 h-4 sm:w-3 sm:h-3" /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBooking(booking.id!)}
+                                className="flex-1 sm:flex-none px-4 py-3 sm:px-3 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm sm:text-xs font-medium flex items-center justify-center gap-1"
+                              >
+                                <Trash2 className="w-4 h-4 sm:w-3 sm:h-3" /> Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
