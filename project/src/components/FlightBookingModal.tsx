@@ -30,9 +30,10 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   const { currentTrip, tripMembers, addPlace } = useStore();
   const [selectedTab, setSelectedTab] = useState<'search' | 'already'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
+    bookingLink: '',
     flightNumber: '',
-    departureTime: '',
-    arrivalTime: '',
+    departureTime: '09:00',
+    arrivalTime: '11:00',
     price: '',
     passengers: tripMembers?.length || 1
   });
@@ -120,16 +121,27 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   };
 
   const handleAddAlreadyBooked = async () => {
-    if (!currentTrip || !alreadyBookedData.flightNumber) return;
+    if (!currentTrip || !alreadyBookedData.departureTime) {
+      alert('Please specify departure time');
+      return;
+    }
+
+    const notesArray = [];
+    if (alreadyBookedData.departureTime && alreadyBookedData.arrivalTime) {
+      notesArray.push(`${alreadyBookedData.departureTime} - ${alreadyBookedData.arrivalTime}`);
+    }
+    if (alreadyBookedData.passengers) notesArray.push(`${alreadyBookedData.passengers} passengers`);
+    if (alreadyBookedData.price) notesArray.push(`$${alreadyBookedData.price}`);
+    if (alreadyBookedData.bookingLink) notesArray.push(`Booking: ${alreadyBookedData.bookingLink}`);
 
     try {
       await addPlace({
         id: crypto.randomUUID(),
-        name: `Flight ${alreadyBookedData.flightNumber}`,
+        name: alreadyBookedData.flightNumber ? `Flight ${alreadyBookedData.flightNumber}` : 'Booked Flight',
         address: `${routeData.from} → ${routeData.to}`,
         latitude: routeData.fromLat || 35.6812,
         longitude: routeData.fromLng || 139.7671,
-        notes: `${alreadyBookedData.departureTime} - ${alreadyBookedData.arrivalTime} • ${alreadyBookedData.passengers} passengers • $${alreadyBookedData.price}`,
+        notes: notesArray.join(' • '),
         category: 'transportation',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -142,12 +154,14 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
         is_user_location: true,
         is_selected_for_optimization: true,
         normalized_wish_level: 0.5,
-        rating: 4.0
+        rating: 4.0,
+        booking_url: alreadyBookedData.bookingLink
       });
 
       onClose();
     } catch (error) {
       console.error('Failed to add flight:', error);
+      alert('Failed to add flight to trip. Please try again.');
     }
   };
 
@@ -299,9 +313,23 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                   Already Booked a Flight?
                 </h3>
                 <div className="space-y-3 sm:space-y-4">
-                  <div className="mb-3 sm:mb-4">
+                  {/* Booking Link Field */}
+                  <div>
                     <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Flight Number
+                      Booking Link
+                    </label>
+                    <input
+                      type="url"
+                      value={alreadyBookedData.bookingLink}
+                      onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, bookingLink: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                      placeholder="e.g., https://trip.com/booking/flight/12345"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Flight Number (Optional)
                     </label>
                     <input
                       type="text"
@@ -311,21 +339,23 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                       placeholder="e.g., FL123"
                     />
                   </div>
+                  {/* Flight Times - Required */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Departure Time
+                        Departure Time *
                       </label>
                       <input
                         type="time"
                         value={alreadyBookedData.departureTime}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, departureTime: e.target.value })}
                         className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        required
                       />
                     </div>
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Arrival Time
+                        Arrival Time (Optional)
                       </label>
                       <input
                         type="time"
@@ -335,10 +365,12 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                       />
                     </div>
                   </div>
+                  
+                  {/* Optional Fields */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Price (USD)
+                        Price (USD) (Optional)
                       </label>
                       <input
                         type="number"
@@ -350,7 +382,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Passengers
+                        Passengers (Optional)
                       </label>
                       <select
                         value={alreadyBookedData.passengers}
@@ -365,7 +397,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                   </div>
                   <button
                     onClick={handleAddAlreadyBooked}
-                    disabled={!alreadyBookedData.flightNumber}
+                    disabled={!alreadyBookedData.departureTime}
                     className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                   >
                     Add Flight to Trip

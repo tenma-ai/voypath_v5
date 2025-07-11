@@ -39,10 +39,13 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   };
   const [selectedTab, setSelectedTab] = useState<'search' | 'already'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
+    bookingLink: '',
     hotelName: '',
     address: '',
     checkIn: dayData?.date || '',
     checkOut: '',
+    checkInTime: '15:00',
+    checkOutTime: '11:00',
     guests: tripMembers?.length || 1,
     pricePerNight: '',
     rating: 4
@@ -122,16 +125,26 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   };
 
   const handleAddAlreadyBooked = async () => {
-    if (!currentTrip || !alreadyBookedData.hotelName) return;
+    if (!currentTrip || !alreadyBookedData.checkInTime) {
+      alert('Please specify check-in time');
+      return;
+    }
+
+    const notesArray = [];
+    if (alreadyBookedData.checkIn) notesArray.push(`Check-in: ${alreadyBookedData.checkIn} at ${alreadyBookedData.checkInTime}`);
+    if (alreadyBookedData.checkOut) notesArray.push(`Check-out: ${alreadyBookedData.checkOut} at ${alreadyBookedData.checkOutTime}`);
+    if (alreadyBookedData.guests) notesArray.push(`${alreadyBookedData.guests} guests`);
+    if (alreadyBookedData.pricePerNight) notesArray.push(`$${alreadyBookedData.pricePerNight}/night`);
+    if (alreadyBookedData.bookingLink) notesArray.push(`Booking: ${alreadyBookedData.bookingLink}`);
 
     try {
       await addPlace({
         id: crypto.randomUUID(),
-        name: alreadyBookedData.hotelName,
+        name: alreadyBookedData.hotelName || 'Booked Hotel',
         address: alreadyBookedData.address || nearbyLocation?.name || 'Hotel Location',
         latitude: nearbyLocation?.lat || 35.6812,
         longitude: nearbyLocation?.lng || 139.7671,
-        notes: `Check-in: ${alreadyBookedData.checkIn}, Check-out: ${alreadyBookedData.checkOut} • ${alreadyBookedData.guests} guests • $${alreadyBookedData.pricePerNight}/night`,
+        notes: notesArray.join(' • '),
         category: 'lodging',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -140,16 +153,18 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
         user_id: useStore.getState().user?.id || '',
         place_type: 'hotel',
         wish_level: 5,
-        stay_duration_minutes: 8 * 60, // 8 hours
+        stay_duration_minutes: 8 * 60,
         is_user_location: true,
         is_selected_for_optimization: true,
         normalized_wish_level: 0.5,
-        rating: alreadyBookedData.rating
+        rating: alreadyBookedData.rating,
+        booking_url: alreadyBookedData.bookingLink
       });
 
       onClose();
     } catch (error) {
       console.error('Failed to add hotel:', error);
+      alert('Failed to add hotel to trip. Please try again.');
     }
   };
 
@@ -304,10 +319,24 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                   Already Booked a Hotel?
                 </h3>
                 <div className="space-y-3 sm:space-y-4">
+                  {/* Booking Link Field */}
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Booking Link
+                    </label>
+                    <input
+                      type="url"
+                      value={alreadyBookedData.bookingLink}
+                      onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, bookingLink: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                      placeholder="e.g., https://trip.com/booking/12345"
+                    />
+                  </div>
+                  
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Hotel Name
+                        Hotel Name (Optional)
                       </label>
                       <input
                         type="text"
@@ -319,7 +348,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Address
+                        Address (Optional)
                       </label>
                       <input
                         type="text"
@@ -330,10 +359,39 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                       />
                     </div>
                   </div>
+                  {/* Check-in and Check-out Times - Required */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Check-in Date
+                        Check-in Time *
+                      </label>
+                      <input
+                        type="time"
+                        value={alreadyBookedData.checkInTime}
+                        onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, checkInTime: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Check-out Time *
+                      </label>
+                      <input
+                        type="time"
+                        value={alreadyBookedData.checkOutTime}
+                        onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, checkOutTime: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Check-in and Check-out Dates - Optional */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Check-in Date (Optional)
                       </label>
                       <input
                         type="date"
@@ -344,7 +402,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Check-out Date
+                        Check-out Date (Optional)
                       </label>
                       <input
                         type="date"
@@ -371,7 +429,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Price per Night (USD)
+                        Price per Night (USD) (Optional)
                       </label>
                       <input
                         type="number"
@@ -383,7 +441,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Rating
+                        Rating (Optional)
                       </label>
                       <select
                         value={alreadyBookedData.rating}
@@ -398,7 +456,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                   </div>
                   <button
                     onClick={handleAddAlreadyBooked}
-                    disabled={!alreadyBookedData.hotelName}
+                    disabled={!alreadyBookedData.checkInTime}
                     className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                   >
                     Add Hotel to Trip
