@@ -213,13 +213,42 @@ export const useStore = create<StoreState>()((set, get) => ({
       // Current trip
       currentTrip: null,
       setCurrentTrip: async (trip) => {
+        console.log('🎯 setCurrentTrip called:', {
+          tripId: trip.id,
+          tripName: trip.name
+        });
+        
         const currentOptimizationResult = get().optimizationResult;
         const currentTripId = get().currentTrip?.id;
         const currentHasUserOptimized = get().hasUserOptimized;
         const currentHasUserEditedSchedule = get().hasUserEditedSchedule;
         
+        console.log('📊 Current state before setting trip:', {
+          currentTripId,
+          currentHasUserOptimized,
+          currentHasUserEditedSchedule
+        });
+        
         // Check if this is truly a different trip vs. navigation return
-        const isActuallyNewTrip = currentTripId !== trip.id;
+        // Only consider it a new trip if we had a current trip AND it's different
+        const isActuallyNewTrip = currentTripId && currentTripId !== trip.id;
+        console.log('🔍 Trip analysis:', { isActuallyNewTrip });
+        
+        // Check localStorage for edit state before any state changes
+        const savedEditState = localStorage.getItem(`hasUserEditedSchedule_${trip.id}`);
+        
+        // Debug: List all localStorage keys that contain edit state
+        const allLocalStorageKeys = Object.keys(localStorage).filter(key => key.includes('hasUserEditedSchedule'));
+        console.log('💾 localStorage edit state for trip:', {
+          tripId: trip.id,
+          savedEditState,
+          key: `hasUserEditedSchedule_${trip.id}`,
+          allEditStateKeys: allLocalStorageKeys,
+          allEditStateValues: allLocalStorageKeys.reduce((acc, key) => {
+            acc[key] = localStorage.getItem(key);
+            return acc;
+          }, {} as Record<string, string | null>)
+        });
         
         set({ 
           currentTrip: trip, 
@@ -236,27 +265,43 @@ export const useStore = create<StoreState>()((set, get) => ({
             // Always reload member colors
             await get().loadMemberColorsForTrip(trip.id);
             
+            // Always load data first
+            await get().loadPlacesFromDatabase(trip.id);
+            await get().loadOptimizationResult(trip.id);
+            
             if (isActuallyNewTrip) {
-              // Switching to a completely different trip
+              console.log('🔄 Switching to new trip - resetting states');
+              // Switching to a completely different trip - reset states but still check localStorage
               set({ 
                 hasUserOptimized: false,
                 hasUserEditedSchedule: false,
                 optimizationResult: null
               });
               
-              await get().loadPlacesFromDatabase(trip.id);
-              await get().loadOptimizationResult(trip.id);
-            } else {
-              // Returning to same trip - preserve states and reload data from database
-              await get().loadPlacesFromDatabase(trip.id);
-              await get().loadOptimizationResult(trip.id);
-              
-              // Restore edit state from localStorage
-              const savedEditState = localStorage.getItem(`hasUserEditedSchedule_${trip.id}`);
+              // Still check localStorage for this trip's edit state
               if (savedEditState === 'true') {
+                console.log('✅ Found saved edit state for new trip, restoring');
                 set({ hasUserEditedSchedule: true });
               }
+            } else {
+              console.log('🔄 Same trip or initial load - checking localStorage');
+              // Same trip or initial load - always check localStorage
+              if (savedEditState === 'true') {
+                console.log('✅ Setting hasUserEditedSchedule to true from localStorage');
+                set({ hasUserEditedSchedule: true });
+              } else {
+                console.log('❌ No saved edit state found, keeping current state');
+              }
             }
+            
+            // Final state check
+            const finalState = get();
+            console.log('🏁 Final state after setCurrentTrip:', {
+              hasUserOptimized: finalState.hasUserOptimized,
+              hasUserEditedSchedule: finalState.hasUserEditedSchedule,
+              optimizationResult: !!finalState.optimizationResult
+            });
+            
           } catch (error) {
             console.error('Failed to load trip data:', error);
           }
@@ -788,16 +833,26 @@ export const useStore = create<StoreState>()((set, get) => ({
       // Edit mode control - when true, optimization is disabled
       hasUserEditedSchedule: false,
       setHasUserEditedSchedule: (value) => {
+        const { currentTrip } = get();
+        console.log('🔄 setHasUserEditedSchedule called:', {
+          value,
+          currentTripId: currentTrip?.id,
+          stackTrace: new Error().stack
+        });
+        
         set({ hasUserEditedSchedule: value });
         
         // Persist edit state to localStorage with trip context
-        const { currentTrip } = get();
         if (currentTrip) {
           if (value) {
             localStorage.setItem(`hasUserEditedSchedule_${currentTrip.id}`, 'true');
+            console.log('💾 Saved edit state to localStorage:', `hasUserEditedSchedule_${currentTrip.id}=true`);
           } else {
             localStorage.removeItem(`hasUserEditedSchedule_${currentTrip.id}`);
+            console.log('🗑️ Removed edit state from localStorage:', `hasUserEditedSchedule_${currentTrip.id}`);
           }
+        } else {
+          console.warn('⚠️ No currentTrip available when setting edit state');
         }
       },
       
@@ -1634,13 +1689,34 @@ export const useStore = create<StoreState>()((set, get) => ({
 
             // Check if this is an edited schedule (created by edit-schedule edge function)
             const isEditedSchedule = result.algorithm_version === 'edit-schedule-v1' || result.edit_action;
+            const currentEditState = get().hasUserEditedSchedule;
+            
+            console.log('🔍 loadOptimizationResult - edit state analysis:', {
+              isEditedSchedule,
+              currentEditState,
+              algorithm_version: result.algorithm_version,
+              edit_action: result.edit_action,
+              willSetEditState: isEditedSchedule || currentEditState
+            });
+            
+            // Check localStorage for current trip's edit state to ensure we don't override it
+            const { currentTrip } = get();
+            const localStorageEditState = currentTrip 
+              ? localStorage.getItem(`hasUserEditedSchedule_${currentTrip.id}`) === 'true'
+              : false;
+            
+            console.log('🔍 loadOptimizationResult - localStorage check:', {
+              localStorageEditState,
+              currentEditState,
+              finalEditState: isEditedSchedule || currentEditState || localStorageEditState
+            });
             
             set({ 
               optimizationResult: optimizationResult,
               // Set hasUserOptimized to true when we have valid optimization results
               hasUserOptimized: true,
-              // Set hasUserEditedSchedule if this was created by editing
-              hasUserEditedSchedule: isEditedSchedule || get().hasUserEditedSchedule
+              // Set hasUserEditedSchedule if this was created by editing OR stored in localStorage
+              hasUserEditedSchedule: isEditedSchedule || currentEditState || localStorageEditState
             });
           } else {
             // No results found in database, preserve existing if available
@@ -1976,6 +2052,46 @@ export const useStore = create<StoreState>()((set, get) => ({
         }
       },
     }));
+
+// Debug functions for localStorage troubleshooting
+if (typeof window !== 'undefined') {
+  // Expose debug functions globally for console access
+  (window as any).voypath_debug = {
+    // Check edit state for current trip
+    checkEditState: () => {
+      const state = useStore.getState();
+      const tripId = state.currentTrip?.id;
+      if (!tripId) {
+        console.log('No current trip');
+        return;
+      }
+      
+      const localStorageValue = localStorage.getItem(`hasUserEditedSchedule_${tripId}`);
+      const storeValue = state.hasUserEditedSchedule;
+      
+      console.log('Edit State Debug:', {
+        tripId,
+        localStorageValue,
+        storeValue,
+        allEditKeys: Object.keys(localStorage).filter(k => k.includes('hasUserEditedSchedule'))
+      });
+    },
+    
+    // Manually set edit state
+    setEditState: (value: boolean) => {
+      const state = useStore.getState();
+      state.setHasUserEditedSchedule(value);
+      console.log('Set edit state to:', value);
+    },
+    
+    // Clear all edit state from localStorage
+    clearAllEditStates: () => {
+      const keys = Object.keys(localStorage).filter(k => k.includes('hasUserEditedSchedule'));
+      keys.forEach(key => localStorage.removeItem(key));
+      console.log('Cleared edit state keys:', keys);
+    }
+  };
+}
 
 // Apply theme to document
 if (typeof window !== 'undefined') {

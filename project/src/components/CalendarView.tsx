@@ -10,11 +10,7 @@ import MealInsertionModal from './MealInsertionModal';
 import PlaceInsertionModal from './PlaceInsertionModal';
 import HotelBookingModal from './HotelBookingModal';
 import FlightBookingModal from './FlightBookingModal';
-import { createClient } from '@supabase/supabase-js';
-
-// Define constants directly (replace with actual values or env)
-const SUPABASE_URL = 'https://rdufxwoeneglyponagdz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkdWZ4d29lbmVnbHlwb25hZ2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0ODY3NDgsImV4cCI6MjA2NTA2Mjc0OH0.n4rjoYq3hdi145qlH-JC-xn6PCTA1vEsdpX_vS-YK08';
+import { supabase } from '../lib/supabase';
 
 interface CalendarViewProps {
   optimizationResult?: any;
@@ -442,8 +438,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     
     // Async backend call
     try {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      
       // Prepare proper day data structure for edge function using reordered places
       const dayDataForBackend = {
         day: dayData.day,

@@ -250,20 +250,31 @@ async function handleReorderPlaces(data: any, supabase: any): Promise<any> {
   // Recalculate route details with new order
   const routeWithDetails = calculateRouteDetails(places);
   
-  // Create updated schedule
-  const updatedSchedule = createDailySchedule(routeWithDetails, dayData.date);
+  // Create updated schedule for just this day (preserve day number)
+  const updatedDaySchedule = {
+    day: dayData.day,
+    date: dayData.date,
+    scheduled_places: routeWithDetails.map((place, index) => ({
+      ...place,
+      order_in_day: index + 1,
+      day_number: dayData.day
+    })),
+    total_travel_time: routeWithDetails.reduce((sum, p) => sum + (p.travel_time_from_previous || 0), 0),
+    total_visit_time: routeWithDetails.reduce((sum, p) => sum + p.stay_duration_minutes, 0),
+    meal_breaks: []
+  };
   
   return {
     updated_schedule: {
       optimization: {
-        daily_schedules: updatedSchedule
+        daily_schedules: [updatedDaySchedule]
       }
     },
     message: `Place reordered from position ${sourceIndex + 1} to ${targetIndex + 1}`
   };
 }
 
-async function handleResizeDuration(data: any, supabase: any): Promise<any> {
+async function handleResizeDuration(data: any, supabase: any, tripId: string): Promise<any> {
   console.log('⏱️ Handling duration resize:', data);
   
   const { placeId, newDuration, oldDuration } = data;
@@ -272,10 +283,11 @@ async function handleResizeDuration(data: any, supabase: any): Promise<any> {
     throw new Error('Invalid duration resize data');
   }
   
-  // Load current optimization result
+  // Load current optimization result for the specific trip
   const { data: currentResult, error } = await supabase
     .from('optimization_results')
     .select('*')
+    .eq('trip_id', tripId)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -364,7 +376,7 @@ async function handleResizeDuration(data: any, supabase: any): Promise<any> {
   };
 }
 
-async function handleInsertPlace(data: any, supabase: any): Promise<any> {
+async function handleInsertPlace(data: any, supabase: any, tripId: string): Promise<any> {
   console.log('➕ Handling place insertion:', data);
   
   const { placeData, insertionContext } = data;
@@ -373,10 +385,11 @@ async function handleInsertPlace(data: any, supabase: any): Promise<any> {
     throw new Error('Invalid place insertion data');
   }
   
-  // Load current optimization result
+  // Load current optimization result for the specific trip
   const { data: currentResult, error } = await supabase
     .from('optimization_results')
     .select('*')
+    .eq('trip_id', tripId)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -422,7 +435,7 @@ async function handleInsertPlace(data: any, supabase: any): Promise<any> {
   };
 }
 
-async function handleDeletePlace(data: any, supabase: any): Promise<any> {
+async function handleDeletePlace(data: any, supabase: any, tripId: string): Promise<any> {
   console.log('🗑️ Handling place deletion:', data);
   
   const { placeId, dayData, blockIndex } = data;
@@ -431,10 +444,11 @@ async function handleDeletePlace(data: any, supabase: any): Promise<any> {
     throw new Error('Invalid place deletion data');
   }
   
-  // Load current optimization result
+  // Load current optimization result for the specific trip
   const { data: currentResult, error } = await supabase
     .from('optimization_results')
     .select('*')
+    .eq('trip_id', tripId)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -519,13 +533,13 @@ Deno.serve(async (req) => {
         result = await handleReorderPlaces(data, supabase);
         break;
       case 'resize':
-        result = await handleResizeDuration(data, supabase);
+        result = await handleResizeDuration(data, supabase, trip_id);
         break;
       case 'insert':
-        result = await handleInsertPlace(data, supabase);
+        result = await handleInsertPlace(data, supabase, trip_id);
         break;
       case 'delete':
-        result = await handleDeletePlace(data, supabase);
+        result = await handleDeletePlace(data, supabase, trip_id);
         break;
       default:
         throw new Error(`Unknown action: ${action}`);

@@ -62,11 +62,17 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
   
   // Debug logging
   useEffect(() => {
-    // Debug state logging
+    console.log('🔘 OptimizeRouteButton state:', {
+      tripId,
+      placesLength: places.length,
+      tripPlacesLength: tripPlaces.length,
+      hasPlaces,
+      hasUserEditedSchedule,
+      currentUser: !!currentUser,
       isOptimizing,
       isReady
     });
-  }, [tripId, places.length, tripPlaces.length, hasPlaces, currentUser, isOptimizing, isReady]);
+  }, [tripId, places.length, tripPlaces.length, hasPlaces, hasUserEditedSchedule, currentUser, isOptimizing, isReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -300,6 +306,16 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
         <>
           <Wand2 className="w-5 h-5" />
           <span>Add Places First</span>
+        </>
+      );
+    }
+
+    // Show different text based on edit state
+    if (hasUserEditedSchedule) {
+      return (
+        <>
+          <Wand2 className="w-5 h-5" />
+          <span>やり直し</span>
         </>
       );
     }
