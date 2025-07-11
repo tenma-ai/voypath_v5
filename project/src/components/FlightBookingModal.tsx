@@ -147,7 +147,15 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   };
 
   const handleSaveBooking = async () => {
+    console.log('🔍 Save booking debug:', { 
+      currentTripId: currentTrip?.id, 
+      userId: user?.id, 
+      currentTrip: !!currentTrip, 
+      user: !!user 
+    });
+    
     if (!currentTrip?.id || !user?.id) {
+      console.error('❌ Missing required data:', { currentTrip: currentTrip?.id, user: user?.id });
       alert('Please login to save booking information');
       return;
     }

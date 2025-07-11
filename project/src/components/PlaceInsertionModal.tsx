@@ -32,7 +32,19 @@ const PlaceInsertionModal: React.FC<PlaceInsertionModalProps> = ({
   const { currentTrip, addPlace } = useStore();
 
   const handlePlaceSelect = async (place: GooglePlace) => {
-    if (!currentTrip) return;
+    const user = useStore.getState().user;
+    console.log('🔍 Add place debug:', { 
+      currentTripId: currentTrip?.id, 
+      userId: user?.id, 
+      currentTrip: !!currentTrip, 
+      user: !!user,
+      placeName: place.name
+    });
+    
+    if (!currentTrip) {
+      console.error('❌ No current trip for add place');
+      return;
+    }
 
     try {
       // Calculate suggested time slot based on insertion position

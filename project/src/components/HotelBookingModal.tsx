@@ -151,7 +151,15 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   };
 
   const handleSaveBooking = async () => {
+    console.log('🔍 Save hotel booking debug:', { 
+      currentTripId: currentTrip?.id, 
+      userId: user?.id, 
+      currentTrip: !!currentTrip, 
+      user: !!user 
+    });
+    
     if (!currentTrip?.id || !user?.id) {
+      console.error('❌ Missing required data for hotel:', { currentTrip: currentTrip?.id, user: user?.id });
       alert('Please login to save booking information');
       return;
     }
