@@ -11,9 +11,43 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   auth: {
     persistSession: true,
-    autoRefreshToken: true
+    autoRefreshToken: true,
+    detectSessionInUrl: true
   }
 })
+
+// Enhanced token management
+let tokenRefreshTimer: NodeJS.Timeout | null = null;
+
+// Proactive token refresh - refresh when 5 minutes remain
+const setupProactiveTokenRefresh = () => {
+  if (tokenRefreshTimer) {
+    clearTimeout(tokenRefreshTimer);
+  }
+  
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session?.expires_at) {
+      const expiresAt = session.expires_at * 1000; // Convert to milliseconds
+      const now = Date.now();
+      const timeUntilExpiry = expiresAt - now;
+      const refreshTime = Math.max(0, timeUntilExpiry - 5 * 60 * 1000); // 5 minutes before expiry
+      
+      if (refreshTime > 0) {
+        tokenRefreshTimer = setTimeout(() => {
+          console.log('🔄 Proactively refreshing token');
+          supabase.auth.refreshSession();
+        }, refreshTime);
+      }
+    }
+  });
+};
+
+// Listen for auth events to setup refresh
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+    setupProactiveTokenRefresh();
+  }
+});
 
 // Auth helper functions with integrated persistence
 export const getCurrentUser = async () => {

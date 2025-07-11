@@ -247,16 +247,18 @@ export const useStore = create<StoreState>()((set, get) => ({
             
             // Always load data first
             await get().loadPlacesFromDatabase(trip.id);
-            await get().loadOptimizationResult(trip.id);
             
             if (isActuallyNewTrip) {
-              console.log('🔄 Switching to new trip - resetting states');
-              // Switching to a completely different trip - reset states
+              console.log('🔄 Switching to new trip - resetting states first');
+              // Reset states BEFORE loading optimization result for new trip
               set({ 
                 hasUserOptimized: false,
                 optimizationResult: null
               });
             }
+            
+            // Load optimization result after potential reset
+            await get().loadOptimizationResult(trip.id);
             
             // Final state check
             const finalState = get();
