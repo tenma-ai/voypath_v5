@@ -7,6 +7,18 @@ export class BookingService {
    */
   static async saveBooking(booking: Omit<Booking, 'id' | 'created_at' | 'updated_at'>): Promise<Booking> {
     try {
+      // Debug authentication status before booking save
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('🔍 Booking save - Auth status:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        userId: session?.user?.id,
+        bookingUserId: booking.user_id,
+        expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+        sessionError: sessionError?.message,
+        environment: import.meta.env.PROD ? 'production' : 'development'
+      });
+
       const { data, error } = await supabase
         .from('bookings')
         .insert({
@@ -18,13 +30,24 @@ export class BookingService {
         .single();
 
       if (error) {
-        console.error('Failed to save booking:', error);
+        console.error('🚨 Booking save failed:', {
+          error: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          bookingData: {
+            user_id: booking.user_id,
+            trip_id: booking.trip_id,
+            booking_type: booking.booking_type
+          }
+        });
         throw new Error(`Failed to save booking: ${error.message}`);
       }
 
+      console.log('✅ Booking saved successfully:', { bookingId: data.id, type: booking.booking_type });
       return data as Booking;
     } catch (error) {
-      console.error('BookingService.saveBooking error:', error);
+      console.error('🚨 BookingService.saveBooking error:', error);
       throw error;
     }
   }

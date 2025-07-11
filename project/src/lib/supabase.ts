@@ -12,11 +12,24 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    // More aggressive session management for production
+    debug: import.meta.env.PROD,
+    flowType: 'pkce'
+  },
+  // Increase timeout for production stability
+  global: {
+    fetch: (url, options = {}) => {
+      return fetch(url, {
+        ...options,
+        // 30 second timeout for production
+        signal: AbortSignal.timeout(30000)
+      });
+    }
   }
 })
 
-// Enhanced token management
+// Enhanced token management with production debugging
 let tokenRefreshTimer: NodeJS.Timeout | null = null;
 
 // Proactive token refresh - refresh when 5 minutes remain
@@ -25,29 +38,123 @@ const setupProactiveTokenRefresh = () => {
     clearTimeout(tokenRefreshTimer);
   }
   
-  supabase.auth.getSession().then(({ data: { session } }) => {
+  supabase.auth.getSession().then(({ data: { session }, error }) => {
+    if (error) {
+      console.error('🚨 Session retrieval error:', error);
+      return;
+    }
+    
     if (session?.expires_at) {
       const expiresAt = session.expires_at * 1000; // Convert to milliseconds
       const now = Date.now();
       const timeUntilExpiry = expiresAt - now;
       const refreshTime = Math.max(0, timeUntilExpiry - 5 * 60 * 1000); // 5 minutes before expiry
       
+      console.log(`🔍 Session debug - Expires at: ${new Date(expiresAt).toISOString()}, Time until expiry: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes, Refresh in: ${Math.round(refreshTime / 1000 / 60)} minutes`);
+      
       if (refreshTime > 0) {
-        tokenRefreshTimer = setTimeout(() => {
+        tokenRefreshTimer = setTimeout(async () => {
           console.log('🔄 Proactively refreshing token');
-          supabase.auth.refreshSession();
+          try {
+            const { data, error } = await supabase.auth.refreshSession();
+            if (error) {
+              console.error('🚨 Token refresh failed:', error);
+              // Attempt to re-establish session
+              const { data: newSession } = await supabase.auth.getSession();
+              if (!newSession.session) {
+                console.error('🚨 No valid session after refresh failure - user may need to re-authenticate');
+              }
+            } else {
+              console.log('✅ Token refreshed successfully');
+              setupProactiveTokenRefresh(); // Schedule next refresh
+            }
+          } catch (refreshError) {
+            console.error('🚨 Token refresh exception:', refreshError);
+          }
         }, refreshTime);
+      } else {
+        console.warn('⚠️ Token already expired or expires very soon');
+        // Attempt immediate refresh
+        supabase.auth.refreshSession().then(({ error }) => {
+          if (error) {
+            console.error('🚨 Immediate token refresh failed:', error);
+          }
+        });
       }
+    } else {
+      console.warn('⚠️ No session or expiry time found');
     }
   });
 };
 
 // Listen for auth events to setup refresh
 supabase.auth.onAuthStateChange((event, session) => {
+  console.log(`🔍 Auth state change: ${event}`, {
+    hasSession: !!session,
+    userId: session?.user?.id,
+    expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null
+  });
+  
   if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
     setupProactiveTokenRefresh();
+  } else if (event === 'SIGNED_OUT') {
+    if (tokenRefreshTimer) {
+      clearTimeout(tokenRefreshTimer);
+      tokenRefreshTimer = null;
+    }
   }
 });
+
+// Periodic session health check for production
+let sessionHealthTimer: NodeJS.Timeout | null = null;
+
+const startSessionHealthCheck = () => {
+  if (sessionHealthTimer) {
+    clearInterval(sessionHealthTimer);
+  }
+  
+  // Check session every 2 minutes in production
+  if (import.meta.env.PROD) {
+    sessionHealthTimer = setInterval(async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('🚨 Session health check failed:', error);
+          return;
+        }
+        
+        if (!session) {
+          console.warn('⚠️ Session health check: No session found');
+          return;
+        }
+        
+        const now = Date.now();
+        const expiresAt = session.expires_at * 1000;
+        const timeUntilExpiry = expiresAt - now;
+        
+        if (timeUntilExpiry < 10 * 60 * 1000) { // Less than 10 minutes
+          console.warn(`⚠️ Session expires soon: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes`);
+          
+          // Try to refresh the session
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            console.error('🚨 Session health check refresh failed:', refreshError);
+          } else {
+            console.log('✅ Session refreshed during health check');
+          }
+        } else {
+          console.log(`✅ Session healthy: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes remaining`);
+        }
+      } catch (error) {
+        console.error('🚨 Session health check exception:', error);
+      }
+    }, 2 * 60 * 1000); // Every 2 minutes
+  }
+};
+
+// Start session health check
+startSessionHealthCheck();
 
 // Auth helper functions with integrated persistence
 export const getCurrentUser = async () => {
@@ -271,17 +378,31 @@ export const signOut = async () => {
 // Direct Supabase database insertion for places
 export const addPlaceToDatabase = async (placeData: any) => {
   try {
-    // Adding place to Supabase
+    console.log('🔍 Adding place to database - Debug info:', {
+      environment: import.meta.env.PROD ? 'production' : 'development',
+      placeId: placeData.id,
+      placeName: placeData.name
+    });
     
     // Get current user - check session first, then fallback to dev user
     let user;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('🔍 Session check result:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        userId: session?.user?.id,
+        expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+        error: error?.message
+      });
+      
       if (session?.user) {
         user = session.user;
+      } else {
+        console.warn('⚠️ No valid session found for place addition');
       }
     } catch (error) {
-      // Log message
+      console.error('🚨 Session retrieval failed during place addition:', error);
     }
     
     // If no session, use the development user that was authenticated
