@@ -88,15 +88,9 @@ export function FloatingActionButtons() {
     setIsOptimizing(true);
     setOptimizationError(null);
 
-    // Check if user has edited the schedule - if so, show animation but don't actually optimize
-    if (hasUserEditedSchedule) {
-      // Simulate optimization animation without actually optimizing
-      setTimeout(() => {
-        setIsOptimizing(false);
-        setOptimizationError('Schedule has been manually edited. Optimization is disabled to preserve your changes.');
-      }, 3000);
-      return;
-    }
+    // Edit state checking disabled - optimization always available
+    // Reset edit flag when optimizing
+    setHasUserEditedSchedule(false);
 
     try {
       // Log message

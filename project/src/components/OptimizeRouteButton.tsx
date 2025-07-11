@@ -166,19 +166,9 @@ export function OptimizeRouteButton({ tripId, className = '' }: OptimizeRouteBut
       return;
     }
 
-    // Check if user has edited schedule - if so, show confirmation dialog
-    if (hasUserEditedSchedule) {
-      const confirmOptimization = window.confirm(
-        'Optimizing the schedule may discard manually edited content. Do you want to continue?'
-      );
-      
-      if (!confirmOptimization) {
-        return; // User cancelled - don't proceed with optimization
-      }
-      
-      // User confirmed - proceed with actual optimization and reset edit flag
-      setHasUserEditedSchedule(false);
-    }
+    // Edit state checking disabled - optimization always available
+    // Reset edit flag when optimizing
+    setHasUserEditedSchedule(false);
 
     // Remove the places requirement - allow optimization even without places
     // The backend will handle cases with no places appropriately

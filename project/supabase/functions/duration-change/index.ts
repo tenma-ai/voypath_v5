@@ -194,30 +194,10 @@ Deno.serve(async (req) => {
     
     const executionTime = Date.now() - startTime;
     
-    // Background database update (non-blocking for UX)
+    // Background database update (non-blocking for UX) - temporarily disabled
+    // TODO: Create schedule_changes table if change tracking is needed
     if (result.updated_day_schedule && !result.requires_manual_adjustment) {
-      // Fire and forget database update for successful auto-adjustments
-      supabase
-        .from('schedule_changes')
-        .insert({
-          trip_id,
-          place_id,
-          change_type: 'duration_change',
-          old_duration,
-          new_duration,
-          day_number: day_data.day,
-          user_id: user_id || null,
-          created_at: new Date().toISOString(),
-          execution_time_ms: executionTime,
-          auto_adjusted: !result.requires_manual_adjustment
-        })
-        .then(({ error }) => {
-          if (error) {
-            console.warn('⚠️ Background database update failed:', error.message);
-          } else {
-            console.log('✅ Duration change logged to database');
-          }
-        });
+      console.log('✅ Duration change processed successfully (tracking disabled)');
     }
     
     console.log(`⚡ Fast duration change completed in ${executionTime}ms`);
