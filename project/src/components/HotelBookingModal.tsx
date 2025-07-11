@@ -78,6 +78,13 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   const checkInDateStr = checkInDate.toISOString().split('T')[0];
   const checkOutDateStr = checkOutDate.toISOString().split('T')[0];
 
+  // Modal context for filtering bookings
+  const modalContext = {
+    location: extractCityName(nearbyLocation?.name || 'Unknown'),
+    checkInDate: dayData?.date || checkInDateStr,
+    type: 'hotel' as const
+  };
+
   // Generate correct Trip.com hotel URL based on provided format
   const generateTripComHotelUrl = (city: string, checkIn: string, checkOut: string, guests: number) => {
     // Format dates for Trip.com (YYYY/MM/DD)
@@ -134,17 +141,26 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     if (isOpen && currentTrip?.id) {
       loadSavedBookings();
     }
-  }, [isOpen, currentTrip?.id]);
+  }, [isOpen, currentTrip?.id, modalContext.location, modalContext.checkInDate]);
 
   const loadSavedBookings = async () => {
     if (!currentTrip?.id) return;
     
     setLoading(true);
     try {
-      const bookings = await BookingService.getBookingsByType(currentTrip.id, 'hotel');
-      setSavedBookings(bookings as HotelBooking[]);
+      // Load all hotel bookings for this trip
+      const allBookings = await BookingService.getBookingsByType(currentTrip.id, 'hotel');
+      
+      // Filter bookings by location and check-in date context
+      const contextBookings = allBookings.filter(booking => 
+        booking.location === modalContext.location && 
+        booking.check_in_date === modalContext.checkInDate
+      );
+      
+      setSavedBookings(contextBookings as HotelBooking[]);
     } catch (error) {
       console.error('Failed to load saved bookings:', error);
+      setSavedBookings([]);
     } finally {
       setLoading(false);
     }
@@ -182,7 +198,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
         guests: alreadyBookedData.guests,
         price_per_night: alreadyBookedData.pricePerNight || undefined,
         rating: alreadyBookedData.rating,
-        location: extractCityName(nearbyLocation?.name || 'Unknown'),
+        location: modalContext.location,
         notes: `Hotel booking in ${extractCityName(nearbyLocation?.name || 'Unknown')}`
       };
 

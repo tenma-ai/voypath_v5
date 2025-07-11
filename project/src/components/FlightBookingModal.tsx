@@ -42,6 +42,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   const [savedBookings, setSavedBookings] = useState<FlightBooking[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingBooking, setEditingBooking] = useState<FlightBooking | null>(null);
+  
 
   // Calculate actual departure date
   const getDepartureDate = () => {
@@ -60,6 +61,13 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
 
   const departureDate = getDepartureDate();
   const dateStr = departureDate.toISOString().split('T')[0];
+
+  // Modal context for filtering bookings
+  const modalContext = {
+    route: `${routeData.from} → ${routeData.to}`,
+    date: dayData?.date || dateStr,
+    type: 'flight' as const
+  };
 
   // Extract IATA codes for flight booking
   const extractIATACode = (placeName: string): string | null => {
@@ -130,17 +138,26 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     if (isOpen && currentTrip?.id) {
       loadSavedBookings();
     }
-  }, [isOpen, currentTrip?.id]);
+  }, [isOpen, currentTrip?.id, modalContext.route, modalContext.date]);
 
   const loadSavedBookings = async () => {
     if (!currentTrip?.id) return;
     
     setLoading(true);
     try {
-      const bookings = await BookingService.getBookingsByType(currentTrip.id, 'flight');
-      setSavedBookings(bookings as FlightBooking[]);
+      // Load all flight bookings for this trip
+      const allBookings = await BookingService.getBookingsByType(currentTrip.id, 'flight');
+      
+      // Filter bookings by route and date context
+      const contextBookings = allBookings.filter(booking => 
+        booking.route === modalContext.route && 
+        booking.departure_date === modalContext.date
+      );
+      
+      setSavedBookings(contextBookings as FlightBooking[]);
     } catch (error) {
       console.error('Failed to load saved bookings:', error);
+      setSavedBookings([]);
     } finally {
       setLoading(false);
     }
@@ -174,8 +191,8 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
         arrival_time: alreadyBookedData.arrivalTime || undefined,
         price: alreadyBookedData.price || undefined,
         passengers: alreadyBookedData.passengers,
-        route: `${routeData.from} → ${routeData.to}`,
-        departure_date: dateStr,
+        route: modalContext.route,
+        departure_date: modalContext.date,
         notes: `Flight booking for ${routeData.from} to ${routeData.to}`
       };
 
