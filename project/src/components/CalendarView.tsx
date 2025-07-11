@@ -321,6 +321,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       startTime: string;
       endTime: string;
       duration: number;
+      blockIndex?: number;
     }> = [];
 
     // Sort places by arrival time
@@ -366,7 +367,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       groupedBlocks.push(currentGroup);
     }
 
-    return groupedBlocks;
+    // Add blockIndex to each grouped block
+    return groupedBlocks.map((block, index) => ({
+      ...block,
+      blockIndex: index
+    }));
   }, []);
 
 
@@ -439,13 +444,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     try {
       const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       
-      // Prepare proper day data structure for edge function
+      // Prepare proper day data structure for edge function using reordered places
       const dayDataForBackend = {
         day: dayData.day,
         date: dayData.actualDate || dayData.date,
-        scheduled_places: groupedPlaces.map(block => ({
+        scheduled_places: places.map((block, index) => ({
           ...block.place,
-          order_in_day: block.blockIndex + 1,
+          order_in_day: index + 1,
           arrival_time: block.startTime,
           departure_time: block.endTime,
           stay_duration_minutes: block.duration
@@ -495,7 +500,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     
     e.preventDefault();
     e.stopPropagation();
-    setIsResizing(placeId);
+    
+    // Strip -top or -bottom suffix to get the base place ID
+    const basePlaceId = placeId.replace(/-(?:top|bottom)$/, '');
+    setIsResizing(basePlaceId);
     setResizeStartY(e.clientY);
     setResizeStartDuration(currentDuration);
     setHasUserEditedSchedule(true);

@@ -91,39 +91,35 @@ function App() {
       setIsAuthenticated(true);
 
       // Background tasks with timeout
-      const backgroundTasks = async () => {
+      // Load critical data synchronously to ensure proper initialization
+      const initializeCriticalData = async () => {
         try {
-          // Try to create/update user profile in background (non-blocking)
-          const { createOrUpdateUserProfile } = await import('./lib/supabase');
-          await Promise.race([
-            createOrUpdateUserProfile(user),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Profile update timeout')), 3000))
-          ]);
-        } catch (profileError) {
-          // Profile update failed, continue anyway
-        }
+          // Load data from database first (this is critical for page reload)
+          await initializeFromDatabase();
+          
+          // Update user profile in background (non-critical)
+          try {
+            const { createOrUpdateUserProfile } = await import('./lib/supabase');
+            await createOrUpdateUserProfile(user);
+          } catch (profileError) {
+            console.warn('Profile update failed:', profileError);
+          }
 
-        try {
-          // Load data from database in background
-          await Promise.race([
-            initializeFromDatabase(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Database load timeout')), 3000))
-          ]);
-        } catch (dbError) {
-          // Database load failed, continue anyway
-        }
-
-        try {
           // Check for pending trip join
-          const { useStore } = await import('./store/useStore');
-          await useStore.getState().handlePendingTripJoin();
-        } catch (pendingTripError) {
-          // Pending trip join failed, continue anyway
+          try {
+            const { useStore } = await import('./store/useStore');
+            await useStore.getState().handlePendingTripJoin();
+          } catch (pendingTripError) {
+            console.warn('Pending trip join failed:', pendingTripError);
+          }
+        } catch (dbError) {
+          console.error('Critical data initialization failed:', dbError);
+          // Continue anyway but log the error
         }
       };
 
-      // Run background tasks without blocking UI
-      backgroundTasks();
+      // Run critical initialization
+      await initializeCriticalData();
       
     } catch (error) {
       // Critical error in handleAuthenticated

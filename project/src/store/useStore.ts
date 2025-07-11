@@ -251,8 +251,9 @@ export const useStore = create<StoreState>()((set, get) => ({
               await get().loadPlacesFromDatabase(trip.id);
               await get().loadOptimizationResult(trip.id);
               
-              // Preserve edit state if it was set before
-              if (currentHasUserEditedSchedule) {
+              // Restore edit state from localStorage
+              const savedEditState = localStorage.getItem(`hasUserEditedSchedule_${trip.id}`);
+              if (savedEditState === 'true') {
                 set({ hasUserEditedSchedule: true });
               }
             }
@@ -788,6 +789,16 @@ export const useStore = create<StoreState>()((set, get) => ({
       hasUserEditedSchedule: false,
       setHasUserEditedSchedule: (value) => {
         set({ hasUserEditedSchedule: value });
+        
+        // Persist edit state to localStorage with trip context
+        const { currentTrip } = get();
+        if (currentTrip) {
+          if (value) {
+            localStorage.setItem(`hasUserEditedSchedule_${currentTrip.id}`, 'true');
+          } else {
+            localStorage.removeItem(`hasUserEditedSchedule_${currentTrip.id}`);
+          }
+        }
       },
       
       // Success animation control - only triggers once per optimization
