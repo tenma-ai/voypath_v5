@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
 import { X, Plane, ExternalLink, Trash2, Edit } from 'lucide-react';
