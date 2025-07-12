@@ -35,19 +35,17 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
   const [forceUpdate, setForceUpdate] = useState(0);
 
-  // Setup real-time sync for schedule updates
+  // DISABLED: Setup real-time sync for schedule updates (was causing auth issues)
   useEffect(() => {
-    const handleScheduleUpdate = (event: CustomEvent) => {
-      console.log('CalendarGridView: Received schedule update:', event.detail);
-      // Force re-render by updating forceUpdate state
-      setForceUpdate(prev => prev + 1);
-    };
-
-    window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
-    
-    return () => {
-      window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
-    };
+    console.log('Schedule update listeners disabled - functionality removed');
+    // DISABLED: const handleScheduleUpdate = (event: CustomEvent) => {
+    // DISABLED:   console.log('CalendarGridView: Received schedule update:', event.detail);
+    // DISABLED:   setForceUpdate(prev => prev + 1);
+    // DISABLED: };
+    // DISABLED: window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    // DISABLED: return () => {
+    // DISABLED:   window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    // DISABLED: };
   }, []);
 
   // Setup real-time sync cleanup

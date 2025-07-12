@@ -75,13 +75,14 @@ function TopAppBar() {
 
   const isPremium = user?.isPremium && (!user.premiumExpiresAt || new Date(user.premiumExpiresAt) > new Date());
 
+  // DISABLED: Scroll event listener (was causing auth issues)
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    console.log('Scroll listeners disabled - functionality removed');
+    // DISABLED: const handleScroll = () => {
+    // DISABLED:   setIsScrolled(window.scrollY > 10);
+    // DISABLED: };
+    // DISABLED: window.addEventListener('scroll', handleScroll);
+    // DISABLED: return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Load user's member color

@@ -40,19 +40,17 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
     libraries: libraries
   });
 
-  // Setup real-time sync for schedule updates
+  // DISABLED: Setup real-time sync for schedule updates (was causing auth issues)
   useEffect(() => {
-    const handleScheduleUpdate = (event: CustomEvent) => {
-      console.log('MapView: Received schedule update:', event.detail);
-      // Force re-render by updating a state that triggers place recalculation
-      setShowSuccessOverlay(false);
-    };
-
-    window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
-    
-    return () => {
-      window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
-    };
+    console.log('Schedule update listeners disabled - functionality removed');
+    // DISABLED: const handleScheduleUpdate = (event: CustomEvent) => {
+    // DISABLED:   console.log('MapView: Received schedule update:', event.detail);
+    // DISABLED:   setShowSuccessOverlay(false);
+    // DISABLED: };
+    // DISABLED: window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    // DISABLED: return () => {
+    // DISABLED:   window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    // DISABLED: };
   }, []);
 
   // Setup real-time sync cleanup
@@ -70,30 +68,23 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
     }
   }, [showOptimizationSuccess, optimizationResult, optimizationResultProp]);
 
-  // Setup global flight booking function
+  // DISABLED: Setup global flight booking function (was causing auth issues)
   useEffect(() => {
-    // Global flight booking function for InfoWindow buttons
-    (window as any).bookFlight = (bookingUrl: string) => {
-      // Open booking URL in new tab
-      window.open(bookingUrl, '_blank');
-      
-      // Analytics tracking
-      console.log(`Flight booking: ${bookingUrl}`);
-      
-      // Google Analytics tracking (if available)
-      if (typeof gtag !== 'undefined') {
-        gtag('event', 'flight_booking_click', {
-          'event_category': 'TravelPayouts',
-          'event_label': 'Flight_Booking',
-          'value': 1
-        });
-      }
-    };
-
-    // Cleanup function
-    return () => {
-      delete (window as any).bookFlight;
-    };
+    console.log('Global flight booking function disabled - functionality removed');
+    // DISABLED: (window as any).bookFlight = (bookingUrl: string) => {
+    // DISABLED:   window.open(bookingUrl, '_blank');
+    // DISABLED:   console.log(`Flight booking: ${bookingUrl}`);
+    // DISABLED:   if (typeof gtag !== 'undefined') {
+    // DISABLED:     gtag('event', 'flight_booking_click', {
+    // DISABLED:       'event_category': 'TravelPayouts',
+    // DISABLED:       'event_label': 'Flight_Booking',
+    // DISABLED:       'value': 1
+    // DISABLED:     });
+    // DISABLED:   }
+    // DISABLED: };
+    // DISABLED: return () => {
+    // DISABLED:   delete (window as any).bookFlight;
+    // DISABLED: };
   }, []);
 
 

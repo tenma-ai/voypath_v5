@@ -37,19 +37,17 @@ export function TripDetailPage() {
   const [memberColors, setMemberColors] = useState<Record<string, string>>({});
   const [forceUpdate, setForceUpdate] = useState(0);
   
-  // Setup real-time sync for schedule updates
+  // DISABLED: Setup real-time sync for schedule updates (was causing auth issues)
   useEffect(() => {
-    const handleScheduleUpdate = (event: CustomEvent) => {
-      console.log('TripDetailPage: Received schedule update:', event.detail);
-      // Force re-render by updating forceUpdate state
-      setForceUpdate(prev => prev + 1);
-    };
-
-    window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
-    
-    return () => {
-      window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
-    };
+    console.log('Schedule update listeners disabled - functionality removed');
+    // DISABLED: const handleScheduleUpdate = (event: CustomEvent) => {
+    // DISABLED:   console.log('TripDetailPage: Received schedule update:', event.detail);
+    // DISABLED:   setForceUpdate(prev => prev + 1);
+    // DISABLED: };
+    // DISABLED: window.addEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    // DISABLED: return () => {
+    // DISABLED:   window.removeEventListener('voypath-schedule-update', handleScheduleUpdate as EventListener);
+    // DISABLED: };
   }, []);
 
   const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized, loadTripsFromDatabase, activeView, setActiveView, setupRealTimeSync } = useStore();
@@ -71,34 +69,34 @@ export function TripDetailPage() {
     }
   }, [optimizationError]);
 
-  // Close score popup when clicking outside
+  // DISABLED: Close score popup when clicking outside (was causing auth issues)
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showScorePopup) {
-        const target = event.target as HTMLElement;
-        if (!target.closest('[data-score-popup]')) {
-          setShowScorePopup(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    console.log('Click-outside detection disabled - functionality removed');
+    // DISABLED: const handleClickOutside = (event: MouseEvent) => {
+    // DISABLED:   if (showScorePopup) {
+    // DISABLED:     const target = event.target as HTMLElement;
+    // DISABLED:     if (!target.closest('[data-score-popup]')) {
+    // DISABLED:       setShowScorePopup(false);
+    // DISABLED:     }
+    // DISABLED:   }
+    // DISABLED: };
+    // DISABLED: document.addEventListener('mousedown', handleClickOutside);
+    // DISABLED: return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showScorePopup]);
 
-  // Close member popup when clicking outside
+  // DISABLED: Close member popup when clicking outside (was causing auth issues)
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showMemberPopup) {
-        const target = event.target as HTMLElement;
-        if (!target.closest('[data-member-popup]')) {
-          setShowMemberPopup(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    console.log('Click-outside detection disabled - functionality removed');
+    // DISABLED: const handleClickOutside = (event: MouseEvent) => {
+    // DISABLED:   if (showMemberPopup) {
+    // DISABLED:     const target = event.target as HTMLElement;
+    // DISABLED:     if (!target.closest('[data-member-popup]')) {
+    // DISABLED:       setShowMemberPopup(false);
+    // DISABLED:     }
+    // DISABLED:   }
+    // DISABLED: };
+    // DISABLED: document.addEventListener('mousedown', handleClickOutside);
+    // DISABLED: return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMemberPopup]);
   
   // Set the correct trip when tripId param is provided

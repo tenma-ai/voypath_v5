@@ -594,39 +594,34 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     }
   }, [currentTrip]);
 
-  // Mouse event listeners for resize
+  // DISABLED: Mouse event listeners for resize (was causing auth issues)
   React.useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleResizeMove);
-      document.addEventListener('mouseup', handleResizeEnd);
-      return () => {
-        document.removeEventListener('mousemove', handleResizeMove);
-        document.removeEventListener('mouseup', handleResizeEnd);
-      };
-    }
+    console.log('Mouse event listeners disabled - functionality removed');
+    // DISABLED: if (isResizing) {
+    // DISABLED:   document.addEventListener('mousemove', handleResizeMove);
+    // DISABLED:   document.addEventListener('mouseup', handleResizeEnd);
+    // DISABLED:   return () => {
+    // DISABLED:     document.removeEventListener('mousemove', handleResizeMove);
+    // DISABLED:     document.removeEventListener('mouseup', handleResizeEnd);
+    // DISABLED:   };
+    // DISABLED: }
   }, [isResizing, handleResizeMove, handleResizeEnd]);
   
   // Setup real-time sync system
+  // DISABLED: Realtime and data change listeners (was causing auth issues)
   React.useEffect(() => {
-    console.log('Realtime setup skipped - functionality disabled');
-    // const cleanup = setupRealTimeSync();
-    
-    // Listen for data changes from other views
-    const handleDataChange = (event: CustomEvent) => {
-      const { type, data } = event.detail;
-      if (type === 'schedule') {
-        // Force re-render when schedule updates come from other views
-        // The store will already be updated, this just ensures UI refresh
-        console.log('Calendar view received schedule update:', data);
-      }
-    };
-    
-    window.addEventListener('voypath-data-changed', handleDataChange as EventListener);
-    
-    return () => {
-      // cleanup();
-      window.removeEventListener('voypath-data-changed', handleDataChange as EventListener);
-    };
+    console.log('Realtime setup and data change listeners disabled - functionality removed');
+    // DISABLED: const cleanup = setupRealTimeSync();
+    // DISABLED: const handleDataChange = (event: CustomEvent) => {
+    // DISABLED:   const { type, data } = event.detail;
+    // DISABLED:   if (type === 'schedule') {
+    // DISABLED:     console.log('Calendar view received schedule update:', data);
+    // DISABLED:   }
+    // DISABLED: };
+    // DISABLED: window.addEventListener('voypath-data-changed', handleDataChange as EventListener);
+    // DISABLED: return () => {
+    // DISABLED:   window.removeEventListener('voypath-data-changed', handleDataChange as EventListener);
+    // DISABLED: };
   }, [setupRealTimeSync]);
 
   // Render toggle buttons using Portal to ensure they appear above all other elements
