@@ -285,17 +285,33 @@ const handleVisibilityChange = async () => {
     // Tab became visible again
     if (wasTabHidden) {
       if (!import.meta.env.PROD) {
-        console.log('👁️ Tab visible again - comprehensive session recovery');
+        console.log('👁️ Tab visible again - aggressive client recovery');
       }
       wasTabHidden = false;
       
       // Wait a moment for tab to fully activate
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Comprehensive session recovery for tab switching
+      // AGGRESSIVE RECOVERY: Test client state with timeout
       try {
-        // Step 1: Check current session state
-        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('🔍 Testing client state after tab switch...');
+        
+        // Test with short timeout to detect hanging client
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Client hanging - timeout after 3 seconds')), 3000)
+        );
+        
+        const sessionPromise = supabase.auth.getSession();
+        
+        const sessionResult = await Promise.race([sessionPromise, timeoutPromise]);
+        
+        if (!sessionResult || sessionResult.error) {
+          console.error('🚨 Session test failed or client hanging, forcing client reset');
+          await forceSupabaseClientReset();
+          return;
+        }
+        
+        const { data: { session }, error } = sessionResult;
         
         if (error) {
           console.error('🚨 Session retrieval error after tab focus:', error);
@@ -303,9 +319,7 @@ const handleVisibilityChange = async () => {
           // Try to recover from certain errors
           if (error.message?.includes('Invalid Refresh Token') || error.message?.includes('refresh_token_not_found')) {
             console.log('🔄 Attempting session recovery from refresh token error');
-            // Clear potentially corrupted session and force re-auth
-            await supabase.auth.signOut();
-            window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+            await forceSupabaseClientReset();
             return;
           }
           
@@ -315,43 +329,92 @@ const handleVisibilityChange = async () => {
         
         if (!session) {
           console.warn('⚠️ No session found after tab regain focus');
-          window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+          await forceSupabaseClientReset();
           return;
         }
         
-        // Step 2: Validate session expiry
-        const expiresAt = session.expires_at * 1000;
-        const now = Date.now();
-        const timeUntilExpiry = expiresAt - now;
+        // Test database connectivity with timeout
+        console.log('🔍 Testing database connectivity with timeout...');
+        const dbTestPromise = testDatabaseConnectivity();
+        const dbTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database test hanging - timeout after 5 seconds')), 5000)
+        );
         
-        if (timeUntilExpiry <= 0) {
-          console.warn('⚠️ Session already expired after tab focus');
-          await performTokenRefresh();
+        try {
+          await Promise.race([dbTestPromise, dbTimeoutPromise]);
+          console.log('✅ Database connectivity test passed');
+        } catch (dbError) {
+          console.error('🚨 Database connectivity test failed or hanging:', dbError);
+          await forceSupabaseClientReset();
           return;
         }
         
-        // Step 3: Preemptive refresh if expiring soon (within 15 minutes)
-        if (timeUntilExpiry < 15 * 60 * 1000) {
-          if (!import.meta.env.PROD) {
-            console.log('🔄 Preemptive token refresh due to tab regain focus');
-          }
-          await performTokenRefresh();
-        }
-        
-        // Step 4: Test database connectivity
-        await testDatabaseConnectivity();
+        // If we get here, the client is working
+        console.log('✅ Client state healthy after tab switch');
         
         // Step 5: Emit success event for realtime reconnection
         window.dispatchEvent(new CustomEvent('supabase-tab-focus-recovery-success'));
         
       } catch (error) {
-        console.error('🚨 Comprehensive error during tab focus recovery:', error);
-        window.dispatchEvent(new CustomEvent('supabase-session-error', { detail: error }));
+        console.error('🚨 Tab focus recovery failed, forcing client reset:', error);
+        await forceSupabaseClientReset();
       }
       
       // Restart token refresh system
       setupCustomTokenRefresh();
     }
+  }
+};
+
+// Force Supabase client reset when hanging/broken
+const forceSupabaseClientReset = async () => {
+  console.log('🔄 Forcing Supabase client reset due to hanging state');
+  
+  try {
+    // Clear all existing connections and timers
+    if (tokenRefreshTimer) {
+      clearTimeout(tokenRefreshTimer);
+      tokenRefreshTimer = null;
+    }
+    if (tokenRefreshInterval) {
+      clearInterval(tokenRefreshInterval);
+      tokenRefreshInterval = null;
+    }
+    if (sessionCheckInterval) {
+      clearInterval(sessionCheckInterval);
+      sessionCheckInterval = null;
+    }
+    
+    // Force sign out to clear any corrupted state
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('signOut timeout')), 2000))
+      ]);
+    } catch (signOutError) {
+      console.warn('⚠️ Sign out timed out or failed:', signOutError);
+      // Continue with reset even if signOut fails
+    }
+    
+    // Clear localStorage auth data
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') || key.includes('supabase')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (storageError) {
+      console.warn('⚠️ localStorage clear failed:', storageError);
+    }
+    
+    // Force page reload to reset client state
+    console.log('🔄 Client reset complete - reloading page to ensure clean state');
+    window.location.reload();
+    
+  } catch (resetError) {
+    console.error('🚨 Client reset failed:', resetError);
+    // Last resort: force reload
+    window.location.reload();
   }
 };
 
@@ -1080,6 +1143,7 @@ if (typeof window !== 'undefined') {
   (window as any).testDatabaseConnection = testDatabaseConnection;
   (window as any).validateSessionBeforeOperation = validateSessionBeforeOperation;
   (window as any).debugDatabaseOperation = debugDatabaseOperation;
+  (window as any).forceSupabaseClientReset = forceSupabaseClientReset;
   (window as any).handleNetworkFailure = handleNetworkFailure;
   (window as any).resetNetworkFailureCount = resetNetworkFailureCount;
   (window as any).getEnvironmentInfo = getEnvironmentInfo;
@@ -1091,11 +1155,37 @@ if (typeof window !== 'undefined') {
   (window as any).deletePlace = deletePlace;
   (window as any).findBookedFlightPlaces = findBookedFlightPlaces;
   
-  // Quick test commands
+  // Enhanced quick test commands with timeout protection
   (window as any).quickDebug = async () => {
-    console.log('🚀 Running quick debug suite...');
-    await debugConnectionState();
-    await testDatabaseConnection();
+    console.log('🚀 Running quick debug suite with timeout protection...');
+    
+    try {
+      // Test with timeout to detect hanging
+      const debugPromise = debugConnectionState();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('debugConnectionState hanging - timeout after 5 seconds')), 5000)
+      );
+      
+      await Promise.race([debugPromise, timeoutPromise]);
+      
+      const dbTestPromise = testDatabaseConnection();
+      const dbTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('testDatabaseConnection hanging - timeout after 10 seconds')), 10000)
+      );
+      
+      await Promise.race([dbTestPromise, dbTimeoutPromise]);
+      
+      console.log('✅ Quick debug completed successfully');
+    } catch (error) {
+      console.error('🚨 Quick debug failed or timed out:', error);
+      console.log('🔄 Client appears to be hanging - use forceSupabaseClientReset() to recover');
+    }
+  };
+  
+  // Emergency recovery command
+  (window as any).emergencyRecover = async () => {
+    console.log('🆘 Emergency recovery initiated...');
+    await forceSupabaseClientReset();
   };
 }
 
