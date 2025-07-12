@@ -290,11 +290,41 @@ export const resetNetworkFailureCount = () => {
   }
 };
 
-// Make test function available globally for debugging
+// Environment and configuration diagnostics
+export const getEnvironmentInfo = () => {
+  const info = {
+    // Supabase configuration
+    supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? 'Set' : 'Missing',
+    supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Missing',
+    
+    // Runtime environment
+    environment: import.meta.env.PROD ? 'production' : 'development',
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
+    
+    // Connection info
+    connectionType: typeof navigator !== 'undefined' && 'connection' in navigator 
+      ? (navigator as any).connection?.effectiveType : 'Unknown',
+    
+    // Timing info
+    timestamp: new Date().toISOString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    
+    // Browser capabilities
+    fetchSupported: typeof fetch !== 'undefined',
+    webSocketSupported: typeof WebSocket !== 'undefined',
+    localStorageSupported: typeof localStorage !== 'undefined'
+  };
+  
+  console.log('🔍 Environment Information:', info);
+  return info;
+};
+
+// Make test functions available globally for debugging
 if (typeof window !== 'undefined') {
   (window as any).testSupabaseConnection = testSupabaseConnection;
   (window as any).handleNetworkFailure = handleNetworkFailure;
   (window as any).resetNetworkFailureCount = resetNetworkFailureCount;
+  (window as any).getEnvironmentInfo = getEnvironmentInfo;
 }
 
 // Auth helper functions with integrated persistence
