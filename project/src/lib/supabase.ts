@@ -25,7 +25,34 @@ const getSupabaseConfig = () => {
 };
 
 // Create Supabase client with connection recovery
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
+export let supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
+
+// Force Supabase client recreation when it gets stuck
+export const recreateSupabaseClient = () => {
+  console.log('🔄 Recreating Supabase client to fix hanging state');
+  
+  try {
+    // Create completely new client instance
+    supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
+    console.log('✅ Supabase client recreated successfully');
+    return true;
+  } catch (error) {
+    console.error('🚨 Failed to recreate Supabase client:', error);
+    return false;
+  }
+};
+
+// Global function for debugging - can be called from console
+(window as any).forceClientRecreation = () => {
+  console.log('🔧 Manual client recreation triggered from console');
+  const success = recreateSupabaseClient();
+  if (success) {
+    console.log('✅ Client recreation successful - try your database operations now');
+  } else {
+    console.log('❌ Client recreation failed');
+  }
+  return success;
+};
 
 // Browser connection pool management
 let connectionRecoveryTimeout: NodeJS.Timeout | null = null;
@@ -141,31 +168,46 @@ const handleVisibilityChange = async () => {
     // Tab became visible again  
     if (wasTabHidden) {
       if (!import.meta.env.PROD) {
-        console.log('👁️ Tab visible again - refreshing Supabase client state');
+        console.log('👁️ Tab visible again - testing client and recreating if needed');
       }
       wasTabHidden = false;
       
-      // Force Supabase client to refresh its internal state
+      // Test if Supabase client is still responsive
       connectionRecoveryTimeout = setTimeout(async () => {
         try {
-          // Method 1: Force auth state refresh
-          await supabase.auth.refreshSession();
+          // Quick test with 3-second timeout
+          const testPromise = supabase.from('places').select('id').limit(1);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Client test timeout')), 3000)
+          );
           
-          // Method 2: Test connection with a simple query
-          await supabase.from('places').select('id').limit(1).abortSignal(AbortSignal.timeout(5000));
-          
-          console.log('✅ Supabase client state refreshed successfully');
+          await Promise.race([testPromise, timeoutPromise]);
+          console.log('✅ Supabase client is responsive');
           window.dispatchEvent(new CustomEvent('supabase-tab-focus-recovery-success'));
-        } catch (error) {
-          console.warn('⚠️ Supabase client refresh failed:', error);
           
-          // If refresh fails, force a page reload as last resort
-          if (error.message?.includes('timeout') || error.message?.includes('aborted')) {
-            console.log('🔄 Client appears stuck - forcing page reload');
+        } catch (error) {
+          console.warn('⚠️ Supabase client is not responsive:', error);
+          
+          // Recreate the client
+          const recreated = recreateSupabaseClient();
+          if (recreated) {
+            // Test the new client
+            try {
+              await supabase.from('places').select('id').limit(1);
+              console.log('✅ New Supabase client is working');
+              window.dispatchEvent(new CustomEvent('supabase-client-recreated'));
+            } catch (testError) {
+              console.error('🚨 New client also failed:', testError);
+              // Last resort: page reload
+              console.log('🔄 Forcing page reload as last resort');
+              window.location.reload();
+            }
+          } else {
+            // Could not recreate client, reload page
             window.location.reload();
           }
         }
-      }, 500); // Give tab time to stabilize
+      }, 1000); // Give tab time to stabilize
     }
   }
 };
@@ -898,6 +940,7 @@ if (typeof window !== 'undefined') {
   (window as any).validateSessionBeforeOperation = validateSessionBeforeOperation;
   (window as any).debugDatabaseOperation = debugDatabaseOperation;
   (window as any).refreshSupabaseClientState = refreshSupabaseClientState;
+  (window as any).recreateSupabaseClient = recreateSupabaseClient;
   (window as any).handleNetworkFailure = handleNetworkFailure;
   (window as any).resetNetworkFailureCount = resetNetworkFailureCount;
   (window as any).getEnvironmentInfo = getEnvironmentInfo;
@@ -937,8 +980,25 @@ if (typeof window !== 'undefined') {
   
   // Manual recovery command
   (window as any).recoverConnection = async () => {
-    console.log('🔄 Manual client state refresh initiated...');
-    await refreshSupabaseClientState();
+    console.log('🔄 Manual connection recovery initiated...');
+    
+    try {
+      await refreshSupabaseClientState();
+    } catch (error) {
+      console.warn('⚠️ State refresh failed, trying client recreation...');
+      const recreated = recreateSupabaseClient();
+      if (recreated) {
+        console.log('✅ Client recreated successfully');
+      } else {
+        console.error('🚨 All recovery methods failed');
+      }
+    }
+  };
+  
+  // Force client recreation command
+  (window as any).forceClientRecreation = () => {
+    console.log('🔄 Forcing Supabase client recreation...');
+    return recreateSupabaseClient();
   };
 }
 
