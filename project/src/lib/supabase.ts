@@ -24,7 +24,57 @@ const getSupabaseConfig = () => {
   };
 };
 
+// Create Supabase client with connection recovery
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
+
+// Browser connection pool management
+let connectionRecoveryTimeout: NodeJS.Timeout | null = null;
+
+// Force new connection when returning from background
+const forceConnectionRecovery = async () => {
+  if (connectionRecoveryTimeout) {
+    clearTimeout(connectionRecoveryTimeout);
+  }
+  
+  console.log('🔄 Forcing connection recovery after tab switch');
+  
+  try {
+    // Method 1: Force HTTP/2 connection reset by creating new request with cache-busting
+    const timestamp = Date.now();
+    const testUrl = `${supabaseUrl}/rest/v1/?_recovery=${timestamp}`;
+    
+    // Create a minimal test request to force new connection
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    try {
+      await fetch(testUrl, {
+        method: 'HEAD',
+        headers: {
+          'apikey': supabaseAnonKey,
+          'cache-control': 'no-cache, no-store, must-revalidate',
+          'pragma': 'no-cache'
+        },
+        signal: controller.signal,
+        cache: 'no-store' // Force bypass of browser cache
+      });
+      clearTimeout(timeoutId);
+      console.log('✅ Connection recovery test successful');
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.warn('⚠️ Connection recovery test failed (expected):', fetchError.message);
+    }
+    
+    // Method 2: Force Supabase client to refresh its internal connection state
+    // This triggers a new auth check which should establish fresh connections
+    await supabase.auth.getSession();
+    
+    console.log('✅ Connection recovery completed');
+    
+  } catch (error) {
+    console.error('🚨 Connection recovery failed:', error);
+  }
+};
 
 // Simplified token management - let Supabase handle most of it
 let refreshTimer: NodeJS.Timeout | null = null;
@@ -105,54 +155,23 @@ const handleVisibilityChange = async () => {
     // Tab became hidden
     wasTabHidden = true;
     if (!import.meta.env.PROD) {
-      console.log('🙈 Tab hidden - pausing operations');
+      console.log('🙈 Tab hidden - connections may be suspended');
     }
   } else {
     // Tab became visible again
     if (wasTabHidden) {
       if (!import.meta.env.PROD) {
-        console.log('👁️ Tab visible again - gentle recovery');
+        console.log('👁️ Tab visible again - forcing connection recovery');
       }
       wasTabHidden = false;
       
-      // Wait for tab to stabilize
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      try {
-        // Simple session check without aggressive timeouts
-        const { data: { session }, error } = await supabase.auth.getSession();
+      // Critical: Force connection recovery to address browser networking issues
+      connectionRecoveryTimeout = setTimeout(async () => {
+        await forceConnectionRecovery();
         
-        if (error) {
-          console.warn('⚠️ Session error after tab focus:', error);
-          // Try refreshing the session
-          await performTokenRefresh();
-        } else if (!session) {
-          console.warn('⚠️ No session after tab focus');
-          window.dispatchEvent(new CustomEvent('supabase-session-expired'));
-        } else {
-          // Check if token needs refresh
-          const expiresAt = session.expires_at * 1000;
-          const timeUntilExpiry = expiresAt - Date.now();
-          
-          if (timeUntilExpiry < 10 * 60 * 1000) {
-            console.log('🔄 Token expiring soon, refreshing');
-            await performTokenRefresh();
-          }
-          
-          // Test connectivity with a simple query
-          await testDatabaseConnectivity();
-          
-          console.log('✅ Tab focus recovery completed');
-          window.dispatchEvent(new CustomEvent('supabase-tab-focus-recovery-success'));
-        }
-        
-      } catch (error) {
-        console.error('🚨 Tab focus recovery error:', error);
-        window.dispatchEvent(new CustomEvent('supabase-session-error', { detail: error }));
-      }
-      
-      // Restart token refresh system
-      setupCustomTokenRefresh();
+        // After connection recovery, emit success event
+        window.dispatchEvent(new CustomEvent('supabase-tab-focus-recovery-success'));
+      }, 100); // Quick recovery
     }
   }
 };
@@ -884,7 +903,7 @@ if (typeof window !== 'undefined') {
   (window as any).testDatabaseConnection = testDatabaseConnection;
   (window as any).validateSessionBeforeOperation = validateSessionBeforeOperation;
   (window as any).debugDatabaseOperation = debugDatabaseOperation;
-  // Removed forceSupabaseClientReset - focusing on gentle recovery
+  (window as any).forceConnectionRecovery = forceConnectionRecovery;
   (window as any).handleNetworkFailure = handleNetworkFailure;
   (window as any).resetNetworkFailureCount = resetNetworkFailureCount;
   (window as any).getEnvironmentInfo = getEnvironmentInfo;
@@ -896,7 +915,7 @@ if (typeof window !== 'undefined') {
   (window as any).deletePlace = deletePlace;
   (window as any).findBookedFlightPlaces = findBookedFlightPlaces;
   
-  // Simple debug commands without aggressive timeouts
+  // Debug commands with connection recovery
   (window as any).quickDebug = async () => {
     console.log('🚀 Running debug suite...');
     
@@ -906,7 +925,26 @@ if (typeof window !== 'undefined') {
       console.log('✅ Debug completed successfully');
     } catch (error) {
       console.error('🚨 Debug failed:', error);
+      
+      // If debug fails, try connection recovery
+      console.log('🔄 Attempting connection recovery...');
+      await forceConnectionRecovery();
+      
+      // Retry debug after recovery
+      try {
+        await debugConnectionState();
+        await testDatabaseConnection();
+        console.log('✅ Debug completed successfully after recovery');
+      } catch (retryError) {
+        console.error('🚨 Debug still failing after connection recovery:', retryError);
+      }
     }
+  };
+  
+  // Manual recovery command
+  (window as any).recoverConnection = async () => {
+    console.log('🔄 Manual connection recovery initiated...');
+    await forceConnectionRecovery();
   };
 }
 
