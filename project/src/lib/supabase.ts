@@ -11,7 +11,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   auth: {
     persistSession: true,
-    autoRefreshToken: true,
+    // Disable Supabase's built-in autoRefreshToken to use our custom implementation
+    autoRefreshToken: false,
     detectSessionInUrl: true,
     // Disable debug logs to prevent token exposure
     debug: false,
@@ -29,13 +30,20 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
-// Enhanced token management with production debugging
+// Custom token management that works regardless of page visibility
 let tokenRefreshTimer: NodeJS.Timeout | null = null;
+let tokenRefreshInterval: NodeJS.Timeout | null = null;
 
-// Proactive token refresh - refresh when 5 minutes remain
-const setupProactiveTokenRefresh = () => {
+// Aggressive token refresh - refresh every 45 minutes (15 minutes before 1-hour expiry)
+const setupCustomTokenRefresh = () => {
+  // Clear any existing timers
   if (tokenRefreshTimer) {
     clearTimeout(tokenRefreshTimer);
+    tokenRefreshTimer = null;
+  }
+  if (tokenRefreshInterval) {
+    clearInterval(tokenRefreshInterval);
+    tokenRefreshInterval = null;
   }
   
   supabase.auth.getSession().then(({ data: { session }, error }) => {
@@ -45,42 +53,31 @@ const setupProactiveTokenRefresh = () => {
     }
     
     if (session?.expires_at) {
-      const expiresAt = session.expires_at * 1000; // Convert to milliseconds
+      const expiresAt = session.expires_at * 1000;
       const now = Date.now();
       const timeUntilExpiry = expiresAt - now;
-      const refreshTime = Math.max(0, timeUntilExpiry - 5 * 60 * 1000); // 5 minutes before expiry
+      
+      // If session expires within 1 hour, treat it as a 1-hour session
+      const actualExpiry = timeUntilExpiry > 60 * 60 * 1000 ? now + 60 * 60 * 1000 : expiresAt;
+      const timeUntilActualExpiry = actualExpiry - now;
+      const refreshTime = Math.max(0, timeUntilActualExpiry - 15 * 60 * 1000); // 15 minutes before expiry
       
       if (!import.meta.env.PROD) {
-        console.log(`🔍 Session debug - Expires at: ${new Date(expiresAt).toISOString()}, Time until expiry: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes, Refresh in: ${Math.round(refreshTime / 1000 / 60)} minutes`);
+        console.log(`🔍 Custom token refresh - Actual expiry: ${new Date(actualExpiry).toISOString()}, Refresh in: ${Math.round(refreshTime / 1000 / 60)} minutes`);
       }
       
+      // Schedule first refresh
       if (refreshTime > 0) {
         tokenRefreshTimer = setTimeout(async () => {
-          console.log('🔄 Proactively refreshing token');
-          try {
-            const { data, error } = await supabase.auth.refreshSession();
-            if (error) {
-              console.error('🚨 Token refresh failed:', error);
-              // Attempt to re-establish session
-              const { data: newSession } = await supabase.auth.getSession();
-              if (!newSession.session) {
-                console.error('🚨 No valid session after refresh failure - user may need to re-authenticate');
-              }
-            } else {
-              console.log('✅ Token refreshed successfully');
-              setupProactiveTokenRefresh(); // Schedule next refresh
-            }
-          } catch (refreshError) {
-            console.error('🚨 Token refresh exception:', refreshError);
-          }
+          await performTokenRefresh();
+          // After successful refresh, set up interval for every 45 minutes
+          tokenRefreshInterval = setInterval(performTokenRefresh, 45 * 60 * 1000);
         }, refreshTime);
       } else {
-        console.warn('⚠️ Token already expired or expires very soon');
-        // Attempt immediate refresh
-        supabase.auth.refreshSession().then(({ error }) => {
-          if (error) {
-            console.error('🚨 Immediate token refresh failed:', error);
-          }
+        // Token expires soon or already expired, refresh immediately
+        performTokenRefresh().then(() => {
+          // Set up interval for every 45 minutes
+          tokenRefreshInterval = setInterval(performTokenRefresh, 45 * 60 * 1000);
         });
       }
     } else {
@@ -89,7 +86,35 @@ const setupProactiveTokenRefresh = () => {
   });
 };
 
-// Listen for auth events to setup refresh
+// Perform token refresh with retry logic
+const performTokenRefresh = async () => {
+  try {
+    if (!import.meta.env.PROD) {
+      console.log('🔄 Performing custom token refresh');
+    }
+    
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) {
+      console.error('🚨 Token refresh failed:', error);
+      
+      // Retry once after 5 seconds
+      setTimeout(async () => {
+        const { data: retryData, error: retryError } = await supabase.auth.refreshSession();
+        if (retryError) {
+          console.error('🚨 Token refresh retry failed:', retryError);
+        } else if (!import.meta.env.PROD) {
+          console.log('✅ Token refresh retry successful');
+        }
+      }, 5000);
+    } else if (!import.meta.env.PROD) {
+      console.log('✅ Token refreshed successfully via custom refresh');
+    }
+  } catch (refreshError) {
+    console.error('🚨 Token refresh exception:', refreshError);
+  }
+};
+
+// Listen for auth events to setup custom refresh
 supabase.auth.onAuthStateChange((event, session) => {
   // Minimal logging for security
   if (!import.meta.env.PROD) {
@@ -101,11 +126,16 @@ supabase.auth.onAuthStateChange((event, session) => {
   }
   
   if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-    setupProactiveTokenRefresh();
+    setupCustomTokenRefresh();
   } else if (event === 'SIGNED_OUT') {
+    // Clear all refresh timers
     if (tokenRefreshTimer) {
       clearTimeout(tokenRefreshTimer);
       tokenRefreshTimer = null;
+    }
+    if (tokenRefreshInterval) {
+      clearInterval(tokenRefreshInterval);
+      tokenRefreshInterval = null;
     }
   }
 });
@@ -140,14 +170,7 @@ const startSessionHealthCheck = () => {
         
         if (timeUntilExpiry < 10 * 60 * 1000) { // Less than 10 minutes
           console.warn(`⚠️ Session expires soon: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes`);
-          
-          // Try to refresh the session
-          const { error: refreshError } = await supabase.auth.refreshSession();
-          if (refreshError) {
-            console.error('🚨 Session health check refresh failed:', refreshError);
-          } else {
-            console.log('✅ Session refreshed during health check');
-          }
+          // Don't refresh here - let the custom refresh system handle it
         } else if (!import.meta.env.PROD) {
           console.log(`✅ Session healthy: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes remaining`);
         }
@@ -158,8 +181,11 @@ const startSessionHealthCheck = () => {
   }
 };
 
-// Start session health check
+// Start session health check - but only for monitoring, not for refresh
 startSessionHealthCheck();
+
+// Initialize custom token refresh on startup
+setupCustomTokenRefresh();
 
 // Auth helper functions with integrated persistence
 export const getCurrentUser = async () => {
