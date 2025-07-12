@@ -12,16 +12,24 @@ const isNetworkRestricted = () => {
 };
 
 const getSupabaseConfig = () => {
-  // REVERTED: Back to minimal, stable configuration that worked before
+  // Optimized configuration for tab switching stability
   return {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
       debug: false,
-      flowType: 'pkce'
+      flowType: 'pkce',
+      // Enhanced settings for better tab switching behavior
+      storageKey: 'sb-auth-token',
+      storage: window.localStorage
+    },
+    // Add realtime configuration for better connection handling
+    realtime: {
+      params: {
+        eventsPerSecond: 2
+      }
     }
-    // REMOVED: All custom configurations that broke authentication
   };
 };
 
@@ -157,7 +165,64 @@ export const recreateSupabaseClient = () => {
 };
 
 // Version marker for deployment tracking
-console.log('🚀 Supabase client initialized - Tab switching fix active');
+console.log('🚀 Supabase client initialized - Tab switching fix v2 active');
+
+// Enhanced testing function for tab switching authentication
+(window as any).testTabSwitchingAuth = async () => {
+  console.log('🧪 Testing tab switching authentication behavior...');
+  
+  try {
+    // 1. Check current auth status
+    const { data: { session }, error } = await supabase.auth.getSession();
+    console.log('🔍 Current session:', {
+      authenticated: !!session,
+      userId: session?.user?.id?.substring(0, 8) + '...' || 'none',
+      expires: session?.expires_at ? new Date(session.expires_at * 1000) : 'none',
+      tokenLength: session?.access_token?.length || 0
+    });
+    
+    if (error) {
+      console.error('❌ Session check failed:', error);
+      return false;
+    }
+    
+    // 2. Test database connectivity
+    console.log('🔍 Testing database connectivity...');
+    const dbTest = await supabase.from('users').select('id').limit(1);
+    if (dbTest.error) {
+      console.error('❌ Database test failed:', dbTest.error);
+      return false;
+    } else {
+      console.log('✅ Database connectivity working');
+    }
+    
+    // 3. Force refresh session
+    console.log('🔄 Testing session refresh...');
+    const refreshResult = await supabase.auth.refreshSession();
+    if (refreshResult.error) {
+      console.error('❌ Session refresh failed:', refreshResult.error);
+      return false;
+    } else {
+      console.log('✅ Session refresh successful');
+    }
+    
+    // 4. Test after refresh
+    const dbTestAfterRefresh = await supabase.from('users').select('id').limit(1);
+    if (dbTestAfterRefresh.error) {
+      console.error('❌ Database test after refresh failed:', dbTestAfterRefresh.error);
+      return false;
+    } else {
+      console.log('✅ Database connectivity after refresh working');
+    }
+    
+    console.log('🎉 All tab switching authentication tests passed!');
+    return true;
+    
+  } catch (error) {
+    console.error('🚨 Tab switching auth test failed:', error);
+    return false;
+  }
+};
 
 // Browser connection pool management
 let connectionRecoveryTimeout: NodeJS.Timeout | null = null;
@@ -188,37 +253,8 @@ const refreshSupabaseClientState = async () => {
   }
 };
 
-// Simplified token management - let Supabase handle most of it
-let refreshTimer: NodeJS.Timeout | null = null;
-
-const setupCustomTokenRefresh = () => {
-  // Clear any existing timer
-  if (refreshTimer) {
-    clearTimeout(refreshTimer);
-    refreshTimer = null;
-  }
-  
-  // Only add minimal custom refresh logic
-  supabase.auth.getSession().then(({ data: { session }, error }) => {
-    if (error || !session?.expires_at) {
-      return;
-    }
-    
-    const expiresAt = session.expires_at * 1000;
-    const timeUntilExpiry = expiresAt - Date.now();
-    
-    // Only refresh if expiring within 5 minutes (minimal intervention)
-    if (timeUntilExpiry < 5 * 60 * 1000 && timeUntilExpiry > 0) {
-      refreshTimer = setTimeout(async () => {
-        try {
-          await supabase.auth.refreshSession();
-        } catch (error) {
-          console.warn('Token refresh failed:', error);
-        }
-      }, Math.max(0, timeUntilExpiry - 2 * 60 * 1000)); // Refresh 2 minutes before expiry
-    }
-  });
-};
+// Token management - fully delegated to Supabase autoRefreshToken
+// Custom refresh logic removed to prevent conflicts
 
 // Simple token refresh - minimal intervention
 const performTokenRefresh = async () => {
@@ -248,15 +284,8 @@ supabase.auth.onAuthStateChange((event, session) => {
     });
   }
   
-  if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-    setupCustomTokenRefresh();
-  } else if (event === 'SIGNED_OUT') {
-    // Clear refresh timer
-    if (refreshTimer) {
-      clearTimeout(refreshTimer);
-      refreshTimer = null;
-    }
-  }
+  // Let Supabase handle all token refresh logic natively
+  // No custom intervention needed
 });
 
 // Enhanced Page Visibility API handling optimized for connection stability
@@ -408,27 +437,32 @@ const handleWindowFocus = async () => {
   }
 };
 
-// DISABLED: Tab switching handlers that broke authentication
-// These will be re-enabled once authentication is stable
-/*
+// Simplified tab switching handlers for authentication stability
 if (typeof document !== 'undefined') {
-  console.log('🔧 Setting up enhanced tab switching handlers');
+  console.log('🔧 Setting up minimal tab switching handlers');
   
-  // Add visibility change listener with improved logic
-  document.addEventListener('visibilitychange', handleVisibilityChange, { passive: true });
-  
-  // Add window focus listener with debouncing
-  window.addEventListener('focus', handleWindowFocus, { passive: true });
-  
-  // Add beforeunload listener to clean up timers
-  window.addEventListener('beforeunload', () => {
-    if (connectionHealthTimer) {
-      clearTimeout(connectionHealthTimer);
-      connectionHealthTimer = null;
+  // Minimal visibility change listener - only refresh session when tab becomes visible
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible') {
+      try {
+        console.log('🔄 Tab became visible - refreshing session');
+        await supabase.auth.refreshSession();
+      } catch (error) {
+        console.warn('Session refresh on tab visibility failed:', error);
+      }
     }
-  });
+  }, { passive: true });
+  
+  // Minimal window focus listener
+  window.addEventListener('focus', async () => {
+    try {
+      console.log('🔄 Window focused - refreshing session');
+      await supabase.auth.refreshSession();
+    } catch (error) {
+      console.warn('Session refresh on window focus failed:', error);
+    }
+  }, { passive: true });
 }
-*/
 
 // Periodic session health check for production
 let sessionHealthTimer: NodeJS.Timeout | null = null;
@@ -534,8 +568,7 @@ export const setRealtimeActive = (active: boolean) => {
 // Start session health check - but only for monitoring, not for refresh
 startSessionHealthCheck();
 
-// Initialize custom token refresh on startup
-setupCustomTokenRefresh();
+// Custom token refresh removed - relying on Supabase autoRefreshToken
 
 // Start keep-alive for connection stability
 startKeepAlive();
