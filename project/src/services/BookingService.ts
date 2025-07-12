@@ -9,15 +9,17 @@ export class BookingService {
     try {
       // Debug authentication status before booking save
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('🔍 Booking save - Auth status:', {
-        hasSession: !!session,
-        hasUser: !!session?.user,
-        userId: session?.user?.id ? session.user.id.substring(0, 8) + '...' : null,
-        bookingUserId: booking.user_id ? booking.user_id.substring(0, 8) + '...' : null,
-        expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
-        sessionError: sessionError?.message,
-        environment: import.meta.env.PROD ? 'production' : 'development'
-      });
+      if (!import.meta.env.PROD) {
+        console.log('🔍 Booking save - Auth status:', {
+          hasSession: !!session,
+          hasUser: !!session?.user,
+          userId: session?.user?.id ? session.user.id.substring(0, 8) + '...' : null,
+          bookingUserId: booking.user_id ? booking.user_id.substring(0, 8) + '...' : null,
+          expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+          sessionError: sessionError?.message,
+          environment: import.meta.env.PROD ? 'production' : 'development'
+        });
+      }
 
       const { data, error } = await supabase
         .from('bookings')

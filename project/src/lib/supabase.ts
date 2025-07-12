@@ -13,8 +13,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    // More aggressive session management for production
-    debug: import.meta.env.PROD,
+    // Disable debug logs to prevent token exposure
+    debug: false,
     flowType: 'pkce'
   },
   // Increase timeout for production stability
@@ -50,7 +50,9 @@ const setupProactiveTokenRefresh = () => {
       const timeUntilExpiry = expiresAt - now;
       const refreshTime = Math.max(0, timeUntilExpiry - 5 * 60 * 1000); // 5 minutes before expiry
       
-      console.log(`🔍 Session debug - Expires at: ${new Date(expiresAt).toISOString()}, Time until expiry: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes, Refresh in: ${Math.round(refreshTime / 1000 / 60)} minutes`);
+      if (!import.meta.env.PROD) {
+        console.log(`🔍 Session debug - Expires at: ${new Date(expiresAt).toISOString()}, Time until expiry: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes, Refresh in: ${Math.round(refreshTime / 1000 / 60)} minutes`);
+      }
       
       if (refreshTime > 0) {
         tokenRefreshTimer = setTimeout(async () => {
@@ -89,7 +91,8 @@ const setupProactiveTokenRefresh = () => {
 
 // Listen for auth events to setup refresh
 supabase.auth.onAuthStateChange((event, session) => {
-  if (import.meta.env.PROD) {
+  // Minimal logging for security
+  if (!import.meta.env.PROD) {
     console.log(`🔍 Auth state change: ${event}`, {
       hasSession: !!session,
       userId: session?.user?.id ? session.user.id.substring(0, 8) + '...' : null,
@@ -145,7 +148,7 @@ const startSessionHealthCheck = () => {
           } else {
             console.log('✅ Session refreshed during health check');
           }
-        } else {
+        } else if (!import.meta.env.PROD) {
           console.log(`✅ Session healthy: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes remaining`);
         }
       } catch (error) {
@@ -390,13 +393,15 @@ export const addPlaceToDatabase = async (placeData: any) => {
     let user;
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
-      console.log('🔍 Session check result:', {
-        hasSession: !!session,
-        hasUser: !!session?.user,
-        userId: session?.user?.id ? session.user.id.substring(0, 8) + '...' : null,
-        expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
-        error: error?.message
-      });
+      if (!import.meta.env.PROD) {
+        console.log('🔍 Session check result:', {
+          hasSession: !!session,
+          hasUser: !!session?.user,
+          userId: session?.user?.id ? session.user.id.substring(0, 8) + '...' : null,
+          expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+          error: error?.message
+        });
+      }
       
       if (session?.user) {
         user = session.user;
