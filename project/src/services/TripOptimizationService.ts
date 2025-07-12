@@ -205,9 +205,6 @@ export class TripOptimizationService {
         throw new Error(`Failed to fetch members: ${membersError.message}`)
       }
 
-      // Use production Edge Function with proper authentication
-      const { callSupabaseFunction } = await import('../lib/supabase');
-      
       // Transform places to match Edge Function expected format
       const transformedPlaces = (places || []).map(place => ({
         id: place.id,
@@ -231,17 +228,23 @@ export class TripOptimizationService {
         assigned_color_index: member.assigned_color_index
       }));
 
-      const response = await callSupabaseFunction('normalize-preferences', {
-        trip_id: tripId,
-        places: transformedPlaces,
-        members: transformedMembers,
-        settings: {
-          fairness_weight: 0.6,
-          efficiency_weight: 0.4,
-          include_meals: true,
-          preferred_transport: 'car'
+      const { data: response, error } = await supabase.functions.invoke('normalize-preferences', {
+        body: {
+          trip_id: tripId,
+          places: transformedPlaces,
+          members: transformedMembers,
+          settings: {
+            fairness_weight: 0.6,
+            efficiency_weight: 0.4,
+            include_meals: true,
+            preferred_transport: 'car'
+          }
         }
       })
+
+      if (error) {
+        throw error;
+      }
 
       return response as NormalizationResult
     } catch (error) {
@@ -315,9 +318,6 @@ export class TripOptimizationService {
       }
     }
 
-    // Use production Edge Function with proper authentication
-    const { callSupabaseFunction } = await import('../lib/supabase');
-    
     // Get the current user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -337,18 +337,24 @@ export class TripOptimizationService {
     
     const allTripPlaces = freshPlaces || [];
 
-    const result = await callSupabaseFunction('optimize-route', {
-      trip_id: tripId,
-      member_id: user.id,
-      user_places: allTripPlaces || [], // Send ALL places including departure/destination
-      constraints: {
-        time_constraint_minutes: 1440, // 24 hours default
-        distance_constraint_km: 1000,
-        budget_constraint_yen: 100000,
-        max_places: 20
-      },
-      transport_mode: settings.preferred_transport || 'mixed'
+    const { data: result, error } = await supabase.functions.invoke('optimize-route', {
+      body: {
+        trip_id: tripId,
+        member_id: user.id,
+        user_places: allTripPlaces || [], // Send ALL places including departure/destination
+        constraints: {
+          time_constraint_minutes: 1440, // 24 hours default
+          distance_constraint_km: 1000,
+          budget_constraint_yen: 100000,
+          max_places: 20
+        },
+        transport_mode: settings.preferred_transport || 'mixed'
+      }
     })
+
+    if (error) {
+      throw error;
+    }
     
     if (!result.success) {
       throw new Error(result.error || 'Route optimization failed')
@@ -779,21 +785,14 @@ export class TripOptimizationService {
         throw new Error('No authentication session available');
       }
 
-      const testUrl = `${supabase.supabaseUrl}/functions/v1/normalize-preferences`;
-      
-      const response = await fetch(testUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.session.access_token}`,
-        },
-        body: JSON.stringify({ test: true }),
-        signal: controller.signal,
+      // Use supabase.functions.invoke instead of fetch
+      const { data, error } = await supabase.functions.invoke('normalize-preferences', {
+        body: { test: true }
       });
 
       // We expect this to fail with a validation error, which means the service is reachable
-      if (response.status !== 400 && !response.ok) {
-        throw new Error(`Edge Functions unavailable: ${response.status}`);
+      if (error && !error.message.includes('validation')) {
+        throw new Error(`Edge Functions unavailable: ${error.message}`);
       }
 
     } catch (error) {

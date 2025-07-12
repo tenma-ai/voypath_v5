@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { OptimizationResult } from '../types/optimization';
-import { supabase, callSupabaseFunction } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface User {

@@ -4,7 +4,7 @@
  * Completely excludes sea routes and ensures realistic transportation
  */
 
-import { supabase, callSupabaseFunction } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 // Types
 export interface GeographicRegion {
@@ -201,10 +201,16 @@ export class RealisticRouteCalculator {
   static async getRegionForCoordinate(lat: number, lng: number): Promise<GeographicRegion | null> {
     try {
       // Try using the integrated geographic lookup service
-      const response = await callSupabaseFunction('geographic-lookup', {
-        latitude: lat,
-        longitude: lng
-      }, 'POST');
+      const { data: response, error } = await supabase.functions.invoke('geographic-lookup', {
+        body: {
+          latitude: lat,
+          longitude: lng
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
       
       return response.region || null;
     } catch (error) {
