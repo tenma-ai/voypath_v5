@@ -241,6 +241,17 @@ const validateCurrentSession = async () => {
   }
 };
 
+// Initialize session recovery on startup
+if (typeof window !== 'undefined') {
+  // Attempt session recovery when page loads
+  window.addEventListener('load', async () => {
+    const recovered = await attemptSessionRecovery();
+    if (recovered) {
+      console.log('🎉 Session recovery completed - user should remain signed in');
+    }
+  });
+}
+
 // Listen for auth events to setup custom refresh
 supabase.auth.onAuthStateChange((event, session) => {
   // Minimal logging for security
@@ -366,12 +377,37 @@ const handleVisibilityChange = async () => {
   }
 };
 
-// Force Supabase client reset when hanging/broken
+// Enhanced client reset that preserves session if possible
 const forceSupabaseClientReset = async () => {
   console.log('🔄 Forcing Supabase client reset due to hanging state');
   
   try {
-    // Clear all existing connections and timers
+    // Step 1: Try to preserve session data before reset
+    let preservedSession = null;
+    try {
+      // Quick attempt to get session data (with short timeout)
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session backup timeout')), 1000)
+      );
+      
+      const sessionResult = await Promise.race([sessionPromise, timeoutPromise]);
+      if (sessionResult?.data?.session) {
+        preservedSession = {
+          access_token: sessionResult.data.session.access_token,
+          refresh_token: sessionResult.data.session.refresh_token,
+          user: sessionResult.data.session.user
+        };
+        console.log('💾 Session data preserved for recovery');
+        
+        // Store in a different localStorage key for recovery
+        localStorage.setItem('voypath_session_backup', JSON.stringify(preservedSession));
+      }
+    } catch (backupError) {
+      console.warn('⚠️ Could not backup session:', backupError);
+    }
+    
+    // Step 2: Clear all existing connections and timers
     if (tokenRefreshTimer) {
       clearTimeout(tokenRefreshTimer);
       tokenRefreshTimer = null;
@@ -385,21 +421,20 @@ const forceSupabaseClientReset = async () => {
       sessionCheckInterval = null;
     }
     
-    // Force sign out to clear any corrupted state
+    // Step 3: Force sign out to clear corrupted state (with timeout)
     try {
       await Promise.race([
         supabase.auth.signOut(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('signOut timeout')), 2000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('signOut timeout')), 1000))
       ]);
     } catch (signOutError) {
-      console.warn('⚠️ Sign out timed out or failed:', signOutError);
-      // Continue with reset even if signOut fails
+      console.warn('⚠️ Sign out timed out or failed (expected):', signOutError);
     }
     
-    // Clear localStorage auth data
+    // Step 4: Clear only corrupted Supabase auth data, preserve backup
     try {
       Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('sb-') || key.includes('supabase')) {
+        if ((key.startsWith('sb-') || key.includes('supabase')) && key !== 'voypath_session_backup') {
           localStorage.removeItem(key);
         }
       });
@@ -407,15 +442,60 @@ const forceSupabaseClientReset = async () => {
       console.warn('⚠️ localStorage clear failed:', storageError);
     }
     
-    // Force page reload to reset client state
-    console.log('🔄 Client reset complete - reloading page to ensure clean state');
+    // Step 5: Set recovery flag and reload
+    localStorage.setItem('voypath_recovery_mode', 'true');
+    console.log('🔄 Client reset complete - reloading with session recovery');
     window.location.reload();
     
   } catch (resetError) {
     console.error('🚨 Client reset failed:', resetError);
-    // Last resort: force reload
+    // Last resort: force reload without session preservation
+    localStorage.setItem('voypath_recovery_mode', 'true');
     window.location.reload();
   }
+};
+
+// Session recovery after page reload
+const attemptSessionRecovery = async () => {
+  const recoveryMode = localStorage.getItem('voypath_recovery_mode');
+  const sessionBackup = localStorage.getItem('voypath_session_backup');
+  
+  if (recoveryMode === 'true' && sessionBackup) {
+    console.log('🔄 Attempting session recovery after client reset');
+    
+    try {
+      const preserved = JSON.parse(sessionBackup);
+      
+      // Try to restore session using the refresh token
+      const { data, error } = await supabase.auth.setSession({
+        access_token: preserved.access_token,
+        refresh_token: preserved.refresh_token
+      });
+      
+      if (error) {
+        console.warn('⚠️ Session recovery failed:', error);
+        // Clear recovery data and let user sign in normally
+        localStorage.removeItem('voypath_session_backup');
+        localStorage.removeItem('voypath_recovery_mode');
+      } else {
+        console.log('✅ Session recovered successfully after client reset');
+        // Clean up recovery data
+        localStorage.removeItem('voypath_session_backup');
+        localStorage.removeItem('voypath_recovery_mode');
+        
+        // Restart auth system
+        setupCustomTokenRefresh();
+        
+        return true;
+      }
+    } catch (recoveryError) {
+      console.error('🚨 Session recovery error:', recoveryError);
+      localStorage.removeItem('voypath_session_backup');
+      localStorage.removeItem('voypath_recovery_mode');
+    }
+  }
+  
+  return false;
 };
 
 // Test database connectivity after tab focus
