@@ -2047,13 +2047,23 @@ export const useStore = create<StoreState>()((set, get) => ({
         const { currentTrip, loadPlacesFromDatabase, loadOptimizationResult, realtimeDebounceTimers, isInternalUpdate } = get();
         if (!currentTrip?.id) return;
         
-        console.log('🔄 Setting up enhanced Realtime with debounce and cascade prevention');
+        console.log('🔄 Setting up tab-switching resilient Realtime with WebSocket recovery');
         
-        // Cleanup existing channels and timers
-        get().realtimeChannels.forEach(channel => supabase.removeChannel(channel));
-        realtimeDebounceTimers.forEach(timer => clearTimeout(timer));
-        realtimeDebounceTimers.clear();
-        set({ realtimeChannels: [], realtimeDebounceTimers: new Map() });
+        // Enhanced cleanup with error handling
+        try {
+          get().realtimeChannels.forEach(channel => {
+            try {
+              supabase.removeChannel(channel);
+            } catch (error) {
+              console.warn('⚠️ Error removing realtime channel:', error);
+            }
+          });
+          realtimeDebounceTimers.forEach(timer => clearTimeout(timer));
+          realtimeDebounceTimers.clear();
+          set({ realtimeChannels: [], realtimeDebounceTimers: new Map() });
+        } catch (error) {
+          console.error('🚨 Error during realtime cleanup:', error);
+        }
         
         // Notify polling services that realtime is stopping (cleanup phase)
         try {
@@ -2099,39 +2109,106 @@ export const useStore = create<StoreState>()((set, get) => ({
           set({ realtimeDebounceTimers: timers });
         };
         
-        // Subscribe to places with debounce
-        const placesChannel = supabase
-          .channel(`places:${currentTrip.id}`)
-          .on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'places',
-            filter: `trip_id=eq.${currentTrip.id}`
-          }, (payload) => {
-            console.log('📡 Realtime places change detected:', payload.eventType);
-            debouncedUpdate('places', async () => {
-              await loadPlacesFromDatabase(currentTrip.id);
-            }, 500); // 500ms debounce for places
-          })
-          .subscribe();
+        // Enhanced WebSocket subscription with connection monitoring
+        const channels: RealtimeChannel[] = [];
         
-        // Subscribe to optimization_results with debounce
-        const optChannel = supabase
-          .channel(`optimization_results:${currentTrip.id}`)
-          .on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'optimization_results',
-            filter: `trip_id=eq.${currentTrip.id}`
-          }, (payload) => {
-            console.log('📡 Realtime optimization change detected:', payload.eventType);
-            debouncedUpdate('optimization', async () => {
-              await loadOptimizationResult(currentTrip.id);
-            }, 1000); // 1000ms debounce for optimization
-          })
-          .subscribe();
-        
-        set({ realtimeChannels: [placesChannel, optChannel] });
+        try {
+          // Subscribe to places with enhanced error handling and reconnection
+          const placesChannel = supabase
+            .channel(`places:${currentTrip.id}`, {
+              config: {
+                presence: {
+                  key: `user_${Date.now()}`
+                },
+                broadcast: {
+                  self: false // Don't receive our own broadcasts
+                }
+              }
+            })
+            .on('postgres_changes', {
+              event: '*',
+              schema: 'public',
+              table: 'places',
+              filter: `trip_id=eq.${currentTrip.id}`
+            }, (payload) => {
+              console.log('📡 Realtime places change detected:', payload.eventType);
+              debouncedUpdate('places', async () => {
+                await loadPlacesFromDatabase(currentTrip.id);
+              }, 500); // 500ms debounce for places
+            })
+            .on('system', {}, (payload) => {
+              console.log('🔌 Places channel system event:', payload);
+              if (payload.event === 'phx_error' || payload.event === 'phx_close') {
+                console.warn('⚠️ Places WebSocket connection issue, will auto-reconnect');
+                // Supabase handles reconnection automatically, but we can trigger recovery
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('supabase-realtime-reconnect-needed'));
+                }, 5000);
+              }
+            })
+            .subscribe((status) => {
+              console.log('🔌 Places channel status:', status);
+              if (status === 'CHANNEL_ERROR') {
+                console.error('🚨 Places channel error - triggering recovery');
+                setTimeout(() => get().setupSupabaseRealtime(), 3000);
+              }
+            });
+          
+          channels.push(placesChannel);
+          
+          // Subscribe to optimization_results with enhanced monitoring
+          const optChannel = supabase
+            .channel(`optimization_results:${currentTrip.id}`, {
+              config: {
+                presence: {
+                  key: `user_${Date.now()}`
+                },
+                broadcast: {
+                  self: false
+                }
+              }
+            })
+            .on('postgres_changes', {
+              event: '*',
+              schema: 'public',
+              table: 'optimization_results',
+              filter: `trip_id=eq.${currentTrip.id}`
+            }, (payload) => {
+              console.log('📡 Realtime optimization change detected:', payload.eventType);
+              debouncedUpdate('optimization', async () => {
+                await loadOptimizationResult(currentTrip.id);
+              }, 1000); // 1000ms debounce for optimization
+            })
+            .on('system', {}, (payload) => {
+              console.log('🔌 Optimization channel system event:', payload);
+              if (payload.event === 'phx_error' || payload.event === 'phx_close') {
+                console.warn('⚠️ Optimization WebSocket connection issue, will auto-reconnect');
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('supabase-realtime-reconnect-needed'));
+                }, 5000);
+              }
+            })
+            .subscribe((status) => {
+              console.log('🔌 Optimization channel status:', status);
+              if (status === 'CHANNEL_ERROR') {
+                console.error('🚨 Optimization channel error - triggering recovery');
+                setTimeout(() => get().setupSupabaseRealtime(), 3000);
+              }
+            });
+            
+          channels.push(optChannel);
+          
+          set({ realtimeChannels: channels });
+          
+        } catch (error) {
+          console.error('🚨 Error setting up realtime channels:', error);
+          // Fallback: retry setup after delay
+          setTimeout(() => {
+            console.log('🔄 Retrying realtime setup after error');
+            get().setupSupabaseRealtime();
+          }, 5000);
+          return;
+        }
         
         // Notify other services that realtime is now active to prevent polling conflicts
         try {
@@ -2146,40 +2223,95 @@ export const useStore = create<StoreState>()((set, get) => ({
           console.warn('⚠️ Could not notify polling services about realtime activation:', error);
         }
         
-        // Set up listeners for tab visibility and session events
+        // Enhanced listeners for tab visibility and session events
         const handleSessionExpired = () => {
-          console.warn('🚨 Session expired detected - cleaning up realtime connections');
-          // Clean up realtime connections
-          get().realtimeChannels.forEach(channel => supabase.removeChannel(channel));
-          set({ realtimeChannels: [] });
-          
-          // Optionally trigger re-authentication UI
-        };
-        
-        const handleWindowFocusValid = () => {
-          console.log('✅ Window focus with valid session - checking realtime connections');
-          const { realtimeChannels } = get();
-          
-          // If no active channels, restart realtime
-          if (realtimeChannels.length === 0) {
-            console.log('🔄 Restarting realtime connections after window focus');
-            setTimeout(() => {
-              get().setupSupabaseRealtime();
-            }, 1000); // Small delay to ensure session is fully valid
+          console.warn('🚨 Session expired detected - comprehensive realtime cleanup');
+          try {
+            // Clean up realtime connections with error handling
+            get().realtimeChannels.forEach(channel => {
+              try {
+                supabase.removeChannel(channel);
+              } catch (error) {
+                console.warn('⚠️ Error removing channel during session expiry:', error);
+              }
+            });
+            set({ realtimeChannels: [] });
+            
+            // Clear any pending debounce timers
+            get().realtimeDebounceTimers.forEach(timer => clearTimeout(timer));
+            get().realtimeDebounceTimers.clear();
+            
+          } catch (error) {
+            console.error('🚨 Error during session expiry cleanup:', error);
           }
         };
         
-        // Add event listeners for session management
+        const handleWindowFocusValid = () => {
+          console.log('✅ Window focus with valid session - enhanced connection check');
+          const { realtimeChannels } = get();
+          
+          // Check channel health and restart if needed
+          if (realtimeChannels.length === 0) {
+            console.log('🔄 No active channels - restarting realtime after window focus');
+            setTimeout(() => {
+              get().setupSupabaseRealtime();
+            }, 1000);
+          } else {
+            // Check if existing channels are still healthy
+            let hasUnhealthyChannels = false;
+            realtimeChannels.forEach(channel => {
+              if (channel.state !== 'joined') {
+                console.warn(`⚠️ Channel ${channel.topic} is in state: ${channel.state}`);
+                hasUnhealthyChannels = true;
+              }
+            });
+            
+            if (hasUnhealthyChannels) {
+              console.log('🔄 Found unhealthy channels - restarting realtime');
+              setTimeout(() => {
+                get().setupSupabaseRealtime();
+              }, 2000);
+            }
+          }
+        };
+        
+        const handleTabFocusRecovery = () => {
+          console.log('👁️ Tab focus recovery - checking realtime health');
+          const { realtimeChannels } = get();
+          
+          // More aggressive recovery for tab switching
+          if (realtimeChannels.length === 0) {
+            console.log('🔄 Tab focus recovery - no channels, restarting');
+            setTimeout(() => {
+              get().setupSupabaseRealtime();
+            }, 500); // Faster recovery for tab switching
+          }
+        };
+        
+        const handleRealtimeReconnectNeeded = () => {
+          console.log('🔄 WebSocket reconnection requested - restarting realtime');
+          setTimeout(() => {
+            get().setupSupabaseRealtime();
+          }, 1000);
+        };
+        
+        // Add all event listeners for comprehensive session management
         window.addEventListener('supabase-session-expired', handleSessionExpired);
         window.addEventListener('supabase-window-focus-valid', handleWindowFocusValid);
+        window.addEventListener('supabase-tab-focus-recovery-success', handleTabFocusRecovery);
+        window.addEventListener('supabase-realtime-reconnect-needed', handleRealtimeReconnectNeeded);
         
         // Store cleanup function for these listeners
         const cleanup = () => {
           window.removeEventListener('supabase-session-expired', handleSessionExpired);
           window.removeEventListener('supabase-window-focus-valid', handleWindowFocusValid);
+          window.removeEventListener('supabase-tab-focus-recovery-success', handleTabFocusRecovery);
+          window.removeEventListener('supabase-realtime-reconnect-needed', handleRealtimeReconnectNeeded);
         };
         
-        // Return cleanup function (though it won't be used in current implementation)
+        // Store cleanup function for later use
+        (get() as any).realtimeCleanup = cleanup;
+        
         return cleanup;
       },
 

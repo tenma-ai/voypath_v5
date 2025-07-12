@@ -16,15 +16,27 @@ const getSupabaseConfig = () => {
     realtime: {
       params: {
         eventsPerSecond: 2, // Reduced from 10 to 2 to prevent connection issues
-        timeout: 30000 // 30 seconds timeout instead of default
+        timeout: 30000, // 30 seconds timeout instead of default
+        heartbeatIntervalMs: 30000, // 30 second heartbeat
+        reconnectAfterMs: (tries) => Math.min(tries * 1000, 10000) // Exponential backoff up to 10s
       }
     },
     auth: {
       persistSession: true,
-      autoRefreshToken: false,
+      autoRefreshToken: true, // Re-enable auto-refresh to work with Supabase's built-in system
       detectSessionInUrl: true,
       debug: false,
-      flowType: 'pkce'
+      flowType: 'pkce',
+      storage: window.localStorage, // Explicit storage for cross-tab sync
+      storageKey: 'sb-auth-token' // Custom storage key
+    },
+    db: {
+      schema: 'public'
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'voypath-web@1.0.0'
+      }
     }
   };
 
@@ -78,11 +90,13 @@ const getSupabaseConfig = () => {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
 
-// Custom token management that works regardless of page visibility
+// Enhanced token management with tab visibility awareness
 let tokenRefreshTimer: NodeJS.Timeout | null = null;
 let tokenRefreshInterval: NodeJS.Timeout | null = null;
+let sessionCheckInterval: NodeJS.Timeout | null = null;
+let lastSessionCheck = Date.now();
 
-// Aggressive token refresh - refresh every 45 minutes (15 minutes before 1-hour expiry)
+// Aggressive token refresh - refresh every 30 minutes (30 minutes before 1-hour expiry)
 const setupCustomTokenRefresh = () => {
   // Clear any existing timers
   if (tokenRefreshTimer) {
@@ -92,6 +106,10 @@ const setupCustomTokenRefresh = () => {
   if (tokenRefreshInterval) {
     clearInterval(tokenRefreshInterval);
     tokenRefreshInterval = null;
+  }
+  if (sessionCheckInterval) {
+    clearInterval(sessionCheckInterval);
+    sessionCheckInterval = null;
   }
   
   supabase.auth.getSession().then(({ data: { session }, error }) => {
@@ -105,27 +123,30 @@ const setupCustomTokenRefresh = () => {
       const now = Date.now();
       const timeUntilExpiry = expiresAt - now;
       
-      // If session expires within 1 hour, treat it as a 1-hour session
-      const actualExpiry = timeUntilExpiry > 60 * 60 * 1000 ? now + 60 * 60 * 1000 : expiresAt;
-      const timeUntilActualExpiry = actualExpiry - now;
-      const refreshTime = Math.max(0, timeUntilActualExpiry - 15 * 60 * 1000); // 15 minutes before expiry
+      // More aggressive refresh schedule for tab switching scenarios
+      const refreshTime = Math.max(0, timeUntilExpiry - 30 * 60 * 1000); // 30 minutes before expiry
       
       if (!import.meta.env.PROD) {
-        console.log(`🔍 Custom token refresh - Actual expiry: ${new Date(actualExpiry).toISOString()}, Refresh in: ${Math.round(refreshTime / 1000 / 60)} minutes`);
+        console.log(`🔍 Custom token refresh - Expiry: ${new Date(expiresAt).toISOString()}, Refresh in: ${Math.round(refreshTime / 1000 / 60)} minutes`);
       }
       
       // Schedule first refresh
       if (refreshTime > 0) {
         tokenRefreshTimer = setTimeout(async () => {
           await performTokenRefresh();
-          // After successful refresh, set up interval for every 45 minutes
-          tokenRefreshInterval = setInterval(performTokenRefresh, 45 * 60 * 1000);
+          // After successful refresh, set up interval for every 30 minutes
+          tokenRefreshInterval = setInterval(performTokenRefresh, 30 * 60 * 1000);
         }, refreshTime);
+        
+        // Set up session validation check every 5 minutes
+        sessionCheckInterval = setInterval(validateCurrentSession, 5 * 60 * 1000);
       } else {
         // Token expires soon or already expired, refresh immediately
         performTokenRefresh().then(() => {
-          // Set up interval for every 45 minutes
-          tokenRefreshInterval = setInterval(performTokenRefresh, 45 * 60 * 1000);
+          // Set up interval for every 30 minutes
+          tokenRefreshInterval = setInterval(performTokenRefresh, 30 * 60 * 1000);
+          // Set up session validation check every 5 minutes
+          sessionCheckInterval = setInterval(validateCurrentSession, 5 * 60 * 1000);
         });
       }
     } else {
@@ -134,31 +155,89 @@ const setupCustomTokenRefresh = () => {
   });
 };
 
-// Perform token refresh with retry logic
+// Enhanced token refresh with better error handling
 const performTokenRefresh = async () => {
   try {
+    lastSessionCheck = Date.now();
+    
     if (!import.meta.env.PROD) {
-      console.log('🔄 Performing custom token refresh');
+      console.log('🔄 Performing enhanced token refresh');
     }
     
     const { data, error } = await supabase.auth.refreshSession();
     if (error) {
       console.error('🚨 Token refresh failed:', error);
       
-      // Retry once after 5 seconds
+      // For tab switching issues, try getting a fresh session
+      if (error.message?.includes('refresh_token_not_found') || error.message?.includes('invalid_grant')) {
+        console.log('🔄 Attempting fresh session retrieval after refresh failure');
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !sessionData?.session) {
+          console.error('🚨 Fresh session retrieval also failed:', sessionError);
+          window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+          return;
+        }
+      }
+      
+      // Retry once after 3 seconds (shorter retry for tab switching)
       setTimeout(async () => {
         const { data: retryData, error: retryError } = await supabase.auth.refreshSession();
         if (retryError) {
           console.error('🚨 Token refresh retry failed:', retryError);
+          window.dispatchEvent(new CustomEvent('supabase-session-expired'));
         } else if (!import.meta.env.PROD) {
           console.log('✅ Token refresh retry successful');
         }
-      }, 5000);
+      }, 3000);
     } else if (!import.meta.env.PROD) {
-      console.log('✅ Token refreshed successfully via custom refresh');
+      console.log('✅ Token refreshed successfully via enhanced refresh');
     }
   } catch (refreshError) {
     console.error('🚨 Token refresh exception:', refreshError);
+    window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+  }
+};
+
+// Validate current session periodically
+const validateCurrentSession = async () => {
+  try {
+    // Skip validation if tab is hidden to avoid throttling
+    if (typeof document !== 'undefined' && document.hidden) {
+      return;
+    }
+    
+    const timeSinceLastCheck = Date.now() - lastSessionCheck;
+    if (timeSinceLastCheck < 4 * 60 * 1000) { // Don't check more than every 4 minutes
+      return;
+    }
+    
+    lastSessionCheck = Date.now();
+    
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('🚨 Session validation failed:', error);
+      window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+      return;
+    }
+    
+    if (!session) {
+      console.warn('⚠️ No session found during validation');
+      window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+      return;
+    }
+    
+    const expiresAt = session.expires_at * 1000;
+    const timeUntilExpiry = expiresAt - Date.now();
+    
+    // If session expires within 10 minutes, refresh preemptively
+    if (timeUntilExpiry < 10 * 60 * 1000) {
+      if (!import.meta.env.PROD) {
+        console.log('🔄 Session expiring soon, preemptive refresh');
+      }
+      await performTokenRefresh();
+    }
+  } catch (error) {
+    console.error('🚨 Session validation error:', error);
   }
 };
 
@@ -185,6 +264,10 @@ supabase.auth.onAuthStateChange((event, session) => {
       clearInterval(tokenRefreshInterval);
       tokenRefreshInterval = null;
     }
+    if (sessionCheckInterval) {
+      clearInterval(sessionCheckInterval);
+      sessionCheckInterval = null;
+    }
   }
 });
 
@@ -202,58 +285,145 @@ const handleVisibilityChange = async () => {
     // Tab became visible again
     if (wasTabHidden) {
       if (!import.meta.env.PROD) {
-        console.log('👁️ Tab visible again - validating session and connections');
+        console.log('👁️ Tab visible again - comprehensive session recovery');
       }
       wasTabHidden = false;
       
-      // Immediately check and refresh session if needed
+      // Wait a moment for tab to fully activate
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Comprehensive session recovery for tab switching
       try {
+        // Step 1: Check current session state
         const { data: { session }, error } = await supabase.auth.getSession();
-        if (error || !session) {
-          console.warn('⚠️ Session invalid after tab regain focus');
-          // Session may have expired - trigger re-auth flow
-          window.dispatchEvent(new CustomEvent('supabase-session-expired'));
-        } else {
-          // Check if token is close to expiry and refresh if needed
-          const expiresAt = session.expires_at * 1000;
-          const now = Date.now();
-          const timeUntilExpiry = expiresAt - now;
+        
+        if (error) {
+          console.error('🚨 Session retrieval error after tab focus:', error);
           
-          if (timeUntilExpiry < 10 * 60 * 1000) { // Less than 10 minutes
-            if (!import.meta.env.PROD) {
-              console.log('🔄 Refreshing token due to tab regain focus');
-            }
-            await performTokenRefresh();
+          // Try to recover from certain errors
+          if (error.message?.includes('Invalid Refresh Token') || error.message?.includes('refresh_token_not_found')) {
+            console.log('🔄 Attempting session recovery from refresh token error');
+            // Clear potentially corrupted session and force re-auth
+            await supabase.auth.signOut();
+            window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+            return;
           }
+          
+          window.dispatchEvent(new CustomEvent('supabase-session-error', { detail: error }));
+          return;
         }
+        
+        if (!session) {
+          console.warn('⚠️ No session found after tab regain focus');
+          window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+          return;
+        }
+        
+        // Step 2: Validate session expiry
+        const expiresAt = session.expires_at * 1000;
+        const now = Date.now();
+        const timeUntilExpiry = expiresAt - now;
+        
+        if (timeUntilExpiry <= 0) {
+          console.warn('⚠️ Session already expired after tab focus');
+          await performTokenRefresh();
+          return;
+        }
+        
+        // Step 3: Preemptive refresh if expiring soon (within 15 minutes)
+        if (timeUntilExpiry < 15 * 60 * 1000) {
+          if (!import.meta.env.PROD) {
+            console.log('🔄 Preemptive token refresh due to tab regain focus');
+          }
+          await performTokenRefresh();
+        }
+        
+        // Step 4: Test database connectivity
+        await testDatabaseConnectivity();
+        
+        // Step 5: Emit success event for realtime reconnection
+        window.dispatchEvent(new CustomEvent('supabase-tab-focus-recovery-success'));
+        
       } catch (error) {
-        console.error('🚨 Error checking session after tab focus:', error);
+        console.error('🚨 Comprehensive error during tab focus recovery:', error);
         window.dispatchEvent(new CustomEvent('supabase-session-error', { detail: error }));
       }
       
-      // Restart token refresh system if needed
+      // Restart token refresh system
       setupCustomTokenRefresh();
     }
   }
 };
 
+// Test database connectivity after tab focus
+const testDatabaseConnectivity = async () => {
+  try {
+    // Simple connectivity test - get user profile
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error('🚨 Database connectivity test failed:', error);
+      throw error;
+    }
+    
+    if (!import.meta.env.PROD) {
+      console.log('✅ Database connectivity test passed');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('🚨 Database connectivity test exception:', error);
+    throw error;
+  }
+};
+
 // Window focus handler for additional session validation
 const handleWindowFocus = async () => {
+  // Debounce rapid focus events
+  const now = Date.now();
+  const timeSinceLastFocus = now - (handleWindowFocus as any).lastCall || 0;
+  (handleWindowFocus as any).lastCall = now;
+  
+  if (timeSinceLastFocus < 1000) { // Ignore if called within 1 second
+    return;
+  }
+  
   if (!import.meta.env.PROD) {
-    console.log('🎯 Window gained focus - quick session validation');
+    console.log('🎯 Window gained focus - enhanced session validation');
   }
   
   try {
+    // Enhanced session validation
     const { data: { session }, error } = await supabase.auth.getSession();
-    if (error || !session) {
-      console.warn('⚠️ Session lost during window switch');
-      window.dispatchEvent(new CustomEvent('supabase-session-expired'));
-    } else {
-      // Session is valid, check if any realtime connections need restart
-      window.dispatchEvent(new CustomEvent('supabase-window-focus-valid'));
+    if (error) {
+      console.error('🚨 Session error on window focus:', error);
+      window.dispatchEvent(new CustomEvent('supabase-session-error', { detail: error }));
+      return;
     }
+    
+    if (!session) {
+      console.warn('⚠️ No session on window focus');
+      window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+      return;
+    }
+    
+    // Check session validity
+    const expiresAt = session.expires_at * 1000;
+    const timeUntilExpiry = expiresAt - Date.now();
+    
+    if (timeUntilExpiry <= 0) {
+      console.warn('⚠️ Session expired on window focus');
+      await performTokenRefresh();
+      return;
+    }
+    
+    // Test database connectivity
+    await testDatabaseConnectivity();
+    
+    // Emit success event for realtime reconnection
+    window.dispatchEvent(new CustomEvent('supabase-window-focus-valid'));
+    
   } catch (error) {
-    console.error('🚨 Session check failed on window focus:', error);
+    console.error('🚨 Window focus validation failed:', error);
     window.dispatchEvent(new CustomEvent('supabase-session-error', { detail: error }));
   }
 };
@@ -787,9 +957,67 @@ export const withSessionValidation = async <T>(
   return operation();
 };
 
+// Debug helper to check current connection state
+export const debugConnectionState = async () => {
+  const debugInfo = {
+    timestamp: new Date().toISOString(),
+    visibilityState: document.visibilityState,
+    connectionState: navigator.onLine ? 'online' : 'offline',
+    session: null as any,
+    sessionValid: false,
+    error: null as any
+  };
+  
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    debugInfo.session = session ? {
+      userId: session.user?.id?.substring(0, 8) + '...',
+      expiresAt: new Date(session.expires_at * 1000).toISOString(),
+      timeUntilExpiry: Math.round((session.expires_at * 1000 - Date.now()) / 1000 / 60) + ' minutes'
+    } : null;
+    debugInfo.sessionValid = !!session && !error;
+    debugInfo.error = error;
+  } catch (err) {
+    debugInfo.error = err;
+  }
+  
+  console.log('🔍 Connection Debug Info:', debugInfo);
+  return debugInfo;
+};
+
+// Test database connectivity
+export const testDatabaseConnection = async () => {
+  console.log('🧪 Testing database connection...');
+  try {
+    const startTime = Date.now();
+    const { data, error, count } = await supabase
+      .from('places')
+      .select('id', { count: 'exact', head: true })
+      .limit(1);
+    
+    const duration = Date.now() - startTime;
+    const result = {
+      success: !error,
+      duration: `${duration}ms`,
+      count,
+      error: error?.message,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('🧪 Database test result:', result);
+    return result;
+  } catch (err) {
+    console.error('🚨 Database test failed:', err);
+    return { success: false, error: err };
+  }
+};
+
 // Make test functions available globally for debugging
 if (typeof window !== 'undefined') {
   (window as any).testSupabaseConnection = testSupabaseConnection;
+  (window as any).debugConnectionState = debugConnectionState;
+  (window as any).testDatabaseConnection = testDatabaseConnection;
+  (window as any).validateSessionBeforeOperation = validateSessionBeforeOperation;
   (window as any).handleNetworkFailure = handleNetworkFailure;
   (window as any).resetNetworkFailureCount = resetNetworkFailureCount;
   (window as any).getEnvironmentInfo = getEnvironmentInfo;
