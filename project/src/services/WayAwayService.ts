@@ -42,6 +42,14 @@ export class WayAwayService {
    * Search flight prices using WayAway Data API
    */
   static async searchFlightPrices(params: WayAwayFlightParams): Promise<WayAwayAPIResponse> {
+    // TEMPORARILY DISABLED - Testing if external API calls are causing 5-minute timeout
+    console.log('⚠️ WayAwayService.searchFlightPrices temporarily disabled for debugging');
+    return {
+      success: false,
+      data: {},
+      currency: 'JPY'
+    };
+    
     const { origin, destination, departDate, returnDate, currency = 'JPY' } = params;
     
     logger.config('WayAway Search Config', {
