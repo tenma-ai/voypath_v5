@@ -93,6 +93,22 @@ export const recreateSupabaseClient = () => {
   }
 };
 
+// Check authentication status on load
+(window as any).quickAuthCheck = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    console.log('🔍 Current auth status:', {
+      authenticated: !!session,
+      userId: session?.user?.id?.substring(0, 8) + '...' || 'none',
+      expires: session?.expires_at ? new Date(session.expires_at * 1000) : 'none'
+    });
+    return !!session;
+  } catch (error) {
+    console.error('❌ Auth check failed:', error);
+    return false;
+  }
+};
+
 // Version marker for deployment tracking
 console.log('🚀 Supabase client initialized - Tab switching fix active');
 
