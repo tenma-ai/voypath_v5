@@ -188,6 +188,82 @@ supabase.auth.onAuthStateChange((event, session) => {
   }
 });
 
+// Page Visibility API handling for tab focus issues
+let wasTabHidden = false;
+
+const handleVisibilityChange = async () => {
+  if (document.hidden) {
+    // Tab became hidden
+    wasTabHidden = true;
+    if (!import.meta.env.PROD) {
+      console.log('🙈 Tab hidden - background timers may be throttled');
+    }
+  } else {
+    // Tab became visible again
+    if (wasTabHidden) {
+      if (!import.meta.env.PROD) {
+        console.log('👁️ Tab visible again - validating session and connections');
+      }
+      wasTabHidden = false;
+      
+      // Immediately check and refresh session if needed
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error || !session) {
+          console.warn('⚠️ Session invalid after tab regain focus');
+          // Session may have expired - trigger re-auth flow
+          window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+        } else {
+          // Check if token is close to expiry and refresh if needed
+          const expiresAt = session.expires_at * 1000;
+          const now = Date.now();
+          const timeUntilExpiry = expiresAt - now;
+          
+          if (timeUntilExpiry < 10 * 60 * 1000) { // Less than 10 minutes
+            if (!import.meta.env.PROD) {
+              console.log('🔄 Refreshing token due to tab regain focus');
+            }
+            await performTokenRefresh();
+          }
+        }
+      } catch (error) {
+        console.error('🚨 Error checking session after tab focus:', error);
+        window.dispatchEvent(new CustomEvent('supabase-session-error', { detail: error }));
+      }
+      
+      // Restart token refresh system if needed
+      setupCustomTokenRefresh();
+    }
+  }
+};
+
+// Window focus handler for additional session validation
+const handleWindowFocus = async () => {
+  if (!import.meta.env.PROD) {
+    console.log('🎯 Window gained focus - quick session validation');
+  }
+  
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) {
+      console.warn('⚠️ Session lost during window switch');
+      window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+    } else {
+      // Session is valid, check if any realtime connections need restart
+      window.dispatchEvent(new CustomEvent('supabase-window-focus-valid'));
+    }
+  } catch (error) {
+    console.error('🚨 Session check failed on window focus:', error);
+    window.dispatchEvent(new CustomEvent('supabase-session-error', { detail: error }));
+  }
+};
+
+// Add event listeners for tab visibility and window focus
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('focus', handleWindowFocus);
+}
+
 // Periodic session health check for production
 let sessionHealthTimer: NodeJS.Timeout | null = null;
 
@@ -196,9 +272,14 @@ const startSessionHealthCheck = () => {
     clearInterval(sessionHealthTimer);
   }
   
-  // Check session every 2 minutes in production
+  // Check session every 2 minutes in production - ONLY when tab is visible
   if (import.meta.env.PROD) {
     sessionHealthTimer = setInterval(async () => {
+      // Skip health check if tab is hidden to avoid throttling issues
+      if (document.hidden) {
+        return;
+      }
+      
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
@@ -251,6 +332,14 @@ const startKeepAlive = () => {
       if (checkRealtimeStatus()) {
         if (!import.meta.env.PROD) {
           console.log('😴 Skipping keep-alive - realtime is active');
+        }
+        return;
+      }
+      
+      // Skip keep-alive if tab is hidden to avoid throttling issues
+      if (document.hidden) {
+        if (!import.meta.env.PROD) {
+          console.log('😴 Skipping keep-alive - tab is hidden');
         }
         return;
       }
@@ -648,6 +737,54 @@ export const findSpecificBookedFlight = async () => {
     console.error('❌ Failed to find specific booked flight:', error);
     throw error;
   }
+};
+
+// Session validation for critical operations
+export const validateSessionBeforeOperation = async (operationName: string = 'operation') => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error(`🚨 Session validation failed for ${operationName}:`, error);
+      throw new Error(`Session validation failed: ${error.message}`);
+    }
+    
+    if (!session) {
+      console.warn(`⚠️ No session found for ${operationName}`);
+      throw new Error('Session expired. Please refresh the page and sign in again.');
+    }
+    
+    // Check if token is about to expire (within 5 minutes)
+    const expiresAt = session.expires_at * 1000;
+    const now = Date.now();
+    const timeUntilExpiry = expiresAt - now;
+    
+    if (timeUntilExpiry < 5 * 60 * 1000) {
+      console.log(`🔄 Token expiring soon for ${operationName}, refreshing...`);
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        throw new Error(`Token refresh failed: ${refreshError.message}`);
+      }
+    }
+    
+    if (!import.meta.env.PROD) {
+      console.log(`✅ Session validated for ${operationName}`);
+    }
+    
+    return session;
+  } catch (error) {
+    console.error(`🚨 Session validation error for ${operationName}:`, error);
+    throw error;
+  }
+};
+
+// Enhanced operation wrapper with session validation
+export const withSessionValidation = async <T>(
+  operation: () => Promise<T>,
+  operationName: string = 'operation'
+): Promise<T> => {
+  await validateSessionBeforeOperation(operationName);
+  return operation();
 };
 
 // Make test functions available globally for debugging

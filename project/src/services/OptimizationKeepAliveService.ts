@@ -61,6 +61,12 @@ export class OptimizationKeepAliveService {
       return;
     }
     
+    // Skip pinging if tab is hidden to avoid throttling issues
+    if (typeof document !== 'undefined' && document.hidden) {
+      console.log('😴 Skipping keep-alive pings - tab is hidden');
+      return;
+    }
+    
     const promises = this.FUNCTIONS_TO_KEEP_WARM.map(functionName => 
       this.pingFunction(functionName)
     );

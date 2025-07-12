@@ -2145,6 +2145,42 @@ export const useStore = create<StoreState>()((set, get) => ({
         } catch (error) {
           console.warn('⚠️ Could not notify polling services about realtime activation:', error);
         }
+        
+        // Set up listeners for tab visibility and session events
+        const handleSessionExpired = () => {
+          console.warn('🚨 Session expired detected - cleaning up realtime connections');
+          // Clean up realtime connections
+          get().realtimeChannels.forEach(channel => supabase.removeChannel(channel));
+          set({ realtimeChannels: [] });
+          
+          // Optionally trigger re-authentication UI
+        };
+        
+        const handleWindowFocusValid = () => {
+          console.log('✅ Window focus with valid session - checking realtime connections');
+          const { realtimeChannels } = get();
+          
+          // If no active channels, restart realtime
+          if (realtimeChannels.length === 0) {
+            console.log('🔄 Restarting realtime connections after window focus');
+            setTimeout(() => {
+              get().setupSupabaseRealtime();
+            }, 1000); // Small delay to ensure session is fully valid
+          }
+        };
+        
+        // Add event listeners for session management
+        window.addEventListener('supabase-session-expired', handleSessionExpired);
+        window.addEventListener('supabase-window-focus-valid', handleWindowFocusValid);
+        
+        // Store cleanup function for these listeners
+        const cleanup = () => {
+          window.removeEventListener('supabase-session-expired', handleSessionExpired);
+          window.removeEventListener('supabase-window-focus-valid', handleWindowFocusValid);
+        };
+        
+        // Return cleanup function (though it won't be used in current implementation)
+        return cleanup;
       },
 
       // Calendar edit helper functions
