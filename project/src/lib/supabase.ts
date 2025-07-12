@@ -12,14 +12,24 @@ const isNetworkRestricted = () => {
 };
 
 const getSupabaseConfig = () => {
-  // Minimal configuration - let Supabase use its defaults
+  // Aggressive session persistence configuration
   return {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
       debug: !import.meta.env.PROD,
-      flowType: 'pkce'
+      flowType: 'pkce',
+      // Force persistent storage and longer timeouts
+      storage: window.localStorage, // Explicitly use localStorage
+      storageKey: `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`,
+    },
+    // Configure for better connection persistence
+    global: {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
     }
   };
 };
@@ -27,39 +37,43 @@ const getSupabaseConfig = () => {
 // Create Supabase client with connection recovery
 export let supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
 
-// Force Supabase client recreation when it gets stuck
-export const recreateSupabaseClient = () => {
-  console.log('🔄 Recreating Supabase client to fix hanging state');
+// Force Supabase client recreation WITHOUT breaking authentication
+export const recreateSupabaseClient = async () => {
+  console.log('🔄 Recreating Supabase client while preserving authentication');
   
   try {
-    // Clear any existing auth state to prevent GoTrueClient conflicts
-    if (typeof window !== 'undefined') {
-      // Clear Supabase auth storage
-      localStorage.removeItem(`sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`);
-      sessionStorage.removeItem(`sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`);
-      
-      // Clear any other Supabase keys
-      Object.keys(localStorage).forEach(key => {
-        if (key.includes('supabase') || key.includes('sb-')) {
-          localStorage.removeItem(key);
-        }
-      });
-      Object.keys(sessionStorage).forEach(key => {
-        if (key.includes('supabase') || key.includes('sb-')) {
-          sessionStorage.removeItem(key);
-        }
-      });
+    // Store current session data before any changes
+    let currentSession = null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      currentSession = session;
+      console.log('💾 Current session preserved:', !!currentSession);
+    } catch (error) {
+      console.warn('Could not retrieve current session:', error);
     }
     
-    // Create completely new client instance with fresh config
-    supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      ...getSupabaseConfig(),
-      auth: {
-        ...getSupabaseConfig().auth,
-        storageKey: `sb-${Date.now()}`, // Use unique storage key to avoid conflicts
+    // Create new client instance with SAME configuration (no storage clearing)
+    supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
+    
+    // If we had a session, ensure it's still accessible
+    if (currentSession) {
+      try {
+        // Verify session is still valid
+        const { data: { session: newSession } } = await supabase.auth.getSession();
+        if (!newSession && currentSession.access_token) {
+          // Try to restore session if it was lost
+          await supabase.auth.setSession({
+            access_token: currentSession.access_token,
+            refresh_token: currentSession.refresh_token
+          });
+          console.log('🔑 Session restored successfully');
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not verify/restore session:', error);
       }
-    });
-    console.log('✅ Supabase client recreated successfully with fresh auth state');
+    }
+    
+    console.log('✅ Supabase client recreated with authentication preserved');
     return true;
   } catch (error) {
     console.error('🚨 Failed to recreate Supabase client:', error);
@@ -90,6 +104,52 @@ export const recreateSupabaseClient = () => {
     
     // Force reload without cache
     window.location.reload();
+  }
+};
+
+// Enhanced authentication recovery system
+(window as any).forceAuthRecovery = async () => {
+  console.log('🔧 Forcing authentication recovery...');
+  
+  try {
+    // Try to get current session
+    let { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (!session || error) {
+      console.log('🔄 No active session, attempting recovery from storage...');
+      
+      // Try to recover from localStorage
+      const storageKey = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
+      const storedAuth = localStorage.getItem(storageKey);
+      
+      if (storedAuth) {
+        try {
+          const authData = JSON.parse(storedAuth);
+          if (authData.access_token && authData.refresh_token) {
+            await supabase.auth.setSession({
+              access_token: authData.access_token,
+              refresh_token: authData.refresh_token
+            });
+            console.log('✅ Session recovered from storage');
+            return true;
+          }
+        } catch (parseError) {
+          console.warn('⚠️ Could not parse stored auth data:', parseError);
+        }
+      }
+      
+      console.log('❌ No recoverable session found');
+      return false;
+    }
+    
+    console.log('✅ Active session found:', {
+      userId: session.user.id.substring(0, 8) + '...',
+      expires: new Date(session.expires_at * 1000)
+    });
+    return true;
+  } catch (error) {
+    console.error('🚨 Auth recovery failed:', error);
+    return false;
   }
 };
 
@@ -246,8 +306,24 @@ const handleVisibilityChange = async () => {
         } catch (error) {
           console.warn('⚠️ Supabase client is not responsive:', error);
           
-          // Recreate the client
-          const recreated = recreateSupabaseClient();
+          // First try auth recovery, then client recreation
+          console.log('🔑 Attempting authentication recovery first...');
+          const authRecovered = await (window as any).forceAuthRecovery();
+          
+          if (authRecovered) {
+            // Test if auth recovery fixed the issue
+            try {
+              await supabase.from('places').select('id').limit(1);
+              console.log('✅ Auth recovery fixed the issue');
+              window.dispatchEvent(new CustomEvent('supabase-auth-recovered'));
+              return;
+            } catch (testError) {
+              console.warn('⚠️ Auth recovery didn\'t fix client issue, trying recreation...');
+            }
+          }
+          
+          // If auth recovery didn't work, try client recreation
+          const recreated = await recreateSupabaseClient();
           if (recreated) {
             // Test the new client
             try {
