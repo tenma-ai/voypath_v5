@@ -206,7 +206,7 @@ function App() {
       await criticalInitialization();
 
       // Non-critical background tasks - run without blocking authentication
-      setImmediate(async () => {
+      setTimeout(async () => {
         try {
           // Update user profile in background (non-critical)
           const { createOrUpdateUserProfile } = await import('./lib/supabase');
@@ -222,7 +222,7 @@ function App() {
         } catch (pendingTripError) {
           console.warn('Pending trip join failed:', pendingTripError);
         }
-      });
+      }, 0);
       
     } catch (error) {
       // Critical error in handleAuthenticated - clear user state
