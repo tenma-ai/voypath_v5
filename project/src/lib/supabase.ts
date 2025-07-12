@@ -82,15 +82,20 @@ export const recreateSupabaseClient = async () => {
 };
 
 // Global function for debugging - can be called from console
-(window as any).forceClientRecreation = () => {
+(window as any).forceClientRecreation = async () => {
   console.log('🔧 Manual client recreation triggered from console');
-  const success = recreateSupabaseClient();
-  if (success) {
-    console.log('✅ Client recreation successful - try your database operations now');
-  } else {
-    console.log('❌ Client recreation failed');
+  try {
+    const success = await recreateSupabaseClient();
+    if (success) {
+      console.log('✅ Client recreation successful - try your database operations now');
+    } else {
+      console.log('❌ Client recreation failed');
+    }
+    return success;
+  } catch (error) {
+    console.error('🚨 Manual client recreation error:', error);
+    return false;
   }
-  return success;
 };
 
 // Nuclear option - force page reload to completely reset everything
@@ -107,46 +112,55 @@ export const recreateSupabaseClient = async () => {
   }
 };
 
-// Enhanced authentication recovery system
+// Enhanced authentication recovery system with timeout
 (window as any).forceAuthRecovery = async () => {
   console.log('🔧 Forcing authentication recovery...');
   
   try {
-    // Try to get current session
-    let { data: { session }, error } = await supabase.auth.getSession();
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Auth recovery timeout')), 5000)
+    );
     
-    if (!session || error) {
-      console.log('🔄 No active session, attempting recovery from storage...');
+    const recoveryPromise = (async () => {
+      // Try to get current session
+      let { data: { session }, error } = await supabase.auth.getSession();
       
-      // Try to recover from localStorage
-      const storageKey = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
-      const storedAuth = localStorage.getItem(storageKey);
-      
-      if (storedAuth) {
-        try {
-          const authData = JSON.parse(storedAuth);
-          if (authData.access_token && authData.refresh_token) {
-            await supabase.auth.setSession({
-              access_token: authData.access_token,
-              refresh_token: authData.refresh_token
-            });
-            console.log('✅ Session recovered from storage');
-            return true;
+      if (!session || error) {
+        console.log('🔄 No active session, attempting recovery from storage...');
+        
+        // Try to recover from localStorage
+        const storageKey = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
+        const storedAuth = localStorage.getItem(storageKey);
+        
+        if (storedAuth) {
+          try {
+            const authData = JSON.parse(storedAuth);
+            if (authData.access_token && authData.refresh_token) {
+              await supabase.auth.setSession({
+                access_token: authData.access_token,
+                refresh_token: authData.refresh_token
+              });
+              console.log('✅ Session recovered from storage');
+              return true;
+            }
+          } catch (parseError) {
+            console.warn('⚠️ Could not parse stored auth data:', parseError);
           }
-        } catch (parseError) {
-          console.warn('⚠️ Could not parse stored auth data:', parseError);
         }
+        
+        console.log('❌ No recoverable session found');
+        return false;
       }
       
-      console.log('❌ No recoverable session found');
-      return false;
-    }
+      console.log('✅ Active session found:', {
+        userId: session.user.id.substring(0, 8) + '...',
+        expires: new Date(session.expires_at * 1000)
+      });
+      return true;
+    })();
     
-    console.log('✅ Active session found:', {
-      userId: session.user.id.substring(0, 8) + '...',
-      expires: new Date(session.expires_at * 1000)
-    });
-    return true;
+    return await Promise.race([recoveryPromise, timeoutPromise]);
   } catch (error) {
     console.error('🚨 Auth recovery failed:', error);
     return false;
@@ -306,38 +320,23 @@ const handleVisibilityChange = async () => {
         } catch (error) {
           console.warn('⚠️ Supabase client is not responsive:', error);
           
-          // First try auth recovery, then client recreation
-          console.log('🔑 Attempting authentication recovery first...');
-          const authRecovered = await (window as any).forceAuthRecovery();
+          // Skip complex recovery, go straight to simple client recreation
+          console.log('🔧 Attempting simple client recreation...');
           
-          if (authRecovered) {
-            // Test if auth recovery fixed the issue
-            try {
-              await supabase.from('places').select('id').limit(1);
-              console.log('✅ Auth recovery fixed the issue');
-              window.dispatchEvent(new CustomEvent('supabase-auth-recovered'));
-              return;
-            } catch (testError) {
-              console.warn('⚠️ Auth recovery didn\'t fix client issue, trying recreation...');
-            }
-          }
-          
-          // If auth recovery didn't work, try client recreation
-          const recreated = await recreateSupabaseClient();
-          if (recreated) {
-            // Test the new client
-            try {
+          try {
+            const recreated = await recreateSupabaseClient();
+            if (recreated) {
+              // Test the new client
               await supabase.from('places').select('id').limit(1);
               console.log('✅ New Supabase client is working');
               window.dispatchEvent(new CustomEvent('supabase-client-recreated'));
-            } catch (testError) {
-              console.error('🚨 New client also failed:', testError);
-              // Last resort: page reload
-              console.log('🔄 Forcing page reload as last resort');
-              window.location.reload();
+            } else {
+              throw new Error('Client recreation failed');
             }
-          } else {
-            // Could not recreate client, reload page
+          } catch (recreationError) {
+            console.error('🚨 Client recreation failed:', recreationError);
+            // Last resort: page reload
+            console.log('🔄 Forcing page reload as last resort');
             window.location.reload();
           }
         }
