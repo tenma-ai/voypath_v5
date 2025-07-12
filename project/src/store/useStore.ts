@@ -1956,6 +1956,11 @@ export const useStore = create<StoreState>()((set, get) => ({
       // Supabase real-time subscriptions
       realtimeChannels: [],
       setupSupabaseRealtime: () => {
+        // TEMPORARILY DISABLED - Testing if Realtime is causing 5-minute timeout issues
+        // This function sets up real-time subscriptions that may be hitting connection limits
+        console.log('⚠️ setupSupabaseRealtime temporarily disabled for debugging');
+        return;
+        
         const { currentTrip, loadPlacesFromDatabase, loadOptimizationResult } = get();
         if (!currentTrip?.id) return;
         

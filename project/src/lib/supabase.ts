@@ -15,7 +15,8 @@ const getSupabaseConfig = () => {
   const baseConfig = {
     realtime: {
       params: {
-        eventsPerSecond: 10
+        eventsPerSecond: 2, // Reduced from 10 to 2 to prevent connection issues
+        timeout: 30000 // 30 seconds timeout instead of default
       }
     },
     auth: {
