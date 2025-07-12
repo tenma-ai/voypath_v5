@@ -3,40 +3,79 @@ import { createClient, RealtimeChannel } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  realtime: {
-    params: {
-      eventsPerSecond: 10
+// Network restriction detection (background only, no UI impact)
+const isNetworkRestricted = () => {
+  const hostname = window.location.hostname;
+  
+  // Only detect known problematic patterns - be conservative
+  return hostname.includes('.vercel.app') && document.referrer.includes('vercel.com');
+};
+
+const getSupabaseConfig = () => {
+  const baseConfig = {
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
+    },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: false,
+      detectSessionInUrl: true,
+      debug: false,
+      flowType: 'pkce'
     }
-  },
-  auth: {
-    persistSession: true,
-    // Disable Supabase's built-in autoRefreshToken to use our custom implementation
-    autoRefreshToken: false,
-    detectSessionInUrl: true,
-    // Disable debug logs to prevent token exposure
-    debug: false,
-    flowType: 'pkce'
-  },
-  // Aggressive timeout for network blocking environments
-  global: {
-    fetch: (url, options = {}) => {
-      // Create timeout with abort controller for better control
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        controller.abort();
-        console.warn('🚨 Network request timed out after 3 seconds:', url);
-      }, 3000); // 3 second timeout for quick failure detection and retry
-      
-      return fetch(url, {
-        ...options,
-        signal: controller.signal
-      }).finally(() => {
-        clearTimeout(timeoutId);
-      });
-    }
+  };
+
+  if (isNetworkRestricted()) {
+    // Ultra-conservative settings for restricted networks
+    return {
+      ...baseConfig,
+      global: {
+        fetch: (url, options = {}) => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            controller.abort();
+            console.warn('🚨 Network-restricted timeout (2s):', url);
+          }, 2000); // Even shorter timeout for restricted networks
+          
+          return fetch(url, {
+            ...options,
+            signal: controller.signal,
+            mode: 'cors',
+            credentials: 'omit', // Avoid credential issues
+            cache: 'no-cache' // Prevent caching issues
+          }).finally(() => {
+            clearTimeout(timeoutId);
+          });
+        }
+      }
+    };
   }
-})
+
+  // Normal configuration
+  return {
+    ...baseConfig,
+    global: {
+      fetch: (url, options = {}) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          console.warn('🚨 Network request timed out after 3 seconds:', url);
+        }, 3000);
+        
+        return fetch(url, {
+          ...options,
+          signal: controller.signal
+        }).finally(() => {
+          clearTimeout(timeoutId);
+        });
+      }
+    }
+  };
+};
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
 
 // Custom token management that works regardless of page visibility
 let tokenRefreshTimer: NodeJS.Timeout | null = null;
@@ -222,6 +261,41 @@ setupCustomTokenRefresh();
 // Start keep-alive for connection stability
 startKeepAlive();
 
+// Silent background connectivity monitor (no UI impact)
+let connectivityCheckTimer: NodeJS.Timeout | null = null;
+let lastSuccessfulConnection = Date.now();
+
+const startConnectivityMonitor = () => {
+  if (connectivityCheckTimer) {
+    clearInterval(connectivityCheckTimer);
+  }
+  
+  connectivityCheckTimer = setInterval(async () => {
+    try {
+      // Very lightweight connectivity test
+      const response = await fetch(supabaseUrl + '/rest/v1/', {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(2000)
+      });
+      
+      if (response.ok) {
+        lastSuccessfulConnection = Date.now();
+        resetNetworkFailureCount();
+      }
+    } catch (error) {
+      const timeSinceLastSuccess = Date.now() - lastSuccessfulConnection;
+      
+      // If no successful connection for more than 6 minutes, log warning
+      if (timeSinceLastSuccess > 6 * 60 * 1000) {
+        console.warn('⚠️ Extended connectivity issues detected, but continuing silently');
+      }
+    }
+  }, 4 * 60 * 1000); // Check every 4 minutes, offset from keep-alive
+};
+
+// Start silent monitoring (completely in background)
+startConnectivityMonitor();
+
 // Test function for diagnosing connection issues
 export const testSupabaseConnection = async () => {
   const startTime = Date.now();
@@ -334,11 +408,21 @@ export const handleNetworkFailure = (error: any, operation: string) => {
   if (networkFailureCount >= MAX_NETWORK_FAILURES) {
     console.error('🚨 Multiple network failures detected. Connection may be blocked.');
     
-    // Show user-friendly error message
-    if (typeof window !== 'undefined') {
+    // Silent background recovery - no UI interruption
+    console.log('🔄 Attempting silent recovery in background...');
+    
+    // Try to clear any cached connections
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(reg => reg.update());
+      });
+    }
+    
+    // Only show user prompt in extreme cases (more than 5 failures)
+    if (networkFailureCount >= 5 && typeof window !== 'undefined') {
       const shouldReload = confirm(
-        'ネットワーク接続に問題が発生しました。ページを再読み込みしますか？\n\n' +
-        'Network connection issues detected. Would you like to reload the page?'
+        'ネットワーク接続に継続的な問題があります。ページを再読み込みしますか？\n\n' +
+        'Persistent network issues detected. Would you like to reload the page?'
       );
       
       if (shouldReload) {
@@ -456,6 +540,84 @@ export const deleteBooking = async (bookingId: string) => {
   }
 };
 
+export const findPlacesByUser = async (userName: string) => {
+  try {
+    // First find the user ID
+    const users = await findUserByName(userName);
+    if (!users || users.length === 0) {
+      console.log('❌ User not found:', userName);
+      return [];
+    }
+    
+    const userId = users[0].id;
+    
+    // Find places created by this user
+    const { data, error } = await supabase
+      .from('places')
+      .select('*')
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    console.log('🔍 Found places for user:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to find places:', error);
+    throw error;
+  }
+};
+
+export const deletePlace = async (placeId: string) => {
+  try {
+    const { error } = await supabase
+      .from('places')
+      .delete()
+      .eq('id', placeId);
+    
+    if (error) throw error;
+    console.log('✅ Deleted place:', placeId);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to delete place:', error);
+    throw error;
+  }
+};
+
+export const findBookedFlightPlaces = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('places')
+      .select('*')
+      .or('name.ilike.%Booked Flight%, name.ilike.%Flight%, category.eq.transportation')
+      .eq('category', 'transportation');
+    
+    if (error) throw error;
+    console.log('🔍 Found booked flight places:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to find booked flight places:', error);
+    throw error;
+  }
+};
+
+export const findSpecificBookedFlight = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('places')
+      .select('*')
+      .eq('name', 'Booked Flight')
+      .eq('category', 'transportation')
+      .ilike('notes', '%09:00 - 11:00%')
+      .ilike('notes', '%5 passengers%');
+    
+    if (error) throw error;
+    console.log('🔍 Found specific booked flight:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to find specific booked flight:', error);
+    throw error;
+  }
+};
+
 // Make test functions available globally for debugging
 if (typeof window !== 'undefined') {
   (window as any).testSupabaseConnection = testSupabaseConnection;
@@ -466,6 +628,9 @@ if (typeof window !== 'undefined') {
   (window as any).findBookingsForTrip = findBookingsForTrip;
   (window as any).findUserByName = findUserByName;
   (window as any).deleteBooking = deleteBooking;
+  (window as any).findPlacesByUser = findPlacesByUser;
+  (window as any).deletePlace = deletePlace;
+  (window as any).findBookedFlightPlaces = findBookedFlightPlaces;
 }
 
 // Auth helper functions with integrated persistence
