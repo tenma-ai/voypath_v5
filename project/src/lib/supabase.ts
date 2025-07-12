@@ -37,48 +37,30 @@ const getSupabaseConfig = () => {
 // Create Supabase client with connection recovery
 export let supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
 
-// Force Supabase client recreation WITHOUT breaking authentication
-export const recreateSupabaseClient = async () => {
-  console.log('🔄 Recreating Supabase client while preserving authentication');
+// Simplified client recreation with timeout
+export const recreateSupabaseClient = () => {
+  console.log('🔄 Recreating Supabase client (simple approach)');
   
-  try {
-    // Store current session data before any changes
-    let currentSession = null;
+  return new Promise((resolve) => {
+    // Set timeout to prevent hanging
+    const timeout = setTimeout(() => {
+      console.warn('⏰ Client recreation timed out, falling back to page reload');
+      window.location.reload();
+    }, 3000);
+    
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      currentSession = session;
-      console.log('💾 Current session preserved:', !!currentSession);
+      // Simple client recreation without complex async operations
+      supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
+      console.log('✅ Supabase client recreated successfully');
+      
+      clearTimeout(timeout);
+      resolve(true);
     } catch (error) {
-      console.warn('Could not retrieve current session:', error);
+      console.error('🚨 Failed to recreate Supabase client:', error);
+      clearTimeout(timeout);
+      resolve(false);
     }
-    
-    // Create new client instance with SAME configuration (no storage clearing)
-    supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
-    
-    // If we had a session, ensure it's still accessible
-    if (currentSession) {
-      try {
-        // Verify session is still valid
-        const { data: { session: newSession } } = await supabase.auth.getSession();
-        if (!newSession && currentSession.access_token) {
-          // Try to restore session if it was lost
-          await supabase.auth.setSession({
-            access_token: currentSession.access_token,
-            refresh_token: currentSession.refresh_token
-          });
-          console.log('🔑 Session restored successfully');
-        }
-      } catch (error) {
-        console.warn('⚠️ Could not verify/restore session:', error);
-      }
-    }
-    
-    console.log('✅ Supabase client recreated with authentication preserved');
-    return true;
-  } catch (error) {
-    console.error('🚨 Failed to recreate Supabase client:', error);
-    return false;
-  }
+  });
 };
 
 // Global function for debugging - can be called from console
@@ -320,25 +302,20 @@ const handleVisibilityChange = async () => {
         } catch (error) {
           console.warn('⚠️ Supabase client is not responsive:', error);
           
-          // Skip complex recovery, go straight to simple client recreation
+          // Try simple client recreation first
           console.log('🔧 Attempting simple client recreation...');
-          
-          try {
-            const recreated = await recreateSupabaseClient();
-            if (recreated) {
-              // Test the new client
-              await supabase.from('places').select('id').limit(1);
-              console.log('✅ New Supabase client is working');
+          recreateSupabaseClient().then((success) => {
+            if (success) {
+              console.log('✅ Client recreation successful');
               window.dispatchEvent(new CustomEvent('supabase-client-recreated'));
             } else {
-              throw new Error('Client recreation failed');
+              console.log('❌ Client recreation failed, user needs to refresh manually');
+              // Show notification instead of forced reload
+              if (confirm('Connection lost after tab switch. Refresh the page to restore functionality?')) {
+                window.location.reload();
+              }
             }
-          } catch (recreationError) {
-            console.error('🚨 Client recreation failed:', recreationError);
-            // Last resort: page reload
-            console.log('🔄 Forcing page reload as last resort');
-            window.location.reload();
-          }
+          });
         }
       }, 1000); // Give tab time to stabilize
     }
