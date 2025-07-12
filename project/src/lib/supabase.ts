@@ -25,8 +25,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-        console.warn('🚨 Network request timed out after 8 seconds:', url);
-      }, 8000); // 8 second timeout (less than Supabase's 10 second limit)
+        console.warn('🚨 Network request timed out after 3 seconds:', url);
+      }, 3000); // 3 second timeout for quick failure detection and retry
       
       return fetch(url, {
         ...options,
@@ -189,11 +189,38 @@ const startSessionHealthCheck = () => {
   }
 };
 
+// Lightweight connection keep-alive for free tier
+let keepAliveTimer: NodeJS.Timeout | null = null;
+
+const startKeepAlive = () => {
+  if (keepAliveTimer) {
+    clearInterval(keepAliveTimer);
+  }
+  
+  // Simple ping every 3 minutes to keep connection warm
+  keepAliveTimer = setInterval(async () => {
+    try {
+      // Very lightweight query - just check if we can connect
+      await supabase.from('places').select('id', { count: 'exact', head: true }).limit(1);
+      if (!import.meta.env.PROD) {
+        console.log('🔄 Connection keep-alive ping successful');
+      }
+    } catch (error) {
+      if (!import.meta.env.PROD) {
+        console.warn('⚠️ Keep-alive ping failed:', error);
+      }
+    }
+  }, 3 * 60 * 1000); // Every 3 minutes
+};
+
 // Start session health check - but only for monitoring, not for refresh
 startSessionHealthCheck();
 
 // Initialize custom token refresh on startup
 setupCustomTokenRefresh();
+
+// Start keep-alive for connection stability
+startKeepAlive();
 
 // Test function for diagnosing connection issues
 export const testSupabaseConnection = async () => {
@@ -260,28 +287,40 @@ export const testSupabaseConnection = async () => {
 let networkFailureCount = 0;
 const MAX_NETWORK_FAILURES = 2; // Reduced to 2 for faster user feedback
 
-// Retry function for database operations
+// Fast retry function optimized for 10-second Supabase limit
 export const retryOperation = async <T>(
   operation: () => Promise<T>,
-  maxRetries: number = 2,
-  delay: number = 1000
+  maxRetries: number = 3,
+  delay: number = 500
 ): Promise<T> => {
+  const startTime = Date.now();
+  
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await operation();
+      const duration = Date.now() - startTime;
+      
       if (attempt > 1) {
-        console.log(`✅ Operation succeeded on attempt ${attempt}`);
+        console.log(`✅ Operation succeeded on attempt ${attempt} (total: ${duration}ms)`);
         resetNetworkFailureCount();
       }
       return result;
     } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      // If we're approaching 10 seconds, don't retry
+      if (duration > 8000) {
+        console.warn(`⏰ Approaching 10s limit (${duration}ms), giving up`);
+        throw error;
+      }
+      
       if (attempt === maxRetries) {
         throw error;
       }
       
-      console.warn(`⚠️ Operation failed on attempt ${attempt}, retrying in ${delay}ms...`);
+      console.warn(`⚠️ Attempt ${attempt} failed (${duration}ms), retrying in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
-      delay *= 1.5; // Exponential backoff
+      delay = Math.min(delay * 1.2, 1000); // Slower exponential backoff, capped at 1s
     }
   }
   throw new Error('Max retries exceeded');
@@ -652,12 +691,14 @@ export const addPlaceToDatabase = async (placeData: any) => {
       status: placeData.status || 'pending' // Default to pending status
     }
     
-    // Insert into Supabase using regular client
-    const { data, error } = await supabase
-      .from('places')
-      .insert(requiredFields)
-      .select()
-      .single()
+    // Insert into Supabase using retry logic
+    const { data, error } = await retryOperation(async () => {
+      return await supabase
+        .from('places')
+        .insert(requiredFields)
+        .select()
+        .single();
+    });
     
     if (error) {
       const duration = Date.now() - startTime;
