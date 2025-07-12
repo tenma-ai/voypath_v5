@@ -93,6 +93,9 @@ export const recreateSupabaseClient = () => {
   }
 };
 
+// Version marker for deployment tracking
+console.log('🚀 Supabase client initialized - Tab switching fix active');
+
 // Browser connection pool management
 let connectionRecoveryTimeout: NodeJS.Timeout | null = null;
 
