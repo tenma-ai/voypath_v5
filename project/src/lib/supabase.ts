@@ -12,25 +12,17 @@ const isNetworkRestricted = () => {
 };
 
 const getSupabaseConfig = () => {
-  // Aggressive session persistence configuration
+  // Minimal, stable configuration that worked before realtime features
   return {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      debug: !import.meta.env.PROD,
-      flowType: 'pkce',
-      // Force persistent storage and longer timeouts
-      storage: window.localStorage, // Explicitly use localStorage
-      storageKey: `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`,
-    },
-    // Configure for better connection persistence
-    global: {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
+      debug: false, // Disable debug to reduce complexity
+      flowType: 'pkce'
+      // Remove all custom configurations that might interfere
     }
+    // Remove global headers that might cause issues
   };
 };
 
@@ -268,59 +260,19 @@ supabase.auth.onAuthStateChange((event, session) => {
   }
 });
 
+// DISABLED: Page Visibility API handling (was causing auth issues)
+// This was added after realtime features and broke authentication on tab switching
+// Problem started after commits d44fb44 and c4a42be
+
+/*
 // Page Visibility API handling for tab focus issues
 let wasTabHidden = false;
 
 const handleVisibilityChange = async () => {
-  if (document.hidden) {
-    // Tab became hidden
-    wasTabHidden = true;
-    if (!import.meta.env.PROD) {
-      console.log('🙈 Tab hidden - client may become stale');
-    }
-  } else {
-    // Tab became visible again  
-    if (wasTabHidden) {
-      if (!import.meta.env.PROD) {
-        console.log('👁️ Tab visible again - testing client and recreating if needed');
-      }
-      wasTabHidden = false;
-      
-      // Test if Supabase client is still responsive
-      connectionRecoveryTimeout = setTimeout(async () => {
-        try {
-          // Quick test with 3-second timeout
-          const testPromise = supabase.from('places').select('id').limit(1);
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Client test timeout')), 3000)
-          );
-          
-          await Promise.race([testPromise, timeoutPromise]);
-          console.log('✅ Supabase client is responsive');
-          window.dispatchEvent(new CustomEvent('supabase-tab-focus-recovery-success'));
-          
-        } catch (error) {
-          console.warn('⚠️ Supabase client is not responsive:', error);
-          
-          // Try simple client recreation first
-          console.log('🔧 Attempting simple client recreation...');
-          recreateSupabaseClient().then((success) => {
-            if (success) {
-              console.log('✅ Client recreation successful');
-              window.dispatchEvent(new CustomEvent('supabase-client-recreated'));
-            } else {
-              console.log('❌ Client recreation failed, user needs to refresh manually');
-              // Show notification instead of forced reload
-              if (confirm('Connection lost after tab switch. Refresh the page to restore functionality?')) {
-                window.location.reload();
-              }
-            }
-          });
-        }
-      }, 1000); // Give tab time to stabilize
-    }
-  }
+  // DISABLED - was causing authentication issues
+  return;
 };
+*/
 
 // Remove aggressive client reset - focus on gentle recovery instead
 
@@ -397,11 +349,14 @@ const handleWindowFocus = async () => {
   }
 };
 
-// Add event listeners for tab visibility and window focus
+// DISABLED: Add event listeners for tab visibility and window focus (was causing auth issues)
+// These listeners were added with realtime features and broke authentication
+/*
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('focus', handleWindowFocus);
 }
+*/
 
 // Periodic session health check for production
 let sessionHealthTimer: NodeJS.Timeout | null = null;
