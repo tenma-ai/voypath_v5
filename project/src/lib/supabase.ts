@@ -187,6 +187,72 @@ startSessionHealthCheck();
 // Initialize custom token refresh on startup
 setupCustomTokenRefresh();
 
+// Test function for diagnosing connection issues
+export const testSupabaseConnection = async () => {
+  const startTime = Date.now();
+  console.log('🧪 Testing Supabase connection...', {
+    timestamp: new Date().toISOString()
+  });
+  
+  try {
+    // Test 1: Check session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const sessionDuration = Date.now() - startTime;
+    console.log('🧪 Session check:', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      userId: session?.user?.id ? session.user.id.substring(0, 8) + '...' : null,
+      duration: `${sessionDuration}ms`,
+      error: sessionError?.message
+    });
+    
+    // Test 2: Simple database query
+    const queryStartTime = Date.now();
+    const { data, error, count } = await supabase
+      .from('places')
+      .select('id', { count: 'exact', head: true })
+      .limit(1);
+    
+    const queryDuration = Date.now() - queryStartTime;
+    console.log('🧪 Database query test:', {
+      success: !error,
+      count,
+      duration: `${queryDuration}ms`,
+      error: error?.message,
+      code: error?.code
+    });
+    
+    const totalDuration = Date.now() - startTime;
+    console.log('🧪 Total connection test duration:', `${totalDuration}ms`);
+    
+    return {
+      sessionOk: !!session && !sessionError,
+      queryOk: !error,
+      totalDuration,
+      sessionDuration,
+      queryDuration
+    };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error('🧪 Connection test failed:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      duration: `${duration}ms`,
+      timestamp: new Date().toISOString()
+    });
+    return {
+      sessionOk: false,
+      queryOk: false,
+      totalDuration: duration,
+      error
+    };
+  }
+};
+
+// Make test function available globally for debugging
+if (typeof window !== 'undefined') {
+  (window as any).testSupabaseConnection = testSupabaseConnection;
+}
+
 // Auth helper functions with integrated persistence
 export const getCurrentUser = async () => {
   const { data: { user }, error } = await supabase.auth.getUser()
@@ -409,10 +475,12 @@ export const signOut = async () => {
 // Direct Supabase database insertion for places
 export const addPlaceToDatabase = async (placeData: any) => {
   try {
+    const startTime = Date.now();
     console.log('🔍 Adding place to database - Debug info:', {
       environment: import.meta.env.PROD ? 'production' : 'development',
       placeId: placeData.id,
-      placeName: placeData.name
+      placeName: placeData.name,
+      timestamp: new Date().toISOString()
     });
     
     // Get current user - check session first, then fallback to dev user
@@ -491,11 +559,24 @@ export const addPlaceToDatabase = async (placeData: any) => {
       .single()
     
     if (error) {
-      // Error: 'Supabase insert error:', error)
+      const duration = Date.now() - startTime;
+      console.error('🚨 Supabase insert error:', {
+        error: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
       throw error
     }
     
-    // Place saved successfully
+    const duration = Date.now() - startTime;
+    console.log('✅ Place saved successfully:', {
+      placeId: data.id,
+      duration: `${duration}ms`,
+      timestamp: new Date().toISOString()
+    });
     return { place: data }
     
   } catch (error) {

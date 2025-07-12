@@ -7,6 +7,12 @@ export class BookingService {
    */
   static async saveBooking(booking: Omit<Booking, 'id' | 'created_at' | 'updated_at'>): Promise<Booking> {
     try {
+      const startTime = Date.now();
+      console.log('🔍 Starting booking save:', {
+        bookingType: booking.booking_type,
+        timestamp: new Date().toISOString()
+      });
+      
       // Debug authentication status before booking save
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (!import.meta.env.PROD) {
@@ -32,21 +38,30 @@ export class BookingService {
         .single();
 
       if (error) {
+        const duration = Date.now() - startTime;
         console.error('🚨 Booking save failed:', {
           error: error.message,
           code: error.code,
           details: error.details,
           hint: error.hint,
+          duration: `${duration}ms`,
           bookingData: {
             user_id: booking.user_id,
             trip_id: booking.trip_id,
             booking_type: booking.booking_type
-          }
+          },
+          timestamp: new Date().toISOString()
         });
         throw new Error(`Failed to save booking: ${error.message}`);
       }
 
-      console.log('✅ Booking saved successfully:', { bookingId: data.id, type: booking.booking_type });
+      const duration = Date.now() - startTime;
+      console.log('✅ Booking saved successfully:', { 
+        bookingId: data.id, 
+        type: booking.booking_type,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
       return data as Booking;
     } catch (error) {
       console.error('🚨 BookingService.saveBooking error:', error);
