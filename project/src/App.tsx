@@ -61,13 +61,19 @@ function App() {
       
       try {
         if (event === 'SIGNED_IN' && session?.user) {
-          await handleAuthenticated(session.user);
+          // Don't await to avoid blocking auth state changes
+          handleAuthenticated(session.user).catch(error => {
+            console.warn('SIGNED_IN authentication handling failed:', error);
+          });
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
           // Ensure user state is consistent after token refresh
           if (!user || user.id !== session.user.id) {
-            await handleAuthenticated(session.user);
+            // Don't await to avoid blocking token refresh
+            handleAuthenticated(session.user).catch(error => {
+              console.warn('TOKEN_REFRESHED authentication handling failed:', error);
+            });
           }
         } else if (event === 'USER_UPDATED' && session?.user) {
           // Update user data when profile changes
@@ -116,8 +122,11 @@ function App() {
           if (session?.user) {
             // Session is valid - ensure user state is consistent
             if (!user || user.id !== session.user.id) {
-              console.log('🔄 Tab focus - refreshing user session');
-              await handleAuthenticated(session.user);
+              console.log('🔄 Tab focus - refreshing user session (non-blocking)');
+              // Don't await to avoid blocking - run in background
+              handleAuthenticated(session.user).catch(error => {
+                console.warn('Tab focus authentication update failed:', error);
+              });
             }
           } else {
             // No valid session - clear user state
@@ -184,26 +193,18 @@ function App() {
         avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture
       });
 
-      // Critical initialization with timeout protection
-      const criticalInitialization = async () => {
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Critical initialization timeout')), 8000)
-        );
-        
+      // All initialization moved to background - don't block authentication
+      setTimeout(async () => {
         try {
-          await Promise.race([
-            initializeFromDatabase(),
-            timeoutPromise
-          ]);
+          console.log('🔄 Starting background database initialization...');
+          await initializeFromDatabase();
+          console.log('✅ Background database initialization completed');
         } catch (error) {
-          console.error('Critical initialization failed:', error);
+          console.warn('Background database initialization failed:', error);
           // Don't fail authentication for database initialization errors
           // The app should still work with the authenticated user
         }
-      };
-
-      // Run critical initialization
-      await criticalInitialization();
+      }, 0);
 
       // Non-critical background tasks - run without blocking authentication
       setTimeout(async () => {
