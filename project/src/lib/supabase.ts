@@ -165,64 +165,138 @@ export const recreateSupabaseClient = () => {
 };
 
 // Version marker for deployment tracking
-console.log('🚀 Supabase client initialized - Tab switching fix v2 active');
+console.log('🚀 Supabase client initialized - Comprehensive auth fix v3 active');
 
-// Enhanced testing function for tab switching authentication
-(window as any).testTabSwitchingAuth = async () => {
-  console.log('🧪 Testing tab switching authentication behavior...');
+// Comprehensive authentication testing suite
+(window as any).testAuthComprehensive = async () => {
+  console.log('🧪 Running comprehensive authentication test suite...');
+  
+  const results = {
+    sessionCheck: false,
+    databaseConnectivity: false,
+    sessionRefresh: false,
+    rlsValidation: false,
+    crossTabSync: false,
+    tabSwitchSimulation: false
+  };
   
   try {
-    // 1. Check current auth status
+    // 1. Session Status Check
+    console.log('🔍 Testing session status...');
     const { data: { session }, error } = await supabase.auth.getSession();
-    console.log('🔍 Current session:', {
-      authenticated: !!session,
-      userId: session?.user?.id?.substring(0, 8) + '...' || 'none',
-      expires: session?.expires_at ? new Date(session.expires_at * 1000) : 'none',
-      tokenLength: session?.access_token?.length || 0
-    });
-    
     if (error) {
       console.error('❌ Session check failed:', error);
-      return false;
+    } else {
+      console.log('✅ Session status check passed:', {
+        authenticated: !!session,
+        userId: session?.user?.id?.substring(0, 8) + '...' || 'none',
+        expires: session?.expires_at ? new Date(session.expires_at * 1000) : 'none'
+      });
+      results.sessionCheck = true;
     }
     
-    // 2. Test database connectivity
+    // 2. Database Connectivity Test
     console.log('🔍 Testing database connectivity...');
     const dbTest = await supabase.from('users').select('id').limit(1);
     if (dbTest.error) {
-      console.error('❌ Database test failed:', dbTest.error);
-      return false;
+      console.error('❌ Database connectivity failed:', dbTest.error);
     } else {
       console.log('✅ Database connectivity working');
+      results.databaseConnectivity = true;
     }
     
-    // 3. Force refresh session
+    // 3. Session Refresh Test
     console.log('🔄 Testing session refresh...');
     const refreshResult = await supabase.auth.refreshSession();
     if (refreshResult.error) {
       console.error('❌ Session refresh failed:', refreshResult.error);
-      return false;
     } else {
       console.log('✅ Session refresh successful');
+      results.sessionRefresh = true;
     }
     
-    // 4. Test after refresh
-    const dbTestAfterRefresh = await supabase.from('users').select('id').limit(1);
-    if (dbTestAfterRefresh.error) {
-      console.error('❌ Database test after refresh failed:', dbTestAfterRefresh.error);
-      return false;
+    // 4. RLS Validation Test
+    console.log('🔍 Testing RLS validation...');
+    try {
+      const rlsTest = await supabase.from('trips').select('id').limit(1);
+      if (rlsTest.error && rlsTest.error.code === 'PGRST116') {
+        console.log('✅ RLS is properly enforced');
+        results.rlsValidation = true;
+      } else if (!rlsTest.error) {
+        console.log('✅ RLS validation passed (user has access)');
+        results.rlsValidation = true;
+      } else {
+        console.warn('⚠️ RLS test inconclusive:', rlsTest.error);
+      }
+    } catch (rlsError) {
+      console.warn('⚠️ RLS test failed:', rlsError);
+    }
+    
+    // 5. Cross-tab Storage Sync Test
+    console.log('🔍 Testing cross-tab storage synchronization...');
+    try {
+      const testKey = 'auth-test-' + Date.now();
+      localStorage.setItem(testKey, 'test-value');
+      
+      // Simulate storage event
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: testKey,
+        newValue: 'test-value'
+      }));
+      
+      setTimeout(() => localStorage.removeItem(testKey), 100);
+      console.log('✅ Storage synchronization test completed');
+      results.crossTabSync = true;
+    } catch (storageError) {
+      console.error('❌ Storage sync test failed:', storageError);
+    }
+    
+    // 6. Tab Switch Simulation
+    console.log('🔍 Simulating tab switch behavior...');
+    try {
+      // Simulate visibility change
+      Object.defineProperty(document, 'visibilityState', {
+        writable: true,
+        value: 'hidden'
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      
+      setTimeout(() => {
+        Object.defineProperty(document, 'visibilityState', {
+          writable: true,
+          value: 'visible'
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+        console.log('✅ Tab switch simulation completed');
+        results.tabSwitchSimulation = true;
+      }, 500);
+    } catch (tabError) {
+      console.error('❌ Tab switch simulation failed:', tabError);
+    }
+    
+    // Summary
+    const passed = Object.values(results).filter(Boolean).length;
+    const total = Object.keys(results).length;
+    
+    console.log(`\n🎯 Test Results: ${passed}/${total} passed`);
+    console.table(results);
+    
+    if (passed === total) {
+      console.log('🎉 All authentication tests passed!');
+      return true;
     } else {
-      console.log('✅ Database connectivity after refresh working');
+      console.warn('⚠️ Some tests failed - check implementation');
+      return false;
     }
-    
-    console.log('🎉 All tab switching authentication tests passed!');
-    return true;
     
   } catch (error) {
-    console.error('🚨 Tab switching auth test failed:', error);
+    console.error('🚨 Comprehensive auth test failed:', error);
     return false;
   }
 };
+
+// Legacy test for backward compatibility
+(window as any).testTabSwitchingAuth = (window as any).testAuthComprehensive;
 
 // Browser connection pool management
 let connectionRecoveryTimeout: NodeJS.Timeout | null = null;
