@@ -32,9 +32,34 @@ export const recreateSupabaseClient = () => {
   console.log('🔄 Recreating Supabase client to fix hanging state');
   
   try {
-    // Create completely new client instance
-    supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
-    console.log('✅ Supabase client recreated successfully');
+    // Clear any existing auth state to prevent GoTrueClient conflicts
+    if (typeof window !== 'undefined') {
+      // Clear Supabase auth storage
+      localStorage.removeItem(`sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`);
+      sessionStorage.removeItem(`sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`);
+      
+      // Clear any other Supabase keys
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('supabase') || key.includes('sb-')) {
+          localStorage.removeItem(key);
+        }
+      });
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.includes('supabase') || key.includes('sb-')) {
+          sessionStorage.removeItem(key);
+        }
+      });
+    }
+    
+    // Create completely new client instance with fresh config
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      ...getSupabaseConfig(),
+      auth: {
+        ...getSupabaseConfig().auth,
+        storageKey: `sb-${Date.now()}`, // Use unique storage key to avoid conflicts
+      }
+    });
+    console.log('✅ Supabase client recreated successfully with fresh auth state');
     return true;
   } catch (error) {
     console.error('🚨 Failed to recreate Supabase client:', error);
@@ -52,6 +77,20 @@ export const recreateSupabaseClient = () => {
     console.log('❌ Client recreation failed');
   }
   return success;
+};
+
+// Nuclear option - force page reload to completely reset everything
+(window as any).forcePageReload = () => {
+  console.log('💥 Nuclear option: Forcing complete page reload to reset all state');
+  
+  // Clear all storage first
+  if (typeof window !== 'undefined') {
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Force reload without cache
+    window.location.reload();
+  }
 };
 
 // Browser connection pool management
