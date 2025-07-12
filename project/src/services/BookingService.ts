@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, handleNetworkFailure, resetNetworkFailureCount } from '../lib/supabase';
 import type { Booking, FlightBooking, HotelBooking } from '../types/booking';
 
 export class BookingService {
@@ -62,8 +62,19 @@ export class BookingService {
         duration: `${duration}ms`,
         timestamp: new Date().toISOString()
       });
+      resetNetworkFailureCount(); // Reset failure count on success
       return data as Booking;
     } catch (error) {
+      // Handle network failures
+      if (error instanceof Error && (
+        error.name === 'AbortError' ||
+        error.message.includes('timeout') ||
+        error.message.includes('network') ||
+        error.message.includes('fetch')
+      )) {
+        handleNetworkFailure(error, 'BookingService.saveBooking');
+      }
+      
       console.error('🚨 BookingService.saveBooking error:', error);
       throw error;
     }

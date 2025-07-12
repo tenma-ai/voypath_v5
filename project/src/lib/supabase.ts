@@ -18,13 +18,21 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     debug: false,
     flowType: 'pkce'
   },
-  // Increase timeout for production stability
+  // Aggressive timeout for network blocking environments
   global: {
     fetch: (url, options = {}) => {
+      // Create timeout with abort controller for better control
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        console.warn('🚨 Network request timed out after 5 seconds:', url);
+      }, 5000); // 5 second timeout for faster detection
+      
       return fetch(url, {
         ...options,
-        // 30 second timeout for production
-        signal: AbortSignal.timeout(30000)
+        signal: controller.signal
+      }).finally(() => {
+        clearTimeout(timeoutId);
       });
     }
   }
@@ -248,9 +256,45 @@ export const testSupabaseConnection = async () => {
   }
 };
 
+// Network failure detection and recovery
+let networkFailureCount = 0;
+const MAX_NETWORK_FAILURES = 3;
+
+export const handleNetworkFailure = (error: any, operation: string) => {
+  networkFailureCount++;
+  
+  console.error(`🚨 Network failure #${networkFailureCount} in ${operation}:`, error);
+  
+  if (networkFailureCount >= MAX_NETWORK_FAILURES) {
+    console.error('🚨 Multiple network failures detected. Connection may be blocked.');
+    
+    // Show user-friendly error message
+    if (typeof window !== 'undefined') {
+      const shouldReload = confirm(
+        'ネットワーク接続に問題が発生しました。ページを再読み込みしますか？\n\n' +
+        'Network connection issues detected. Would you like to reload the page?'
+      );
+      
+      if (shouldReload) {
+        window.location.reload();
+      }
+    }
+  }
+};
+
+// Reset failure count on successful operations
+export const resetNetworkFailureCount = () => {
+  if (networkFailureCount > 0) {
+    console.log('✅ Network connection restored');
+    networkFailureCount = 0;
+  }
+};
+
 // Make test function available globally for debugging
 if (typeof window !== 'undefined') {
   (window as any).testSupabaseConnection = testSupabaseConnection;
+  (window as any).handleNetworkFailure = handleNetworkFailure;
+  (window as any).resetNetworkFailureCount = resetNetworkFailureCount;
 }
 
 // Auth helper functions with integrated persistence
@@ -577,10 +621,21 @@ export const addPlaceToDatabase = async (placeData: any) => {
       duration: `${duration}ms`,
       timestamp: new Date().toISOString()
     });
+    resetNetworkFailureCount(); // Reset failure count on success
     return { place: data }
     
   } catch (error) {
-    // Error: 'Failed to add place to Supabase:', error)
+    // Handle network failures
+    if (error instanceof Error && (
+      error.name === 'AbortError' ||
+      error.message.includes('timeout') ||
+      error.message.includes('network') ||
+      error.message.includes('fetch')
+    )) {
+      handleNetworkFailure(error, 'addPlaceToDatabase');
+    }
+    
+    console.error('🚨 Failed to add place to Supabase:', error);
     throw error
   }
 }
