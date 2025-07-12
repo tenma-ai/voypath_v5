@@ -12,8 +12,8 @@ export class BookingService {
       console.log('🔍 Booking save - Auth status:', {
         hasSession: !!session,
         hasUser: !!session?.user,
-        userId: session?.user?.id,
-        bookingUserId: booking.user_id,
+        userId: session?.user?.id ? session.user.id.substring(0, 8) + '...' : null,
+        bookingUserId: booking.user_id ? booking.user_id.substring(0, 8) + '...' : null,
         expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
         sessionError: sessionError?.message,
         environment: import.meta.env.PROD ? 'production' : 'development'

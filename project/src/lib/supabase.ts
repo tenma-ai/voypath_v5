@@ -89,11 +89,13 @@ const setupProactiveTokenRefresh = () => {
 
 // Listen for auth events to setup refresh
 supabase.auth.onAuthStateChange((event, session) => {
-  console.log(`🔍 Auth state change: ${event}`, {
-    hasSession: !!session,
-    userId: session?.user?.id,
-    expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null
-  });
+  if (import.meta.env.PROD) {
+    console.log(`🔍 Auth state change: ${event}`, {
+      hasSession: !!session,
+      userId: session?.user?.id ? session.user.id.substring(0, 8) + '...' : null,
+      expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null
+    });
+  }
   
   if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
     setupProactiveTokenRefresh();
@@ -391,7 +393,7 @@ export const addPlaceToDatabase = async (placeData: any) => {
       console.log('🔍 Session check result:', {
         hasSession: !!session,
         hasUser: !!session?.user,
-        userId: session?.user?.id,
+        userId: session?.user?.id ? session.user.id.substring(0, 8) + '...' : null,
         expiresAt: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
         error: error?.message
       });
