@@ -153,6 +153,19 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
   
+  // DISABLED: Edge function temporarily disabled to fix authentication issues
+  console.log('🚫 Duration change edge function DISABLED - was interfering with user authentication');
+  
+  return new Response(JSON.stringify({
+    success: false,
+    error: 'Duration change functionality temporarily disabled to fix authentication issues',
+    message: 'This edge function was interfering with user authentication sessions'
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status: 503 // Service Unavailable
+  });
+  
+  /* ORIGINAL CODE DISABLED
   const startTime = Date.now();
   
   try {
@@ -231,4 +244,5 @@ Deno.serve(async (req) => {
       status: 500
     });
   }
+  */
 });
