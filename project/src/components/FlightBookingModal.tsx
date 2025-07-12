@@ -29,7 +29,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   dayData,
   timeSlot
 }) => {
-  const { currentTrip, tripMembers, addPlace, user } = useStore();
+  const { currentTrip, tripMembers, user } = useStore();
   const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     bookingLink: '',
@@ -257,47 +257,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     }
   };
 
-  const handleAddToTrip = async (booking: FlightBooking) => {
-    if (!currentTrip) return;
-
-    const notesArray = [];
-    if (booking.departure_time && booking.arrival_time) {
-      notesArray.push(`${booking.departure_time} - ${booking.arrival_time}`);
-    }
-    if (booking.passengers) notesArray.push(`${booking.passengers} passengers`);
-    if (booking.price) notesArray.push(`$${booking.price}`);
-    if (booking.booking_link) notesArray.push(`Booking: ${booking.booking_link}`);
-
-    try {
-      await addPlace({
-        id: crypto.randomUUID(),
-        name: booking.flight_number ? `Flight ${booking.flight_number}` : 'Booked Flight',
-        address: booking.route || `${routeData.from} → ${routeData.to}`,
-        latitude: routeData.fromLat || 35.6812,
-        longitude: routeData.fromLng || 139.7671,
-        notes: notesArray.join(' • '),
-        category: 'transportation',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        trip_id: currentTrip.id,
-        tripId: currentTrip.id,
-        user_id: user?.id || '',
-        place_type: 'group_selected',
-        wish_level: 5,
-        stay_duration_minutes: 180,
-        is_user_location: true,
-        is_selected_for_optimization: true,
-        normalized_wish_level: 0.5,
-        rating: 4.0,
-        booking_url: booking.booking_link
-      });
-
-      onClose();
-    } catch (error) {
-      console.error('Failed to add flight to trip:', error);
-      alert('Failed to add flight to trip. Please try again.');
-    }
-  };
+  // Removed handleAddToTrip function - bookings should remain separate from places
 
   const mockFlights = generateMockFlights(fromIATA, toIATA);
 
@@ -641,12 +601,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                             </div>
                           </div>
                           <div className="flex flex-col sm:flex-row gap-2">
-                            <button
-                              onClick={() => handleAddToTrip(booking)}
-                              className="w-full sm:w-auto px-4 py-3 sm:px-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-xs font-medium"
-                            >
-                              Add to Trip
-                            </button>
+                            {/* Removed "Add to Trip" button - bookings should stay as bookings, not places */}
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleEditBooking(booking)}

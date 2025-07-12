@@ -385,12 +385,87 @@ export const getEnvironmentInfo = () => {
   return info;
 };
 
+// Database query functions for management
+export const findTripsWithName = async (searchTerm: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('trips')
+      .select('id, name, description, departure_location, owner_id')
+      .or(`name.ilike.%${searchTerm}%, description.ilike.%${searchTerm}%, departure_location.ilike.%${searchTerm}%`);
+    
+    if (error) throw error;
+    console.log('🔍 Found trips:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to find trips:', error);
+    throw error;
+  }
+};
+
+export const findBookingsForTrip = async (tripId: string, userId?: string) => {
+  try {
+    let query = supabase
+      .from('bookings')
+      .select('*')
+      .eq('trip_id', tripId);
+    
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    console.log('🔍 Found bookings:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to find bookings:', error);
+    throw error;
+  }
+};
+
+export const findUserByName = async (name: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .ilike('name', `%${name}%`);
+    
+    if (error) throw error;
+    console.log('🔍 Found users:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to find users:', error);
+    throw error;
+  }
+};
+
+export const deleteBooking = async (bookingId: string) => {
+  try {
+    const { error } = await supabase
+      .from('bookings')
+      .delete()
+      .eq('id', bookingId);
+    
+    if (error) throw error;
+    console.log('✅ Deleted booking:', bookingId);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to delete booking:', error);
+    throw error;
+  }
+};
+
 // Make test functions available globally for debugging
 if (typeof window !== 'undefined') {
   (window as any).testSupabaseConnection = testSupabaseConnection;
   (window as any).handleNetworkFailure = handleNetworkFailure;
   (window as any).resetNetworkFailureCount = resetNetworkFailureCount;
   (window as any).getEnvironmentInfo = getEnvironmentInfo;
+  (window as any).findTripsWithName = findTripsWithName;
+  (window as any).findBookingsForTrip = findBookingsForTrip;
+  (window as any).findUserByName = findUserByName;
+  (window as any).deleteBooking = deleteBooking;
 }
 
 // Auth helper functions with integrated persistence

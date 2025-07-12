@@ -26,7 +26,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   timeSlot,
   nearbyLocation
 }) => {
-  const { currentTrip, tripMembers, addPlace, user } = useStore();
+  const { currentTrip, tripMembers, user } = useStore();
 
   // Extract city name from location string
   const extractCityName = (locationName: string): string => {
@@ -271,46 +271,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     }
   };
 
-  const handleAddToTrip = async (booking: HotelBooking) => {
-    if (!currentTrip) return;
-
-    const notesArray = [];
-    if (booking.check_in_date) notesArray.push(`Check-in: ${booking.check_in_date} at ${booking.check_in_time}`);
-    if (booking.check_out_date) notesArray.push(`Check-out: ${booking.check_out_date} at ${booking.check_out_time}`);
-    if (booking.guests) notesArray.push(`${booking.guests} guests`);
-    if (booking.price_per_night) notesArray.push(`$${booking.price_per_night}/night`);
-    if (booking.booking_link) notesArray.push(`Booking: ${booking.booking_link}`);
-
-    try {
-      await addPlace({
-        id: crypto.randomUUID(),
-        name: booking.hotel_name || 'Booked Hotel',
-        address: booking.address || nearbyLocation?.name || 'Hotel Location',
-        latitude: nearbyLocation?.lat || 35.6812,
-        longitude: nearbyLocation?.lng || 139.7671,
-        notes: notesArray.join(' • '),
-        category: 'lodging',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        trip_id: currentTrip.id,
-        tripId: currentTrip.id,
-        user_id: user?.id || '',
-        place_type: 'group_selected',
-        wish_level: 5,
-        stay_duration_minutes: 8 * 60,
-        is_user_location: true,
-        is_selected_for_optimization: true,
-        normalized_wish_level: 0.5,
-        rating: booking.rating || 4,
-        booking_url: booking.booking_link
-      });
-
-      onClose();
-    } catch (error) {
-      console.error('Failed to add hotel to trip:', error);
-      alert('Failed to add hotel to trip. Please try again.');
-    }
-  };
+  // Removed handleAddToTrip function - hotel bookings should remain separate from places
 
   const mockHotels = generateMockHotels();
   const city = extractCityName(nearbyLocation?.name || 'Tokyo');
@@ -731,12 +692,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                             </div>
                           </div>
                           <div className="flex flex-col sm:flex-row gap-2">
-                            <button
-                              onClick={() => handleAddToTrip(booking)}
-                              className="w-full sm:w-auto px-4 py-3 sm:px-3 sm:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm sm:text-xs font-medium"
-                            >
-                              Add to Trip
-                            </button>
+                            {/* Removed "Add to Trip" button - hotel bookings should stay as bookings, not places */}
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleEditBooking(booking)}
