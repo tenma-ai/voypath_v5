@@ -985,9 +985,12 @@ export const debugConnectionState = async () => {
   return debugInfo;
 };
 
-// Test database connectivity
+// Enhanced database connectivity testing
 export const testDatabaseConnection = async () => {
-  console.log('🧪 Testing database connection...');
+  console.log('🧪 Testing comprehensive database connectivity...');
+  const results = [];
+  
+  // Test 1: Simple select query
   try {
     const startTime = Date.now();
     const { data, error, count } = await supabase
@@ -997,18 +1000,76 @@ export const testDatabaseConnection = async () => {
     
     const duration = Date.now() - startTime;
     const result = {
+      test: 'places_select',
       success: !error,
       duration: `${duration}ms`,
       count,
       error: error?.message,
+      errorCode: error?.code,
+      errorDetails: error?.details,
       timestamp: new Date().toISOString()
     };
     
-    console.log('🧪 Database test result:', result);
-    return result;
+    results.push(result);
   } catch (err) {
-    console.error('🚨 Database test failed:', err);
-    return { success: false, error: err };
+    results.push({ test: 'places_select', success: false, error: err });
+  }
+  
+  // Test 2: Auth user query
+  try {
+    const startTime = Date.now();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    const duration = Date.now() - startTime;
+    const result = {
+      test: 'auth_getUser',
+      success: !error && !!user,
+      duration: `${duration}ms`,
+      userId: user?.id?.substring(0, 8) + '...' || null,
+      error: error?.message,
+      errorCode: error?.code,
+      timestamp: new Date().toISOString()
+    };
+    
+    results.push(result);
+  } catch (err) {
+    results.push({ test: 'auth_getUser', success: false, error: err });
+  }
+  
+  const summary = {
+    totalTests: results.length,
+    passedTests: results.filter(r => r.success).length,
+    failedTests: results.filter(r => !r.success).length,
+    tests: results
+  };
+  
+  console.log('🧪 Comprehensive Database Test Results:', summary);
+  return summary;
+};
+
+// Enhanced operation debugging
+export const debugDatabaseOperation = async (operationName: string, operation: () => Promise<any>) => {
+  console.log(`🔍 Starting database operation debug: ${operationName}`);
+  
+  // Pre-operation checks
+  const preCheck = await debugConnectionState();
+  console.log(`📊 Pre-operation state for ${operationName}:`, preCheck);
+  
+  try {
+    const startTime = Date.now();
+    const result = await operation();
+    const duration = Date.now() - startTime;
+    
+    console.log(`✅ Operation ${operationName} completed in ${duration}ms:`, result);
+    return { success: true, result, duration };
+  } catch (error) {
+    console.error(`❌ Operation ${operationName} failed:`, error);
+    
+    // Post-failure checks
+    const postCheck = await debugConnectionState();
+    console.log(`📊 Post-failure state for ${operationName}:`, postCheck);
+    
+    return { success: false, error, preCheck, postCheck };
   }
 };
 
@@ -1018,6 +1079,7 @@ if (typeof window !== 'undefined') {
   (window as any).debugConnectionState = debugConnectionState;
   (window as any).testDatabaseConnection = testDatabaseConnection;
   (window as any).validateSessionBeforeOperation = validateSessionBeforeOperation;
+  (window as any).debugDatabaseOperation = debugDatabaseOperation;
   (window as any).handleNetworkFailure = handleNetworkFailure;
   (window as any).resetNetworkFailureCount = resetNetworkFailureCount;
   (window as any).getEnvironmentInfo = getEnvironmentInfo;
@@ -1028,6 +1090,13 @@ if (typeof window !== 'undefined') {
   (window as any).findPlacesByUser = findPlacesByUser;
   (window as any).deletePlace = deletePlace;
   (window as any).findBookedFlightPlaces = findBookedFlightPlaces;
+  
+  // Quick test commands
+  (window as any).quickDebug = async () => {
+    console.log('🚀 Running quick debug suite...');
+    await debugConnectionState();
+    await testDatabaseConnection();
+  };
 }
 
 // Auth helper functions with integrated persistence
