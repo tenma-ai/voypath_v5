@@ -12,245 +12,68 @@ const isNetworkRestricted = () => {
 };
 
 const getSupabaseConfig = () => {
-  const baseConfig = {
-    realtime: {
-      params: {
-        eventsPerSecond: 2, // Reduced from 10 to 2 to prevent connection issues
-        timeout: 30000, // 30 seconds timeout instead of default
-        heartbeatIntervalMs: 30000, // 30 second heartbeat
-        reconnectAfterMs: (tries) => Math.min(tries * 1000, 10000) // Exponential backoff up to 10s
-      }
-    },
+  // Minimal configuration - let Supabase use its defaults
+  return {
     auth: {
       persistSession: true,
-      autoRefreshToken: true, // Re-enable auto-refresh to work with Supabase's built-in system
+      autoRefreshToken: true,
       detectSessionInUrl: true,
-      debug: false,
-      flowType: 'pkce',
-      storage: window.localStorage, // Explicit storage for cross-tab sync
-      storageKey: 'sb-auth-token' // Custom storage key
-    },
-    db: {
-      schema: 'public'
-    },
-    global: {
-      headers: {
-        'X-Client-Info': 'voypath-web@1.0.0'
-      }
-    }
-  };
-
-  if (isNetworkRestricted()) {
-    // Ultra-conservative settings for restricted networks
-    return {
-      ...baseConfig,
-      global: {
-        fetch: (url, options = {}) => {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => {
-            controller.abort();
-            console.warn('🚨 Network-restricted timeout (2s):', url);
-          }, 2000); // Even shorter timeout for restricted networks
-          
-          return fetch(url, {
-            ...options,
-            signal: controller.signal,
-            mode: 'cors',
-            credentials: 'omit', // Avoid credential issues
-            cache: 'no-cache' // Prevent caching issues
-          }).finally(() => {
-            clearTimeout(timeoutId);
-          });
-        }
-      }
-    };
-  }
-
-  // Normal configuration
-  return {
-    ...baseConfig,
-    global: {
-      fetch: (url, options = {}) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-          console.warn('🚨 Network request timed out after 3 seconds:', url);
-        }, 3000);
-        
-        return fetch(url, {
-          ...options,
-          signal: controller.signal
-        }).finally(() => {
-          clearTimeout(timeoutId);
-        });
-      }
+      debug: !import.meta.env.PROD,
+      flowType: 'pkce'
     }
   };
 };
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseConfig());
 
-// Enhanced token management with tab visibility awareness
-let tokenRefreshTimer: NodeJS.Timeout | null = null;
-let tokenRefreshInterval: NodeJS.Timeout | null = null;
-let sessionCheckInterval: NodeJS.Timeout | null = null;
-let lastSessionCheck = Date.now();
+// Simplified token management - let Supabase handle most of it
+let refreshTimer: NodeJS.Timeout | null = null;
 
-// Aggressive token refresh - refresh every 30 minutes (30 minutes before 1-hour expiry)
 const setupCustomTokenRefresh = () => {
-  // Clear any existing timers
-  if (tokenRefreshTimer) {
-    clearTimeout(tokenRefreshTimer);
-    tokenRefreshTimer = null;
-  }
-  if (tokenRefreshInterval) {
-    clearInterval(tokenRefreshInterval);
-    tokenRefreshInterval = null;
-  }
-  if (sessionCheckInterval) {
-    clearInterval(sessionCheckInterval);
-    sessionCheckInterval = null;
+  // Clear any existing timer
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
   }
   
+  // Only add minimal custom refresh logic
   supabase.auth.getSession().then(({ data: { session }, error }) => {
-    if (error) {
-      console.error('🚨 Session retrieval error:', error);
-      return;
-    }
-    
-    if (session?.expires_at) {
-      const expiresAt = session.expires_at * 1000;
-      const now = Date.now();
-      const timeUntilExpiry = expiresAt - now;
-      
-      // More aggressive refresh schedule for tab switching scenarios
-      const refreshTime = Math.max(0, timeUntilExpiry - 30 * 60 * 1000); // 30 minutes before expiry
-      
-      if (!import.meta.env.PROD) {
-        console.log(`🔍 Custom token refresh - Expiry: ${new Date(expiresAt).toISOString()}, Refresh in: ${Math.round(refreshTime / 1000 / 60)} minutes`);
-      }
-      
-      // Schedule first refresh
-      if (refreshTime > 0) {
-        tokenRefreshTimer = setTimeout(async () => {
-          await performTokenRefresh();
-          // After successful refresh, set up interval for every 30 minutes
-          tokenRefreshInterval = setInterval(performTokenRefresh, 30 * 60 * 1000);
-        }, refreshTime);
-        
-        // Set up session validation check every 5 minutes
-        sessionCheckInterval = setInterval(validateCurrentSession, 5 * 60 * 1000);
-      } else {
-        // Token expires soon or already expired, refresh immediately
-        performTokenRefresh().then(() => {
-          // Set up interval for every 30 minutes
-          tokenRefreshInterval = setInterval(performTokenRefresh, 30 * 60 * 1000);
-          // Set up session validation check every 5 minutes
-          sessionCheckInterval = setInterval(validateCurrentSession, 5 * 60 * 1000);
-        });
-      }
-    } else {
-      console.warn('⚠️ No session or expiry time found');
-    }
-  });
-};
-
-// Enhanced token refresh with better error handling
-const performTokenRefresh = async () => {
-  try {
-    lastSessionCheck = Date.now();
-    
-    if (!import.meta.env.PROD) {
-      console.log('🔄 Performing enhanced token refresh');
-    }
-    
-    const { data, error } = await supabase.auth.refreshSession();
-    if (error) {
-      console.error('🚨 Token refresh failed:', error);
-      
-      // For tab switching issues, try getting a fresh session
-      if (error.message?.includes('refresh_token_not_found') || error.message?.includes('invalid_grant')) {
-        console.log('🔄 Attempting fresh session retrieval after refresh failure');
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !sessionData?.session) {
-          console.error('🚨 Fresh session retrieval also failed:', sessionError);
-          window.dispatchEvent(new CustomEvent('supabase-session-expired'));
-          return;
-        }
-      }
-      
-      // Retry once after 3 seconds (shorter retry for tab switching)
-      setTimeout(async () => {
-        const { data: retryData, error: retryError } = await supabase.auth.refreshSession();
-        if (retryError) {
-          console.error('🚨 Token refresh retry failed:', retryError);
-          window.dispatchEvent(new CustomEvent('supabase-session-expired'));
-        } else if (!import.meta.env.PROD) {
-          console.log('✅ Token refresh retry successful');
-        }
-      }, 3000);
-    } else if (!import.meta.env.PROD) {
-      console.log('✅ Token refreshed successfully via enhanced refresh');
-    }
-  } catch (refreshError) {
-    console.error('🚨 Token refresh exception:', refreshError);
-    window.dispatchEvent(new CustomEvent('supabase-session-expired'));
-  }
-};
-
-// Validate current session periodically
-const validateCurrentSession = async () => {
-  try {
-    // Skip validation if tab is hidden to avoid throttling
-    if (typeof document !== 'undefined' && document.hidden) {
-      return;
-    }
-    
-    const timeSinceLastCheck = Date.now() - lastSessionCheck;
-    if (timeSinceLastCheck < 4 * 60 * 1000) { // Don't check more than every 4 minutes
-      return;
-    }
-    
-    lastSessionCheck = Date.now();
-    
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error('🚨 Session validation failed:', error);
-      window.dispatchEvent(new CustomEvent('supabase-session-expired'));
-      return;
-    }
-    
-    if (!session) {
-      console.warn('⚠️ No session found during validation');
-      window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+    if (error || !session?.expires_at) {
       return;
     }
     
     const expiresAt = session.expires_at * 1000;
     const timeUntilExpiry = expiresAt - Date.now();
     
-    // If session expires within 10 minutes, refresh preemptively
-    if (timeUntilExpiry < 10 * 60 * 1000) {
-      if (!import.meta.env.PROD) {
-        console.log('🔄 Session expiring soon, preemptive refresh');
+    // Only refresh if expiring within 5 minutes (minimal intervention)
+    if (timeUntilExpiry < 5 * 60 * 1000 && timeUntilExpiry > 0) {
+      refreshTimer = setTimeout(async () => {
+        try {
+          await supabase.auth.refreshSession();
+        } catch (error) {
+          console.warn('Token refresh failed:', error);
+        }
+      }, Math.max(0, timeUntilExpiry - 2 * 60 * 1000)); // Refresh 2 minutes before expiry
+    }
+  });
+};
+
+// Simple token refresh - minimal intervention
+const performTokenRefresh = async () => {
+  try {
+    const { error } = await supabase.auth.refreshSession();
+    if (error) {
+      console.warn('Token refresh failed:', error);
+      if (error.message?.includes('refresh_token_not_found')) {
+        window.dispatchEvent(new CustomEvent('supabase-session-expired'));
       }
-      await performTokenRefresh();
     }
   } catch (error) {
-    console.error('🚨 Session validation error:', error);
+    console.warn('Token refresh exception:', error);
   }
 };
 
-// Initialize session recovery on startup
-if (typeof window !== 'undefined') {
-  // Attempt session recovery when page loads
-  window.addEventListener('load', async () => {
-    const recovered = await attemptSessionRecovery();
-    if (recovered) {
-      console.log('🎉 Session recovery completed - user should remain signed in');
-    }
-  });
-}
+// Removed session recovery startup logic
 
 // Listen for auth events to setup custom refresh
 supabase.auth.onAuthStateChange((event, session) => {
@@ -266,18 +89,10 @@ supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
     setupCustomTokenRefresh();
   } else if (event === 'SIGNED_OUT') {
-    // Clear all refresh timers
-    if (tokenRefreshTimer) {
-      clearTimeout(tokenRefreshTimer);
-      tokenRefreshTimer = null;
-    }
-    if (tokenRefreshInterval) {
-      clearInterval(tokenRefreshInterval);
-      tokenRefreshInterval = null;
-    }
-    if (sessionCheckInterval) {
-      clearInterval(sessionCheckInterval);
-      sessionCheckInterval = null;
+    // Clear refresh timer
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
     }
   }
 });
@@ -290,85 +105,50 @@ const handleVisibilityChange = async () => {
     // Tab became hidden
     wasTabHidden = true;
     if (!import.meta.env.PROD) {
-      console.log('🙈 Tab hidden - background timers may be throttled');
+      console.log('🙈 Tab hidden - pausing operations');
     }
   } else {
     // Tab became visible again
     if (wasTabHidden) {
       if (!import.meta.env.PROD) {
-        console.log('👁️ Tab visible again - aggressive client recovery');
+        console.log('👁️ Tab visible again - gentle recovery');
       }
       wasTabHidden = false;
       
-      // Wait a moment for tab to fully activate
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for tab to stabilize
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // AGGRESSIVE RECOVERY: Test client state with timeout
       try {
-        console.log('🔍 Testing client state after tab switch...');
-        
-        // Test with short timeout to detect hanging client
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Client hanging - timeout after 3 seconds')), 3000)
-        );
-        
-        const sessionPromise = supabase.auth.getSession();
-        
-        const sessionResult = await Promise.race([sessionPromise, timeoutPromise]);
-        
-        if (!sessionResult || sessionResult.error) {
-          console.error('🚨 Session test failed or client hanging, forcing client reset');
-          await forceSupabaseClientReset();
-          return;
-        }
-        
-        const { data: { session }, error } = sessionResult;
+        // Simple session check without aggressive timeouts
+        const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('🚨 Session retrieval error after tab focus:', error);
+          console.warn('⚠️ Session error after tab focus:', error);
+          // Try refreshing the session
+          await performTokenRefresh();
+        } else if (!session) {
+          console.warn('⚠️ No session after tab focus');
+          window.dispatchEvent(new CustomEvent('supabase-session-expired'));
+        } else {
+          // Check if token needs refresh
+          const expiresAt = session.expires_at * 1000;
+          const timeUntilExpiry = expiresAt - Date.now();
           
-          // Try to recover from certain errors
-          if (error.message?.includes('Invalid Refresh Token') || error.message?.includes('refresh_token_not_found')) {
-            console.log('🔄 Attempting session recovery from refresh token error');
-            await forceSupabaseClientReset();
-            return;
+          if (timeUntilExpiry < 10 * 60 * 1000) {
+            console.log('🔄 Token expiring soon, refreshing');
+            await performTokenRefresh();
           }
           
-          window.dispatchEvent(new CustomEvent('supabase-session-error', { detail: error }));
-          return;
+          // Test connectivity with a simple query
+          await testDatabaseConnectivity();
+          
+          console.log('✅ Tab focus recovery completed');
+          window.dispatchEvent(new CustomEvent('supabase-tab-focus-recovery-success'));
         }
-        
-        if (!session) {
-          console.warn('⚠️ No session found after tab regain focus');
-          await forceSupabaseClientReset();
-          return;
-        }
-        
-        // Test database connectivity with timeout
-        console.log('🔍 Testing database connectivity with timeout...');
-        const dbTestPromise = testDatabaseConnectivity();
-        const dbTimeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Database test hanging - timeout after 5 seconds')), 5000)
-        );
-        
-        try {
-          await Promise.race([dbTestPromise, dbTimeoutPromise]);
-          console.log('✅ Database connectivity test passed');
-        } catch (dbError) {
-          console.error('🚨 Database connectivity test failed or hanging:', dbError);
-          await forceSupabaseClientReset();
-          return;
-        }
-        
-        // If we get here, the client is working
-        console.log('✅ Client state healthy after tab switch');
-        
-        // Step 5: Emit success event for realtime reconnection
-        window.dispatchEvent(new CustomEvent('supabase-tab-focus-recovery-success'));
         
       } catch (error) {
-        console.error('🚨 Tab focus recovery failed, forcing client reset:', error);
-        await forceSupabaseClientReset();
+        console.error('🚨 Tab focus recovery error:', error);
+        window.dispatchEvent(new CustomEvent('supabase-session-error', { detail: error }));
       }
       
       // Restart token refresh system
@@ -377,126 +157,7 @@ const handleVisibilityChange = async () => {
   }
 };
 
-// Enhanced client reset that preserves session if possible
-const forceSupabaseClientReset = async () => {
-  console.log('🔄 Forcing Supabase client reset due to hanging state');
-  
-  try {
-    // Step 1: Try to preserve session data before reset
-    let preservedSession = null;
-    try {
-      // Quick attempt to get session data (with short timeout)
-      const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Session backup timeout')), 1000)
-      );
-      
-      const sessionResult = await Promise.race([sessionPromise, timeoutPromise]);
-      if (sessionResult?.data?.session) {
-        preservedSession = {
-          access_token: sessionResult.data.session.access_token,
-          refresh_token: sessionResult.data.session.refresh_token,
-          user: sessionResult.data.session.user
-        };
-        console.log('💾 Session data preserved for recovery');
-        
-        // Store in a different localStorage key for recovery
-        localStorage.setItem('voypath_session_backup', JSON.stringify(preservedSession));
-      }
-    } catch (backupError) {
-      console.warn('⚠️ Could not backup session:', backupError);
-    }
-    
-    // Step 2: Clear all existing connections and timers
-    if (tokenRefreshTimer) {
-      clearTimeout(tokenRefreshTimer);
-      tokenRefreshTimer = null;
-    }
-    if (tokenRefreshInterval) {
-      clearInterval(tokenRefreshInterval);
-      tokenRefreshInterval = null;
-    }
-    if (sessionCheckInterval) {
-      clearInterval(sessionCheckInterval);
-      sessionCheckInterval = null;
-    }
-    
-    // Step 3: Force sign out to clear corrupted state (with timeout)
-    try {
-      await Promise.race([
-        supabase.auth.signOut(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('signOut timeout')), 1000))
-      ]);
-    } catch (signOutError) {
-      console.warn('⚠️ Sign out timed out or failed (expected):', signOutError);
-    }
-    
-    // Step 4: Clear only corrupted Supabase auth data, preserve backup
-    try {
-      Object.keys(localStorage).forEach(key => {
-        if ((key.startsWith('sb-') || key.includes('supabase')) && key !== 'voypath_session_backup') {
-          localStorage.removeItem(key);
-        }
-      });
-    } catch (storageError) {
-      console.warn('⚠️ localStorage clear failed:', storageError);
-    }
-    
-    // Step 5: Set recovery flag and reload
-    localStorage.setItem('voypath_recovery_mode', 'true');
-    console.log('🔄 Client reset complete - reloading with session recovery');
-    window.location.reload();
-    
-  } catch (resetError) {
-    console.error('🚨 Client reset failed:', resetError);
-    // Last resort: force reload without session preservation
-    localStorage.setItem('voypath_recovery_mode', 'true');
-    window.location.reload();
-  }
-};
-
-// Session recovery after page reload
-const attemptSessionRecovery = async () => {
-  const recoveryMode = localStorage.getItem('voypath_recovery_mode');
-  const sessionBackup = localStorage.getItem('voypath_session_backup');
-  
-  if (recoveryMode === 'true' && sessionBackup) {
-    console.log('🔄 Attempting session recovery after client reset');
-    
-    try {
-      const preserved = JSON.parse(sessionBackup);
-      
-      // Try to restore session using the refresh token
-      const { data, error } = await supabase.auth.setSession({
-        access_token: preserved.access_token,
-        refresh_token: preserved.refresh_token
-      });
-      
-      if (error) {
-        console.warn('⚠️ Session recovery failed:', error);
-        // Clear recovery data and let user sign in normally
-        localStorage.removeItem('voypath_session_backup');
-        localStorage.removeItem('voypath_recovery_mode');
-      } else {
-        console.log('✅ Session recovered successfully after client reset');
-        // Clean up recovery data
-        localStorage.removeItem('voypath_session_backup');
-        localStorage.removeItem('voypath_recovery_mode');
-        
-        // Restart auth system
-        setupCustomTokenRefresh();
-        
-        return true;
-      }
-    } catch (recoveryError) {
-      console.error('🚨 Session recovery error:', recoveryError);
-      localStorage.removeItem('voypath_session_backup');
-      localStorage.removeItem('voypath_recovery_mode');
-    }
-  }
-  
-  return false;
-};
+// Remove aggressive client reset - focus on gentle recovery instead
 
 // Test database connectivity after tab focus
 const testDatabaseConnectivity = async () => {
@@ -1223,7 +884,7 @@ if (typeof window !== 'undefined') {
   (window as any).testDatabaseConnection = testDatabaseConnection;
   (window as any).validateSessionBeforeOperation = validateSessionBeforeOperation;
   (window as any).debugDatabaseOperation = debugDatabaseOperation;
-  (window as any).forceSupabaseClientReset = forceSupabaseClientReset;
+  // Removed forceSupabaseClientReset - focusing on gentle recovery
   (window as any).handleNetworkFailure = handleNetworkFailure;
   (window as any).resetNetworkFailureCount = resetNetworkFailureCount;
   (window as any).getEnvironmentInfo = getEnvironmentInfo;
@@ -1235,37 +896,17 @@ if (typeof window !== 'undefined') {
   (window as any).deletePlace = deletePlace;
   (window as any).findBookedFlightPlaces = findBookedFlightPlaces;
   
-  // Enhanced quick test commands with timeout protection
+  // Simple debug commands without aggressive timeouts
   (window as any).quickDebug = async () => {
-    console.log('🚀 Running quick debug suite with timeout protection...');
+    console.log('🚀 Running debug suite...');
     
     try {
-      // Test with timeout to detect hanging
-      const debugPromise = debugConnectionState();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('debugConnectionState hanging - timeout after 5 seconds')), 5000)
-      );
-      
-      await Promise.race([debugPromise, timeoutPromise]);
-      
-      const dbTestPromise = testDatabaseConnection();
-      const dbTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('testDatabaseConnection hanging - timeout after 10 seconds')), 10000)
-      );
-      
-      await Promise.race([dbTestPromise, dbTimeoutPromise]);
-      
-      console.log('✅ Quick debug completed successfully');
+      await debugConnectionState();
+      await testDatabaseConnection();
+      console.log('✅ Debug completed successfully');
     } catch (error) {
-      console.error('🚨 Quick debug failed or timed out:', error);
-      console.log('🔄 Client appears to be hanging - use forceSupabaseClientReset() to recover');
+      console.error('🚨 Debug failed:', error);
     }
-  };
-  
-  // Emergency recovery command
-  (window as any).emergencyRecover = async () => {
-    console.log('🆘 Emergency recovery initiated...');
-    await forceSupabaseClientReset();
   };
 }
 
