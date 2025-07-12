@@ -136,10 +136,19 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     window.open(url, '_blank');
   };
 
-  // Load saved bookings when modal opens
+  // OPTIMIZED: Load saved bookings with caching to prevent repeated DB calls
+  const lastLoadedContext = useRef<string | null>(null);
+  
   useEffect(() => {
     if (isOpen && currentTrip?.id) {
-      loadSavedBookings();
+      // Create cache key from context to avoid unnecessary reloads
+      const contextKey = `${currentTrip.id}-${modalContext.location}-${modalContext.checkInDate}`;
+      
+      // Only reload if context has actually changed
+      if (lastLoadedContext.current !== contextKey) {
+        loadSavedBookings();
+        lastLoadedContext.current = contextKey;
+      }
     }
   }, [isOpen, currentTrip?.id, modalContext.location, modalContext.checkInDate]);
 
@@ -148,8 +157,15 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     
     setLoading(true);
     try {
-      // Load all hotel bookings for this trip
+      // OPTIMIZED: Add timeout monitoring to prevent connection issues
+      const startTime = Date.now();
       const allBookings = await BookingService.getBookingsByType(currentTrip.id, 'hotel');
+      const loadTime = Date.now() - startTime;
+      
+      // Log slow operations that might be causing timeouts
+      if (loadTime > 2000) {
+        console.warn(`⚠️ Slow hotel booking load: ${loadTime}ms`);
+      }
       
       // Filter bookings by location and check-in date context
       const contextBookings = allBookings.filter(booking => 
@@ -158,6 +174,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
       );
       
       setSavedBookings(contextBookings as HotelBooking[]);
+      console.log(`✅ Loaded ${contextBookings.length} hotel bookings in ${loadTime}ms`);
     } catch (error) {
       console.error('Failed to load saved bookings:', error);
       setSavedBookings([]);

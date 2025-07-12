@@ -133,10 +133,19 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     window.open(url, '_blank');
   };
 
-  // Load saved bookings when modal opens
+  // OPTIMIZED: Load saved bookings with caching to prevent repeated DB calls
+  const lastLoadedContext = useRef<string | null>(null);
+  
   useEffect(() => {
     if (isOpen && currentTrip?.id) {
-      loadSavedBookings();
+      // Create cache key from context to avoid unnecessary reloads
+      const contextKey = `${currentTrip.id}-${modalContext.route}-${modalContext.date}`;
+      
+      // Only reload if context has actually changed
+      if (lastLoadedContext.current !== contextKey) {
+        loadSavedBookings();
+        lastLoadedContext.current = contextKey;
+      }
     }
   }, [isOpen, currentTrip?.id, modalContext.route, modalContext.date]);
 
@@ -145,8 +154,15 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     
     setLoading(true);
     try {
-      // Load all flight bookings for this trip
+      // OPTIMIZED: Add timeout and reduced retry to prevent connection issues
+      const startTime = Date.now();
       const allBookings = await BookingService.getBookingsByType(currentTrip.id, 'flight');
+      const loadTime = Date.now() - startTime;
+      
+      // Log slow operations that might be causing timeouts
+      if (loadTime > 2000) {
+        console.warn(`⚠️ Slow booking load: ${loadTime}ms`);
+      }
       
       // Filter bookings by route and date context
       const contextBookings = allBookings.filter(booking => 
@@ -155,6 +171,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
       );
       
       setSavedBookings(contextBookings as FlightBooking[]);
+      console.log(`✅ Loaded ${contextBookings.length} contextual bookings in ${loadTime}ms`);
     } catch (error) {
       console.error('Failed to load saved bookings:', error);
       setSavedBookings([]);

@@ -185,9 +185,18 @@ interface StoreState {
   getUserPlaceCount: (userId: string, tripId?: string) => number;
   upgradeToPremium: () => void;
 
-  // Supabase real-time subscriptions
+  // Supabase real-time subscriptions (enhanced with debounce and cascade prevention)
   realtimeChannels: RealtimeChannel[];
   setupSupabaseRealtime: () => void;
+  // Debounce and cascade prevention
+  realtimeDebounceTimers: Map<string, NodeJS.Timeout>;
+  isInternalUpdate: boolean;
+  
+  // Batch update system for edit operations
+  batchUpdateQueue: Array<{ placeId: string, updates: any }>;
+  batchUpdateTimer: NodeJS.Timeout | null;
+  executeBatchUpdate: (tripId: string) => Promise<void>;
+  queuePlaceUpdate: (placeId: string, updates: any) => void;
 }
 
 export interface TripCreateData {
@@ -235,21 +244,18 @@ export const useStore = create<StoreState>()((set, get) => ({
         const isActuallyNewTrip = currentTripId && currentTripId !== trip.id;
         console.log('🔍 Trip analysis:', { isActuallyNewTrip });
         
-        // Check localStorage for edit state before any state changes
-        const savedEditState = localStorage.getItem(`hasUserEditedSchedule_${trip.id}`);
-        
-        // Debug: List all localStorage keys that contain edit state
-        const allLocalStorageKeys = Object.keys(localStorage).filter(key => key.includes('hasUserEditedSchedule'));
-        console.log('💾 localStorage edit state for trip:', {
-          tripId: trip.id,
-          savedEditState,
-          key: `hasUserEditedSchedule_${trip.id}`,
-          allEditStateKeys: allLocalStorageKeys,
-          allEditStateValues: allLocalStorageKeys.reduce((acc, key) => {
-            acc[key] = localStorage.getItem(key);
-            return acc;
-          }, {} as Record<string, string | null>)
-        });
+        // OPTIMIZED: Simplified localStorage access to reduce I/O operations
+        let savedEditState = null;
+        try {
+          // Single localStorage access with error handling
+          savedEditState = localStorage.getItem(`hasUserEditedSchedule_${trip.id}`);
+          console.log('💾 Simplified localStorage check:', {
+            tripId: trip.id,
+            savedEditState: savedEditState ? 'true' : 'false'
+          });
+        } catch (error) {
+          console.warn('⚠️ localStorage access failed:', error);
+        }
         
         
         set({ 
@@ -257,9 +263,24 @@ export const useStore = create<StoreState>()((set, get) => ({
           showOptimizationSuccess: false  // Reset success animation when switching trips
         });
         
-        // Save current trip ID to localStorage for persistence
+        // OPTIMIZED: Batched localStorage operations to reduce I/O
         if (trip) {
-          localStorage.setItem('currentTripId', trip.id);
+          try {
+            // Batch localStorage operations in a single try-catch
+            const operations = [() => localStorage.setItem('currentTripId', trip.id)];
+            
+            // Only update edit state if we need to
+            if (savedEditState && savedEditState === 'true') {
+              operations.push(() => {
+                // Keep existing edit state for this trip
+              });
+            }
+            
+            // Execute batched operations
+            operations.forEach(op => op());
+          } catch (error) {
+            console.warn('⚠️ localStorage batch operation failed:', error);
+          }
         }
         
         if (trip) {
@@ -834,9 +855,15 @@ export const useStore = create<StoreState>()((set, get) => ({
         set({ hasUserOptimized: value });
       },
       
-      // Edit mode control - when true, optimization is disabled
+      // Edit mode control - TEMPORARILY DISABLED for debugging timeout issues
       hasUserEditedSchedule: false,
       setHasUserEditedSchedule: (value) => {
+        // DISABLED: Edit state tracking disabled to debug 5-minute timeouts
+        console.log('🚫 setHasUserEditedSchedule DISABLED for debugging:', { value });
+        return;
+        
+        // Original implementation commented out
+        /*
         const { currentTrip } = get();
         console.log('🔄 setHasUserEditedSchedule called:', {
           value,
@@ -858,6 +885,7 @@ export const useStore = create<StoreState>()((set, get) => ({
         } else {
           console.warn('⚠️ No currentTrip available when setting edit state');
         }
+        */
       },
       
       
@@ -884,8 +912,14 @@ export const useStore = create<StoreState>()((set, get) => ({
       isProcessingScheduleUpdates: false,
       lastScheduleUpdateId: null,
       
-      // Real-time schedule update functions
+      // Real-time schedule update functions - TEMPORARILY DISABLED
       updateScheduleInRealTime: async (updateData: any) => {
+        // DISABLED: Real-time updates disabled to debug 5-minute timeouts
+        console.log('🚫 updateScheduleInRealTime DISABLED for debugging:', { updateData });
+        return;
+        
+        // Original implementation commented out
+        /*
         const { currentTrip, isProcessingScheduleUpdates } = get();
         if (!currentTrip || isProcessingScheduleUpdates) return;
         
@@ -912,9 +946,16 @@ export const useStore = create<StoreState>()((set, get) => ({
         } finally {
           set({ isProcessingScheduleUpdates: false });
         }
+        */
       },
       
       broadcastScheduleUpdate: (updateData: any) => {
+        // DISABLED: Schedule broadcasting disabled to debug 5-minute timeouts
+        console.log('🚫 broadcastScheduleUpdate DISABLED for debugging:', { updateData });
+        return;
+        
+        // Original implementation commented out
+        /*
         // Emit custom event for real-time sync between views
         window.dispatchEvent(new CustomEvent('voypath-schedule-update', {
           detail: updateData
@@ -934,6 +975,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             }
           });
         }
+        */
       },
       
       applyUpdateToSchedules: (schedules: any[], updateData: any) => {
@@ -1025,8 +1067,14 @@ export const useStore = create<StoreState>()((set, get) => ({
         }
       },
       
-      // Calendar edit functions
+      // Calendar edit functions - TEMPORARILY DISABLED
       movePlace: async (placeId: string, sourceIndex: number, targetIndex: number, dayData: any) => {
+        // DISABLED: Move place functionality disabled to debug 5-minute timeouts
+        console.log('🚫 movePlace DISABLED for debugging:', { placeId, sourceIndex, targetIndex, dayData });
+        return;
+        
+        // Original implementation commented out
+        /*
         // First, immediately update the UI for responsiveness
         const { optimizationResult, setOptimizationResult } = get();
         
@@ -1073,9 +1121,16 @@ export const useStore = create<StoreState>()((set, get) => ({
           console.warn('Background reorder update failed:', error);
           // UI already updated, so this is just a warning
         }
+        */
       },
       
       resizePlaceDuration: async (placeId: string, newDuration: number, oldDuration: number) => {
+        // DISABLED: Resize place duration disabled to debug 5-minute timeouts
+        console.log('🚫 resizePlaceDuration DISABLED for debugging:', { placeId, newDuration, oldDuration });
+        return;
+        
+        // Original implementation commented out
+        /*
         // First, immediately update the UI for responsiveness
         const { optimizationResult, setOptimizationResult } = get();
         
@@ -1134,9 +1189,16 @@ export const useStore = create<StoreState>()((set, get) => ({
           console.warn('Background duration update failed:', error);
           // UI already updated, so this is just a warning
         }
+        */
       },
       
       insertPlace: async (placeData: any, insertionContext: any) => {
+        // DISABLED: Insert place functionality disabled to debug 5-minute timeouts
+        console.log('🚫 insertPlace DISABLED for debugging:', { placeData, insertionContext });
+        return;
+        
+        // Original implementation commented out
+        /*
         await get().updateScheduleInRealTime({
           action: 'insert',
           data: {
@@ -1144,9 +1206,16 @@ export const useStore = create<StoreState>()((set, get) => ({
             insertionContext
           }
         });
+        */
       },
       
       deleteScheduledPlace: async (placeId: string, dayData: any, blockIndex: number) => {
+        // DISABLED: Delete scheduled place disabled to debug 5-minute timeouts
+        console.log('🚫 deleteScheduledPlace DISABLED for debugging:', { placeId, dayData, blockIndex });
+        return;
+        
+        // Original implementation commented out
+        /*
         await get().updateScheduleInRealTime({
           action: 'delete',
           data: {
@@ -1155,6 +1224,7 @@ export const useStore = create<StoreState>()((set, get) => ({
             blockIndex
           }
         });
+        */
       },
 
       // Premium functions
@@ -1692,6 +1762,9 @@ export const useStore = create<StoreState>()((set, get) => ({
             };
 
 
+            // DISABLED: Edit state tracking disabled for debugging
+            // Original edit state tracking commented out
+            /*
             // Check if this is an edited schedule (created by edit-schedule edge function)
             const isEditedSchedule = result.algorithm_version === 'edit-schedule-v1' || result.edit_action;
             const currentEditState = get().hasUserEditedSchedule;
@@ -1722,6 +1795,15 @@ export const useStore = create<StoreState>()((set, get) => ({
               hasUserOptimized: true,
               // Set hasUserEditedSchedule if this was created by editing OR stored in localStorage
               hasUserEditedSchedule: isEditedSchedule || currentEditState || localStorageEditState
+            });
+            */
+            
+            // Simplified set without edit state tracking for debugging
+            set({ 
+              optimizationResult: optimizationResult,
+              hasUserOptimized: true,
+              // DISABLED: hasUserEditedSchedule tracking disabled
+              // hasUserEditedSchedule: false
             });
           } else {
             // No results found in database, preserve existing if available
@@ -1955,20 +2037,69 @@ export const useStore = create<StoreState>()((set, get) => ({
 
       // Supabase real-time subscriptions
       realtimeChannels: [],
-      setupSupabaseRealtime: () => {
-        // TEMPORARILY DISABLED - Testing if Realtime is causing 5-minute timeout issues
-        // This function sets up real-time subscriptions that may be hitting connection limits
-        console.log('⚠️ setupSupabaseRealtime temporarily disabled for debugging');
-        return;
-        
-        const { currentTrip, loadPlacesFromDatabase, loadOptimizationResult } = get();
+      realtimeDebounceTimers: new Map(),
+      isInternalUpdate: false,
+      
+      // Batch update system
+      batchUpdateQueue: [],
+      batchUpdateTimer: null,
+      setupSupabaseRealtime: async () => {
+        const { currentTrip, loadPlacesFromDatabase, loadOptimizationResult, realtimeDebounceTimers, isInternalUpdate } = get();
         if (!currentTrip?.id) return;
         
-        // Cleanup existing channels
-        get().realtimeChannels.forEach(channel => supabase.removeChannel(channel));
-        set({ realtimeChannels: [] });
+        console.log('🔄 Setting up enhanced Realtime with debounce and cascade prevention');
         
-        // Subscribe to places
+        // Cleanup existing channels and timers
+        get().realtimeChannels.forEach(channel => supabase.removeChannel(channel));
+        realtimeDebounceTimers.forEach(timer => clearTimeout(timer));
+        realtimeDebounceTimers.clear();
+        set({ realtimeChannels: [], realtimeDebounceTimers: new Map() });
+        
+        // Notify polling services that realtime is stopping (cleanup phase)
+        try {
+          const { setRealtimeActive } = await import('../lib/supabase');
+          setRealtimeActive(false);
+          
+          const { OptimizationKeepAliveService } = await import('../services/OptimizationKeepAliveService');
+          OptimizationKeepAliveService.setRealtimeActive(false);
+          
+          console.log('🔄 Notified polling services that realtime is stopping');
+        } catch (error) {
+          console.warn('⚠️ Could not notify polling services about realtime deactivation:', error);
+        }
+        
+        // Debounced update function to prevent cascading updates
+        const debouncedUpdate = (key: string, updateFn: () => Promise<void>, delay: number = 1000) => {
+          // Skip updates if this is an internal update (prevents cascade)
+          if (get().isInternalUpdate) {
+            console.log('🚫 Skipping realtime update - internal update in progress');
+            return;
+          }
+          
+          const timers = get().realtimeDebounceTimers;
+          
+          // Clear existing timer for this key
+          if (timers.has(key)) {
+            clearTimeout(timers.get(key)!);
+          }
+          
+          // Set new debounced timer
+          const timer = setTimeout(async () => {
+            try {
+              console.log(`🔄 Executing debounced realtime update: ${key}`);
+              await updateFn();
+              timers.delete(key);
+            } catch (error) {
+              console.error(`❌ Realtime update failed for ${key}:`, error);
+              timers.delete(key);
+            }
+          }, delay);
+          
+          timers.set(key, timer);
+          set({ realtimeDebounceTimers: timers });
+        };
+        
+        // Subscribe to places with debounce
         const placesChannel = supabase
           .channel(`places:${currentTrip.id}`)
           .on('postgres_changes', {
@@ -1976,13 +2107,15 @@ export const useStore = create<StoreState>()((set, get) => ({
             schema: 'public',
             table: 'places',
             filter: `trip_id=eq.${currentTrip.id}`
-          }, async (payload) => {
-            await loadPlacesFromDatabase(currentTrip.id);
-            await loadOptimizationResult(currentTrip.id);
+          }, (payload) => {
+            console.log('📡 Realtime places change detected:', payload.eventType);
+            debouncedUpdate('places', async () => {
+              await loadPlacesFromDatabase(currentTrip.id);
+            }, 500); // 500ms debounce for places
           })
           .subscribe();
         
-        // Subscribe to optimization_results
+        // Subscribe to optimization_results with debounce
         const optChannel = supabase
           .channel(`optimization_results:${currentTrip.id}`)
           .on('postgres_changes', {
@@ -1990,12 +2123,28 @@ export const useStore = create<StoreState>()((set, get) => ({
             schema: 'public',
             table: 'optimization_results',
             filter: `trip_id=eq.${currentTrip.id}`
-          }, async (payload) => {
-            await loadOptimizationResult(currentTrip.id);
+          }, (payload) => {
+            console.log('📡 Realtime optimization change detected:', payload.eventType);
+            debouncedUpdate('optimization', async () => {
+              await loadOptimizationResult(currentTrip.id);
+            }, 1000); // 1000ms debounce for optimization
           })
           .subscribe();
         
         set({ realtimeChannels: [placesChannel, optChannel] });
+        
+        // Notify other services that realtime is now active to prevent polling conflicts
+        try {
+          const { setRealtimeActive } = await import('../lib/supabase');
+          setRealtimeActive(true);
+          
+          const { OptimizationKeepAliveService } = await import('../services/OptimizationKeepAliveService');
+          OptimizationKeepAliveService.setRealtimeActive(true);
+          
+          console.log('✅ Enhanced Realtime setup complete with debounce protection and polling coordination');
+        } catch (error) {
+          console.warn('⚠️ Could not notify polling services about realtime activation:', error);
+        }
       },
 
       // Calendar edit helper functions

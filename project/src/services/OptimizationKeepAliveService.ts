@@ -8,7 +8,8 @@ import { supabase } from '../lib/supabase';
 
 export class OptimizationKeepAliveService {
   private static keepAliveInterval: NodeJS.Timeout | null = null;
-  private static readonly PING_INTERVAL = 4 * 60 * 1000; // 4 minutes (before 5min cold start)
+  private static readonly PING_INTERVAL = 8 * 60 * 1000; // 8 minutes (reduced frequency to prevent realtime conflicts)
+  private static isRealtimeActive = false;
   private static readonly FUNCTIONS_TO_KEEP_WARM = [
     'optimize-route',
     'normalize-preferences'
@@ -51,9 +52,15 @@ export class OptimizationKeepAliveService {
   }
 
   /**
-   * Ping all optimization functions to keep them warm
+   * Ping all optimization functions to keep them warm - OPTIMIZED to prevent realtime conflicts
    */
   private static async pingAllFunctions(): Promise<void> {
+    // Skip pinging if realtime is active to prevent connection conflicts
+    if (this.isRealtimeActive) {
+      console.log('😴 Skipping keep-alive pings - realtime is active');
+      return;
+    }
+    
     const promises = this.FUNCTIONS_TO_KEEP_WARM.map(functionName => 
       this.pingFunction(functionName)
     );
@@ -110,17 +117,27 @@ export class OptimizationKeepAliveService {
   }
 
   /**
+   * Set realtime status to coordinate with keep-alive
+   */
+  static setRealtimeActive(active: boolean): void {
+    this.isRealtimeActive = active;
+    console.log(`🔄 Keep-alive service: realtime status updated to ${active ? 'ACTIVE' : 'INACTIVE'}`);
+  }
+
+  /**
    * Get keep-alive status for monitoring
    */
   static getStatus(): {
     active: boolean;
     interval: number;
     functions: string[];
+    realtimeActive: boolean;
   } {
     return {
       active: this.isActive(),
       interval: this.PING_INTERVAL,
-      functions: [...this.FUNCTIONS_TO_KEEP_WARM]
+      functions: [...this.FUNCTIONS_TO_KEEP_WARM],
+      realtimeActive: this.isRealtimeActive
     };
   }
 }

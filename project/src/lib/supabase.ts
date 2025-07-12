@@ -229,17 +229,32 @@ const startSessionHealthCheck = () => {
   }
 };
 
-// Lightweight connection keep-alive for free tier
+// Lightweight connection keep-alive for free tier - OPTIMIZED to prevent realtime conflicts
 let keepAliveTimer: NodeJS.Timeout | null = null;
+let isRealtimeActive = false;
+
+// Function to check if realtime subscriptions are active
+const checkRealtimeStatus = () => {
+  // Simple check for active realtime channels
+  return isRealtimeActive;
+};
 
 const startKeepAlive = () => {
   if (keepAliveTimer) {
     clearInterval(keepAliveTimer);
   }
   
-  // Simple ping every 3 minutes to keep connection warm
+  // OPTIMIZED: Longer intervals and conditional execution to prevent conflicts
   keepAliveTimer = setInterval(async () => {
     try {
+      // Skip keep-alive if realtime is active to prevent polling conflicts
+      if (checkRealtimeStatus()) {
+        if (!import.meta.env.PROD) {
+          console.log('😴 Skipping keep-alive - realtime is active');
+        }
+        return;
+      }
+      
       // Very lightweight query - just check if we can connect
       await supabase.from('places').select('id', { count: 'exact', head: true }).limit(1);
       if (!import.meta.env.PROD) {
@@ -250,7 +265,15 @@ const startKeepAlive = () => {
         console.warn('⚠️ Keep-alive ping failed:', error);
       }
     }
-  }, 3 * 60 * 1000); // Every 3 minutes
+  }, 5 * 60 * 1000); // Every 5 minutes (increased from 3 to reduce conflicts)
+};
+
+// Export function to control realtime status
+export const setRealtimeActive = (active: boolean) => {
+  isRealtimeActive = active;
+  if (!import.meta.env.PROD) {
+    console.log(`🔄 Realtime status updated: ${active ? 'ACTIVE' : 'INACTIVE'}`);
+  }
 };
 
 // Start session health check - but only for monitoring, not for refresh
@@ -262,7 +285,7 @@ setupCustomTokenRefresh();
 // Start keep-alive for connection stability
 startKeepAlive();
 
-// Silent background connectivity monitor (no UI impact)
+// Silent background connectivity monitor (no UI impact) - OPTIMIZED
 let connectivityCheckTimer: NodeJS.Timeout | null = null;
 let lastSuccessfulConnection = Date.now();
 
@@ -273,6 +296,14 @@ const startConnectivityMonitor = () => {
   
   connectivityCheckTimer = setInterval(async () => {
     try {
+      // Skip connectivity check if realtime is active to prevent conflicts
+      if (checkRealtimeStatus()) {
+        if (!import.meta.env.PROD) {
+          console.log('😴 Skipping connectivity check - realtime is active');
+        }
+        return;
+      }
+      
       // Very lightweight connectivity test
       const response = await fetch(supabaseUrl + '/rest/v1/', {
         method: 'HEAD',
@@ -291,7 +322,7 @@ const startConnectivityMonitor = () => {
         console.warn('⚠️ Extended connectivity issues detected, but continuing silently');
       }
     }
-  }, 4 * 60 * 1000); // Check every 4 minutes, offset from keep-alive
+  }, 7 * 60 * 1000); // Check every 7 minutes (increased from 4 to reduce conflicts)
 };
 
 // Start silent monitoring (completely in background)

@@ -19,7 +19,9 @@ interface CalendarViewProps {
 const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
+  // TEMPORARILY DISABLED - Edit mode disabled to debug 5-minute timeout issues
   const [isEditMode, setIsEditMode] = useState(false);
+  const isEditingDisabled = true;
   const [mealModal, setMealModal] = useState<{
     isOpen: boolean;
     mealType: 'breakfast' | 'lunch' | 'dinner';
@@ -1579,10 +1581,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
         <div className="fixed bottom-20 right-4 z-[99999] flex flex-col items-center">
           <button
             onClick={() => {
-              setIsEditMode(!isEditMode);
+              if (!isEditingDisabled) {
+                setIsEditMode(!isEditMode);
+              }
             }}
+            disabled={isEditingDisabled}
             className={`w-14 h-14 rounded-full shadow-glow hover:shadow-glow-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden group ${
-              isEditMode
+              isEditingDisabled 
+                ? 'bg-gray-400 cursor-not-allowed opacity-50'
+                : isEditMode
                 ? 'bg-gradient-to-br from-green-500 via-emerald-500 to-green-600'
                 : 'bg-gradient-to-br from-primary-500 via-secondary-500 to-primary-600'
             }`}
