@@ -1,4 +1,4 @@
-import { supabase, handleNetworkFailure, resetNetworkFailureCount } from '../lib/supabase';
+import { supabase, handleNetworkFailure, resetNetworkFailureCount, retryOperation } from '../lib/supabase';
 import type { Booking, FlightBooking, HotelBooking } from '../types/booking';
 
 export class BookingService {
@@ -27,15 +27,17 @@ export class BookingService {
         });
       }
 
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert({
-          ...booking,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      const { data, error } = await retryOperation(async () => {
+        return await supabase
+          .from('bookings')
+          .insert({
+            ...booking,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+      });
 
       if (error) {
         const duration = Date.now() - startTime;

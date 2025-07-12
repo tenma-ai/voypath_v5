@@ -25,8 +25,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-        console.warn('🚨 Network request timed out after 5 seconds:', url);
-      }, 5000); // 5 second timeout for faster detection
+        console.warn('🚨 Network request timed out after 8 seconds:', url);
+      }, 8000); // 8 second timeout (less than Supabase's 10 second limit)
       
       return fetch(url, {
         ...options,
@@ -258,7 +258,34 @@ export const testSupabaseConnection = async () => {
 
 // Network failure detection and recovery
 let networkFailureCount = 0;
-const MAX_NETWORK_FAILURES = 3;
+const MAX_NETWORK_FAILURES = 2; // Reduced to 2 for faster user feedback
+
+// Retry function for database operations
+export const retryOperation = async <T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 2,
+  delay: number = 1000
+): Promise<T> => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await operation();
+      if (attempt > 1) {
+        console.log(`✅ Operation succeeded on attempt ${attempt}`);
+        resetNetworkFailureCount();
+      }
+      return result;
+    } catch (error) {
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      console.warn(`⚠️ Operation failed on attempt ${attempt}, retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 1.5; // Exponential backoff
+    }
+  }
+  throw new Error('Max retries exceeded');
+};
 
 export const handleNetworkFailure = (error: any, operation: string) => {
   networkFailureCount++;
