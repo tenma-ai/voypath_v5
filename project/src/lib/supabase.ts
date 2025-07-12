@@ -12,71 +12,16 @@ const isNetworkRestricted = () => {
 };
 
 const getSupabaseConfig = () => {
-  // Optimized configuration for Session Mode stability and tab switching
+  // REVERTED: Back to minimal, stable configuration that worked before
   return {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
       debug: false,
-      flowType: 'pkce',
-      // Enhanced session persistence for tab switching
-      storageKey: 'voypath-supabase-auth-token',
-      storage: {
-        getItem: (key: string) => {
-          try {
-            return localStorage.getItem(key);
-          } catch {
-            return null;
-          }
-        },
-        setItem: (key: string, value: string) => {
-          try {
-            localStorage.setItem(key, value);
-          } catch {
-            // Ignore storage errors
-          }
-        },
-        removeItem: (key: string) => {
-          try {
-            localStorage.removeItem(key);
-          } catch {
-            // Ignore storage errors
-          }
-        }
-      }
-    },
-    db: {
-      schema: 'public'
-    },
-    global: {
-      headers: {
-        'x-application-name': 'voypath-v5',
-        'x-connection-mode': 'session',
-        'x-tab-switching-optimized': 'true'
-      },
-      // Enhanced fetch configuration for connection stability
-      fetch: (url: string, options: any = {}) => {
-        // Add timeout and retry logic
-        const enhancedOptions = {
-          ...options,
-          signal: AbortSignal.timeout(10000), // 10 second timeout
-          headers: {
-            ...options.headers,
-            'Connection': 'keep-alive',
-            'Keep-Alive': 'timeout=5, max=1000'
-          }
-        };
-        
-        return fetch(url, enhancedOptions);
-      }
-    },
-    // Enhanced connection stability for tab switching
-    realtime: {
-      params: {
-        eventsPerSecond: 10
-      }
+      flowType: 'pkce'
     }
+    // REMOVED: All custom configurations that broke authentication
   };
 };
 
@@ -463,7 +408,9 @@ const handleWindowFocus = async () => {
   }
 };
 
-// Enhanced event listeners for tab visibility and window focus - optimized for stability
+// DISABLED: Tab switching handlers that broke authentication
+// These will be re-enabled once authentication is stable
+/*
 if (typeof document !== 'undefined') {
   console.log('🔧 Setting up enhanced tab switching handlers');
   
@@ -481,6 +428,7 @@ if (typeof document !== 'undefined') {
     }
   });
 }
+*/
 
 // Periodic session health check for production
 let sessionHealthTimer: NodeJS.Timeout | null = null;
@@ -1141,63 +1089,17 @@ if (typeof window !== 'undefined') {
   (window as any).deletePlace = deletePlace;
   (window as any).findBookedFlightPlaces = findBookedFlightPlaces;
   
-  // Enhanced debug commands with tab switching awareness
+  // SIMPLIFIED: Basic debug commands without tab switching interference
   (window as any).quickDebug = async () => {
-    console.log('🚀 Running enhanced debug suite...');
-    
-    // Check if tab was recently switched
-    const timeSinceLastVisibilityChange = Date.now() - lastVisibilityChange;
-    const wasRecentlyHidden = timeSinceLastVisibilityChange < 30000; // Within last 30 seconds
-    
-    console.log('📊 Tab switching context:', {
-      documentVisibility: document.visibilityState,
-      timeSinceLastVisibilityChange: `${Math.round(timeSinceLastVisibilityChange / 1000)}s`,
-      wasRecentlyHidden,
-      timestamp: new Date().toISOString()
-    });
+    console.log('🚀 Running basic debug suite...');
     
     try {
       await debugConnectionState();
       await testDatabaseConnection();
       console.log('✅ Debug completed successfully');
-      
-      // If recently switched tabs and debug passes, connection is healthy
-      if (wasRecentlyHidden) {
-        console.log('🎯 Tab switching detected - connection remains healthy');
-      }
     } catch (error) {
       console.error('🚨 Debug failed:', error);
-      
-      // Enhanced recovery for tab switching scenarios
-      if (wasRecentlyHidden) {
-        console.log('🔄 Tab switching may have caused connection issues - attempting targeted recovery...');
-        
-        try {
-          // Force client recreation for tab switching issues
-          await recreateSupabaseClient();
-          
-          // Retry debug after client recreation
-          await debugConnectionState();
-          await testDatabaseConnection();
-          console.log('✅ Debug completed successfully after tab switching recovery');
-        } catch (retryError) {
-          console.error('🚨 Debug still failing after tab switching recovery:', retryError);
-          
-          // Final fallback - page reload recommendation
-          console.log('💡 Recommendation: Try refreshing the page if issues persist');
-        }
-      } else {
-        // Standard recovery for non-tab-switching issues
-        console.log('🔄 Attempting standard connection recovery...');
-        try {
-          await refreshSupabaseClientState();
-          await debugConnectionState();
-          await testDatabaseConnection();
-          console.log('✅ Debug completed successfully after standard recovery');
-        } catch (retryError) {
-          console.error('🚨 Debug still failing after standard recovery:', retryError);
-        }
-      }
+      console.log('💡 Try refreshing the page if authentication issues persist');
     }
   };
   
