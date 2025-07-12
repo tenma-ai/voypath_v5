@@ -30,49 +30,29 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, getSupabaseCo
 // Browser connection pool management
 let connectionRecoveryTimeout: NodeJS.Timeout | null = null;
 
-// Force new connection when returning from background
-const forceConnectionRecovery = async () => {
-  if (connectionRecoveryTimeout) {
-    clearTimeout(connectionRecoveryTimeout);
-  }
-  
-  console.log('🔄 Forcing connection recovery after tab switch');
+// Refresh Supabase client state after tab switching
+const refreshSupabaseClientState = async () => {
+  console.log('🔄 Refreshing Supabase client state after tab switch');
   
   try {
-    // Method 1: Force HTTP/2 connection reset by creating new request with cache-busting
-    const timestamp = Date.now();
-    const testUrl = `${supabaseUrl}/rest/v1/?_recovery=${timestamp}`;
-    
-    // Create a minimal test request to force new connection
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    try {
-      await fetch(testUrl, {
-        method: 'HEAD',
-        headers: {
-          'apikey': supabaseAnonKey,
-          'cache-control': 'no-cache, no-store, must-revalidate',
-          'pragma': 'no-cache'
-        },
-        signal: controller.signal,
-        cache: 'no-store' // Force bypass of browser cache
-      });
-      clearTimeout(timeoutId);
-      console.log('✅ Connection recovery test successful');
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      console.warn('⚠️ Connection recovery test failed (expected):', fetchError.message);
+    // Force auth session refresh to reset client state
+    const { error } = await supabase.auth.refreshSession();
+    if (error) {
+      console.warn('Auth refresh failed:', error);
     }
     
-    // Method 2: Force Supabase client to refresh its internal connection state
-    // This triggers a new auth check which should establish fresh connections
-    await supabase.auth.getSession();
+    // Test database connectivity with timeout
+    const testPromise = supabase.from('places').select('id').limit(1);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database test timeout')), 3000)
+    );
     
-    console.log('✅ Connection recovery completed');
+    await Promise.race([testPromise, timeoutPromise]);
+    console.log('✅ Supabase client state refresh successful');
     
   } catch (error) {
-    console.error('🚨 Connection recovery failed:', error);
+    console.error('🚨 Supabase client state refresh failed:', error);
+    throw error;
   }
 };
 
@@ -155,23 +135,37 @@ const handleVisibilityChange = async () => {
     // Tab became hidden
     wasTabHidden = true;
     if (!import.meta.env.PROD) {
-      console.log('🙈 Tab hidden - connections may be suspended');
+      console.log('🙈 Tab hidden - client may become stale');
     }
   } else {
-    // Tab became visible again
+    // Tab became visible again  
     if (wasTabHidden) {
       if (!import.meta.env.PROD) {
-        console.log('👁️ Tab visible again - forcing connection recovery');
+        console.log('👁️ Tab visible again - refreshing Supabase client state');
       }
       wasTabHidden = false;
       
-      // Critical: Force connection recovery to address browser networking issues
+      // Force Supabase client to refresh its internal state
       connectionRecoveryTimeout = setTimeout(async () => {
-        await forceConnectionRecovery();
-        
-        // After connection recovery, emit success event
-        window.dispatchEvent(new CustomEvent('supabase-tab-focus-recovery-success'));
-      }, 100); // Quick recovery
+        try {
+          // Method 1: Force auth state refresh
+          await supabase.auth.refreshSession();
+          
+          // Method 2: Test connection with a simple query
+          await supabase.from('places').select('id').limit(1).abortSignal(AbortSignal.timeout(5000));
+          
+          console.log('✅ Supabase client state refreshed successfully');
+          window.dispatchEvent(new CustomEvent('supabase-tab-focus-recovery-success'));
+        } catch (error) {
+          console.warn('⚠️ Supabase client refresh failed:', error);
+          
+          // If refresh fails, force a page reload as last resort
+          if (error.message?.includes('timeout') || error.message?.includes('aborted')) {
+            console.log('🔄 Client appears stuck - forcing page reload');
+            window.location.reload();
+          }
+        }
+      }, 500); // Give tab time to stabilize
     }
   }
 };
@@ -903,7 +897,7 @@ if (typeof window !== 'undefined') {
   (window as any).testDatabaseConnection = testDatabaseConnection;
   (window as any).validateSessionBeforeOperation = validateSessionBeforeOperation;
   (window as any).debugDatabaseOperation = debugDatabaseOperation;
-  (window as any).forceConnectionRecovery = forceConnectionRecovery;
+  (window as any).refreshSupabaseClientState = refreshSupabaseClientState;
   (window as any).handleNetworkFailure = handleNetworkFailure;
   (window as any).resetNetworkFailureCount = resetNetworkFailureCount;
   (window as any).getEnvironmentInfo = getEnvironmentInfo;
@@ -943,8 +937,8 @@ if (typeof window !== 'undefined') {
   
   // Manual recovery command
   (window as any).recoverConnection = async () => {
-    console.log('🔄 Manual connection recovery initiated...');
-    await forceConnectionRecovery();
+    console.log('🔄 Manual client state refresh initiated...');
+    await refreshSupabaseClientState();
   };
 }
 
