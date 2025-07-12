@@ -70,7 +70,7 @@ export const LIMITS = {
   FREE: {
     TRIPS: 3,
     MEMBERS_PER_TRIP: 5,
-    PLACES_PER_USER: 10,
+    PLACES_PER_USER: 20,
   },
   PREMIUM: {
     TRIPS: Infinity,
