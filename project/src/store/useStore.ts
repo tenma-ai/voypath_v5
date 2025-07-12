@@ -1901,14 +1901,14 @@ export const useStore = create<StoreState>()((set, get) => ({
 
           // Check if user is already a member
           try {
-            const memberResponse = await fetch(`https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/members/${pendingTrip.tripId}`, {
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-              },
+            const { data: memberResponse, error: memberError } = await supabase.functions.invoke('trip-member-management', {
+              body: {
+                action: 'get-members',
+                tripId: pendingTrip.tripId
+              }
             });
 
-            if (memberResponse.ok) {
+            if (!memberError && memberResponse) {
               // User already a member
             } else {
               // Add user as trip member directly

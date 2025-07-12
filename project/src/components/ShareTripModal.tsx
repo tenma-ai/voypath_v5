@@ -84,18 +84,17 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
 
   const loadExistingShares = async () => {
     try {
-      const headers = await getAuthHeaders();
-      
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('trip-sharing-v3', {
+        body: {
           action: 'get_my_shares'
-        }),
+        }
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
         const tripShares = data.shares.filter((share: any) => share.trips?.id === tripId);
         setShareLinks(tripShares.map((share: any) => ({
           id: share.id,
@@ -169,17 +168,15 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
       // Log message
       // Log message
 
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
+      const { data: newShare, error } = await supabase.functions.invoke('trip-sharing-v3', {
+        body: requestBody
       });
 
-      // Log message
-      // Response headers
+      if (error) {
+        throw error;
+      }
 
-      if (response.ok) {
-        const newShare = await response.json();
+      if (newShare) {
         // Log message
         setShareLinks([newShare, ...shareLinks]);
         
@@ -231,17 +228,17 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
     try {
       const headers = await getAuthHeaders();
       
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
+      const { error } = await supabase.functions.invoke('trip-sharing-v3', {
+        body: {
           action: 'delete_share',
           shareId
-        }),
+        }
       });
 
-      if (response.ok) {
+      if (!error) {
         setShareLinks(shareLinks.filter(link => link.id !== shareId));
+      } else {
+        throw error;
       }
     } catch (error) {
       // Error occurred

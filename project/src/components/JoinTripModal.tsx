@@ -62,48 +62,22 @@ export function JoinTripModal({ isOpen, onClose }: JoinTripModalProps) {
       console.log('Join attempt:', { cleanCode, userId: user.id });
 
       // Call trip-member-management Edge Function
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/join-trip', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
+      const { data: response, error } = await supabase.functions.invoke('trip-member-management', {
+        body: {
+          action: 'join-trip',
           invitation_code: cleanCode
-        }),
+        }
       });
 
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        let errorMessage = 'Failed to join trip';
-        try {
-          const errorData = await response.json();
-          console.log('Error response data:', errorData);
-          errorMessage = errorData.error || errorData.message || errorMessage;
-        } catch (parseError) {
-          console.log('Failed to parse error response');
-          const errorText = await response.text();
-          console.log('Error response text:', errorText);
-          if (errorText) errorMessage = errorText;
-        }
-        
-        // Provide more specific error messages
-        if (response.status === 404) {
-          errorMessage = 'Invalid invitation code. Please check the code and try again.';
-        } else if (response.status === 401) {
-          errorMessage = 'Please log in to join a trip.';
-        } else if (response.status === 403) {
-          errorMessage = 'You do not have permission to join this trip.';
-        } else if (response.status === 409) {
-          errorMessage = 'You are already a member of this trip.';
-        }
-        
-        throw new Error(errorMessage);
+      if (error) {
+        throw error;
       }
 
-      const data = await response.json();
+      if (!response || !response.trip) {
+        throw new Error('Invalid invitation code. Please check the code and try again.');
+      }
+
+      const data = response;
       // Log message
 
       // Refresh trips data from database

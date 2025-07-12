@@ -65,47 +65,28 @@ export class WayAwayService {
 
     try {
       // Use ONLY Supabase Edge Function (TravelPayouts API requires server-side calls)
-      const supabaseProxyUrl = `https://rdufxwoeneglyponagdz.supabase.co/functions/v1/wayaway-proxy`;
-      const searchParams = new URLSearchParams({
+      const { supabase } = await import('../lib/supabase');
+      const searchParams = {
         origin,
         destination,
         depart_date: departDate,
         currency,
-        token: this.API_TOKEN
+        token: this.API_TOKEN,
+        ...(returnDate && { return_date: returnDate })
+      };
+
+      logger.apiCall('Calling WayAway via Supabase Edge Function (server-side only)', JSON.stringify(searchParams));
+
+      // Use supabase.functions.invoke instead of fetch
+      const { data: response, error } = await supabase.functions.invoke('wayaway-proxy', {
+        body: searchParams
       });
 
-      if (returnDate) {
-        searchParams.append('return_date', returnDate);
+      if (error) {
+        throw error;
       }
 
-      logger.apiCall('Calling WayAway via Supabase Edge Function (server-side only)', `${supabaseProxyUrl}?${searchParams.toString()}`);
-
-      // Try without authentication first (for public proxy)
-      let response = await fetch(`${supabaseProxyUrl}?${searchParams.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-
-      // If 401, try with authentication
-      if (response.status === 401 && this.SUPABASE_ANON_KEY) {
-        logger.debug('Retrying with authentication');
-        response = await fetch(`${supabaseProxyUrl}?${searchParams.toString()}`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${this.SUPABASE_ANON_KEY}`,
-            'apikey': this.SUPABASE_ANON_KEY
-          },
-        });
-      }
-      
-      if (!response.ok) {
-        throw new Error(`Supabase proxy error: ${response.status} - ${response.statusText}`);
-      }
-
-      const result = await response.json();
+      const result = response;
       
       // Check if response is valid JSON (not HTML error page)
       if (typeof result === 'string' && result.includes('<!doctype')) {

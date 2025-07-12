@@ -263,62 +263,43 @@ export function SharedTripView() {
       
       // Request headers prepared
       
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
+      const { data: response, error } = await supabase.functions.invoke('trip-sharing-v3', {
+        body: requestBody
       });
+
+      if (error) {
+        throw error;
+      }
       
       // Log message
       
-      if (!response.ok) {
-        try {
-          const errorText = await response.text();
-          // Log message
-          
-          // Try to parse as JSON for more details
-          try {
-            const errorJson = JSON.parse(errorText);
-            // Log message
-          } catch (parseError) {
-            // Log message
-          }
-        } catch (readError) {
-          // Log message
-        }
-      }
-
-      if (response.ok) {
-        const data = await response.json();
+      if (response) {
         
         // Log message
         // Permissions loaded
         
-        if (data.requiresPassword) {
+        if (response.requiresPassword) {
           setIsPasswordRequired(true);
           setIsLoading(false);
           return;
         }
 
-        setShareData(data);
+        setShareData(response);
         setIsPasswordRequired(false);
         
         
         // If user is authenticated and can join as member, redirect to actual trip page
-        if (user && data.trip && data.permissions?.can_join_as_member) {
+        if (user && response.trip && response.permissions?.can_join_as_member) {
           // Log message
           setIsRedirecting(true);
-          await redirectToTripPage(data.trip);
+          await redirectToTripPage(response.trip);
           return;
-        } else if (user && data.trip) {
+        } else if (user && response.trip) {
           // User is authenticated but cannot join as member (view-only)
           // Log message
         } else {
           // Log message
         }
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to load shared trip');
       }
     } catch (error) {
       setError('Failed to load shared trip');

@@ -93,25 +93,18 @@ export function SharePage() {
       }
 
       
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-member-management/create-invitation', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('trip-member-management', {
+        body: {
+          action: 'create-invitation',
           trip_id: currentTrip.id,
           max_uses: 10,
           description: 'Share page invitation'
-        }),
+        }
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (!error && data) {
         setJoinCode(data.invitation.code);
       } else {
-        const errorData = await response.json();
         // Failed to generate invitation code - fallback to existing code if generation fails
         const existingCodes = await getExistingInvitationCodes();
         if (existingCodes.length > 0) {
@@ -135,13 +128,8 @@ export function SharePage() {
     setGeneratingLink(true);
     try {
       
-      const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/trip-sharing-v3', {
-        method: 'POST',
-        headers: {
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('trip-sharing-v3', {
+        body: {
           action: 'create_share_link',
           trip_id: currentTrip.id,
           share_type: 'external_view',
@@ -150,11 +138,10 @@ export function SharePage() {
             can_join_as_member: true,
             can_export: true
           }
-        }),
+        }
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (!error && data) {
         setShareLink(`${window.location.origin}/shared/${data.shareToken}`);
       } else {
         // Failed to generate share link - try to get existing share link

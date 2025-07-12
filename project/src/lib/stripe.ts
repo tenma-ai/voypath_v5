@@ -59,21 +59,19 @@ const getAuthHeaders = async () => {
 // Stripe Checkout セッション作成
 export const createCheckoutSession = async () => {
   try {
-    const headers = await getAuthHeaders();
+    const { supabase } = await import('./supabase');
     
-    const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/stripe-subscription-management', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('stripe-subscription-management', {
+      body: {
         action: 'create_checkout_session',
-      }),
+      }
     });
 
-    if (!response.ok) {
+    if (error) {
       throw new Error('Failed to create checkout session');
     }
 
-    const { sessionId, url } = await response.json();
+    const { sessionId, url } = data;
     return { sessionId, url };
   } catch (error) {
     // Error occurred
@@ -84,21 +82,19 @@ export const createCheckoutSession = async () => {
 // カスタマーポータルセッション作成
 export const createCustomerPortalSession = async () => {
   try {
-    const headers = await getAuthHeaders();
+    const { supabase } = await import('./supabase');
     
-    const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/stripe-subscription-management', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('stripe-subscription-management', {
+      body: {
         action: 'create_portal_session',
-      }),
+      }
     });
 
-    if (!response.ok) {
+    if (error) {
       throw new Error('Failed to create portal session');
     }
 
-    const { url } = await response.json();
+    const { url } = data;
     return url;
   } catch (error) {
     // Error occurred
@@ -109,21 +105,19 @@ export const createCustomerPortalSession = async () => {
 // サブスクリプション状態確認
 export const checkSubscriptionStatus = async () => {
   try {
-    const headers = await getAuthHeaders();
+    const { supabase } = await import('./supabase');
     
-    const response = await fetch('https://rdufxwoeneglyponagdz.supabase.co/functions/v1/stripe-subscription-management', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('stripe-subscription-management', {
+      body: {
         action: 'check_subscription',
-      }),
+      }
     });
 
-    if (!response.ok) {
+    if (error) {
       throw new Error('Failed to check subscription status');
     }
 
-    return await response.json();
+    return data;
   } catch (error) {
     // Error occurred
     throw error;
