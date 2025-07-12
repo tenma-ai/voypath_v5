@@ -608,7 +608,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   
   // Setup real-time sync system
   React.useEffect(() => {
-    const cleanup = setupRealTimeSync();
+    console.log('Realtime setup skipped - functionality disabled');
+    // const cleanup = setupRealTimeSync();
     
     // Listen for data changes from other views
     const handleDataChange = (event: CustomEvent) => {
@@ -623,7 +624,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
     window.addEventListener('voypath-data-changed', handleDataChange as EventListener);
     
     return () => {
-      cleanup();
+      // cleanup();
       window.removeEventListener('voypath-data-changed', handleDataChange as EventListener);
     };
   }, [setupRealTimeSync]);

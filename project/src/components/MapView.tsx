@@ -57,8 +57,9 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
 
   // Setup real-time sync cleanup
   useEffect(() => {
-    const cleanup = setupRealTimeSync();
-    return cleanup;
+    console.log('Realtime setup skipped - functionality disabled');
+    // const cleanup = setupRealTimeSync();
+    // return cleanup;
   }, [setupRealTimeSync]);
 
   // Handle optimization success animation - only show when explicitly triggered

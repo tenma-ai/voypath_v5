@@ -52,8 +52,9 @@ const CalendarGridView: React.FC<CalendarGridViewProps> = ({ optimizationResult 
 
   // Setup real-time sync cleanup
   useEffect(() => {
-    const cleanup = setupRealTimeSync();
-    return cleanup;
+    console.log('Realtime setup skipped - functionality disabled');
+    // const cleanup = setupRealTimeSync();
+    // return cleanup;
   }, [setupRealTimeSync]);
 
   // Time formatting function
