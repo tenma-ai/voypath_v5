@@ -8,6 +8,7 @@ import { OptimizationSuccessOverlay } from './OptimizationSuccessOverlay';
 import { AnimatePresence } from 'framer-motion';
 import { getColorOrFallback } from '../utils/ColorFallbackUtils';
 import { pixabayService } from '../services/PixabayService';
+// Map component for displaying travel routes and places
 import { DateUtils } from '../utils/DateUtils';
 import { PlaceDateUtils } from '../utils/PlaceDateUtils';
 import { TravelPayoutsService, FlightOption } from '../services/TravelPayoutsService';
