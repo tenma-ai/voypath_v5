@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, MapPin, DollarSign, Car, Train, Calendar, Star, AlertCircle } from 'lucide-react';
+import { Clock, MapPin, DollarSign, Car, Train, Calendar, Star, AlertCircle, Utensils } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { Place, DetailedSchedule, PlaceWithTiming } from '../types/optimization';
 import { TransportIcon, getTransportColor, getTransportEmoji } from '../utils/transportIcons';
@@ -36,6 +36,24 @@ interface MealBreak {
   type: 'breakfast' | 'lunch' | 'dinner';
   duration: number;
   location: string;
+}
+
+interface HotelEvent {
+  time: string;
+  duration: number;
+  type: 'hotel';
+}
+
+interface TimelineEvent {
+  id: string;
+  type: 'place' | 'hotel' | 'meal';
+  time: string;
+  endTime?: string;
+  title: string;
+  icon: React.ReactNode;
+  color: string;
+  position?: 'left' | 'right';
+  data?: any;
 }
 
 export function OptimizedTimelineView({ optimizationResult, className = '' }: OptimizedTimelineViewProps) {
@@ -156,6 +174,64 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
     }
     
     return meals;
+  };
+
+  // Hotel icon component using the provided building icon
+  const HotelIcon = () => (
+    <svg className="w-4 h-4" viewBox="0 0 64 64" fill="currentColor">
+      <path d="M8 58h48V22H8v36zm6-30h36v24H14V28z"/>
+      <rect x="18" y="32" width="4" height="4"/>
+      <rect x="26" y="32" width="4" height="4"/>
+      <rect x="34" y="32" width="4" height="4"/>
+      <rect x="42" y="32" width="4" height="4"/>
+      <rect x="18" y="40" width="4" height="4"/>
+      <rect x="26" y="40" width="4" height="4"/>
+      <rect x="34" y="40" width="4" height="4"/>
+      <rect x="42" y="40" width="4" height="4"/>
+      <rect x="18" y="48" width="4" height="4"/>
+      <rect x="26" y="48" width="4" height="4"/>
+      <rect x="34" y="48" width="4" height="4"/>
+      <rect x="42" y="48" width="4" height="4"/>
+      <path d="M6 20h52v-8H50V6H14v6H6v8zm8-12h36v4H14V8z"/>
+    </svg>
+  );
+
+  const generateTimelineEvents = (day: TimelineDay): TimelineEvent[] => {
+    const events: TimelineEvent[] = [];
+    
+    // Add hotel event (22:00 - 08:00 next day)
+    events.push({
+      id: `hotel-${day.date}`,
+      type: 'hotel',
+      time: '22:00',
+      endTime: '08:00',
+      title: 'Hotel Stay',
+      icon: <HotelIcon />,
+      color: '#7c3aed',
+      data: { duration: '10 hours' }
+    });
+
+    // Add meal events (fixed times, right-aligned)
+    const mealTimes = [
+      { time: '08:00', name: 'Breakfast', duration: 60 },
+      { time: '12:00', name: 'Lunch', duration: 60 },
+      { time: '18:00', name: 'Dinner', duration: 90 }
+    ];
+
+    mealTimes.forEach((meal, index) => {
+      events.push({
+        id: `meal-${day.date}-${index}`,
+        type: 'meal',
+        time: meal.time,
+        title: meal.name,
+        icon: <Utensils className="w-4 h-4" />,
+        color: '#f59e0b',
+        position: 'right',
+        data: { duration: meal.duration }
+      });
+    });
+
+    return events;
   };
 
   // Use centralized transport utility
@@ -292,12 +368,67 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
                   
                   {/* Timeline Items */}
                   <div className="space-y-6">
+                    {/* Hotel and Meal Events */}
+                    {generateTimelineEvents(day).map((event, eventIndex) => (
+                      <motion.div
+                        key={event.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: (dayIndex * 0.1) + (eventIndex * 0.02) }}
+                        className={`relative flex items-start space-x-4 ${
+                          event.position === 'right' ? 'flex-row-reverse' : ''
+                        }`}
+                      >
+                        {/* Event Dot */}
+                        <div 
+                          className="relative z-10 w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg"
+                          style={{ backgroundColor: event.color }}
+                        >
+                          {event.icon}
+                        </div>
+                        
+                        {/* Event Card */}
+                        <div className={`${
+                          event.position === 'right' ? 'w-32' : 'flex-1'
+                        } bg-slate-50/80 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-200/50 dark:border-slate-600/50 ${
+                          event.type === 'hotel' ? 'border-purple-200 bg-purple-50' : ''
+                        } ${
+                          event.type === 'meal' ? 'border-amber-200 bg-amber-50' : ''
+                        }`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-xs font-medium ${
+                              event.type === 'hotel' ? 'text-purple-700' : 
+                              event.type === 'meal' ? 'text-amber-700' : 'text-slate-600'
+                            }`}>
+                              {event.time}{event.endTime ? ` - ${event.endTime}` : ''}
+                            </span>
+                          </div>
+                          <h4 className={`${
+                            event.type === 'hotel' ? 'text-sm font-medium text-purple-800' :
+                            event.type === 'meal' ? 'text-sm font-medium text-amber-800' :
+                            'text-sm font-semibold text-slate-900'
+                          }`}>
+                            {event.title}
+                          </h4>
+                          {event.data?.duration && (
+                            <p className={`text-xs ${
+                              event.type === 'hotel' ? 'text-purple-600' :
+                              event.type === 'meal' ? 'text-amber-600' : 'text-slate-600'
+                            }`}>
+                              {event.data.duration}
+                            </p>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                    
+                    {/* Place Items */}
                     {day.places.map((item, index) => (
                       <motion.div
                         key={item.place.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: (dayIndex * 0.1) + (index * 0.05) }}
+                        transition={{ delay: (dayIndex * 0.1) + (index * 0.05) + 0.1 }}
                         className="relative flex items-start space-x-4"
                       >
                         {/* Timeline Dot */}
