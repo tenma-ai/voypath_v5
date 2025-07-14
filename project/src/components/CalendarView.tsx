@@ -1365,9 +1365,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               borderLeftWidth: '4px'
                             }}
                             onClick={() => {
+                              // Use consistent hotel identifier for both parts
+                              const hotelId = `hotel-${dayData.day}`;
                               setHotelModal({
                                 isOpen: true,
-                                dayData: dayData,
+                                dayData: { ...dayData, hotelId }, // Add hotel identifier
                                 timeSlot: '22:00 - 08:00',
                                 nearbyLocation: dayData.places.length > 0 ? {
                                   lat: dayData.places[0].latitude || 35.6812,
@@ -1388,38 +1390,47 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                         )}
                         
                         {/* Hotel part 2: 06:00 - 08:00 (early morning) - Skip on first day */}
-                        {dayIndex > 0 && (
-                          <div
-                            className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
-                            style={{ 
-                              top: `0px`, // 06:00 position (start of timeline)
-                              height: `${2 * 60}px`, // 06:00-08:00 (2 hours * 60px)
-                              backgroundColor: '#faf5ff',
-                              borderLeftColor: '#a855f7',
-                              borderLeftWidth: '4px'
-                            }}
-                            onClick={() => {
-                              setHotelModal({
-                                isOpen: true,
-                                dayData: dayData,
-                                timeSlot: '22:00 - 08:00',
-                                nearbyLocation: dayData.places.length > 0 ? {
-                                  lat: dayData.places[0].latitude || 35.6812,
-                                  lng: dayData.places[0].longitude || 139.7671,
-                                  name: dayData.places[0].place_name || dayData.places[0].name
-                                } : undefined
-                              });
-                            }}
-                          >
-                            <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
-                              Hotel Stay
+                        {dayIndex > 0 && (() => {
+                          // Get previous day's data for consistency
+                          const dayKeys = Object.keys(formattedResult.schedulesByDay);
+                          const prevDayKey = dayKeys[dayIndex - 1];
+                          const prevDayData = formattedResult.schedulesByDay[prevDayKey];
+                          
+                          return (
+                            <div
+                              className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
+                              style={{ 
+                                top: `0px`, // 06:00 position (start of timeline)
+                                height: `${2 * 60}px`, // 06:00-08:00 (2 hours * 60px)
+                                backgroundColor: '#faf5ff',
+                                borderLeftColor: '#a855f7',
+                                borderLeftWidth: '4px'
+                              }}
+                              onClick={() => {
+                                // Use same hotel identifier as previous day's hotel part 1
+                                const hotelId = `hotel-${prevDayData.day}`;
+                                setHotelModal({
+                                  isOpen: true,
+                                  dayData: { ...prevDayData, hotelId }, // Use previous day's data for consistency
+                                  timeSlot: '22:00 - 08:00',
+                                  nearbyLocation: prevDayData.places.length > 0 ? {
+                                    lat: prevDayData.places[0].latitude || 35.6812,
+                                    lng: prevDayData.places[0].longitude || 139.7671,
+                                    name: prevDayData.places[0].place_name || prevDayData.places[0].name
+                                  } : undefined
+                                });
+                              }}
+                            >
+                              <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
+                                Hotel Stay
+                              </div>
+                              <div className="text-xs text-gray-600 flex items-center">
+                                <Clock className="w-3 h-3 mr-1" />
+                                <span>22:00 - 08:00</span>
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-600 flex items-center">
-                              <Clock className="w-3 h-3 mr-1" />
-                              <span>22:00 - 08:00</span>
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </>
                     </div>
                     
