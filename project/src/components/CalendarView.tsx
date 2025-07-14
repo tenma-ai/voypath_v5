@@ -1267,69 +1267,87 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                         );
                       })}
                       
-                      {/* Meal events - Always visible, icon only, right-aligned */}
+                      {/* Meal events - Always visible, icon with duration lines */}
                       <>
-                        {/* Breakfast time (8:00 AM) */}
-                        <div
-                          className="absolute right-2 w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center z-50"
-                          style={{ top: `${(8 - 6) * 60}px` }}
-                          onClick={() => {
-                            setMealModal({
-                              isOpen: true,
-                              mealType: 'breakfast',
-                              dayData: dayData,
-                              timeSlot: '08:00',
-                              nearbyLocation: dayData.places.length > 0 ? {
-                                lat: dayData.places[0].latitude || 35.6812,
-                                lng: dayData.places[0].longitude || 139.7671,
-                                name: dayData.places[0].place_name || dayData.places[0].name
-                              } : undefined
-                            });
-                          }}
-                        >
-                          <Utensils className="w-4 h-4" />
+                        {/* Breakfast time (8:00 AM) - 1 hour duration */}
+                        <div className="absolute right-2 z-50" style={{ top: `${(8 - 6) * 60}px` }}>
+                          {/* Duration line */}
+                          <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-amber-400 h-16" 
+                               style={{ top: '-20px' }}>
+                          </div>
+                          {/* Meal icon */}
+                          <div
+                            className="w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center relative z-10"
+                            onClick={() => {
+                              setMealModal({
+                                isOpen: true,
+                                mealType: 'breakfast',
+                                dayData: dayData,
+                                timeSlot: '08:00',
+                                nearbyLocation: dayData.places.length > 0 ? {
+                                  lat: dayData.places[0].latitude || 35.6812,
+                                  lng: dayData.places[0].longitude || 139.7671,
+                                  name: dayData.places[0].place_name || dayData.places[0].name
+                                } : undefined
+                              });
+                            }}
+                          >
+                            <Utensils className="w-4 h-4" />
+                          </div>
                         </div>
                         
-                        {/* Lunch time (12:00 PM) */}
-                        <div
-                          className="absolute right-2 w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center z-50"
-                          style={{ top: `${(12 - 6) * 60}px` }}
-                          onClick={() => {
-                            setMealModal({
-                              isOpen: true,
-                              mealType: 'lunch',
-                              dayData: dayData,
-                              timeSlot: '12:00',
-                              nearbyLocation: dayData.places.length > 0 ? {
-                                lat: dayData.places[0].latitude || 35.6812,
-                                lng: dayData.places[0].longitude || 139.7671,
-                                name: dayData.places[0].place_name || dayData.places[0].name
-                              } : undefined
-                            });
-                          }}
-                        >
-                          <Utensils className="w-4 h-4" />
+                        {/* Lunch time (12:00 PM) - 1 hour duration */}
+                        <div className="absolute right-2 z-50" style={{ top: `${(12 - 6) * 60}px` }}>
+                          {/* Duration line */}
+                          <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-amber-400 h-16" 
+                               style={{ top: '-20px' }}>
+                          </div>
+                          {/* Meal icon */}
+                          <div
+                            className="w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center relative z-10"
+                            onClick={() => {
+                              setMealModal({
+                                isOpen: true,
+                                mealType: 'lunch',
+                                dayData: dayData,
+                                timeSlot: '12:00',
+                                nearbyLocation: dayData.places.length > 0 ? {
+                                  lat: dayData.places[0].latitude || 35.6812,
+                                  lng: dayData.places[0].longitude || 139.7671,
+                                  name: dayData.places[0].place_name || dayData.places[0].name
+                                } : undefined
+                              });
+                            }}
+                          >
+                            <Utensils className="w-4 h-4" />
+                          </div>
                         </div>
                         
-                        {/* Dinner time (6:00 PM) */}
-                        <div
-                          className="absolute right-2 w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center z-50"
-                          style={{ top: `${(18 - 6) * 60}px` }}
-                          onClick={() => {
-                            setMealModal({
-                              isOpen: true,
-                              mealType: 'dinner',
-                              dayData: dayData,
-                              timeSlot: '18:00',
-                              nearbyLocation: dayData.places.length > 0 ? {
-                                lat: dayData.places[0].latitude || 35.6812,
-                                lng: dayData.places[0].longitude || 139.7671,
-                                name: dayData.places[0].place_name || dayData.places[0].name
-                              } : undefined
-                            });
-                          }}
-                        >
-                          <Utensils className="w-4 h-4" />
+                        {/* Dinner time (6:00 PM) - 1.5 hour duration */}
+                        <div className="absolute right-2 z-50" style={{ top: `${(18 - 6) * 60}px` }}>
+                          {/* Duration line */}
+                          <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-amber-400 h-20" 
+                               style={{ top: '-20px' }}>
+                          </div>
+                          {/* Meal icon */}
+                          <div
+                            className="w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center relative z-10"
+                            onClick={() => {
+                              setMealModal({
+                                isOpen: true,
+                                mealType: 'dinner',
+                                dayData: dayData,
+                                timeSlot: '18:00',
+                                nearbyLocation: dayData.places.length > 0 ? {
+                                  lat: dayData.places[0].latitude || 35.6812,
+                                  lng: dayData.places[0].longitude || 139.7671,
+                                  name: dayData.places[0].place_name || dayData.places[0].name
+                                } : undefined
+                              });
+                            }}
+                          >
+                            <Utensils className="w-4 h-4" />
+                          </div>
                         </div>
                       </>
                       
