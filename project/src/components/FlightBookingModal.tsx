@@ -29,7 +29,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   dayData,
   timeSlot
 }) => {
-  const { currentTrip, tripMembers, user } = useStore();
+  const { currentTrip, tripMembers, user, addBooking, refreshBookings } = useStore();
   const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     bookingLink: '',
@@ -219,8 +219,12 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
           ...flightData
         });
         setEditingBooking(null);
+        // Update global store
+        refreshBookings();
       } else {
-        await BookingService.saveFlightBooking(currentTrip.id, user.id, flightData);
+        const savedBooking = await BookingService.saveFlightBooking(currentTrip.id, user.id, flightData);
+        // Add to global store
+        addBooking(savedBooking);
       }
 
       // Reload bookings

@@ -39,20 +39,7 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   transportMode,
   preCalculatedInfo
 }) => {
-  const { currentTrip, tripMembers, user } = useStore();
-  
-  // For flight mode, use the dedicated FlightBookingModal
-  if (transportMode === 'flight') {
-    return (
-      <FlightBookingModal
-        isOpen={isOpen}
-        onClose={onClose}
-        routeData={routeData}
-        dayData={dayData}
-        timeSlot={timeSlot}
-      />
-    );
-  }
+  const { currentTrip, tripMembers, user, addBooking, refreshBookings } = useStore();
   const [selectedTab, setSelectedTab] = useState<'search' | 'add' | 'saved'>('search');
   const [walkingInfo, setWalkingInfo] = useState<{
     distance: string;
@@ -313,10 +300,14 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
       };
 
       if (editingBooking) {
-        await BookingService.updateBooking(editingBooking.id, bookingToSave);
+        const updatedBooking = await BookingService.updateBooking(editingBooking.id, bookingToSave);
         setEditingBooking(null);
+        // Update global store
+        refreshBookings();
       } else {
-        await BookingService.saveTransportBooking(bookingToSave);
+        const savedBooking = await BookingService.saveTransportBooking(bookingToSave);
+        // Add to global store
+        addBooking(savedBooking);
       }
 
       await loadSavedBookings();
@@ -385,6 +376,19 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
     });
     setSelectedTab('add');
   };
+
+  // For flight mode, use the dedicated FlightBookingModal
+  if (transportMode === 'flight') {
+    return (
+      <FlightBookingModal
+        isOpen={isOpen}
+        onClose={onClose}
+        routeData={routeData}
+        dayData={dayData}
+        timeSlot={timeSlot}
+      />
+    );
+  }
 
   const modalTitle = transportMode === 'walking' ? 'Walking & Taxi Options' : 'Transportation Options';
   const IconComponent = transportMode === 'walking' ? MapPin : Car;
