@@ -39,8 +39,6 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   transportMode,
   preCalculatedInfo
 }) => {
-  const { currentTrip, tripMembers, user, bookingCacheVersion } = useStore();
-  
   // For flight mode, use the dedicated FlightBookingModal
   if (transportMode === 'flight') {
     return (
@@ -53,6 +51,8 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
       />
     );
   }
+
+  const { currentTrip, tripMembers, user, bookingCacheVersion } = useStore();
   const [selectedTab, setSelectedTab] = useState<'search' | 'add' | 'saved'>('search');
   const [walkingInfo, setWalkingInfo] = useState<{
     distance: string;
