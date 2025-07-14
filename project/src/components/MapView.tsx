@@ -503,60 +503,54 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
       return 'walking';
     };
 
-    // Create proper dayData structure with correct date logic (matching FlightBookingModal)
+    // Create proper dayData structure using CalendarView's approach with formattedResult
     const createDayData = () => {
-      // Primary: Use dayData from place's scheduled information if available
-      if (toPlace.dayData) {
-        return toPlace.dayData;
-      }
-      
-      // Secondary: Extract from place's optimization schedule data
-      if (toPlace.day && toPlace.date) {
-        return {
-          day: toPlace.day,
-          actualDate: toPlace.date,
-          date: toPlace.date
-        };
-      }
-      
-      // Tertiary: Look up place in optimization result to find correct day and date
-      if (currentTrip?.startDate) {
-        try {
-          const currentOptimizationResult = optimizationResult || optimizationResultProp;
-          if (currentOptimizationResult?.optimization?.daily_schedules) {
-            for (const schedule of currentOptimizationResult.optimization.daily_schedules) {
-              if (schedule.scheduled_places?.some((p: any) => 
-                p.id === toPlace.id || 
-                p.place_name === toPlace.place_name ||
-                p.name === toPlace.name ||
-                (p.latitude === toPlace.latitude && p.longitude === toPlace.longitude)
-              )) {
-                // Calculate the actual date for this day
-                const tripDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
-                return {
+      // Primary: Use the same logic as CalendarView - get from formattedResult.schedulesByDay
+      try {
+        const currentOptimizationResult = optimizationResult || optimizationResultProp;
+        if (currentOptimizationResult?.optimization?.daily_schedules && currentTrip) {
+          // Import the same formatting logic from CalendarView
+          const formatOptimizationResult = (result: any) => {
+            const schedulesByDay: Record<string, any> = {};
+            
+            if (result?.optimization?.daily_schedules) {
+              result.optimization.daily_schedules.forEach((schedule: any) => {
+                const dayKey = `day-${schedule.day}`;
+                const actualDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
+                
+                schedulesByDay[dayKey] = {
                   day: schedule.day,
-                  actualDate: tripDate.toISOString().split('T')[0],
-                  date: tripDate.toISOString().split('T')[0]
+                  actualDate: actualDate.toISOString().split('T')[0],
+                  date: actualDate.toISOString().split('T')[0],
+                  scheduled_places: schedule.scheduled_places || []
                 };
-              }
+              });
+            }
+            
+            return { schedulesByDay };
+          };
+          
+          const formattedResult = formatOptimizationResult(currentOptimizationResult);
+          
+          // Find which day contains this place (same as CalendarView logic)
+          for (const [dayKey, dayData] of Object.entries(formattedResult.schedulesByDay)) {
+            const places = (dayData as any).scheduled_places || [];
+            if (places.some((p: any) => 
+              p.id === toPlace.id || 
+              p.place_name === toPlace.place_name ||
+              p.name === toPlace.name ||
+              (p.latitude === toPlace.latitude && p.longitude === toPlace.longitude)
+            )) {
+              console.log('Found correct dayData for place:', toPlace.place_name || toPlace.name, 'on day:', (dayData as any).day, 'date:', (dayData as any).actualDate);
+              return dayData;
             }
           }
-        } catch (error) {
-          console.warn('Could not determine day data from optimization result:', error);
         }
+      } catch (error) {
+        console.warn('Could not determine day data using CalendarView approach:', error);
       }
       
-      // Fallback: Use place's scheduled date if available, otherwise current date
-      if (toPlace.scheduledDate) {
-        const schedDate = new Date(toPlace.scheduledDate);
-        return {
-          day: 1,
-          actualDate: schedDate.toISOString().split('T')[0],
-          date: schedDate.toISOString().split('T')[0]
-        };
-      }
-      
-      // Final fallback: use current date
+      // Fallback: use current date (same as CalendarView fallback)
       const today = new Date();
       return {
         day: 1,
