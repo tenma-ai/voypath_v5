@@ -99,21 +99,20 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
           return timeA.localeCompare(timeB);
         });
 
-      if (dayPlaces.length > 0) {
-        const placesWithTiming = generateDayTimeline(dayPlaces, currentDate);
-        const totalDuration = placesWithTiming.reduce((sum, p) => sum + p.stayDuration, 0);
-        const totalCost = placesWithTiming.reduce((sum, p) => sum + (p.place.estimated_cost || 0), 0);
-        const mealBreaks = generateMealBreaks(placesWithTiming);
+      // Always create a day entry to show hotel and meal events even if no places
+      const placesWithTiming = dayPlaces.length > 0 ? generateDayTimeline(dayPlaces, currentDate) : [];
+      const totalDuration = placesWithTiming.reduce((sum, p) => sum + p.stayDuration, 0);
+      const totalCost = placesWithTiming.reduce((sum, p) => sum + (p.place.estimated_cost || 0), 0);
+      const mealBreaks = generateMealBreaks(placesWithTiming);
 
-        days.push({
-          date: dateStr,
-          displayDate: DateUtils.formatCalendarDate(currentDate),
-          places: placesWithTiming,
-          totalDuration,
-          totalCost,
-          mealBreaks
-        });
-      }
+      days.push({
+        date: dateStr,
+        displayDate: DateUtils.formatCalendarDate(currentDate),
+        places: placesWithTiming,
+        totalDuration,
+        totalCost,
+        mealBreaks
+      });
 
       currentDate.setDate(currentDate.getDate() + 1);
     }
@@ -282,7 +281,7 @@ export function OptimizedTimelineView({ optimizationResult, className = '' }: Op
     );
   }
 
-  if (timelineData.length === 0) {
+  if (timelineData.length === 0 && !currentTrip) {
     return (
       <div className={`h-full flex items-center justify-center bg-slate-50 dark:bg-slate-900 ${className}`}>
         <div className="text-center p-8">
