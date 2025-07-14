@@ -143,6 +143,6 @@ export class CountryUtils {
    */
   static async generateNavitimeUrl(fromLat?: number, fromLng?: number): Promise<string> {
     const countryCode = await this.getCountryCodeWithFallback(fromLat, fromLng);
-    return `https://transit.navitime.com/en/${countryCode}`;
+    return `https://transit.navitime.com/en/${countryCode}/`;
   }
 }
