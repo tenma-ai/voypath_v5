@@ -1360,7 +1360,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                   className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
                                   style={{ 
                                     top: `${getHotelPosition(22)}px`, // 22:00 position
-                                    height: `${getHotelPosition(6) + 60 - getHotelPosition(22)}px`, // From 22:00 to 6:00 + extra space
+                                    height: `${(18 * 60) + (3 * 60) - getHotelPosition(22)}px`, // From 22:00 to end of timeline (day hours + night hours)
                                     backgroundColor: '#faf5ff',
                                     borderLeftColor: '#a855f7',
                                     borderLeftWidth: '4px'
