@@ -3,7 +3,7 @@ export interface BaseBooking {
   id?: string;
   trip_id: string;
   user_id: string;
-  booking_type: 'flight' | 'hotel';
+  booking_type: 'flight' | 'hotel' | 'walking' | 'car';
   booking_link?: string;
   notes?: string;
   created_at?: string;
@@ -56,7 +56,40 @@ export interface HotelBooking extends BaseBooking {
   price?: undefined;
 }
 
-export type Booking = FlightBooking | HotelBooking;
+export interface TransportBooking extends BaseBooking {
+  booking_type: 'walking' | 'car';
+  route?: string;
+  departure_date?: string;
+  departure_time: string;
+  arrival_time: string;
+  price?: number;
+  passengers: number;
+  transport_info?: {
+    route_details?: string;
+    walking_distance?: string;
+    walking_duration?: string;
+    line_number?: string;
+    platform?: string;
+    direction?: string;
+    departure_station?: string;
+    arrival_station?: string;
+  };
+  
+  // Flight and hotel fields should be undefined for transport
+  flight_number?: undefined;
+  hotel_name?: undefined;
+  address?: undefined;
+  check_in_time?: undefined;
+  check_out_time?: undefined;
+  check_in_date?: undefined;
+  check_out_date?: undefined;
+  guests?: undefined;
+  price_per_night?: undefined;
+  rating?: undefined;
+  location?: undefined;
+}
+
+export type Booking = FlightBooking | HotelBooking | TransportBooking;
 
 // Form data interfaces (for UI state)
 export interface FlightBookingFormData {

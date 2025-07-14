@@ -1,5 +1,5 @@
 import { supabase, handleNetworkFailure, resetNetworkFailureCount, retryOperation } from '../lib/supabase';
-import type { Booking, FlightBooking, HotelBooking } from '../types/booking';
+import type { Booking, FlightBooking, HotelBooking, TransportBooking } from '../types/booking';
 
 export class BookingService {
   /**
@@ -269,5 +269,12 @@ export class BookingService {
     };
 
     return this.saveBooking(booking) as Promise<HotelBooking>;
+  }
+
+  /**
+   * Save a transport booking with transport-specific data
+   */
+  static async saveTransportBooking(transportData: Omit<TransportBooking, 'id' | 'created_at' | 'updated_at'>): Promise<TransportBooking> {
+    return this.saveBooking(transportData) as Promise<TransportBooking>;
   }
 }

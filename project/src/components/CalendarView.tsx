@@ -10,6 +10,7 @@ import MealInsertionModal from './MealInsertionModal';
 import PlaceInsertionModal from './PlaceInsertionModal';
 import HotelBookingModal from './HotelBookingModal';
 import FlightBookingModal from './FlightBookingModal';
+import TransportBookingModal from './TransportBookingModal';
 import { supabase } from '../lib/supabase';
 
 interface CalendarViewProps {
@@ -97,6 +98,39 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       nearbyLocation: undefined
     }
   });
+
+  const [transportModal, setTransportModal] = useState<{
+    isOpen: boolean;
+    routeData: {
+      from: string;
+      to: string;
+      fromLat?: number;
+      fromLng?: number;
+      toLat?: number;
+      toLng?: number;
+    };
+    dayData: any;
+    timeSlot: string;
+    transportMode: 'walking' | 'car';
+    preCalculatedInfo?: {
+      travelTime: number;
+      transportMode: string;
+    };
+  }>({
+    isOpen: false,
+    routeData: {
+      from: '',
+      to: '',
+      fromLat: undefined,
+      fromLng: undefined,
+      toLat: undefined,
+      toLng: undefined
+    },
+    dayData: null,
+    timeSlot: '',
+    transportMode: 'walking',
+    preCalculatedInfo: undefined
+  });
   
   // Drag and drop state
   const [draggedPlace, setDraggedPlace] = useState<any>(null);
@@ -178,6 +212,27 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
         lat: place?.latitude || 35.6812,
         lng: place?.longitude || 139.7671,
         name: place?.place_name || place?.name || 'Current Location'
+      }
+    });
+  }, []);
+
+  const handleTransportBooking = useCallback((fromPlace: any, toPlace: any, dayData: any, transportMode: 'walking' | 'car', travelTime?: number, actualTransportMode?: string) => {
+    setTransportModal({
+      isOpen: true,
+      routeData: {
+        from: fromPlace?.place_name || fromPlace?.name || 'Start Location',
+        to: toPlace?.place_name || toPlace?.name || 'End Location',
+        fromLat: fromPlace?.latitude,
+        fromLng: fromPlace?.longitude,
+        toLat: toPlace?.latitude,
+        toLng: toPlace?.longitude
+      },
+      dayData: dayData,
+      timeSlot: `${transportMode === 'walking' ? 'Walking' : 'Transportation'} from ${fromPlace?.place_name || fromPlace?.name} to ${toPlace?.place_name || toPlace?.name}`,
+      transportMode: transportMode,
+      preCalculatedInfo: {
+        travelTime: travelTime || 0,
+        transportMode: actualTransportMode || transportMode
       }
     });
   }, []);
@@ -967,7 +1022,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                       
                                       {/* Car transport info */}
                                       {(transportMode.toLowerCase().includes('car') || transportMode.toLowerCase().includes('drive') || transportMode.toLowerCase().includes('taxi')) && (
-                                        <div className="bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm">
+                                        <div 
+                                          className="bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-800 transition-colors"
+                                          onClick={() => handleTransportBooking(places[placeIndex], places[placeIndex + 1], day, 'car', travelTime, transportMode)}
+                                          title="Click to book transportation"
+                                        >
                                           {getTransportIcon(transportMode)}
                                           <span className="text-xs text-amber-600 dark:text-amber-400">
                                             {formatTravelTime(travelTime)}
@@ -977,7 +1036,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                       
                                       {/* Walking transport info */}
                                       {(transportMode.toLowerCase().includes('walk') || transportMode.toLowerCase().includes('foot') || transportMode === 'walking') && (
-                                        <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm">
+                                        <div 
+                                          className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                          onClick={() => handleTransportBooking(places[placeIndex], places[placeIndex + 1], day, 'walking', travelTime, transportMode)}
+                                          title="Click for walking options and taxi booking"
+                                        >
                                           {getTransportIcon(transportMode)}
                                           <span className="text-xs text-gray-600 dark:text-gray-400">
                                             {formatTravelTime(travelTime)}
@@ -1558,6 +1621,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
           routeData={flightModal.routeData}
           dayData={flightModal.dayData}
           timeSlot={flightModal.timeSlot}
+        />,
+        document.body
+      )}
+      
+      {/* Transport Booking Modal - Portal to ensure it's on top */}
+      {ReactDOM.createPortal(
+        <TransportBookingModal
+          isOpen={transportModal.isOpen}
+          onClose={() => setTransportModal({ ...transportModal, isOpen: false })}
+          routeData={transportModal.routeData}
+          dayData={transportModal.dayData}
+          timeSlot={transportModal.timeSlot}
+          transportMode={transportModal.transportMode}
+          preCalculatedInfo={transportModal.preCalculatedInfo}
         />,
         document.body
       )}
