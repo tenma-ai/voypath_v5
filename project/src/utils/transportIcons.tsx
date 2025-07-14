@@ -24,6 +24,7 @@ const getTransportIconPath = (mode: string): string => {
     case 'public_transport':
     case 'bus':
     case 'train':
+      return '/icons8-train-50 (1).png';
     case 'bicycle':
     case 'taxi':
     default:

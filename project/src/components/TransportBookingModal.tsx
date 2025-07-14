@@ -542,7 +542,7 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
 
                       <div className="border border-gray-200 rounded-lg p-4 bg-white">
                         <h3 className="font-semibold mb-2 flex items-center">
-                          <Route className="w-5 h-5 mr-2" />
+                          <img src="/icons8-train-50 (1).png" alt="Train" className="w-5 h-5 mr-2" />
                           Public Transportation
                         </h3>
                         <p className="text-gray-600 mb-4">Find trains, buses, and other public transport</p>
