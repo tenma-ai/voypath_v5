@@ -904,25 +904,25 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
                             {booking.booking_link && (
                               <button
                                 onClick={() => window.open(booking.booking_link!, '_blank')}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-1"
                                 title="Open booking link"
                               >
-                                <ExternalLink className="w-4 h-4" />
+                                <ExternalLink className="w-4 h-4" /> Book
                               </button>
                             )}
                             <button
                               onClick={() => handleEditBooking(booking)}
-                              className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium flex items-center gap-1"
                               title="Edit booking"
                             >
-                              <Edit className="w-4 h-4" />
+                              <Edit className="w-4 h-4" /> Edit
                             </button>
                             <button
                               onClick={() => handleDeleteBooking(booking.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center gap-1"
                               title="Delete booking"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" /> Delete
                             </button>
                           </div>
                         </div>

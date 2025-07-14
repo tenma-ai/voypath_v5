@@ -613,24 +613,18 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                               {booking.price && (
                                 <div>Price: ${booking.price}</div>
                               )}
-                              {booking.booking_link && (
-                                <div className="flex items-center gap-1">
-                                  <span>Booking:</span>
-                                  <a 
-                                    href={booking.booking_link} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
-                                  >
-                                    Link <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                </div>
-                              )}
                             </div>
                           </div>
                           <div className="flex flex-col sm:flex-row gap-2">
-                            {/* Removed "Add to Trip" button - bookings should stay as bookings, not places */}
                             <div className="flex gap-2">
+                              {booking.booking_link && (
+                                <button
+                                  onClick={() => window.open(booking.booking_link!, '_blank')}
+                                  className="flex-1 sm:flex-none px-4 py-3 sm:px-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-xs font-medium flex items-center justify-center gap-1"
+                                >
+                                  <ExternalLink className="w-4 h-4 sm:w-3 sm:h-3" /> Book
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleEditBooking(booking)}
                                 className="flex-1 sm:flex-none px-4 py-3 sm:px-3 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm sm:text-xs font-medium flex items-center justify-center gap-1"
