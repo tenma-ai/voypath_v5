@@ -423,9 +423,8 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
                 <IconComponent className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">{modalTitle}</h2>
-                <p className="text-gray-600">{modalContext.route}</p>
-                <p className="text-sm text-gray-500">{departureDate.toLocaleDateString()}</p>
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">{transportMode === 'walking' ? 'Walking & Taxi' : 'Transportation'}</h2>
+                <p className="text-xs sm:text-sm text-gray-600">{modalContext.route}</p>
               </div>
             </div>
             <button
@@ -440,7 +439,7 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
           <div className="flex border-b border-gray-200">
             <button
               onClick={() => setSelectedTab('search')}
-              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+              className={`flex-1 py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-medium transition-colors ${
                 selectedTab === 'search'
                   ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
                   : 'text-gray-500 hover:text-gray-700'
@@ -450,7 +449,7 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
             </button>
             <button
               onClick={() => setSelectedTab('add')}
-              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+              className={`flex-1 py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-medium transition-colors ${
                 selectedTab === 'add'
                   ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
                   : 'text-gray-500 hover:text-gray-700'
@@ -460,13 +459,13 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
             </button>
             <button
               onClick={() => setSelectedTab('saved')}
-              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+              className={`flex-1 py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm font-medium transition-colors ${
                 selectedTab === 'saved'
                   ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              Saved Bookings ({savedBookings.length})
+              Saved ({savedBookings.length})
             </button>
           </div>
 
