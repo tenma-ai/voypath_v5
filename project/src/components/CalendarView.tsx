@@ -849,16 +849,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                         const endHour = parseInt(block.endTime.split(':')[0]);
                         const endMinute = parseInt(block.endTime.split(':')[1]);
                         
-                        // Calculate position and height
+                        // UNIFIED position calculation - must match the timeline axis exactly
                         const calculatePosition = (hour: number, minute: number) => {
                           if (hour >= 6 && hour <= 23) {
-                            // Day hours: 6 AM to 11 PM
+                            // Day hours: 6 AM to 11 PM (each hour = 60px)
                             return (hour - 6) * 60 + (minute / 60) * 60;
                           } else {
-                            // Night hours: 12 AM to 5 AM
-                            const nightHours = 18 * 60; // 6 AM to 11 PM = 18 hours * 60px
+                            // Night hours: 12 AM to 5 AM (3-hour blocks = 40px each)
+                            const dayHours = 18 * 60; // 6 AM to 11 PM = 18 hours * 60px = 1080px
                             if (hour >= 0 && hour < 6) {
-                              return nightHours + Math.floor(hour / 3) * 40 + (minute / 180) * 40;
+                              const nightBlockIndex = Math.floor(hour / 3); // 0-2, 3-5
+                              const minuteOffset = (hour % 3) * 60 + minute; // Minutes within the 3-hour block
+                              return dayHours + nightBlockIndex * 40 + (minuteOffset / 180) * 40;
                             }
                             return 0;
                           }
@@ -1269,166 +1271,208 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                       
                       {/* Meal events - Always visible, icon with duration lines */}
                       <>
-                        {/* Breakfast time (8:00 AM) - 1 hour duration */}
-                        <div className="absolute right-2 z-50" style={{ top: `${(8 - 6) * 60}px` }}>
-                          {/* Duration line */}
-                          <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-amber-400 h-16" 
-                               style={{ top: '-20px' }}>
-                          </div>
-                          {/* Meal icon */}
-                          <div
-                            className="w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center relative z-10"
-                            onClick={() => {
-                              setMealModal({
-                                isOpen: true,
-                                mealType: 'breakfast',
-                                dayData: dayData,
-                                timeSlot: '08:00',
-                                nearbyLocation: dayData.places.length > 0 ? {
-                                  lat: dayData.places[0].latitude || 35.6812,
-                                  lng: dayData.places[0].longitude || 139.7671,
-                                  name: dayData.places[0].place_name || dayData.places[0].name
-                                } : undefined
-                              });
-                            }}
-                          >
-                            <Utensils className="w-4 h-4" />
-                          </div>
-                        </div>
-                        
-                        {/* Lunch time (12:00 PM) - 1 hour duration */}
-                        <div className="absolute right-2 z-50" style={{ top: `${(12 - 6) * 60}px` }}>
-                          {/* Duration line */}
-                          <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-amber-400 h-16" 
-                               style={{ top: '-20px' }}>
-                          </div>
-                          {/* Meal icon */}
-                          <div
-                            className="w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center relative z-10"
-                            onClick={() => {
-                              setMealModal({
-                                isOpen: true,
-                                mealType: 'lunch',
-                                dayData: dayData,
-                                timeSlot: '12:00',
-                                nearbyLocation: dayData.places.length > 0 ? {
-                                  lat: dayData.places[0].latitude || 35.6812,
-                                  lng: dayData.places[0].longitude || 139.7671,
-                                  name: dayData.places[0].place_name || dayData.places[0].name
-                                } : undefined
-                              });
-                            }}
-                          >
-                            <Utensils className="w-4 h-4" />
-                          </div>
-                        </div>
-                        
-                        {/* Dinner time (6:00 PM) - 1.5 hour duration */}
-                        <div className="absolute right-2 z-50" style={{ top: `${(18 - 6) * 60}px` }}>
-                          {/* Duration line */}
-                          <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-amber-400 h-20" 
-                               style={{ top: '-20px' }}>
-                          </div>
-                          {/* Meal icon */}
-                          <div
-                            className="w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center relative z-10"
-                            onClick={() => {
-                              setMealModal({
-                                isOpen: true,
-                                mealType: 'dinner',
-                                dayData: dayData,
-                                timeSlot: '18:00',
-                                nearbyLocation: dayData.places.length > 0 ? {
-                                  lat: dayData.places[0].latitude || 35.6812,
-                                  lng: dayData.places[0].longitude || 139.7671,
-                                  name: dayData.places[0].place_name || dayData.places[0].name
-                                } : undefined
-                              });
-                            }}
-                          >
-                            <Utensils className="w-4 h-4" />
-                          </div>
-                        </div>
+                        {(() => {
+                          // Shared position calculation function
+                          const getMealPosition = (hour: number, minute: number = 0) => {
+                            if (hour >= 6 && hour <= 23) {
+                              return (hour - 6) * 60 + (minute / 60) * 60;
+                            } else {
+                              const dayHours = 18 * 60;
+                              if (hour >= 0 && hour < 6) {
+                                const nightBlockIndex = Math.floor(hour / 3);
+                                const minuteOffset = (hour % 3) * 60 + minute;
+                                return dayHours + nightBlockIndex * 40 + (minuteOffset / 180) * 40;
+                              }
+                              return 0;
+                            }
+                          };
+
+                          return (
+                            <>
+                              {/* Breakfast time (8:00 AM) - 1 hour duration */}
+                              <div className="absolute right-2 z-50" style={{ top: `${getMealPosition(8)}px` }}>
+                                {/* Duration line */}
+                                <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-amber-400 h-16" 
+                                     style={{ top: '-20px' }}>
+                                </div>
+                                {/* Meal icon */}
+                                <div
+                                  className="w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center relative z-10"
+                                  onClick={() => {
+                                    setMealModal({
+                                      isOpen: true,
+                                      mealType: 'breakfast',
+                                      dayData: dayData,
+                                      timeSlot: '08:00',
+                                      nearbyLocation: dayData.places.length > 0 ? {
+                                        lat: dayData.places[0].latitude || 35.6812,
+                                        lng: dayData.places[0].longitude || 139.7671,
+                                        name: dayData.places[0].place_name || dayData.places[0].name
+                                      } : undefined
+                                    });
+                                  }}
+                                >
+                                  <Utensils className="w-4 h-4" />
+                                </div>
+                              </div>
+                              
+                              {/* Lunch time (12:00 PM) - 1 hour duration */}
+                              <div className="absolute right-2 z-50" style={{ top: `${getMealPosition(12)}px` }}>
+                                {/* Duration line */}
+                                <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-amber-400 h-16" 
+                                     style={{ top: '-20px' }}>
+                                </div>
+                                {/* Meal icon */}
+                                <div
+                                  className="w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center relative z-10"
+                                  onClick={() => {
+                                    setMealModal({
+                                      isOpen: true,
+                                      mealType: 'lunch',
+                                      dayData: dayData,
+                                      timeSlot: '12:00',
+                                      nearbyLocation: dayData.places.length > 0 ? {
+                                        lat: dayData.places[0].latitude || 35.6812,
+                                        lng: dayData.places[0].longitude || 139.7671,
+                                        name: dayData.places[0].place_name || dayData.places[0].name
+                                      } : undefined
+                                    });
+                                  }}
+                                >
+                                  <Utensils className="w-4 h-4" />
+                                </div>
+                              </div>
+                              
+                              {/* Dinner time (6:00 PM) - 1.5 hour duration */}
+                              <div className="absolute right-2 z-50" style={{ top: `${getMealPosition(18)}px` }}>
+                                {/* Duration line */}
+                                <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-amber-400 h-20" 
+                                     style={{ top: '-20px' }}>
+                                </div>
+                                {/* Meal icon */}
+                                <div
+                                  className="w-8 h-8 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full shadow-sm border border-amber-300 cursor-pointer flex items-center justify-center relative z-10"
+                                  onClick={() => {
+                                    setMealModal({
+                                      isOpen: true,
+                                      mealType: 'dinner',
+                                      dayData: dayData,
+                                      timeSlot: '18:00',
+                                      nearbyLocation: dayData.places.length > 0 ? {
+                                        lat: dayData.places[0].latitude || 35.6812,
+                                        lng: dayData.places[0].longitude || 139.7671,
+                                        name: dayData.places[0].place_name || dayData.places[0].name
+                                      } : undefined
+                                    });
+                                  }}
+                                >
+                                  <Utensils className="w-4 h-4" />
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </>
                       
                       {/* Hotel event - Same UI as place cards (22:00 - 08:00) */}
                       <>
-                        {/* Hotel part 1: 22:00 - end of day - Skip on last day */}
-                        {dayIndex < Object.keys(formattedResult.schedulesByDay).length - 1 && (
-                          <div
-                            className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
-                            style={{ 
-                              top: `${(22 - 6) * 60}px`, // 22:00 position
-                              height: `${60 + 80}px`, // 22:00-23:00 (60px) + night blocks 00:00-06:00 (80px)
-                              backgroundColor: '#faf5ff',
-                              borderLeftColor: '#a855f7',
-                              borderLeftWidth: '4px'
-                            }}
-                            onClick={() => {
-                              // Use consistent hotel identifier for both parts
-                              const hotelId = `hotel-${dayData.day}`;
-                              setHotelModal({
-                                isOpen: true,
-                                dayData: { ...dayData, hotelId }, // Add hotel identifier
-                                timeSlot: '22:00 - 08:00',
-                                nearbyLocation: dayData.places.length > 0 ? {
-                                  lat: dayData.places[0].latitude || 35.6812,
-                                  lng: dayData.places[0].longitude || 139.7671,
-                                  name: dayData.places[0].place_name || dayData.places[0].name
-                                } : undefined
-                              });
-                            }}
-                          >
-                            <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
-                              Hotel Stay
-                            </div>
-                            <div className="text-xs text-gray-600 flex items-center">
-                              <Clock className="w-3 h-3 mr-1" />
-                              <span>22:00 - 08:00</span>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Hotel part 2: 06:00 - 08:00 (early morning) - Skip on first day */}
-                        {dayIndex > 0 && (() => {
-                          // Get previous day's data for consistency
-                          const dayKeys = Object.keys(formattedResult.schedulesByDay);
-                          const prevDayKey = dayKeys[dayIndex - 1];
-                          const prevDayData = formattedResult.schedulesByDay[prevDayKey];
-                          
+                        {(() => {
+                          // Shared position calculation function for hotels
+                          const getHotelPosition = (hour: number, minute: number = 0) => {
+                            if (hour >= 6 && hour <= 23) {
+                              return (hour - 6) * 60 + (minute / 60) * 60;
+                            } else {
+                              const dayHours = 18 * 60;
+                              if (hour >= 0 && hour < 6) {
+                                const nightBlockIndex = Math.floor(hour / 3);
+                                const minuteOffset = (hour % 3) * 60 + minute;
+                                return dayHours + nightBlockIndex * 40 + (minuteOffset / 180) * 40;
+                              }
+                              return 0;
+                            }
+                          };
+
                           return (
-                            <div
-                              className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
-                              style={{ 
-                                top: `0px`, // 06:00 position (start of timeline)
-                                height: `${2 * 60}px`, // 06:00-08:00 (2 hours * 60px)
-                                backgroundColor: '#faf5ff',
-                                borderLeftColor: '#a855f7',
-                                borderLeftWidth: '4px'
-                              }}
-                              onClick={() => {
-                                // Use same hotel identifier as previous day's hotel part 1
-                                const hotelId = `hotel-${prevDayData.day}`;
-                                setHotelModal({
-                                  isOpen: true,
-                                  dayData: { ...prevDayData, hotelId }, // Use previous day's data for consistency
-                                  timeSlot: '22:00 - 08:00',
-                                  nearbyLocation: prevDayData.places.length > 0 ? {
-                                    lat: prevDayData.places[0].latitude || 35.6812,
-                                    lng: prevDayData.places[0].longitude || 139.7671,
-                                    name: prevDayData.places[0].place_name || prevDayData.places[0].name
-                                  } : undefined
-                                });
-                              }}
-                            >
-                              <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
-                                Hotel Stay
-                              </div>
-                              <div className="text-xs text-gray-600 flex items-center">
-                                <Clock className="w-3 h-3 mr-1" />
-                                <span>22:00 - 08:00</span>
-                              </div>
-                            </div>
+                            <>
+                              {/* Hotel part 1: 22:00 - end of day - Skip on last day */}
+                              {dayIndex < Object.keys(formattedResult.schedulesByDay).length - 1 && (
+                                <div
+                                  className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
+                                  style={{ 
+                                    top: `${getHotelPosition(22)}px`, // 22:00 position using unified calculation
+                                    height: `${getHotelPosition(6) - getHotelPosition(22) + 60}px`, // From 22:00 to 06:00 next day + 2 hours
+                                    backgroundColor: '#faf5ff',
+                                    borderLeftColor: '#a855f7',
+                                    borderLeftWidth: '4px'
+                                  }}
+                                  onClick={() => {
+                                    // Use consistent hotel identifier for both parts
+                                    const hotelId = `hotel-${dayData.day}`;
+                                    setHotelModal({
+                                      isOpen: true,
+                                      dayData: { ...dayData, hotelId }, // Add hotel identifier
+                                      timeSlot: '22:00 - 08:00',
+                                      nearbyLocation: dayData.places.length > 0 ? {
+                                        lat: dayData.places[0].latitude || 35.6812,
+                                        lng: dayData.places[0].longitude || 139.7671,
+                                        name: dayData.places[0].place_name || dayData.places[0].name
+                                      } : undefined
+                                    });
+                                  }}
+                                >
+                                  <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
+                                    Hotel Stay
+                                  </div>
+                                  <div className="text-xs text-gray-600 flex items-center">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    <span>22:00 - 08:00</span>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Hotel part 2: 06:00 - 08:00 (early morning) - Skip on first day */}
+                              {dayIndex > 0 && (() => {
+                                // Get previous day's data for consistency
+                                const dayKeys = Object.keys(formattedResult.schedulesByDay);
+                                const prevDayKey = dayKeys[dayIndex - 1];
+                                const prevDayData = formattedResult.schedulesByDay[prevDayKey];
+                                
+                                return (
+                                  <div
+                                    className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
+                                    style={{ 
+                                      top: `${getHotelPosition(6)}px`, // 06:00 position using unified calculation
+                                      height: `${getHotelPosition(8) - getHotelPosition(6)}px`, // 06:00-08:00 (2 hours)
+                                      backgroundColor: '#faf5ff',
+                                      borderLeftColor: '#a855f7',
+                                      borderLeftWidth: '4px'
+                                    }}
+                                    onClick={() => {
+                                      // Use same hotel identifier as previous day's hotel part 1
+                                      const hotelId = `hotel-${prevDayData.day}`;
+                                      setHotelModal({
+                                        isOpen: true,
+                                        dayData: { ...prevDayData, hotelId }, // Use previous day's data for consistency
+                                        timeSlot: '22:00 - 08:00',
+                                        nearbyLocation: prevDayData.places.length > 0 ? {
+                                          lat: prevDayData.places[0].latitude || 35.6812,
+                                          lng: prevDayData.places[0].longitude || 139.7671,
+                                          name: prevDayData.places[0].place_name || prevDayData.places[0].name
+                                        } : undefined
+                                      });
+                                    }}
+                                  >
+                                    <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
+                                      Hotel Stay
+                                    </div>
+                                    <div className="text-xs text-gray-600 flex items-center">
+                                      <Clock className="w-3 h-3 mr-1" />
+                                      <span>22:00 - 08:00</span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </>
                           );
                         })()}
                       </>
