@@ -39,7 +39,7 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   transportMode,
   preCalculatedInfo
 }) => {
-  const { currentTrip, tripMembers, user, addBooking, refreshBookings } = useStore();
+  const { currentTrip, tripMembers, user, addBooking, refreshBookings, bookings } = useStore();
   const [selectedTab, setSelectedTab] = useState<'search' | 'add' | 'saved'>('search');
   const [walkingInfo, setWalkingInfo] = useState<{
     distance: string;
@@ -99,6 +99,13 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
       loadWalkingInfo();
     }
   }, [isOpen, transportMode, preCalculatedInfo]);
+
+  // Load saved bookings when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadSavedBookings();
+    }
+  }, [isOpen]);
 
   const loadWalkingInfo = async () => {
     // Use pre-calculated info if available
@@ -218,16 +225,16 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
         lastLoadedContext.current = contextKey;
       }
     }
-  }, [isOpen, currentTrip?.id, modalContext.route, modalContext.date, transportMode]);
+  }, [isOpen, currentTrip?.id, modalContext.route, modalContext.date, transportMode, bookings]);
 
   const loadSavedBookings = async () => {
     if (!currentTrip?.id) return;
     
     setLoading(true);
     try {
-      const allBookings = await BookingService.getBookingsByType(currentTrip.id, transportMode);
-      
-      const contextBookings = allBookings.filter(booking => 
+      // Filter bookings from global store instead of making API call
+      const contextBookings = bookings.filter(booking => 
+        booking.booking_type === transportMode &&
         booking.route === modalContext.route && 
         booking.departure_date === modalContext.date
       );
