@@ -362,7 +362,10 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
               <div className="p-4 sm:p-6">
                 {/* Mock Flights */}
                 <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Available Flights</h3>
+                  <div className="flex items-center space-x-3">
+                    <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Available Flights</h3>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 italic">Search failed, using mock data instead</span>
+                  </div>
                   <div className="grid gap-3 sm:gap-4">
                     {mockFlights.map((flight, index) => (
                       <div key={index} className="bg-slate-50 dark:bg-slate-700/50 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-600">

@@ -50,9 +50,9 @@ class UberServiceClass {
    */
   async searchRides(params: UberRideSearchParams): Promise<UberRide[]> {
     try {
-      // For demo purposes, return mock data if API is not properly configured
+      // Check if API is properly configured
       if (!this.serverToken || this.serverToken === 'your_uber_server_token_here') {
-        return this.getMockRides(params);
+        throw new Error('Uber API not configured');
       }
 
       const url = `${this.baseUrl}/v1.2/products`;
@@ -94,8 +94,8 @@ class UberServiceClass {
 
     } catch (error) {
       console.error('Failed to search Uber rides:', error);
-      // Return mock data as fallback
-      return this.getMockRides(params);
+      // Return empty array instead of mock data
+      return [];
     }
   }
 
@@ -182,47 +182,6 @@ class UberServiceClass {
     return `${baseUrl}?${queryParams}`;
   }
 
-  /**
-   * Generate mock ride data for demonstration
-   */
-  private getMockRides(params: UberRideSearchParams): UberRide[] {
-    // Calculate approximate distance for mock pricing
-    const distance = this.calculateDistance(
-      params.pickup_latitude,
-      params.pickup_longitude,
-      params.destination_latitude,
-      params.destination_longitude
-    );
-
-    const basePrice = Math.max(300, Math.round(distance * 120)); // Base price calculation
-
-    return [
-      {
-        product_id: 'mock_uber_x',
-        display_name: 'UberX',
-        duration: `${Math.round(distance * 2 + 5)} min`,
-        distance: `${distance.toFixed(1)} km`,
-        price_estimate: `¥${basePrice} - ¥${basePrice + 200}`,
-        capacity: 4
-      },
-      {
-        product_id: 'mock_uber_comfort',
-        display_name: 'Uber Comfort',
-        duration: `${Math.round(distance * 2 + 3)} min`,
-        distance: `${distance.toFixed(1)} km`,
-        price_estimate: `¥${basePrice + 150} - ¥${basePrice + 350}`,
-        capacity: 4
-      },
-      {
-        product_id: 'mock_uber_xl',
-        display_name: 'UberXL',
-        duration: `${Math.round(distance * 2 + 7)} min`,
-        distance: `${distance.toFixed(1)} km`,
-        price_estimate: `¥${basePrice + 300} - ¥${basePrice + 500}`,
-        capacity: 6
-      }
-    ];
-  }
 
   /**
    * Calculate distance between two points using Haversine formula
