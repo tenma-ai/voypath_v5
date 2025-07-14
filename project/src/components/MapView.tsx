@@ -42,7 +42,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
     };
     dayData: any;
     timeSlot: string;
-    transportMode: 'walking' | 'car';
+    transportMode: 'walking' | 'car' | 'flight';
     preCalculatedInfo?: {
       travelTime: number;
       transportMode: string;
@@ -464,20 +464,43 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
   // Handle route click
   const handleRouteClick = useCallback((fromPlace: any, toPlace: any, event: google.maps.PolyMouseEvent) => {
     // Determine transport mode based on route data
-    const getTransportMode = (): 'walking' | 'car' => {
+    const getTransportMode = (): 'walking' | 'car' | 'flight' => {
       const transport = toPlace.transport_mode || fromPlace.transport_mode || '';
       
+      // Check for explicit transport mode first
       if (transport.toLowerCase().includes('walk')) return 'walking';
-      if (transport.toLowerCase().includes('flight')) return 'car'; // Default to car for flights in map view
+      if (transport.toLowerCase().includes('flight') || transport.toLowerCase().includes('fly')) return 'flight';
+      if (transport.toLowerCase().includes('car') || transport.toLowerCase().includes('drive')) return 'car';
       
-      // Distance-based fallback
+      // Check if either location is an airport
+      const fromIsAirport = fromPlace.place_type === 'airport' || 
+        fromPlace.name?.toLowerCase().includes('airport') || 
+        fromPlace.place_name?.toLowerCase().includes('airport');
+      const toIsAirport = toPlace.place_type === 'airport' || 
+        toPlace.name?.toLowerCase().includes('airport') || 
+        toPlace.place_name?.toLowerCase().includes('airport');
+      const fromIsSystem = fromPlace.place_type === 'departure' || fromPlace.place_type === 'destination';
+      const toIsSystem = toPlace.place_type === 'departure' || toPlace.place_type === 'destination';
+      
+      if ((fromIsAirport && toIsAirport) || 
+          (fromIsAirport && toIsSystem) || 
+          (fromIsSystem && toIsAirport)) {
+        return 'flight';
+      }
+      
+      // Distance-based detection (rough approximation)
       const lat1 = Number(fromPlace.latitude);
       const lng1 = Number(fromPlace.longitude);
       const lat2 = Number(toPlace.latitude);
       const lng2 = Number(toPlace.longitude);
       const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
       
-      return distance > 0.01 ? 'car' : 'walking';
+      // Large distance suggests flight
+      if (distance > 5) return 'flight';
+      // Medium distance suggests car
+      if (distance > 0.01) return 'car';
+      // Short distance suggests walking
+      return 'walking';
     };
 
     // Prepare data for TransportBookingModal

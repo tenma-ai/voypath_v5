@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
-import { X, MapPin, ExternalLink, Trash2, Edit, Car, Clock, Route, Search } from 'lucide-react';
+import { X, MapPin, ExternalLink, Trash2, Edit, Car, Clock, Route, Search, Plane } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { DateUtils } from '../utils/DateUtils';
 import { BookingService } from '../services/BookingService';
 import { UberService } from '../services/UberService';
 import { CountryUtils } from '../utils/CountryUtils';
+import FlightBookingModal from './FlightBookingModal';
 import type { TransportBooking } from '../types/booking';
 
 interface TransportBookingModalProps {
@@ -22,7 +23,7 @@ interface TransportBookingModalProps {
   };
   dayData: any;
   timeSlot: string;
-  transportMode: 'walking' | 'car';
+  transportMode: 'walking' | 'car' | 'flight';
   preCalculatedInfo?: {
     travelTime: number;
     transportMode: string;
@@ -39,6 +40,19 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   preCalculatedInfo
 }) => {
   const { currentTrip, tripMembers, user } = useStore();
+  
+  // For flight mode, use the dedicated FlightBookingModal
+  if (transportMode === 'flight') {
+    return (
+      <FlightBookingModal
+        isOpen={isOpen}
+        onClose={onClose}
+        routeData={routeData}
+        dayData={dayData}
+        timeSlot={timeSlot}
+      />
+    );
+  }
   const [selectedTab, setSelectedTab] = useState<'search' | 'add' | 'saved'>('search');
   const [walkingInfo, setWalkingInfo] = useState<{
     distance: string;

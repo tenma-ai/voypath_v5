@@ -108,7 +108,7 @@ export class BookingService {
   /**
    * Get bookings by type for a specific trip
    */
-  static async getBookingsByType(tripId: string, type: 'flight' | 'hotel'): Promise<Booking[]> {
+  static async getBookingsByType(tripId: string, type: 'flight' | 'hotel' | 'walking' | 'car'): Promise<Booking[]> {
     try {
       const { data, error } = await supabase
         .from('bookings')
