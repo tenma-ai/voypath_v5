@@ -503,18 +503,60 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
       return 'walking';
     };
 
+    // Create proper dayData structure instead of passing place object
+    const createDayData = () => {
+      // Try to get day and date from the place's optimization data
+      if (toPlace.day && toPlace.date) {
+        return {
+          day: toPlace.day,
+          actualDate: toPlace.date,
+          date: toPlace.date
+        };
+      }
+      
+      // Fallback: try to determine day from place order and trip start date
+      if (currentTrip?.startDate) {
+        try {
+          // Find the place index in the optimization result
+          const currentOptimizationResult = optimizationResult || optimizationResultProp;
+          if (currentOptimizationResult?.optimization?.daily_schedules) {
+            for (const schedule of currentOptimizationResult.optimization.daily_schedules) {
+              if (schedule.scheduled_places?.some((p: any) => p.id === toPlace.id || p.place_name === toPlace.place_name)) {
+                const tripDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
+                return {
+                  day: schedule.day,
+                  actualDate: tripDate.toISOString().split('T')[0],
+                  date: tripDate.toISOString().split('T')[0]
+                };
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('Could not determine day data from optimization result:', error);
+        }
+      }
+      
+      // Final fallback: use current date
+      const today = new Date();
+      return {
+        day: 1,
+        actualDate: today.toISOString().split('T')[0],
+        date: today.toISOString().split('T')[0]
+      };
+    };
+
     // Prepare data for TransportBookingModal
     const transportMode = getTransportMode();
     const modalData = {
       routeData: {
-        from: fromPlace?.place_name || fromPlace?.name || 'From Location',
-        to: toPlace?.place_name || toPlace?.name || 'To Location',
+        from: fromPlace?.place_name || fromPlace?.name || 'Start Location',
+        to: toPlace?.place_name || toPlace?.name || 'End Location',
         fromLat: Number(fromPlace?.latitude),
         fromLng: Number(fromPlace?.longitude),
         toLat: Number(toPlace?.latitude),
         toLng: Number(toPlace?.longitude)
       },
-      dayData: toPlace, // Pass the place data as day data
+      dayData: createDayData(), // Create proper day data structure
       timeSlot: toPlace?.departure_time || '09:00',
       transportMode,
       preCalculatedInfo: {
@@ -525,7 +567,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
 
     setTransportModalData(modalData);
     setShowTransportModal(true);
-  }, []);
+  }, [currentTrip, optimizationResult, optimizationResultProp]);
 
   // Update map bounds when places change - only on initial load
   useEffect(() => {
