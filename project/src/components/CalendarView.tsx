@@ -1353,69 +1353,73 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                       
                       {/* Hotel event - Same UI as place cards (22:00 - 08:00) */}
                       <>
-                        {/* Hotel part 1: 22:00 - end of day (22:00-24:00 + night blocks 00:00-06:00) */}
-                        <div
-                          className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
-                          style={{ 
-                            top: `${(22 - 6) * 60}px`, // 22:00 position
-                            height: `${60 + 80}px`, // 22:00-23:00 (60px) + night blocks 00:00-06:00 (80px)
-                            backgroundColor: '#faf5ff',
-                            borderLeftColor: '#a855f7',
-                            borderLeftWidth: '4px'
-                          }}
-                          onClick={() => {
-                            setHotelModal({
-                              isOpen: true,
-                              dayData: dayData,
-                              timeSlot: '22:00 - 08:00',
-                              nearbyLocation: dayData.places.length > 0 ? {
-                                lat: dayData.places[0].latitude || 35.6812,
-                                lng: dayData.places[0].longitude || 139.7671,
-                                name: dayData.places[0].place_name || dayData.places[0].name
-                              } : undefined
-                            });
-                          }}
-                        >
-                          <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
-                            Hotel Stay
+                        {/* Hotel part 1: 22:00 - end of day - Skip on last day */}
+                        {dayIndex < Object.keys(formattedResult.schedulesByDay).length - 1 && (
+                          <div
+                            className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
+                            style={{ 
+                              top: `${(22 - 6) * 60}px`, // 22:00 position
+                              height: `${60 + 80}px`, // 22:00-23:00 (60px) + night blocks 00:00-06:00 (80px)
+                              backgroundColor: '#faf5ff',
+                              borderLeftColor: '#a855f7',
+                              borderLeftWidth: '4px'
+                            }}
+                            onClick={() => {
+                              setHotelModal({
+                                isOpen: true,
+                                dayData: dayData,
+                                timeSlot: '22:00 - 08:00',
+                                nearbyLocation: dayData.places.length > 0 ? {
+                                  lat: dayData.places[0].latitude || 35.6812,
+                                  lng: dayData.places[0].longitude || 139.7671,
+                                  name: dayData.places[0].place_name || dayData.places[0].name
+                                } : undefined
+                              });
+                            }}
+                          >
+                            <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
+                              Hotel Stay
+                            </div>
+                            <div className="text-xs text-gray-600 flex items-center">
+                              <Clock className="w-3 h-3 mr-1" />
+                              <span>22:00 - 08:00</span>
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-600 flex items-center">
-                            <Clock className="w-3 h-3 mr-1" />
-                            <span>22:00 - 08:00</span>
-                          </div>
-                        </div>
+                        )}
                         
-                        {/* Hotel part 2: 06:00 - 08:00 (early morning) */}
-                        <div
-                          className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
-                          style={{ 
-                            top: `0px`, // 06:00 position (start of timeline)
-                            height: `${2 * 60}px`, // 06:00-08:00 (2 hours * 60px)
-                            backgroundColor: '#faf5ff',
-                            borderLeftColor: '#a855f7',
-                            borderLeftWidth: '4px'
-                          }}
-                          onClick={() => {
-                            setHotelModal({
-                              isOpen: true,
-                              dayData: dayData,
-                              timeSlot: '22:00 - 08:00',
-                              nearbyLocation: dayData.places.length > 0 ? {
-                                lat: dayData.places[0].latitude || 35.6812,
-                                lng: dayData.places[0].longitude || 139.7671,
-                                name: dayData.places[0].place_name || dayData.places[0].name
-                              } : undefined
-                            });
-                          }}
-                        >
-                          <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
-                            Hotel Stay
+                        {/* Hotel part 2: 06:00 - 08:00 (early morning) - Skip on first day */}
+                        {dayIndex > 0 && (
+                          <div
+                            className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
+                            style={{ 
+                              top: `0px`, // 06:00 position (start of timeline)
+                              height: `${2 * 60}px`, // 06:00-08:00 (2 hours * 60px)
+                              backgroundColor: '#faf5ff',
+                              borderLeftColor: '#a855f7',
+                              borderLeftWidth: '4px'
+                            }}
+                            onClick={() => {
+                              setHotelModal({
+                                isOpen: true,
+                                dayData: dayData,
+                                timeSlot: '22:00 - 08:00',
+                                nearbyLocation: dayData.places.length > 0 ? {
+                                  lat: dayData.places[0].latitude || 35.6812,
+                                  lng: dayData.places[0].longitude || 139.7671,
+                                  name: dayData.places[0].place_name || dayData.places[0].name
+                                } : undefined
+                              });
+                            }}
+                          >
+                            <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
+                              Hotel Stay
+                            </div>
+                            <div className="text-xs text-gray-600 flex items-center">
+                              <Clock className="w-3 h-3 mr-1" />
+                              <span>22:00 - 08:00</span>
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-600 flex items-center">
-                            <Clock className="w-3 h-3 mr-1" />
-                            <span>06:00 - 08:00</span>
-                          </div>
-                        </div>
+                        )}
                       </>
                     </div>
                     
