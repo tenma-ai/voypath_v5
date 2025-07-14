@@ -505,52 +505,73 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
 
     // Create proper dayData structure using CalendarView's approach with formattedResult
     const createDayData = () => {
+      console.log('🔍 MapView createDayData called for place:', toPlace);
+      console.log('🔍 Current trip:', currentTrip);
+      console.log('🔍 Optimization result:', optimizationResult || optimizationResultProp);
+      
       // Primary: Use the same logic as CalendarView - get from formattedResult.schedulesByDay
       try {
         const currentOptimizationResult = optimizationResult || optimizationResultProp;
+        console.log('🔍 Using optimization result:', currentOptimizationResult);
+        
         if (currentOptimizationResult?.optimization?.daily_schedules && currentTrip) {
-          // Import the same formatting logic from CalendarView
+          console.log('🔍 Daily schedules found:', currentOptimizationResult.optimization.daily_schedules);
+          
+          // Import the EXACT same formatting logic from CalendarView
           const formatOptimizationResult = (result: any) => {
+            if (!hasUserOptimized || !result?.optimization?.daily_schedules || !currentTrip) {
+              return { schedulesByDay: {} };
+            }
+
             const schedulesByDay: Record<string, any> = {};
             
-            if (result?.optimization?.daily_schedules) {
-              result.optimization.daily_schedules.forEach((schedule: any) => {
-                const dayKey = `day-${schedule.day}`;
-                const actualDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
-                
-                schedulesByDay[dayKey] = {
-                  day: schedule.day,
-                  actualDate: actualDate.toISOString().split('T')[0],
-                  date: actualDate.toISOString().split('T')[0],
-                  scheduled_places: schedule.scheduled_places || []
-                };
-              });
-            }
-            
+            result.optimization.daily_schedules.forEach((schedule: any) => {
+              const dayKey = `day-${schedule.day}`;
+              // Use consistent date calculation
+              const actualDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
+              
+              console.log(`🔍 Processing day ${schedule.day}, calculated date:`, DateUtils.formatForStorage(actualDate).split('T')[0]);
+              
+              schedulesByDay[dayKey] = {
+                day: schedule.day,
+                date: DateUtils.formatForStorage(actualDate).split('T')[0], // YYYY-MM-DD format
+                actualDate: actualDate,
+                places: schedule.scheduled_places || [] // List view shows all places including airports and transport
+              };
+            });
+
             return { schedulesByDay };
           };
           
           const formattedResult = formatOptimizationResult(currentOptimizationResult);
+          console.log('🔍 Formatted result:', formattedResult);
           
-          // Find which day contains this place (same as CalendarView logic)
+          // Find which day contains this place (EXACT same as CalendarView logic)
           for (const [dayKey, dayData] of Object.entries(formattedResult.schedulesByDay)) {
-            const places = (dayData as any).scheduled_places || [];
+            const places = (dayData as any).places || []; // Use 'places' not 'scheduled_places'
+            console.log(`🔍 Checking day ${dayKey}, places:`, places.map((p: any) => p.place_name || p.name));
+            
             if (places.some((p: any) => 
               p.id === toPlace.id || 
               p.place_name === toPlace.place_name ||
               p.name === toPlace.name ||
               (p.latitude === toPlace.latitude && p.longitude === toPlace.longitude)
             )) {
-              console.log('Found correct dayData for place:', toPlace.place_name || toPlace.name, 'on day:', (dayData as any).day, 'date:', (dayData as any).actualDate);
+              console.log('✅ Found correct dayData for place:', toPlace.place_name || toPlace.name, 'on day:', (dayData as any).day, 'date:', (dayData as any).date);
               return dayData;
             }
           }
+          
+          console.log('❌ Place not found in any day schedule');
+        } else {
+          console.log('❌ No daily schedules or trip found');
         }
       } catch (error) {
-        console.warn('Could not determine day data using CalendarView approach:', error);
+        console.warn('❌ Could not determine day data using CalendarView approach:', error);
       }
       
       // Fallback: use current date (same as CalendarView fallback)
+      console.log('🔄 Using fallback - current date');
       const today = new Date();
       return {
         day: 1,
@@ -603,7 +624,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
 
     setTransportModalData(modalData);
     setShowTransportModal(true);
-  }, [currentTrip, optimizationResult, optimizationResultProp]);
+  }, [currentTrip, optimizationResult, optimizationResultProp, hasUserOptimized]);
 
   // Update map bounds when places change - only on initial load
   useEffect(() => {
