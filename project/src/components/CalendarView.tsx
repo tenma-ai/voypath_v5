@@ -721,49 +721,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
           
           {/* Unified Time Grid */}
           <div className="relative">
-            {/* Time axis (left side) - Hidden on mobile */}
-            <div className="absolute left-0 top-0 bottom-0 w-16 bg-gray-50 border-r border-gray-200 hidden md:block">
-              {(() => {
-                const timeSlots = [];
-                let currentHeight = 0;
-                // Day hours (6 AM to 11 PM) - 1 hour intervals
-                for (let hour = 6; hour <= 23; hour++) {
-                  timeSlots.push({
-                    time: `${hour.toString().padStart(2, '0')}:00`,
-                    isNight: false,
-                    height: 60,
-                    top: currentHeight
-                  });
-                  currentHeight += 60;
-                }
-                // Night hours (12 AM to 5 AM) - 3 hour intervals
-                for (let hour = 0; hour < 6; hour += 3) {
-                  timeSlots.push({
-                    time: `${hour.toString().padStart(2, '0')}:00`,
-                    isNight: true,
-                    height: 40,
-                    top: currentHeight
-                  });
-                  currentHeight += 40;
-                }
-                
-                return timeSlots.map((slot, index) => (
-                  <div
-                    key={slot.time}
-                    className="absolute w-full flex items-center justify-center text-xs text-gray-500 border-b border-gray-200"
-                    style={{ 
-                      height: `${slot.height}px`,
-                      top: `${slot.top}px`
-                    }}
-                  >
-                    {slot.time}
-                  </div>
-                ));
-              })()}
-            </div>
             
             {/* Days content area */}
-            <div className="md:ml-16 flex md:flex-row flex-col">
+            <div className="flex md:flex-row flex-col">
               {Object.entries(formattedResult.schedulesByDay).map(([dayKey, dayData], dayIndex) => (
                 <div key={dayKey} className="md:flex-1 min-w-0 border-r md:border-r border-gray-200 md:last:border-r-0 border-b md:border-b-0 last:border-b-0">
                   {/* Day header */}
