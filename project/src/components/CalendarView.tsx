@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
-import { Calendar, Clock, MapPin, List, Grid3X3, Edit3, Check, X, Move, ArrowUpDown, Plane, Car, Navigation } from 'lucide-react';
+import { Calendar, Clock, MapPin, List, Grid3X3, Edit3, Check, X, Move, ArrowUpDown, Plane, Car, Navigation, Utensils } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getPlaceColor } from '../utils/ColorUtils';
 import { DateUtils } from '../utils/DateUtils';
