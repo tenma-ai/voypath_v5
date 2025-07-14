@@ -248,8 +248,8 @@ export function ShareTripModal({ isOpen, onClose, tripId }: ShareTripModalProps)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] pt-20 pb-20 sm:pt-6 sm:pb-6">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[calc(100vh-10rem)] sm:max-h-[90vh] overflow-y-auto mx-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-2 pt-16 pb-16 sm:p-4 sm:pt-6 sm:pb-6">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Share Trip</h2>
           <button

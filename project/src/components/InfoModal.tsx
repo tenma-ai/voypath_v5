@@ -478,13 +478,13 @@ export function InfoModal({ isOpen, onClose, type }: InfoModalProps) {
     <Dialog open={isOpen} onClose={onClose} className="relative z-[9999]">
       <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" aria-hidden="true" />
       
-      <div className="fixed inset-0 flex items-center justify-center p-4 pt-20 pb-20 sm:pt-6 sm:pb-6">
+      <div className="fixed inset-0 flex items-center justify-center p-2 pt-16 pb-16 sm:p-4 sm:pt-6 sm:pb-6">
         <Dialog.Panel
           as={motion.div}
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="w-full max-w-2xl max-h-[calc(100vh-10rem)] sm:max-h-[90vh] bg-white dark:bg-slate-800 rounded-xl shadow-xl overflow-hidden"
+          className="w-full max-w-2xl max-h-[85vh] sm:max-h-[90vh] bg-white dark:bg-slate-800 rounded-xl shadow-xl overflow-hidden"
         >
           <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-primary-500 to-secondary-600">
             <Dialog.Title className="text-xl font-semibold text-white flex items-center space-x-3">
