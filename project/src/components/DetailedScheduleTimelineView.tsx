@@ -11,7 +11,8 @@ import {
   ChevronUp,
   Calendar,
   Timer,
-  Route
+  Route,
+  Utensils
 } from 'lucide-react';
 import type { OptimizedTrip, OptimizedPlace, TravelSegment } from '../types/optimization';
 
@@ -24,7 +25,7 @@ interface DetailedScheduleTimelineViewProps {
 
 interface TimelineEvent {
   id: string;
-  type: 'place' | 'travel' | 'break';
+  type: 'place' | 'travel' | 'break' | 'hotel' | 'meal';
   startTime: Date;
   endTime: Date;
   place?: OptimizedPlace;
@@ -34,6 +35,7 @@ interface TimelineEvent {
   icon: React.ReactNode;
   color: string;
   details: Record<string, unknown>;
+  position?: 'left' | 'right'; // For meal positioning
 }
 
 const getTransportIcon = (mode: string) => {
@@ -46,6 +48,26 @@ const getTransportIcon = (mode: string) => {
     return <img src="/icons8-walking-50.png" className="w-4 h-4" alt="Walking" />;
   }
 };
+
+// Hotel icon component using the provided building icon
+const HotelIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 64 64" fill="currentColor">
+    <path d="M8 58h48V22H8v36zm6-30h36v24H14V28z"/>
+    <rect x="18" y="32" width="4" height="4"/>
+    <rect x="26" y="32" width="4" height="4"/>
+    <rect x="34" y="32" width="4" height="4"/>
+    <rect x="42" y="32" width="4" height="4"/>
+    <rect x="18" y="40" width="4" height="4"/>
+    <rect x="26" y="40" width="4" height="4"/>
+    <rect x="34" y="40" width="4" height="4"/>
+    <rect x="42" y="40" width="4" height="4"/>
+    <rect x="18" y="48" width="4" height="4"/>
+    <rect x="26" y="48" width="4" height="4"/>
+    <rect x="34" y="48" width="4" height="4"/>
+    <rect x="42" y="48" width="4" height="4"/>
+    <path d="M6 20h52v-8H50V6H14v6H6v8zm8-12h36v4H14V8z"/>
+  </svg>
+);
 
 export default function DetailedScheduleTimelineView({
   optimizedTrip,
@@ -69,6 +91,58 @@ export default function DetailedScheduleTimelineView({
 
     const daySchedule = optimizedTrip.detailedSchedule[selectedDay];
     const events: TimelineEvent[] = [];
+    const currentDate = new Date();
+    currentDate.setDate(currentDate.getDate() + selectedDay);
+    const dateStr = currentDate.toISOString().split('T')[0];
+
+    // Add hotel event (22:00 - 08:00 next day)
+    const hotelStart = new Date(`${dateStr}T22:00:00`);
+    const nextDate = new Date(currentDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    const hotelEnd = new Date(`${nextDate.toISOString().split('T')[0]}T08:00:00`);
+    
+    events.push({
+      id: `hotel-${selectedDay}`,
+      type: 'hotel',
+      startTime: hotelStart,
+      endTime: hotelEnd,
+      title: 'Hotel Stay',
+      subtitle: 'Rest and accommodation',
+      icon: <HotelIcon />,
+      color: '#7c3aed',
+      details: {
+        duration: '10 hours',
+        type: 'accommodation'
+      }
+    });
+
+    // Add meal events (fixed times, right-aligned)
+    const mealTimes = [
+      { time: '08:00', name: 'Breakfast', duration: 60 },
+      { time: '12:00', name: 'Lunch', duration: 60 },
+      { time: '18:00', name: 'Dinner', duration: 90 }
+    ];
+
+    mealTimes.forEach((meal, index) => {
+      const mealStart = new Date(`${dateStr}T${meal.time}:00`);
+      const mealEnd = new Date(mealStart.getTime() + meal.duration * 60000);
+      
+      events.push({
+        id: `meal-${selectedDay}-${index}`,
+        type: 'meal',
+        startTime: mealStart,
+        endTime: mealEnd,
+        title: meal.name,
+        subtitle: `${meal.duration} minutes`,
+        icon: <Utensils className="w-4 h-4" />,
+        color: '#f59e0b',
+        position: 'right',
+        details: {
+          duration: meal.duration,
+          type: 'meal'
+        }
+      });
+    });
 
     daySchedule.places.forEach((place, index) => {
       // Add place visit event
@@ -267,7 +341,9 @@ export default function DetailedScheduleTimelineView({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ delay: index * 0.1 }}
-                    className="relative flex items-start gap-4"
+                    className={`relative flex items-start gap-4 ${
+                      event.position === 'right' ? 'flex-row-reverse' : ''
+                    }`}
                   >
                     {/* Timeline Dot */}
                     <div 
@@ -278,32 +354,50 @@ export default function DetailedScheduleTimelineView({
                     </div>
 
                     {/* Event Content */}
-                    <div className="flex-1 min-w-0">
+                    <div className={`${
+                      event.position === 'right' ? 'w-32' : 'flex-1'
+                    } min-w-0`}>
                       <div 
                         className={`bg-white border rounded-lg shadow-sm transition-all duration-200 ${
                           event.type === 'place' ? 'hover:shadow-md cursor-pointer' : ''
-                        } ${expandedEvents.has(event.id) ? 'shadow-md' : ''}`}
+                        } ${expandedEvents.has(event.id) ? 'shadow-md' : ''} ${
+                          event.type === 'hotel' ? 'border-purple-200 bg-purple-50' : ''
+                        } ${
+                          event.type === 'meal' ? 'border-amber-200 bg-amber-50' : ''
+                        }`}
                         onClick={() => event.type === 'place' && event.place && handlePlaceClick(event.place)}
                       >
                         {/* Event Header */}
-                        <div className="p-4">
+                        <div className={`${event.type === 'hotel' ? 'p-2' : 'p-4'}`}>
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="text-sm font-medium text-gray-600">
+                                <span className={`text-sm font-medium ${
+                                  event.type === 'hotel' ? 'text-purple-700' : 
+                                  event.type === 'meal' ? 'text-amber-700' : 'text-gray-600'
+                                }`}>
                                   {formatTime(event.startTime)} - {formatTime(event.endTime)}
                                 </span>
                                 <Timer className="w-3 h-3 text-gray-400" />
                               </div>
-                              <h3 className="text-lg font-semibold text-gray-900 truncate">
+                              <h3 className={`${
+                                event.type === 'hotel' ? 'text-sm font-medium text-purple-800' :
+                                event.type === 'meal' ? 'text-sm font-medium text-amber-800' :
+                                'text-lg font-semibold text-gray-900'
+                              } truncate`}>
                                 {event.title}
                               </h3>
                               {event.subtitle && (
-                                <p className="text-sm text-gray-600">{event.subtitle}</p>
+                                <p className={`text-xs ${
+                                  event.type === 'hotel' ? 'text-purple-600' :
+                                  event.type === 'meal' ? 'text-amber-600' : 'text-gray-600'
+                                }`}>
+                                  {event.subtitle}
+                                </p>
                               )}
                             </div>
                             
-                            {(viewMode === 'detailed' || event.type === 'place') && (
+                            {(viewMode === 'detailed' || event.type === 'place') && event.type !== 'hotel' && event.type !== 'meal' && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
