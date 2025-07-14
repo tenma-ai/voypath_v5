@@ -31,6 +31,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
   const [showPlaceModal, setShowPlaceModal] = useState(false);
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [selectedPlaceForModal, setSelectedPlaceForModal] = useState<any>(null);
+  const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [transportModalData, setTransportModalData] = useState<{
     routeData: {
       from: string;
@@ -422,10 +423,19 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
     const newInfoWindow = new google.maps.InfoWindow();
     setInfoWindow(newInfoWindow);
     
+    // Track user interactions to prevent auto-reset
+    const handleUserInteraction = () => {
+      setUserHasInteracted(true);
+    };
+    
+    // Listen for user map interactions
+    map.addListener('drag', handleUserInteraction);
+    map.addListener('zoom_changed', handleUserInteraction);
+    
     // Force a small delay to ensure map is fully rendered
     setTimeout(() => {
-      // Adjust map bounds to show all markers
-      if (places.length > 0) {
+      // Adjust map bounds to show all markers - only if user hasn't interacted
+      if (places.length > 0 && !userHasInteracted) {
         const bounds = new google.maps.LatLngBounds();
         places.forEach((place, index) => {
           if (place.latitude && place.longitude) {
@@ -445,7 +455,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
         }, 100);
       }
     }, 100);
-  }, [places]);
+  }, [places, userHasInteracted]);
 
   const onUnmount = useCallback(() => {
     setMap(null);
@@ -618,9 +628,9 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
     setShowTransportModal(true);
   }, [currentTrip, optimizationResult, optimizationResultProp, hasUserOptimized]);
 
-  // Update map bounds when places change - only on initial load
+  // Update map bounds when places change - only on initial load and if user hasn't interacted
   useEffect(() => {
-    if (map && places.length > 0) {
+    if (map && places.length > 0 && !userHasInteracted) {
       // Check if this is the initial load (map hasn't been fitted yet)
       const hasBeenFitted = (map as any).__boundsSet;
       
@@ -638,7 +648,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
         (map as any).__boundsSet = true;
       }
     }
-  }, [map, places]);
+  }, [map, places, userHasInteracted]);
 
   if (loadError) {
     return (
