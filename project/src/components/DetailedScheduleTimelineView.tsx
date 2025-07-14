@@ -2,7 +2,7 @@
  * Detailed Schedule Timeline View - Phase 8 Implementation
  * TODO 135: Create detailed schedule timeline view
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MapPin, 
@@ -80,11 +80,7 @@ export default function DetailedScheduleTimelineView({
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [viewMode, setViewMode] = useState<'detailed' | 'compact'>('detailed');
 
-  useEffect(() => {
-    generateTimelineEvents();
-  }, [optimizedTrip, selectedDay, generateTimelineEvents]);
-
-  const generateTimelineEvents = () => {
+  const generateTimelineEvents = useCallback(() => {
     if (!optimizedTrip.detailedSchedule || !optimizedTrip.detailedSchedule[selectedDay]) {
       return;
     }
@@ -192,7 +188,11 @@ export default function DetailedScheduleTimelineView({
     });
 
     setTimelineEvents(events.sort((a, b) => a.startTime.getTime() - b.startTime.getTime()));
-  };
+  }, [optimizedTrip, selectedDay]);
+
+  useEffect(() => {
+    generateTimelineEvents();
+  }, [generateTimelineEvents]);
 
   const getPlaceColor = (place: OptimizedPlace): string => {
     if (place.member_preferences && place.member_preferences.length > 0) {
@@ -368,51 +368,80 @@ export default function DetailedScheduleTimelineView({
                         onClick={() => event.type === 'place' && event.place && handlePlaceClick(event.place)}
                       >
                         {/* Event Header */}
-                        <div className={`${event.type === 'hotel' ? 'p-2' : 'p-4'}`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className={`text-sm font-medium ${
-                                  event.type === 'hotel' ? 'text-purple-700' : 
-                                  event.type === 'meal' ? 'text-amber-700' : 'text-gray-600'
-                                }`}>
-                                  {formatTime(event.startTime)} - {formatTime(event.endTime)}
-                                </span>
-                                <Timer className="w-3 h-3 text-gray-400" />
+                        <div className={`${
+                          event.type === 'hotel' ? 'p-2' : 
+                          event.type === 'meal' ? 'p-2' : 'p-4'
+                        }`}>
+                          {/* Hotel: Horizontal bar layout */}
+                          {event.type === 'hotel' && (
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-1 text-purple-700">
+                                {event.icon}
+                                <span className="text-sm font-medium">22:00 - 08:00</span>
                               </div>
-                              <h3 className={`${
-                                event.type === 'hotel' ? 'text-sm font-medium text-purple-800' :
-                                event.type === 'meal' ? 'text-sm font-medium text-amber-800' :
-                                'text-lg font-semibold text-gray-900'
-                              } truncate`}>
+                              <div className="flex-1">
+                                <div className="h-2 bg-purple-200 rounded-full">
+                                  <div className="h-full bg-purple-400 rounded-full w-full"></div>
+                                </div>
+                              </div>
+                              <span className="text-sm font-medium text-purple-800">{event.title}</span>
+                            </div>
+                          )}
+                          
+                          {/* Meal: Compact vertical layout */}
+                          {event.type === 'meal' && (
+                            <div className="text-center">
+                              <div className="flex items-center justify-center gap-1 mb-1">
+                                {event.icon}
+                                <span className="text-xs font-medium text-amber-700">
+                                  {formatTime(event.startTime)}
+                                </span>
+                              </div>
+                              <h3 className="text-sm font-medium text-amber-800">
                                 {event.title}
                               </h3>
-                              {event.subtitle && (
-                                <p className={`text-xs ${
-                                  event.type === 'hotel' ? 'text-purple-600' :
-                                  event.type === 'meal' ? 'text-amber-600' : 'text-gray-600'
-                                }`}>
-                                  {event.subtitle}
-                                </p>
+                            </div>
+                          )}
+                          
+                          {/* Place: Normal layout */}
+                          {event.type === 'place' && (
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-medium text-gray-600">
+                                    {formatTime(event.startTime)} - {formatTime(event.endTime)}
+                                  </span>
+                                  <Timer className="w-3 h-3 text-gray-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                                  {event.title}
+                                </h3>
+                                {event.subtitle && (
+                                  <p className="text-xs text-gray-600">
+                                    {event.subtitle}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              {/* Expand button only for places */}
+                              {(viewMode === 'detailed' || event.type === 'place') && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleEventExpansion(event.id);
+                                  }}
+                                  className="ml-2 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                >
+                                  {expandedEvents.has(event.id) ? (
+                                    <ChevronUp className="w-4 h-4 text-gray-500" />
+                                  ) : (
+                                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                                  )}
+                                </button>
                               )}
                             </div>
-                            
-                            {(viewMode === 'detailed' || event.type === 'place') && event.type !== 'hotel' && event.type !== 'meal' && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleEventExpansion(event.id);
-                                }}
-                                className="ml-2 p-1 rounded-full hover:bg-gray-100 transition-colors"
-                              >
-                                {expandedEvents.has(event.id) ? (
-                                  <ChevronUp className="w-4 h-4 text-gray-500" />
-                                ) : (
-                                  <ChevronDown className="w-4 h-4 text-gray-500" />
-                                )}
-                              </button>
-                            )}
-                          </div>
+                          )}
+                        </div>
 
                           {/* Member Preferences for Places */}
                           {event.type === 'place' && event.place?.member_preferences && (
