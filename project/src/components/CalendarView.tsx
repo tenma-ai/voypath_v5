@@ -1024,7 +1024,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                       {(transportMode.toLowerCase().includes('car') || transportMode.toLowerCase().includes('drive') || transportMode.toLowerCase().includes('taxi')) && (
                                         <div 
                                           className="bg-amber-50 dark:bg-amber-900 border border-amber-200 dark:border-amber-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-800 transition-colors"
-                                          onClick={() => handleTransportBooking(places[placeIndex], places[placeIndex + 1], day, 'car', travelTime, transportMode)}
+                                          onClick={() => handleTransportBooking(prevBlock.place, currentBlock.place, dayData, 'car', travelTime, transportMode)}
                                           title="Click to book transportation"
                                         >
                                           {getTransportIcon(transportMode)}
@@ -1038,7 +1038,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                       {(transportMode.toLowerCase().includes('walk') || transportMode.toLowerCase().includes('foot') || transportMode === 'walking') && (
                                         <div 
                                           className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 flex items-center space-x-1 shadow-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                                          onClick={() => handleTransportBooking(places[placeIndex], places[placeIndex + 1], day, 'walking', travelTime, transportMode)}
+                                          onClick={() => handleTransportBooking(prevBlock.place, currentBlock.place, dayData, 'walking', travelTime, transportMode)}
                                           title="Click for walking options and taxi booking"
                                         >
                                           {getTransportIcon(transportMode)}
