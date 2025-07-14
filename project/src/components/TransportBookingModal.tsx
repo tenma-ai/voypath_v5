@@ -386,6 +386,7 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
     setSelectedTab('add');
   };
 
+  // Modal configuration based on transport mode
   const modalTitle = transportMode === 'walking' ? 'Walking & Taxi Options' : 'Transportation Options';
   const IconComponent = transportMode === 'walking' ? MapPin : Car;
 
