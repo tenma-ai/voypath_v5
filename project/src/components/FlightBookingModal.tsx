@@ -620,22 +620,22 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                               {booking.booking_link && (
                                 <button
                                   onClick={() => window.open(booking.booking_link!, '_blank')}
-                                  className="flex-1 sm:flex-none px-4 py-3 sm:px-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-xs font-medium flex items-center justify-center gap-1"
+                                  className="px-2 py-2 sm:px-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
                                 >
-                                  <ExternalLink className="w-4 h-4 sm:w-3 sm:h-3" /> Book
+                                  <ExternalLink className="w-3 h-3" /> Book
                                 </button>
                               )}
                               <button
                                 onClick={() => handleEditBooking(booking)}
-                                className="flex-1 sm:flex-none px-4 py-3 sm:px-3 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm sm:text-xs font-medium flex items-center justify-center gap-1"
+                                className="px-2 py-2 sm:px-3 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
                               >
-                                <Edit className="w-4 h-4 sm:w-3 sm:h-3" /> Edit
+                                <Edit className="w-3 h-3" /> Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteBooking(booking.id!)}
-                                className="flex-1 sm:flex-none px-4 py-3 sm:px-3 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm sm:text-xs font-medium flex items-center justify-center gap-1"
+                                className="px-2 py-2 sm:px-3 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
                               >
-                                <Trash2 className="w-4 h-4 sm:w-3 sm:h-3" /> Delete
+                                <Trash2 className="w-3 h-3" /> Delete
                               </button>
                             </div>
                           </div>

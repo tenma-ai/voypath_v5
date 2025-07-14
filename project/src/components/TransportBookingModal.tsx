@@ -904,25 +904,25 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
                             {booking.booking_link && (
                               <button
                                 onClick={() => window.open(booking.booking_link!, '_blank')}
-                                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-1"
+                                className="px-2 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center gap-1"
                                 title="Open booking link"
                               >
-                                <ExternalLink className="w-4 h-4" /> Book
+                                <ExternalLink className="w-3 h-3" /> Book
                               </button>
                             )}
                             <button
                               onClick={() => handleEditBooking(booking)}
-                              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium flex items-center gap-1"
+                              className="px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-medium flex items-center gap-1"
                               title="Edit booking"
                             >
-                              <Edit className="w-4 h-4" /> Edit
+                              <Edit className="w-3 h-3" /> Edit
                             </button>
                             <button
                               onClick={() => handleDeleteBooking(booking.id)}
-                              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center gap-1"
+                              className="px-2 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-medium flex items-center gap-1"
                               title="Delete booking"
                             >
-                              <Trash2 className="w-4 h-4" /> Delete
+                              <Trash2 className="w-3 h-3" /> Delete
                             </button>
                           </div>
                         </div>
