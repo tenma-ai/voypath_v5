@@ -753,15 +753,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                           });
                           currentHeight += 60;
                         }
-                        // Night hours (12 AM to 5 AM) - 3 hour intervals
-                        for (let hour = 0; hour < 6; hour += 3) {
+                        // Night hours (12 AM to 6 AM) - 3 hour intervals, same height as day hours
+                        for (let hour = 0; hour <= 6; hour += 3) {
                           timeSlots.push({
                             time: `${hour.toString().padStart(2, '0')}:00`,
                             isNight: true,
-                            height: 40,
+                            height: 60, // Same height as day hours (3-hour block = 1-hour day block)
                             top: currentHeight
                           });
-                          currentHeight += 40;
+                          currentHeight += 60;
                         }
                         
                         return timeSlots.map((slot, index) => (
@@ -815,12 +815,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                             // Day hours: 6 AM to 11 PM (each hour = 60px)
                             return (hour - 6) * 60 + (minute / 60) * 60;
                           } else {
-                            // Night hours: 12 AM to 5 AM (3-hour blocks = 40px each)
+                            // Night hours: 12 AM to 6 AM (3-hour blocks = 60px each, same as day hours)
                             const dayHours = 18 * 60; // 6 AM to 11 PM = 18 hours * 60px = 1080px
-                            if (hour >= 0 && hour < 6) {
-                              const nightBlockIndex = Math.floor(hour / 3); // 0-2, 3-5
+                            if (hour >= 0 && hour <= 6) {
+                              const nightBlockIndex = Math.floor(hour / 3); // 0-2, 3-5, 6
                               const minuteOffset = (hour % 3) * 60 + minute; // Minutes within the 3-hour block
-                              return dayHours + nightBlockIndex * 40 + (minuteOffset / 180) * 40;
+                              return dayHours + nightBlockIndex * 60 + (minuteOffset / 180) * 60;
                             }
                             return 0;
                           }
@@ -854,8 +854,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                   return (hour - 6) * 60 + (minute / 60) * 60;
                                 } else {
                                   const nightHours = 18 * 60;
-                                  if (hour >= 0 && hour < 6) {
-                                    return nightHours + Math.floor(hour / 3) * 40 + (minute / 180) * 40;
+                                  if (hour >= 0 && hour <= 6) {
+                                    return nightHours + Math.floor(hour / 3) * 60 + (minute / 180) * 60;
                                   }
                                   return 0;
                                 }
@@ -920,8 +920,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                     return (hour - 6) * 60 + (minute / 60) * 60;
                                   } else {
                                     const nightHours = 18 * 60;
-                                    if (hour >= 0 && hour < 6) {
-                                      return nightHours + Math.floor(hour / 3) * 40 + (minute / 180) * 40;
+                                    if (hour >= 0 && hour <= 6) {
+                                      return nightHours + Math.floor(hour / 3) * 60 + (minute / 180) * 60;
                                     }
                                     return 0;
                                   }
@@ -1238,10 +1238,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               return (hour - 6) * 60 + (minute / 60) * 60;
                             } else {
                               const dayHours = 18 * 60;
-                              if (hour >= 0 && hour < 6) {
+                              if (hour >= 0 && hour <= 6) {
                                 const nightBlockIndex = Math.floor(hour / 3);
                                 const minuteOffset = (hour % 3) * 60 + minute;
-                                return dayHours + nightBlockIndex * 40 + (minuteOffset / 180) * 40;
+                                return dayHours + nightBlockIndex * 60 + (minuteOffset / 180) * 60;
                               }
                               return 0;
                             }
@@ -1343,10 +1343,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                               return (hour - 6) * 60 + (minute / 60) * 60;
                             } else {
                               const dayHours = 18 * 60;
-                              if (hour >= 0 && hour < 6) {
+                              if (hour >= 0 && hour <= 6) {
                                 const nightBlockIndex = Math.floor(hour / 3);
                                 const minuteOffset = (hour % 3) * 60 + minute;
-                                return dayHours + nightBlockIndex * 40 + (minuteOffset / 180) * 40;
+                                return dayHours + nightBlockIndex * 60 + (minuteOffset / 180) * 60;
                               }
                               return 0;
                             }
@@ -1360,7 +1360,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                   className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
                                   style={{ 
                                     top: `${getHotelPosition(22)}px`, // 22:00 position
-                                    height: `${getHotelPosition(0) + 80 - getHotelPosition(22)}px`, // From 22:00 to end of timeline (includes night hours)
+                                    height: `${getHotelPosition(6) + 60 - getHotelPosition(22)}px`, // From 22:00 to 6:00 + extra space
                                     backgroundColor: '#faf5ff',
                                     borderLeftColor: '#a855f7',
                                     borderLeftWidth: '4px'
