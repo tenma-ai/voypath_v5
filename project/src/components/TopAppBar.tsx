@@ -418,7 +418,7 @@ function TopAppBar() {
                         <div className="fixed inset-0 bg-black/10" onClick={() => setShowVoypathMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="absolute left-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
+                          className="absolute left-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-8rem)] sm:max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
                           style={{ 
                             zIndex: 10001,
                             opacity: 1,
@@ -428,7 +428,7 @@ function TopAppBar() {
                             willChange: 'transform',
                             position: 'fixed',
                             left: '0.5rem',
-                            top: '3.5rem'
+                            top: '4.5rem'
                           }}
                           variants={menuVariants}
                           initial="hidden"
@@ -724,7 +724,7 @@ function TopAppBar() {
                         <div className="fixed inset-0 bg-black/10" onClick={() => setShowProfileMenu(false)} style={{ zIndex: 10000 }} />
                         
                         <motion.div 
-                          className="absolute right-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
+                          className="absolute right-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-8rem)] sm:max-h-[calc(100vh-5rem)] bg-white dark:bg-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 overflow-y-auto overflow-x-hidden"
                           style={{ 
                             zIndex: 10001,
                             opacity: 1,
@@ -734,7 +734,7 @@ function TopAppBar() {
                             willChange: 'transform',
                             position: 'fixed',
                             right: '0.5rem',
-                            top: '3.5rem'
+                            top: '4.5rem'
                           }}
                           variants={menuVariants}
                           initial="hidden"
