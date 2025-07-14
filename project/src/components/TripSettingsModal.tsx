@@ -470,14 +470,14 @@ export function TripSettingsModal({ isOpen, onClose }: TripSettingsModalProps) {
             aria-hidden="true" 
           />
           
-          <div className="fixed inset-0 flex items-center justify-center p-4">
+          <div className="fixed inset-0 flex items-center justify-center p-4 pt-20 pb-20 sm:pt-6 sm:pb-6">
             <Dialog.Panel
               as={motion.div}
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="w-full max-w-2xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 overflow-hidden max-h-[90vh]"
+              className="w-full max-w-2xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-glass border border-slate-200/50 dark:border-slate-700/50 overflow-hidden max-h-[calc(100vh-10rem)] sm:max-h-[90vh]"
             >
               {/* Header */}
               <div className="relative p-6 pb-4 border-b border-slate-200/50 dark:border-slate-700/50">

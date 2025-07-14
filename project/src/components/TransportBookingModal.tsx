@@ -399,7 +399,7 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   const IconComponent = transportMode === 'walking' ? MapPin : Car;
 
   return (
-    <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+    <Dialog open={isOpen} onClose={onClose} className="relative z-[9999]">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -408,13 +408,13 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
         onClick={onClose}
       />
 
-      <div className="fixed inset-0 flex items-center justify-center p-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4 pt-20 pb-20 sm:pt-6 sm:pb-6">
         <Dialog.Panel
           as={motion.div}
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="w-full max-w-4xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden"
+          className="w-full max-w-4xl max-h-[calc(100vh-10rem)] sm:max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
