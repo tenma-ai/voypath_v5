@@ -1439,7 +1439,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                     </div>
                     
                     {/* Ensure minimum height for the day column */}
-                    <div style={{ height: '1320px' }} /> {/* 18 hours * 60px + 2 night blocks * 40px */}
+                    <div style={{ height: '1260px' }} /> {/* 18 hours * 60px + 3 night blocks * 60px */}
                   </div>
                 </div>
               ))}
