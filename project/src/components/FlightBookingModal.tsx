@@ -437,7 +437,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                     </button>
                   </div>
                 </div>
-                <div className="pb-8 sm:pb-12"></div>
+                <div className="pb-20 sm:pb-12"></div>
               </div>
             ) : selectedTab === 'already' ? (
               <div className="p-4 sm:p-6">
@@ -565,7 +565,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                     )}
                   </div>
                 </div>
-                <div className="pb-8 sm:pb-12"></div>
+                <div className="pb-20 sm:pb-12"></div>
               </div>
             ) : (
               <div className="p-4 sm:p-6">
@@ -650,7 +650,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                     ))}
                   </div>
                 )}
-                <div className="pb-8 sm:pb-12"></div>
+                <div className="pb-20 sm:pb-12"></div>
               </div>
             )}
           </div>

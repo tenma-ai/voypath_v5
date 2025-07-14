@@ -648,7 +648,7 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
         (map as any).__boundsSet = true;
       }
     }
-  }, [map, places, userHasInteracted]);
+  }, [map, places.length, userHasInteracted]); // Only depend on places.length, not full places array
 
   if (loadError) {
     return (
