@@ -2,8 +2,6 @@ import { create } from 'zustand';
 import { OptimizationResult } from '../types/optimization';
 import { supabase } from '../lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import type { Booking } from '../types/booking';
-import { BookingService } from '../services/BookingService';
 
 export interface User {
   id: string;
@@ -146,14 +144,6 @@ interface StoreState {
   // Selected day for ListView/MapView synchronization
   selectedDay: string | null;
   setSelectedDay: (day: string | null) => void;
-
-  // Bookings
-  bookings: Booking[];
-  bookingsLoading: boolean;
-  refreshBookings: () => Promise<void>;
-  addBooking: (booking: Booking) => void;
-  updateBooking: (id: string, updates: Partial<Booking>) => void;
-  deleteBookingFromStore: (id: string) => void;
 
   // Real-time sync system for calendar edits
   scheduleUpdateQueue: any[];
@@ -915,40 +905,6 @@ export const useStore = create<StoreState>()((set, get) => ({
       selectedDay: null,
       setSelectedDay: (day) => {
         set({ selectedDay: day });
-      },
-
-      // Bookings
-      bookings: [],
-      bookingsLoading: false,
-      refreshBookings: async () => {
-        const { currentTrip } = get();
-        if (!currentTrip?.id) return;
-        
-        set({ bookingsLoading: true });
-        try {
-          const bookings = await BookingService.getBookingsForTrip(currentTrip.id);
-          set({ bookings, bookingsLoading: false });
-        } catch (error) {
-          console.error('Failed to refresh bookings:', error);
-          set({ bookingsLoading: false });
-        }
-      },
-      addBooking: (booking) => {
-        set((state) => ({
-          bookings: [...state.bookings, booking]
-        }));
-      },
-      updateBooking: (id, updates) => {
-        set((state) => ({
-          bookings: state.bookings.map(booking => 
-            booking.id === id ? { ...booking, ...updates } : booking
-          )
-        }));
-      },
-      deleteBookingFromStore: (id) => {
-        set((state) => ({
-          bookings: state.bookings.filter(booking => booking.id !== id)
-        }));
       },
       
       // Real-time sync system
