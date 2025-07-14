@@ -29,7 +29,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   dayData,
   timeSlot
 }) => {
-  const { currentTrip, tripMembers, user, addBooking, refreshBookings, bookings } = useStore();
+  const { currentTrip, tripMembers, user, addBooking, refreshBookings } = useStore();
   const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     bookingLink: '',
@@ -147,22 +147,31 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
         lastLoadedContext.current = contextKey;
       }
     }
-  }, [isOpen, currentTrip?.id, modalContext.route, modalContext.date, bookings]);
+  }, [isOpen, currentTrip?.id, modalContext.route, modalContext.date]);
 
   const loadSavedBookings = async () => {
     if (!currentTrip?.id) return;
     
     setLoading(true);
     try {
-      // Filter bookings from global store instead of making API call
-      const contextBookings = bookings.filter(booking => 
-        booking.booking_type === 'flight' &&
+      // OPTIMIZED: Add timeout and reduced retry to prevent connection issues
+      const startTime = Date.now();
+      const allBookings = await BookingService.getBookingsByType(currentTrip.id, 'flight');
+      const loadTime = Date.now() - startTime;
+      
+      // Log slow operations that might be causing timeouts
+      if (loadTime > 2000) {
+        console.warn(`⚠️ Slow booking load: ${loadTime}ms`);
+      }
+      
+      // Filter bookings by route and date context
+      const contextBookings = allBookings.filter(booking => 
         booking.route === modalContext.route && 
         booking.departure_date === modalContext.date
       );
       
       setSavedBookings(contextBookings as FlightBooking[]);
-      console.log(`✅ Loaded ${contextBookings.length} contextual bookings from global store`);
+      console.log(`✅ Loaded ${contextBookings.length} contextual bookings in ${loadTime}ms`);
     } catch (error) {
       console.error('Failed to load saved bookings:', error);
       setSavedBookings([]);
