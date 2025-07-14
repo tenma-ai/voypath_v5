@@ -29,7 +29,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   dayData,
   timeSlot
 }) => {
-  const { currentTrip, tripMembers, user } = useStore();
+  const { currentTrip, tripMembers, user, bookingCacheVersion } = useStore();
   const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     bookingLink: '',
@@ -148,6 +148,14 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
       }
     }
   }, [isOpen, currentTrip?.id, modalContext.route, modalContext.date]);
+
+  // Invalidate cache when bookingCacheVersion changes
+  useEffect(() => {
+    if (isOpen && bookingCacheVersion > 0) {
+      lastLoadedContext.current = null; // Reset cache
+      loadSavedBookings();
+    }
+  }, [bookingCacheVersion]);
 
   const loadSavedBookings = async () => {
     if (!currentTrip?.id) return;

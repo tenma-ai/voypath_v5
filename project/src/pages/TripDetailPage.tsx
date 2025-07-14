@@ -50,7 +50,7 @@ export function TripDetailPage() {
     // DISABLED: };
   }, []);
 
-  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized, loadTripsFromDatabase, activeView, setActiveView, setupRealTimeSync } = useStore();
+  const { currentTrip, places, trips, isOptimizing, optimizationResult, setIsOptimizing, setOptimizationResult, updateTrip, user, loadPlacesFromAPI, loadOptimizationResult, createSystemPlaces, loadPlacesFromDatabase, setCurrentTrip, hasUserOptimized, setHasUserOptimized, loadTripsFromDatabase, activeView, setActiveView, setupRealTimeSync, invalidateBookingCache } = useStore();
 
   // Setup real-time sync cleanup
   useEffect(() => {
@@ -148,6 +148,13 @@ export function TripDetailPage() {
       cancelled = true;
     };
   }, [currentTrip?.id]);
+
+  // Invalidate booking cache when switching views
+  useEffect(() => {
+    if (currentTrip?.id) {
+      invalidateBookingCache();
+    }
+  }, [activeView, currentTrip?.id, invalidateBookingCache]);
 
   const loadTripMembers = async () => {
     if (!currentTrip?.id) return;

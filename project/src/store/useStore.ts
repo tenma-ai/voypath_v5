@@ -145,6 +145,10 @@ interface StoreState {
   selectedDay: string | null;
   setSelectedDay: (day: string | null) => void;
 
+  // Simple booking cache invalidation trigger
+  bookingCacheVersion: number;
+  invalidateBookingCache: () => void;
+
   // Real-time sync system for calendar edits
   scheduleUpdateQueue: any[];
   isProcessingScheduleUpdates: boolean;
@@ -905,6 +909,12 @@ export const useStore = create<StoreState>()((set, get) => ({
       selectedDay: null,
       setSelectedDay: (day) => {
         set({ selectedDay: day });
+      },
+
+      // Simple booking cache invalidation
+      bookingCacheVersion: 0,
+      invalidateBookingCache: () => {
+        set((state) => ({ bookingCacheVersion: state.bookingCacheVersion + 1 }));
       },
       
       // Real-time sync system

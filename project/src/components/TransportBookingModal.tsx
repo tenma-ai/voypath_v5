@@ -39,7 +39,7 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   transportMode,
   preCalculatedInfo
 }) => {
-  const { currentTrip, tripMembers, user } = useStore();
+  const { currentTrip, tripMembers, user, bookingCacheVersion } = useStore();
   
   // For flight mode, use the dedicated FlightBookingModal
   if (transportMode === 'flight') {
@@ -232,6 +232,14 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
       }
     }
   }, [isOpen, currentTrip?.id, modalContext.route, modalContext.date, transportMode]);
+
+  // Invalidate cache when bookingCacheVersion changes
+  useEffect(() => {
+    if (isOpen && bookingCacheVersion > 0) {
+      lastLoadedContext.current = null; // Reset cache
+      loadSavedBookings();
+    }
+  }, [bookingCacheVersion]);
 
   const loadSavedBookings = async () => {
     if (!currentTrip?.id) return;
