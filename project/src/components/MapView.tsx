@@ -13,7 +13,7 @@ import { DateUtils } from '../utils/DateUtils';
 import { PlaceDateUtils } from '../utils/PlaceDateUtils';
 import { TravelPayoutsService, FlightOption } from '../services/TravelPayoutsService';
 import MapPlaceModal from './MapPlaceModal';
-import MapRouteModal from './MapRouteModal';
+import TransportBookingModal from './TransportBookingModal';
 
 const libraries: ("places" | "geometry")[] = ["places", "geometry"];
 
@@ -29,9 +29,25 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
   const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
   const [placeImages, setPlaceImages] = useState<Map<string, string>>(new Map());
   const [showPlaceModal, setShowPlaceModal] = useState(false);
-  const [showRouteModal, setShowRouteModal] = useState(false);
+  const [showTransportModal, setShowTransportModal] = useState(false);
   const [selectedPlaceForModal, setSelectedPlaceForModal] = useState<any>(null);
-  const [selectedRouteForModal, setSelectedRouteForModal] = useState<{ fromPlace: any; toPlace: any } | null>(null);
+  const [transportModalData, setTransportModalData] = useState<{
+    routeData: {
+      from: string;
+      to: string;
+      fromLat?: number;
+      fromLng?: number;
+      toLat?: number;
+      toLng?: number;
+    };
+    dayData: any;
+    timeSlot: string;
+    transportMode: 'walking' | 'car';
+    preCalculatedInfo?: {
+      travelTime: number;
+      transportMode: string;
+    };
+  } | null>(null);
   const { currentTrip, memberColors, tripMembers, hasUserOptimized, isOptimizing, showOptimizationSuccess, setShowOptimizationSuccess, optimizationResult, selectedDay, setupRealTimeSync } = useStore();
 
   // Load Google Maps API
@@ -447,9 +463,45 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
 
   // Handle route click
   const handleRouteClick = useCallback((fromPlace: any, toPlace: any, event: google.maps.PolyMouseEvent) => {
-    // Always use the new modal for better UX
-    setSelectedRouteForModal({ fromPlace, toPlace });
-    setShowRouteModal(true);
+    // Determine transport mode based on route data
+    const getTransportMode = (): 'walking' | 'car' => {
+      const transport = toPlace.transport_mode || fromPlace.transport_mode || '';
+      
+      if (transport.toLowerCase().includes('walk')) return 'walking';
+      if (transport.toLowerCase().includes('flight')) return 'car'; // Default to car for flights in map view
+      
+      // Distance-based fallback
+      const lat1 = Number(fromPlace.latitude);
+      const lng1 = Number(fromPlace.longitude);
+      const lat2 = Number(toPlace.latitude);
+      const lng2 = Number(toPlace.longitude);
+      const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
+      
+      return distance > 0.01 ? 'car' : 'walking';
+    };
+
+    // Prepare data for TransportBookingModal
+    const transportMode = getTransportMode();
+    const modalData = {
+      routeData: {
+        from: fromPlace?.place_name || fromPlace?.name || 'From Location',
+        to: toPlace?.place_name || toPlace?.name || 'To Location',
+        fromLat: Number(fromPlace?.latitude),
+        fromLng: Number(fromPlace?.longitude),
+        toLat: Number(toPlace?.latitude),
+        toLng: Number(toPlace?.longitude)
+      },
+      dayData: toPlace, // Pass the place data as day data
+      timeSlot: toPlace?.departure_time || '09:00',
+      transportMode,
+      preCalculatedInfo: {
+        travelTime: toPlace?.travel_time_from_previous || 0,
+        transportMode: toPlace?.transport_mode || transportMode
+      }
+    };
+
+    setTransportModalData(modalData);
+    setShowTransportModal(true);
   }, []);
 
   // Update map bounds when places change - only on initial load
@@ -609,12 +661,17 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
         index={places.findIndex(p => p === selectedPlaceForModal)}
       />
 
-      <MapRouteModal
-        isOpen={showRouteModal}
-        onClose={() => setShowRouteModal(false)}
-        fromPlace={selectedRouteForModal?.fromPlace}
-        toPlace={selectedRouteForModal?.toPlace}
-      />
+      {transportModalData && (
+        <TransportBookingModal
+          isOpen={showTransportModal}
+          onClose={() => setShowTransportModal(false)}
+          routeData={transportModalData.routeData}
+          dayData={transportModalData.dayData}
+          timeSlot={transportModalData.timeSlot}
+          transportMode={transportModalData.transportMode}
+          preCalculatedInfo={transportModalData.preCalculatedInfo}
+        />
+      )}
     </div>
   );
 };
