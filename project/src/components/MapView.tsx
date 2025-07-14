@@ -503,9 +503,14 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
       return 'walking';
     };
 
-    // Create proper dayData structure instead of passing place object
+    // Create proper dayData structure with correct date logic (matching FlightBookingModal)
     const createDayData = () => {
-      // Try to get day and date from the place's optimization data
+      // Primary: Use dayData from place's scheduled information if available
+      if (toPlace.dayData) {
+        return toPlace.dayData;
+      }
+      
+      // Secondary: Extract from place's optimization schedule data
       if (toPlace.day && toPlace.date) {
         return {
           day: toPlace.day,
@@ -514,14 +519,19 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
         };
       }
       
-      // Fallback: try to determine day from place order and trip start date
+      // Tertiary: Look up place in optimization result to find correct day and date
       if (currentTrip?.startDate) {
         try {
-          // Find the place index in the optimization result
           const currentOptimizationResult = optimizationResult || optimizationResultProp;
           if (currentOptimizationResult?.optimization?.daily_schedules) {
             for (const schedule of currentOptimizationResult.optimization.daily_schedules) {
-              if (schedule.scheduled_places?.some((p: any) => p.id === toPlace.id || p.place_name === toPlace.place_name)) {
+              if (schedule.scheduled_places?.some((p: any) => 
+                p.id === toPlace.id || 
+                p.place_name === toPlace.place_name ||
+                p.name === toPlace.name ||
+                (p.latitude === toPlace.latitude && p.longitude === toPlace.longitude)
+              )) {
+                // Calculate the actual date for this day
                 const tripDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
                 return {
                   day: schedule.day,
@@ -536,6 +546,16 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
         }
       }
       
+      // Fallback: Use place's scheduled date if available, otherwise current date
+      if (toPlace.scheduledDate) {
+        const schedDate = new Date(toPlace.scheduledDate);
+        return {
+          day: 1,
+          actualDate: schedDate.toISOString().split('T')[0],
+          date: schedDate.toISOString().split('T')[0]
+        };
+      }
+      
       // Final fallback: use current date
       const today = new Date();
       return {
@@ -545,18 +565,40 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
       };
     };
 
-    // Prepare data for TransportBookingModal
-    const transportMode = getTransportMode();
-    const modalData = {
-      routeData: {
-        from: fromPlace?.place_name || fromPlace?.name || 'Start Location',
-        to: toPlace?.place_name || toPlace?.name || 'End Location',
+    // Create route data with round-trip distinction (matching FlightBookingModal logic)
+    const createRouteData = () => {
+      const fromName = fromPlace?.place_name || fromPlace?.name || 'Start Location';
+      const toName = toPlace?.place_name || toPlace?.name || 'End Location';
+      
+      // Add time-based or sequence-based distinction for round trips
+      let routeId = '';
+      if (fromName === toName) {
+        // Same location round trip - add time distinction
+        const timeSlot = toPlace?.departure_time || '09:00';
+        routeId = ` (${timeSlot})`;
+      } else if (fromName.includes(toName) || toName.includes(fromName)) {
+        // Similar location names - add coordinates for distinction
+        const fromCoords = `${Number(fromPlace?.latitude).toFixed(4)},${Number(fromPlace?.longitude).toFixed(4)}`;
+        const toCoords = `${Number(toPlace?.latitude).toFixed(4)},${Number(toPlace?.longitude).toFixed(4)}`;
+        routeId = ` [${fromCoords}→${toCoords}]`;
+      }
+      
+      return {
+        from: fromName,
+        to: toName + routeId,
         fromLat: Number(fromPlace?.latitude),
         fromLng: Number(fromPlace?.longitude),
         toLat: Number(toPlace?.latitude),
         toLng: Number(toPlace?.longitude)
-      },
-      dayData: createDayData(), // Create proper day data structure
+      };
+    };
+
+    // Prepare data for TransportBookingModal
+    const transportMode = getTransportMode();
+    const dayData = createDayData();
+    const modalData = {
+      routeData: createRouteData(),
+      dayData: dayData,
       timeSlot: toPlace?.departure_time || '09:00',
       transportMode,
       preCalculatedInfo: {
