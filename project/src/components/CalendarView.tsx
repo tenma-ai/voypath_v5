@@ -778,8 +778,49 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                   
                   {/* Time slots content */}
                   <div className="relative">
+                    {/* Time axis for each day (right side) */}
+                    <div className="absolute left-0 top-0 bottom-0 w-12 bg-gray-50 border-r border-gray-200 z-20">
+                      {(() => {
+                        const timeSlots = [];
+                        let currentHeight = 0;
+                        // Day hours (6 AM to 11 PM) - 1 hour intervals
+                        for (let hour = 6; hour <= 23; hour++) {
+                          timeSlots.push({
+                            time: `${hour.toString().padStart(2, '0')}:00`,
+                            isNight: false,
+                            height: 60,
+                            top: currentHeight
+                          });
+                          currentHeight += 60;
+                        }
+                        // Night hours (12 AM to 5 AM) - 3 hour intervals
+                        for (let hour = 0; hour < 6; hour += 3) {
+                          timeSlots.push({
+                            time: `${hour.toString().padStart(2, '0')}:00`,
+                            isNight: true,
+                            height: 40,
+                            top: currentHeight
+                          });
+                          currentHeight += 40;
+                        }
+                        
+                        return timeSlots.map((slot, index) => (
+                          <div
+                            key={slot.time}
+                            className="absolute w-full flex items-center justify-center text-xs text-gray-500 border-b border-gray-200"
+                            style={{ 
+                              height: `${slot.height}px`,
+                              top: `${slot.top}px`
+                            }}
+                          >
+                            {slot.time}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                    
                     {/* Background time grid */}
-                    <div className="absolute inset-0">
+                    <div className="absolute inset-0 ml-12">
                       {(() => {
                         const timeSlots = [];
                         let currentHeight = 0;
@@ -819,7 +860,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                     </div>
                     
                     {/* Place blocks positioned on time grid */}
-                    <div className="relative z-10">
+                    <div className="relative z-10 ml-12">
                       {/* Day start add button */}
                       {isEditMode && (
                         <button
@@ -1399,8 +1440,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                 <div
                                   className="absolute left-1 right-1 hover:shadow-md transition-shadow duration-200 rounded-lg border border-gray-200 p-2 z-10 cursor-pointer"
                                   style={{ 
-                                    top: `${getHotelPosition(22)}px`, // 22:00 position using unified calculation
-                                    height: `${getHotelPosition(6) - getHotelPosition(22) + 60}px`, // From 22:00 to 06:00 next day + 2 hours
+                                    top: `${getHotelPosition(22)}px`, // 22:00 position
+                                    height: `${getHotelPosition(0) + 80 - getHotelPosition(22)}px`, // From 22:00 to end of timeline (includes night hours)
                                     backgroundColor: '#faf5ff',
                                     borderLeftColor: '#a855f7',
                                     borderLeftWidth: '4px'
