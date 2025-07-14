@@ -1267,78 +1267,97 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                         );
                       })}
                       
-                      {/* Edit mode: Meal insertion buttons */}
-                      {isEditMode && (
-                        <>
-                          {/* Breakfast time (7-9 AM) */}
-                          <button
-                            className="absolute left-2 bg-orange-100 hover:bg-orange-200 text-orange-700 text-xs px-2 py-1 rounded-md shadow-sm transition-all duration-200 border border-orange-300"
-                            style={{ top: `${(7 - 6) * 60 + 15}px` }}
-                            onClick={() => {
-                              setMealModal({
-                                isOpen: true,
-                                mealType: 'breakfast',
-                                dayData: dayData,
-                                timeSlot: '07:00 - 09:00',
-                                nearbyLocation: dayData.places.length > 0 ? {
-                                  lat: dayData.places[0].latitude || 35.6812,
-                                  lng: dayData.places[0].longitude || 139.7671,
-                                  name: dayData.places[0].place_name || dayData.places[0].name
-                                } : undefined
-                              });
-                            }}
-                          >
-                            + breakfast
-                          </button>
-                          
-                          {/* Lunch time (12-2 PM) */}
-                          <button
-                            className="absolute left-2 bg-green-100 hover:bg-green-200 text-green-700 text-xs px-2 py-1 rounded-md shadow-sm transition-all duration-200 border border-green-300"
-                            style={{ top: `${(12 - 6) * 60 + 15}px` }}
-                            onClick={() => {
-                              setMealModal({
-                                isOpen: true,
-                                mealType: 'lunch',
-                                dayData: dayData,
-                                timeSlot: '12:00 - 14:00',
-                                nearbyLocation: dayData.places.length > 0 ? {
-                                  lat: dayData.places[0].latitude || 35.6812,
-                                  lng: dayData.places[0].longitude || 139.7671,
-                                  name: dayData.places[0].place_name || dayData.places[0].name
-                                } : undefined
-                              });
-                            }}
-                          >
-                            + lunch
-                          </button>
-                          
-                          {/* Dinner time (6-8 PM) */}
-                          <button
-                            className="absolute left-2 bg-red-100 hover:bg-red-200 text-red-700 text-xs px-2 py-1 rounded-md shadow-sm transition-all duration-200 border border-red-300"
-                            style={{ top: `${(18 - 6) * 60 + 15}px` }}
-                            onClick={() => {
-                              setMealModal({
-                                isOpen: true,
-                                mealType: 'dinner',
-                                dayData: dayData,
-                                timeSlot: '18:00 - 20:00',
-                                nearbyLocation: dayData.places.length > 0 ? {
-                                  lat: dayData.places[0].latitude || 35.6812,
-                                  lng: dayData.places[0].longitude || 139.7671,
-                                  name: dayData.places[0].place_name || dayData.places[0].name
-                                } : undefined
-                              });
-                            }}
-                          >
-                            + dinner
-                          </button>
-                        </>
-                      )}
+                      {/* Meal events - Always visible, right-aligned */}
+                      <>
+                        {/* Breakfast time (8:00 AM) */}
+                        <div
+                          className="absolute right-2 w-32 border-amber-200 bg-amber-50 text-amber-800 text-xs p-2 rounded-md shadow-sm border cursor-pointer hover:bg-amber-100"
+                          style={{ top: `${(8 - 6) * 60}px` }}
+                          onClick={() => {
+                            setMealModal({
+                              isOpen: true,
+                              mealType: 'breakfast',
+                              dayData: dayData,
+                              timeSlot: '08:00',
+                              nearbyLocation: dayData.places.length > 0 ? {
+                                lat: dayData.places[0].latitude || 35.6812,
+                                lng: dayData.places[0].longitude || 139.7671,
+                                name: dayData.places[0].place_name || dayData.places[0].name
+                              } : undefined
+                            });
+                          }}
+                        >
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-1 mb-1">
+                              <Utensils className="w-3 h-3" />
+                              <span className="text-xs font-medium">08:00</span>
+                            </div>
+                            <div className="text-sm font-medium">Breakfast</div>
+                          </div>
+                        </div>
+                        
+                        {/* Lunch time (12:00 PM) */}
+                        <div
+                          className="absolute right-2 w-32 border-amber-200 bg-amber-50 text-amber-800 text-xs p-2 rounded-md shadow-sm border cursor-pointer hover:bg-amber-100"
+                          style={{ top: `${(12 - 6) * 60}px` }}
+                          onClick={() => {
+                            setMealModal({
+                              isOpen: true,
+                              mealType: 'lunch',
+                              dayData: dayData,
+                              timeSlot: '12:00',
+                              nearbyLocation: dayData.places.length > 0 ? {
+                                lat: dayData.places[0].latitude || 35.6812,
+                                lng: dayData.places[0].longitude || 139.7671,
+                                name: dayData.places[0].place_name || dayData.places[0].name
+                              } : undefined
+                            });
+                          }}
+                        >
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-1 mb-1">
+                              <Utensils className="w-3 h-3" />
+                              <span className="text-xs font-medium">12:00</span>
+                            </div>
+                            <div className="text-sm font-medium">Lunch</div>
+                          </div>
+                        </div>
+                        
+                        {/* Dinner time (6:00 PM) */}
+                        <div
+                          className="absolute right-2 w-32 border-amber-200 bg-amber-50 text-amber-800 text-xs p-2 rounded-md shadow-sm border cursor-pointer hover:bg-amber-100"
+                          style={{ top: `${(18 - 6) * 60}px` }}
+                          onClick={() => {
+                            setMealModal({
+                              isOpen: true,
+                              mealType: 'dinner',
+                              dayData: dayData,
+                              timeSlot: '18:00',
+                              nearbyLocation: dayData.places.length > 0 ? {
+                                lat: dayData.places[0].latitude || 35.6812,
+                                lng: dayData.places[0].longitude || 139.7671,
+                                name: dayData.places[0].place_name || dayData.places[0].name
+                              } : undefined
+                            });
+                          }}
+                        >
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-1 mb-1">
+                              <Utensils className="w-3 h-3" />
+                              <span className="text-xs font-medium">18:00</span>
+                            </div>
+                            <div className="text-sm font-medium">Dinner</div>
+                          </div>
+                        </div>
+                      </>
                       
-                      {/* Hotel booking button (night time) - Always visible */}
-                      <button
-                        className="absolute left-2 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs px-2 py-1 rounded-md shadow-sm transition-all duration-200 border border-purple-300"
-                        style={{ top: `${(22 - 6) * 60 + 15}px` }}
+                      {/* Hotel event - Horizontal bar (22:00 - 08:00) */}
+                      <div
+                        className="absolute left-2 right-16 border-purple-200 bg-purple-50 text-purple-800 text-xs p-2 rounded-md shadow-sm border cursor-pointer hover:bg-purple-100"
+                        style={{ 
+                          top: `${(22 - 6) * 60}px`,
+                          height: '600px' // 10 hours (22:00-08:00) * 60px
+                        }}
                         onClick={() => {
                           setHotelModal({
                             isOpen: true,
@@ -1352,8 +1371,34 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                           });
                         }}
                       >
-                        + hotel
-                      </button>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1 text-purple-700">
+                            <svg className="w-4 h-4" viewBox="0 0 64 64" fill="currentColor">
+                              <path d="M8 58h48V22H8v36zm6-30h36v24H14V28z"/>
+                              <rect x="18" y="32" width="4" height="4"/>
+                              <rect x="26" y="32" width="4" height="4"/>
+                              <rect x="34" y="32" width="4" height="4"/>
+                              <rect x="42" y="32" width="4" height="4"/>
+                              <rect x="18" y="40" width="4" height="4"/>
+                              <rect x="26" y="40" width="4" height="4"/>
+                              <rect x="34" y="40" width="4" height="4"/>
+                              <rect x="42" y="40" width="4" height="4"/>
+                              <rect x="18" y="48" width="4" height="4"/>
+                              <rect x="26" y="48" width="4" height="4"/>
+                              <rect x="34" y="48" width="4" height="4"/>
+                              <rect x="42" y="48" width="4" height="4"/>
+                              <path d="M6 20h52v-8H50V6H14v6H6v8zm8-12h36v4H14V8z"/>
+                            </svg>
+                            <span className="text-sm font-medium">22:00 - 08:00</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="h-2 bg-purple-200 rounded-full">
+                              <div className="h-full bg-purple-400 rounded-full w-full"></div>
+                            </div>
+                          </div>
+                          <span className="text-sm font-medium text-purple-800">Hotel Stay</span>
+                        </div>
+                      </div>
                     </div>
                     
                     {/* Ensure minimum height for the day column */}
