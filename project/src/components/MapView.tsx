@@ -505,11 +505,8 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
 
     // Create proper dayData structure - use place's own day_number and scheduled_date
     const createDayData = () => {
-      console.log('🔍 MapView createDayData called for place:', toPlace);
-      
       // Primary: Use place's own day_number and scheduled_date if available (most reliable)
       if (toPlace.day_number && toPlace.scheduled_date && currentTrip) {
-        console.log('✅ Using place own day_number:', toPlace.day_number, 'scheduled_date:', toPlace.scheduled_date);
         return {
           day: toPlace.day_number,
           date: toPlace.scheduled_date,
@@ -522,14 +519,11 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
         const currentOptimizationResult = optimizationResult || optimizationResultProp;
         
         if (currentOptimizationResult?.optimization?.daily_schedules && currentTrip) {
-          console.log('🔍 Searching by exact ID in daily schedules');
-          
           for (const schedule of currentOptimizationResult.optimization.daily_schedules) {
             if (schedule.scheduled_places?.some((p: any) => p.id === toPlace.id)) {
               const actualDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
               const dateStr = DateUtils.formatForStorage(actualDate).split('T')[0];
               
-              console.log('✅ Found place by ID in day:', schedule.day, 'date:', dateStr);
               return {
                 day: schedule.day,
                 date: dateStr,
@@ -537,11 +531,9 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
               };
             }
           }
-          
-          console.log('❌ Place ID not found in any day schedule');
         }
       } catch (error) {
-        console.warn('❌ Could not find place in optimization result:', error);
+        console.warn('Could not find place in optimization result:', error);
       }
       
       // Tertiary: Try coordinates matching if place has location data
@@ -550,8 +542,6 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
           const currentOptimizationResult = optimizationResult || optimizationResultProp;
           
           if (currentOptimizationResult?.optimization?.daily_schedules) {
-            console.log('🔍 Searching by coordinates');
-            
             for (const schedule of currentOptimizationResult.optimization.daily_schedules) {
               if (schedule.scheduled_places?.some((p: any) => 
                 Math.abs(p.latitude - toPlace.latitude) < 0.0001 && 
@@ -560,7 +550,6 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
                 const actualDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
                 const dateStr = DateUtils.formatForStorage(actualDate).split('T')[0];
                 
-                console.log('✅ Found place by coordinates in day:', schedule.day, 'date:', dateStr);
                 return {
                   day: schedule.day,
                   date: dateStr,
@@ -570,12 +559,11 @@ const MapView: React.FC<MapViewProps> = ({ optimizationResultProp }) => {
             }
           }
         } catch (error) {
-          console.warn('❌ Could not find place by coordinates:', error);
+          console.warn('Could not find place by coordinates:', error);
         }
       }
       
       // Fallback: use current date
-      console.log('🔄 Using fallback - current date');
       const today = new Date();
       return {
         day: 1,
