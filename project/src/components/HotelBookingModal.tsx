@@ -326,48 +326,9 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
         });
         setEditingBooking(null);
       } else {
-        // Save to bookings table (for UI display and management)
+        // Save to bookings table only (Google Maps data will be stored here for Add to Trip)
+        console.log('💾 Saving hotel booking with Google Maps data for future Add to Trip');
         await BookingService.saveHotelBooking(currentTrip.id, user.id, hotelData);
-        
-        // If Google Maps location data exists, also save as time-constrained place
-        if (alreadyBookedData.latitude && alreadyBookedData.longitude && alreadyBookedData.google_place_id) {
-          console.log('🏨 Saving hotel as time-constrained place with Google Maps data');
-          
-          // Create ISO datetime strings for constraints
-          const checkInDateTime = `${alreadyBookedData.checkIn || checkInDateStr}T${alreadyBookedData.checkInTime}:00.000Z`;
-          const checkOutDateTime = `${alreadyBookedData.checkOut || checkOutDateStr}T${alreadyBookedData.checkOutTime}:00.000Z`;
-          
-          // Calculate stay duration in minutes
-          const checkInTime = new Date(checkInDateTime);
-          const checkOutTime = new Date(checkOutDateTime);
-          const stayDurationMinutes = Math.round((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60));
-          
-          const { error: placeError } = await supabase
-            .from('places')
-            .insert({
-              trip_id: currentTrip.id,
-              user_id: user.id,
-              name: alreadyBookedData.hotelName || 'Selected Hotel',
-              latitude: alreadyBookedData.latitude,
-              longitude: alreadyBookedData.longitude,
-              address: alreadyBookedData.address,
-              category: 'tourist_attraction', // Use existing valid category
-              place_type: 'member_wish', // Use valid place_type
-              constraint_arrival_time: checkInDateTime,
-              constraint_departure_time: checkOutDateTime,
-              stay_duration_minutes: Math.max(stayDurationMinutes, 720), // Minimum 12 hours
-              wish_level: 5, // High priority for booked hotels
-              source: 'google_maps_booking',
-              google_place_id: alreadyBookedData.google_place_id,
-              notes: `Hotel booking: ${alreadyBookedData.hotelName || 'Hotel'}`
-            });
-            
-          if (placeError) {
-            console.warn('⚠️ Could not save hotel as place:', placeError.message);
-          } else {
-            console.log('✅ Hotel saved as time-constrained place for optimization');
-          }
-        }
       }
 
       // Reload bookings

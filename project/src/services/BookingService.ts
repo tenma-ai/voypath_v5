@@ -289,19 +289,14 @@ export class BookingService {
         userId: userId.substring(0, 8) + '...'
       });
 
-      // Call the edit-schedule Edge Function with the booking data
-      const { data, error } = await supabase.functions.invoke('edit-schedule', {
-        body: {
-          trip_id: tripId,
-          member_id: userId,
-          action: 'add_booking',
-          booking: booking
-        }
-      });
-
-      if (error) {
-        console.error('❌ Failed to add booking to trip:', error);
-        throw new Error(`Failed to add booking to trip: ${error.message}`);
+      if (booking.booking_type === 'hotel') {
+        await this.addHotelToTrip(tripId, userId, booking as HotelBooking);
+      } else if (booking.booking_type === 'flight') {
+        await this.addFlightToTrip(tripId, userId, booking as FlightBooking);
+      } else if (booking.booking_type === 'car' || booking.booking_type === 'walking') {
+        await this.addTransportToTrip(tripId, userId, booking as TransportBooking);
+      } else {
+        throw new Error(`Unsupported booking type: ${booking.booking_type}`);
       }
 
       console.log('✅ Booking successfully added to trip');
@@ -312,5 +307,90 @@ export class BookingService {
       await handleNetworkFailure(error);
       throw error;
     }
+  }
+
+  /**
+   * Add hotel booking to trip as time-constrained place
+   */
+  static async addHotelToTrip(tripId: string, userId: string, booking: HotelBooking): Promise<void> {
+    try {
+      console.log('🏨 Adding hotel booking to trip as time-constrained place');
+
+      // Check if hotel has Google Maps location data
+      if (!booking.latitude || !booking.longitude || !booking.google_place_id) {
+        throw new Error('Hotel must have location data (latitude, longitude, google_place_id) to be added to trip. Please select a hotel from Google Maps search.');
+      }
+
+      // Check for existing hotel places from this modal context to prevent duplicates
+      const modalContext = `${booking.location}-${booking.check_in_date}`;
+      const { data: existingHotels } = await supabase
+        .from('places')
+        .select('id, name')
+        .eq('trip_id', tripId)
+        .eq('source', 'google_maps_booking')
+        .ilike('notes', `%${modalContext}%`);
+
+      if (existingHotels && existingHotels.length > 0) {
+        throw new Error(`A hotel has already been added for ${booking.location} on ${booking.check_in_date}. Only one hotel per modal context is allowed.`);
+      }
+
+      // Create ISO datetime strings for constraints
+      const checkInDateTime = `${booking.check_in_date}T${booking.check_in_time}:00.000Z`;
+      const checkOutDateTime = `${booking.check_out_date}T${booking.check_out_time}:00.000Z`;
+
+      // Calculate stay duration in minutes
+      const checkInTime = new Date(checkInDateTime);
+      const checkOutTime = new Date(checkOutDateTime);
+      const stayDurationMinutes = Math.round((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60));
+
+      // Insert hotel as time-constrained place
+      const { error: placeError } = await supabase
+        .from('places')
+        .insert({
+          trip_id: tripId,
+          user_id: userId,
+          name: booking.hotel_name || 'Selected Hotel',
+          latitude: booking.latitude,
+          longitude: booking.longitude,
+          address: booking.address,
+          category: 'tourist_attraction', // Use existing valid category
+          place_type: 'member_wish', // Use valid place_type
+          constraint_arrival_time: checkInDateTime,
+          constraint_departure_time: checkOutDateTime,
+          stay_duration_minutes: Math.max(stayDurationMinutes, 720), // Minimum 12 hours
+          wish_level: 5, // High priority for booked hotels
+          source: 'google_maps_booking',
+          google_place_id: booking.google_place_id,
+          notes: `Hotel booking: ${booking.hotel_name || 'Hotel'} | Context: ${modalContext}`
+        });
+
+      if (placeError) {
+        console.error('❌ Failed to create hotel place:', placeError.message);
+        throw new Error(`Failed to add hotel to trip: ${placeError.message}`);
+      }
+
+      console.log('✅ Hotel successfully added as time-constrained place for optimization');
+    } catch (error) {
+      console.error('🚨 addHotelToTrip failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add flight booking to trip - updates airport place constraints
+   */
+  static async addFlightToTrip(tripId: string, userId: string, booking: FlightBooking): Promise<void> {
+    // TODO: Implement flight constraint logic
+    console.log('✈️ Flight booking to trip - not yet implemented');
+    throw new Error('Flight booking to trip not yet implemented');
+  }
+
+  /**
+   * Add transport booking to trip - updates endpoint place constraints
+   */
+  static async addTransportToTrip(tripId: string, userId: string, booking: TransportBooking): Promise<void> {
+    // TODO: Implement transport constraint logic
+    console.log('🚗 Transport booking to trip - not yet implemented');
+    throw new Error('Transport booking to trip not yet implemented');
   }
 }
