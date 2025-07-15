@@ -263,19 +263,53 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     try {
       // OPTIMIZED: Add timeout monitoring to prevent connection issues
       const startTime = Date.now();
+      
+      console.log('🔍 Loading hotel bookings with modal context:', {
+        modalContext,
+        nearbyLocation: nearbyLocation?.name,
+        dayData: dayData?.date,
+        checkInDateStr
+      });
+      
       const allBookings = await BookingService.getBookingsByType(currentTrip.id, 'hotel');
       const loadTime = Date.now() - startTime;
+      
+      console.log('📋 All hotel bookings loaded:', allBookings.map(b => ({
+        id: b.id,
+        hotel_name: b.hotel_name,
+        location: b.location,
+        check_in_date: b.check_in_date,
+        created_at: b.created_at
+      })));
       
       // Log slow operations that might be causing timeouts
       if (loadTime > 2000) {
         console.warn(`⚠️ Slow hotel booking load: ${loadTime}ms`);
       }
       
-      // Filter bookings by location and check-in date context
-      const contextBookings = allBookings.filter(booking => 
-        booking.location === modalContext.location && 
-        booking.check_in_date === modalContext.checkInDate
-      );
+      // Filter bookings by location and check-in date context with flexible matching
+      const contextBookings = allBookings.filter(booking => {
+        // Check if booking location matches modal context location (flexible matching)
+        const locationMatch = booking.location === modalContext.location ||
+                             (booking.location && booking.location.includes(modalContext.location)) ||
+                             (modalContext.location && modalContext.location.includes(booking.location || ''));
+        
+        // Check if check-in date matches
+        const dateMatch = booking.check_in_date === modalContext.checkInDate;
+        
+        console.log(`🔍 Hotel booking filter check:`, {
+          bookingId: booking.id,
+          bookingLocation: booking.location,
+          modalLocation: modalContext.location,
+          bookingCheckIn: booking.check_in_date,
+          modalCheckIn: modalContext.checkInDate,
+          locationMatch,
+          dateMatch,
+          include: locationMatch && dateMatch
+        });
+        
+        return locationMatch && dateMatch;
+      });
       
       setSavedBookings(contextBookings as HotelBooking[]);
       console.log(`✅ Loaded ${contextBookings.length} hotel bookings in ${loadTime}ms`);
