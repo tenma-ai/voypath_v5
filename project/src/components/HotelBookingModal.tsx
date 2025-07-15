@@ -40,6 +40,17 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     const parts = cityName.split(',').map(part => part.trim());
     return parts[0] || locationName;
   };
+  // Extract default times from timeSlot or use default values
+  const getDefaultTimes = () => {
+    if (timeSlot && timeSlot.includes('-')) {
+      const [startTime, endTime] = timeSlot.split('-');
+      return { checkInTime: startTime.trim(), checkOutTime: endTime.trim() };
+    }
+    return { checkInTime: '15:00', checkOutTime: '11:00' };
+  };
+  
+  const defaultTimes = getDefaultTimes();
+  
   const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     bookingLink: '',
@@ -47,8 +58,8 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     address: '',
     checkIn: dayData?.date || '',
     checkOut: '',
-    checkInTime: '15:00',
-    checkOutTime: '11:00',
+    checkInTime: defaultTimes.checkInTime,
+    checkOutTime: defaultTimes.checkOutTime,
     guests: tripMembers?.length || 1,
     pricePerNight: '',
     rating: 4,
@@ -341,8 +352,8 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
         address: '',
         checkIn: dayData?.date || '',
         checkOut: '',
-        checkInTime: '15:00',
-        checkOutTime: '11:00',
+        checkInTime: defaultTimes.checkInTime,
+        checkOutTime: defaultTimes.checkOutTime,
         guests: tripMembers?.length || 1,
         pricePerNight: '',
         rating: 4,

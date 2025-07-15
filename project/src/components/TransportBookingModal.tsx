@@ -61,11 +61,23 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   }>({ distance: '', duration: '', loaded: false });
   const [uberRides, setUberRides] = useState<any[]>([]);
   const [uberLoading, setUberLoading] = useState(false);
+  
+  // Extract default times from timeSlot or use default values
+  const getDefaultTimes = () => {
+    if (timeSlot && timeSlot.includes('-')) {
+      const [startTime, endTime] = timeSlot.split('-');
+      return { departureTime: startTime.trim(), arrivalTime: endTime.trim() };
+    }
+    return { departureTime: '09:00', arrivalTime: '11:00' };
+  };
+  
+  const defaultTimes = getDefaultTimes();
+  
   const [bookingData, setBookingData] = useState({
     bookingLink: '',
     routeInfo: '',
-    departureTime: '09:00',
-    arrivalTime: '11:00',
+    departureTime: defaultTimes.departureTime,
+    arrivalTime: defaultTimes.arrivalTime,
     price: '',
     notes: '',
     passengers: tripMembers?.length || 1,
@@ -334,8 +346,8 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
       setBookingData({
         bookingLink: '',
         routeInfo: '',
-        departureTime: '09:00',
-        arrivalTime: '11:00',
+        departureTime: defaultTimes.departureTime,
+        arrivalTime: defaultTimes.arrivalTime,
         price: '',
         notes: '',
         passengers: tripMembers?.length || 1,
@@ -829,8 +841,8 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
                         setBookingData({
                           bookingLink: '',
                           routeInfo: '',
-                          departureTime: '09:00',
-                          arrivalTime: '11:00',
+                          departureTime: defaultTimes.departureTime,
+                          arrivalTime: defaultTimes.arrivalTime,
                           price: '',
                           notes: '',
                           passengers: tripMembers?.length || 1,

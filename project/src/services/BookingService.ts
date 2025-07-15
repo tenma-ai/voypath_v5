@@ -380,17 +380,283 @@ export class BookingService {
    * Add flight booking to trip - updates airport place constraints
    */
   static async addFlightToTrip(tripId: string, userId: string, booking: FlightBooking): Promise<void> {
-    // TODO: Implement flight constraint logic
-    console.log('✈️ Flight booking to trip - not yet implemented');
-    throw new Error('Flight booking to trip not yet implemented');
+    try {
+      console.log('✈️ Adding flight booking to trip as airport place constraints');
+
+      if (!booking.route || !booking.departure_time || !booking.arrival_time || !booking.departure_date) {
+        throw new Error('Flight must have route, departure/arrival times, and departure date to be added to trip.');
+      }
+
+      // Parse route: "Tokyo Haneda Airport (HND) → Beijing Daxing International Airport (PKX)"
+      const routeParts = booking.route.split(' → ');
+      if (routeParts.length < 2) {
+        throw new Error('Invalid flight route format. Expected: "Departure Airport → Arrival Airport"');
+      }
+
+      const departureAirport = routeParts[0].trim();
+      const arrivalAirport = routeParts[1].trim();
+
+      // Create ISO datetime strings for constraints
+      const departureDateTime = `${booking.departure_date}T${booking.departure_time}:00.000Z`;
+      
+      // Handle arrival time (might be next day for overnight flights)
+      let arrivalDate = booking.departure_date;
+      if (booking.departure_time && booking.arrival_time) {
+        const depHour = parseInt(booking.departure_time.split(':')[0]);
+        const arrHour = parseInt(booking.arrival_time.split(':')[0]);
+        
+        // If arrival time is much earlier than departure, assume next day
+        if (arrHour < depHour && (depHour - arrHour) > 12) {
+          const nextDay = new Date(booking.departure_date);
+          nextDay.setDate(nextDay.getDate() + 1);
+          arrivalDate = nextDay.toISOString().split('T')[0];
+        }
+      }
+      const arrivalDateTime = `${arrivalDate}T${booking.arrival_time}:00.000Z`;
+
+      // Find departure airport place (flexible search)
+      let depPlace = null;
+      try {
+        // Try exact match first
+        let { data: exactMatch } = await supabase
+          .from('places')
+          .select('*')
+          .eq('trip_id', tripId)
+          .eq('name', departureAirport)
+          .limit(1);
+        
+        if (exactMatch && exactMatch.length > 0) {
+          depPlace = exactMatch[0];
+        } else {
+          // Try partial match with airport name without codes
+          const airportNameOnly = departureAirport.replace(/\s*\([A-Z]{3,4}\)\s*/, '').trim();
+          let { data: partialMatch } = await supabase
+            .from('places')
+            .select('*')
+            .eq('trip_id', tripId)
+            .ilike('name', `%${airportNameOnly}%`)
+            .limit(1);
+          
+          if (partialMatch && partialMatch.length > 0) {
+            depPlace = partialMatch[0];
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error searching for departure airport: ${error}`);
+      }
+
+      // Find arrival airport place (flexible search)
+      let arrPlace = null;
+      try {
+        // Try exact match first
+        let { data: exactMatch } = await supabase
+          .from('places')
+          .select('*')
+          .eq('trip_id', tripId)
+          .eq('name', arrivalAirport)
+          .limit(1);
+        
+        if (exactMatch && exactMatch.length > 0) {
+          arrPlace = exactMatch[0];
+        } else {
+          // Try partial match with airport name without codes
+          const airportNameOnly = arrivalAirport.replace(/\s*\([A-Z]{3,4}\)\s*/, '').trim();
+          let { data: partialMatch } = await supabase
+            .from('places')
+            .select('*')
+            .eq('trip_id', tripId)
+            .ilike('name', `%${airportNameOnly}%`)
+            .limit(1);
+          
+          if (partialMatch && partialMatch.length > 0) {
+            arrPlace = partialMatch[0];
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error searching for arrival airport: ${error}`);
+      }
+
+      // Update departure airport constraints
+      if (depPlace) {
+        const { error: depError } = await supabase
+          .from('places')
+          .update({ constraint_departure_time: departureDateTime })
+          .eq('id', depPlace.id);
+        
+        if (depError) {
+          console.warn(`⚠️ Could not update departure airport constraint: ${depError.message}`);
+        } else {
+          console.log(`✅ Updated departure constraint: ${departureAirport} at ${departureDateTime}`);
+        }
+      } else {
+        console.warn(`⚠️ Departure airport place not found: ${departureAirport}`);
+      }
+
+      // Update arrival airport constraints
+      if (arrPlace) {
+        const { error: arrError } = await supabase
+          .from('places')
+          .update({ constraint_arrival_time: arrivalDateTime })
+          .eq('id', arrPlace.id);
+        
+        if (arrError) {
+          console.warn(`⚠️ Could not update arrival airport constraint: ${arrError.message}`);
+        } else {
+          console.log(`✅ Updated arrival constraint: ${arrivalAirport} at ${arrivalDateTime}`);
+        }
+      } else {
+        console.warn(`⚠️ Arrival airport place not found: ${arrivalAirport}`);
+      }
+
+      if (!depPlace && !arrPlace) {
+        throw new Error(`No airport places found in trip for route: ${booking.route}. Please add airports to your trip first.`);
+      }
+
+      console.log('✅ Flight constraints successfully added to airport places');
+    } catch (error) {
+      console.error('🚨 addFlightToTrip failed:', error);
+      throw error;
+    }
   }
 
   /**
    * Add transport booking to trip - updates endpoint place constraints
    */
   static async addTransportToTrip(tripId: string, userId: string, booking: TransportBooking): Promise<void> {
-    // TODO: Implement transport constraint logic
-    console.log('🚗 Transport booking to trip - not yet implemented');
-    throw new Error('Transport booking to trip not yet implemented');
+    try {
+      console.log(`🚗 Adding ${booking.booking_type} booking to trip as endpoint place constraints`);
+
+      if (!booking.route || !booking.departure_time || !booking.arrival_time || !booking.departure_date) {
+        throw new Error(`${booking.booking_type} must have route, departure/arrival times, and departure date to be added to trip.`);
+      }
+
+      // Parse route: "Location A → Location B"
+      const routeParts = booking.route.split(' → ');
+      if (routeParts.length < 2) {
+        throw new Error('Invalid transport route format. Expected: "From Location → To Location"');
+      }
+
+      const fromLocation = routeParts[0].trim();
+      const toLocation = routeParts[1].trim();
+
+      // Create ISO datetime strings for constraints
+      const departureDateTime = `${booking.departure_date}T${booking.departure_time}:00.000Z`;
+      
+      // Handle arrival time (might be next day for overnight transport)
+      let arrivalDate = booking.departure_date;
+      if (booking.departure_time && booking.arrival_time) {
+        const depHour = parseInt(booking.departure_time.split(':')[0]);
+        const arrHour = parseInt(booking.arrival_time.split(':')[0]);
+        
+        // If arrival time is much earlier than departure, assume next day
+        if (arrHour < depHour && (depHour - arrHour) > 12) {
+          const nextDay = new Date(booking.departure_date);
+          nextDay.setDate(nextDay.getDate() + 1);
+          arrivalDate = nextDay.toISOString().split('T')[0];
+        }
+      }
+      const arrivalDateTime = `${arrivalDate}T${booking.arrival_time}:00.000Z`;
+
+      // Find from location place (flexible search)
+      let fromPlace = null;
+      try {
+        // Try exact match first
+        let { data: exactMatch } = await supabase
+          .from('places')
+          .select('*')
+          .eq('trip_id', tripId)
+          .eq('name', fromLocation)
+          .limit(1);
+        
+        if (exactMatch && exactMatch.length > 0) {
+          fromPlace = exactMatch[0];
+        } else {
+          // Try partial match
+          let { data: partialMatch } = await supabase
+            .from('places')
+            .select('*')
+            .eq('trip_id', tripId)
+            .ilike('name', `%${fromLocation}%`)
+            .limit(1);
+          
+          if (partialMatch && partialMatch.length > 0) {
+            fromPlace = partialMatch[0];
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error searching for from location: ${error}`);
+      }
+
+      // Find to location place (flexible search)
+      let toPlace = null;
+      try {
+        // Try exact match first
+        let { data: exactMatch } = await supabase
+          .from('places')
+          .select('*')
+          .eq('trip_id', tripId)
+          .eq('name', toLocation)
+          .limit(1);
+        
+        if (exactMatch && exactMatch.length > 0) {
+          toPlace = exactMatch[0];
+        } else {
+          // Try partial match
+          let { data: partialMatch } = await supabase
+            .from('places')
+            .select('*')
+            .eq('trip_id', tripId)
+            .ilike('name', `%${toLocation}%`)
+            .limit(1);
+          
+          if (partialMatch && partialMatch.length > 0) {
+            toPlace = partialMatch[0];
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error searching for to location: ${error}`);
+      }
+
+      // Update from location constraints
+      if (fromPlace) {
+        const { error: fromError } = await supabase
+          .from('places')
+          .update({ constraint_departure_time: departureDateTime })
+          .eq('id', fromPlace.id);
+        
+        if (fromError) {
+          console.warn(`⚠️ Could not update from location constraint: ${fromError.message}`);
+        } else {
+          console.log(`✅ Updated departure constraint: ${fromLocation} at ${departureDateTime}`);
+        }
+      } else {
+        console.warn(`⚠️ From location place not found: ${fromLocation}`);
+      }
+
+      // Update to location constraints
+      if (toPlace) {
+        const { error: toError } = await supabase
+          .from('places')
+          .update({ constraint_arrival_time: arrivalDateTime })
+          .eq('id', toPlace.id);
+        
+        if (toError) {
+          console.warn(`⚠️ Could not update to location constraint: ${toError.message}`);
+        } else {
+          console.log(`✅ Updated arrival constraint: ${toLocation} at ${arrivalDateTime}`);
+        }
+      } else {
+        console.warn(`⚠️ To location place not found: ${toLocation}`);
+      }
+
+      if (!fromPlace && !toPlace) {
+        throw new Error(`No places found in trip for route: ${booking.route}. Please add these locations to your trip first.`);
+      }
+
+      console.log(`✅ ${booking.booking_type} constraints successfully added to endpoint places`);
+    } catch (error) {
+      console.error(`🚨 addTransportToTrip failed:`, error);
+      throw error;
+    }
   }
 }

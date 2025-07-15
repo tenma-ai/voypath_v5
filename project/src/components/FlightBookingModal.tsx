@@ -30,12 +30,24 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   timeSlot
 }) => {
   const { currentTrip, tripMembers, user, bookingCacheVersion } = useStore();
+  
+  // Extract default times from timeSlot or use default values
+  const getDefaultTimes = () => {
+    if (timeSlot && timeSlot.includes('-')) {
+      const [startTime, endTime] = timeSlot.split('-');
+      return { departureTime: startTime.trim(), arrivalTime: endTime.trim() };
+    }
+    return { departureTime: '09:00', arrivalTime: '11:00' };
+  };
+  
+  const defaultTimes = getDefaultTimes();
+  
   const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     bookingLink: '',
     flightNumber: '',
-    departureTime: '09:00',
-    arrivalTime: '11:00',
+    departureTime: defaultTimes.departureTime,
+    arrivalTime: defaultTimes.arrivalTime,
     price: '',
     passengers: tripMembers?.length || 1
   });
@@ -238,8 +250,8 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
       setAlreadyBookedData({
         bookingLink: '',
         flightNumber: '',
-        departureTime: '09:00',
-        arrivalTime: '11:00',
+        departureTime: defaultTimes.departureTime,
+        arrivalTime: defaultTimes.arrivalTime,
         price: '',
         passengers: tripMembers?.length || 1
       });
@@ -259,8 +271,8 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     setAlreadyBookedData({
       bookingLink: booking.booking_link || '',
       flightNumber: booking.flight_number || '',
-      departureTime: booking.departure_time || '09:00',
-      arrivalTime: booking.arrival_time || '11:00',
+      departureTime: booking.departure_time || defaultTimes.departureTime,
+      arrivalTime: booking.arrival_time || defaultTimes.arrivalTime,
       price: booking.price || '',
       passengers: booking.passengers || tripMembers?.length || 1
     });
@@ -569,8 +581,8 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                           setAlreadyBookedData({
                             bookingLink: '',
                             flightNumber: '',
-                            departureTime: '09:00',
-                            arrivalTime: '11:00',
+                            departureTime: defaultTimes.departureTime,
+                            arrivalTime: defaultTimes.arrivalTime,
                             price: '',
                             passengers: tripMembers?.length || 1
                           });
