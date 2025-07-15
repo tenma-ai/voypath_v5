@@ -76,6 +76,8 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   const [bookingData, setBookingData] = useState({
     bookingLink: '',
     routeInfo: '',
+    departureDate: dateStr,
+    arrivalDate: dateStr,
     departureTime: defaultTimes.departureTime,
     arrivalTime: defaultTimes.arrivalTime,
     price: '',
@@ -313,7 +315,8 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
         user_id: user.id,
         booking_type: transportMode,
         route: modalContext.route,
-        departure_date: modalContext.date,
+        departure_date: bookingData.departureDate,
+        arrival_date: bookingData.arrivalDate,
         departure_time: bookingData.departureTime,
         arrival_time: bookingData.arrivalTime,
         price: bookingData.price ? parseFloat(bookingData.price) : null,
@@ -346,6 +349,8 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
       setBookingData({
         bookingLink: '',
         routeInfo: '',
+        departureDate: dateStr,
+        arrivalDate: dateStr,
         departureTime: defaultTimes.departureTime,
         arrivalTime: defaultTimes.arrivalTime,
         price: '',
@@ -410,6 +415,8 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
     setBookingData({
       bookingLink: booking.booking_link || '',
       routeInfo: booking.transport_info?.route_details || '',
+      departureDate: booking.departure_date || dateStr,
+      arrivalDate: booking.arrival_date || dateStr,
       departureTime: booking.departure_time,
       arrivalTime: booking.arrival_time,
       price: booking.price?.toString() || '',
@@ -758,6 +765,32 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
                       </div>
                     </>
                   )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Departure Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={bookingData.departureDate}
+                      onChange={(e) => setBookingData({ ...bookingData, departureDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Arrival Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={bookingData.arrivalDate}
+                      onChange={(e) => setBookingData({ ...bookingData, arrivalDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">

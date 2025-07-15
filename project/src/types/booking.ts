@@ -15,10 +15,11 @@ export interface FlightBooking extends BaseBooking {
   flight_number?: string;
   departure_time?: string;
   arrival_time?: string;
+  departure_date?: string;
+  arrival_date?: string;
   price?: string;
   passengers?: number;
   route?: string;
-  departure_date?: string;
   
   // Hotel fields should be null/undefined for flights
   hotel_name?: undefined;
@@ -45,6 +46,9 @@ export interface HotelBooking extends BaseBooking {
   price_per_night?: string;
   rating?: number;
   location?: string;
+  latitude?: number;
+  longitude?: number;
+  google_place_id?: string;
   
   // Flight fields should be null/undefined for hotels
   flight_number?: undefined;
@@ -60,6 +64,7 @@ export interface TransportBooking extends BaseBooking {
   booking_type: 'walking' | 'car';
   route?: string;
   departure_date?: string;
+  arrival_date?: string;
   departure_time: string;
   arrival_time: string;
   price?: number;

@@ -46,6 +46,8 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     bookingLink: '',
     flightNumber: '',
+    departureDate: dateStr,
+    arrivalDate: dateStr,
     departureTime: defaultTimes.departureTime,
     arrivalTime: defaultTimes.arrivalTime,
     price: '',
@@ -224,12 +226,13 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
       const flightData = {
         booking_link: alreadyBookedData.bookingLink || undefined,
         flight_number: alreadyBookedData.flightNumber || undefined,
+        departure_date: alreadyBookedData.departureDate,
+        arrival_date: alreadyBookedData.arrivalDate,
         departure_time: alreadyBookedData.departureTime,
         arrival_time: alreadyBookedData.arrivalTime || undefined,
         price: alreadyBookedData.price || undefined,
         passengers: alreadyBookedData.passengers,
         route: modalContext.route,
-        departure_date: modalContext.date,
         notes: `Flight booking for ${routeData.from} to ${routeData.to}`
       };
 
@@ -250,6 +253,8 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
       setAlreadyBookedData({
         bookingLink: '',
         flightNumber: '',
+        departureDate: dateStr,
+        arrivalDate: dateStr,
         departureTime: defaultTimes.departureTime,
         arrivalTime: defaultTimes.arrivalTime,
         price: '',
@@ -271,6 +276,8 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     setAlreadyBookedData({
       bookingLink: booking.booking_link || '',
       flightNumber: booking.flight_number || '',
+      departureDate: booking.departure_date || dateStr,
+      arrivalDate: booking.arrival_date || dateStr,
       departureTime: booking.departure_time || defaultTimes.departureTime,
       arrivalTime: booking.arrival_time || defaultTimes.arrivalTime,
       price: booking.price || '',
@@ -510,6 +517,35 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                       placeholder="e.g., FL123"
                     />
                   </div>
+                  
+                  {/* Flight Dates */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Departure Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={alreadyBookedData.departureDate}
+                        onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, departureDate: e.target.value })}
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Arrival Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={alreadyBookedData.arrivalDate}
+                        onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, arrivalDate: e.target.value })}
+                        className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
                   {/* Flight Times - Required */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
@@ -581,6 +617,8 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                           setAlreadyBookedData({
                             bookingLink: '',
                             flightNumber: '',
+                            departureDate: dateStr,
+                            arrivalDate: dateStr,
                             departureTime: defaultTimes.departureTime,
                             arrivalTime: defaultTimes.arrivalTime,
                             price: '',

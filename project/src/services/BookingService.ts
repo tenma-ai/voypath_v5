@@ -209,10 +209,11 @@ export class BookingService {
     flight_number?: string;
     departure_time?: string;
     arrival_time?: string;
+    departure_date?: string;
+    arrival_date?: string;
     price?: string;
     passengers?: number;
     route?: string;
-    departure_date?: string;
     notes?: string;
   }): Promise<FlightBooking> {
     const booking: Omit<FlightBooking, 'id' | 'created_at' | 'updated_at'> = {
@@ -223,10 +224,11 @@ export class BookingService {
       flight_number: flightData.flight_number,
       departure_time: flightData.departure_time,
       arrival_time: flightData.arrival_time,
+      departure_date: flightData.departure_date,
+      arrival_date: flightData.arrival_date,
       price: flightData.price,
       passengers: flightData.passengers,
       route: flightData.route,
-      departure_date: flightData.departure_date,
       notes: flightData.notes
     };
 
@@ -248,6 +250,9 @@ export class BookingService {
     price_per_night?: string;
     rating?: number;
     location?: string;
+    latitude?: number;
+    longitude?: number;
+    google_place_id?: string;
     notes?: string;
   }): Promise<HotelBooking> {
     const booking: Omit<HotelBooking, 'id' | 'created_at' | 'updated_at'> = {
@@ -265,6 +270,9 @@ export class BookingService {
       price_per_night: hotelData.price_per_night,
       rating: hotelData.rating,
       location: hotelData.location,
+      latitude: hotelData.latitude,
+      longitude: hotelData.longitude,
+      google_place_id: hotelData.google_place_id,
       notes: hotelData.notes
     };
 
@@ -316,9 +324,12 @@ export class BookingService {
     try {
       console.log('🏨 Adding hotel booking to trip as time-constrained place');
 
-      // Check if hotel has Google Maps location data
+      // Check if hotel has Google Maps location data 
       if (!booking.latitude || !booking.longitude || !booking.google_place_id) {
-        throw new Error('Hotel must have location data (latitude, longitude, google_place_id) to be added to trip. Please select a hotel from Google Maps search.');
+        console.log('ℹ️ Hotel booking lacks Google Maps location data. This booking will be UI-only and not included in edit schedule optimization.');
+        
+        // Allow saving without Google Maps data but inform user it won't be optimized
+        throw new Error('To include this hotel in trip optimization, please select a hotel from Google Maps search. Without location data, this booking will only appear in your saved bookings list.');
       }
 
       // Check for existing hotel places from this modal context to prevent duplicates
@@ -344,25 +355,34 @@ export class BookingService {
       const stayDurationMinutes = Math.round((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60));
 
       // Insert hotel as time-constrained place
+      const placeData = {
+        trip_id: tripId,
+        user_id: userId,
+        name: booking.hotel_name || 'Selected Hotel',
+        address: booking.address,
+        category: 'tourist_attraction', // Use existing valid category
+        place_type: 'member_wish', // Use valid place_type
+        constraint_arrival_time: checkInDateTime,
+        constraint_departure_time: checkOutDateTime,
+        stay_duration_minutes: Math.max(stayDurationMinutes, 720), // Minimum 12 hours
+        wish_level: 5, // High priority for booked hotels
+        source: booking.google_place_id ? 'google_maps_booking' : 'manual_booking',
+        notes: `Hotel booking: ${booking.hotel_name || 'Hotel'} | Context: ${modalContext}`
+      };
+
+      // Add coordinates and Google Place ID only if available
+      if (booking.latitude && booking.longitude) {
+        placeData.latitude = booking.latitude;
+        placeData.longitude = booking.longitude;
+      }
+      
+      if (booking.google_place_id) {
+        placeData.google_place_id = booking.google_place_id;
+      }
+
       const { error: placeError } = await supabase
         .from('places')
-        .insert({
-          trip_id: tripId,
-          user_id: userId,
-          name: booking.hotel_name || 'Selected Hotel',
-          latitude: booking.latitude,
-          longitude: booking.longitude,
-          address: booking.address,
-          category: 'tourist_attraction', // Use existing valid category
-          place_type: 'member_wish', // Use valid place_type
-          constraint_arrival_time: checkInDateTime,
-          constraint_departure_time: checkOutDateTime,
-          stay_duration_minutes: Math.max(stayDurationMinutes, 720), // Minimum 12 hours
-          wish_level: 5, // High priority for booked hotels
-          source: 'google_maps_booking',
-          google_place_id: booking.google_place_id,
-          notes: `Hotel booking: ${booking.hotel_name || 'Hotel'} | Context: ${modalContext}`
-        });
+        .insert(placeData);
 
       if (placeError) {
         console.error('❌ Failed to create hotel place:', placeError.message);
@@ -399,9 +419,9 @@ export class BookingService {
       // Create ISO datetime strings for constraints
       const departureDateTime = `${booking.departure_date}T${booking.departure_time}:00.000Z`;
       
-      // Handle arrival time (might be next day for overnight flights)
-      let arrivalDate = booking.departure_date;
-      if (booking.departure_time && booking.arrival_time) {
+      // Use explicit arrival_date if provided, otherwise calculate from departure
+      let arrivalDate = booking.arrival_date || booking.departure_date;
+      if (!booking.arrival_date && booking.departure_time && booking.arrival_time) {
         const depHour = parseInt(booking.departure_time.split(':')[0]);
         const arrHour = parseInt(booking.arrival_time.split(':')[0]);
         
@@ -542,9 +562,9 @@ export class BookingService {
       // Create ISO datetime strings for constraints
       const departureDateTime = `${booking.departure_date}T${booking.departure_time}:00.000Z`;
       
-      // Handle arrival time (might be next day for overnight transport)
-      let arrivalDate = booking.departure_date;
-      if (booking.departure_time && booking.arrival_time) {
+      // Use explicit arrival_date if provided, otherwise calculate from departure
+      let arrivalDate = booking.arrival_date || booking.departure_date;
+      if (!booking.arrival_date && booking.departure_time && booking.arrival_time) {
         const depHour = parseInt(booking.departure_time.split(':')[0]);
         const arrHour = parseInt(booking.arrival_time.split(':')[0]);
         
