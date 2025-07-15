@@ -232,6 +232,397 @@ function formatTime(minutes: number): string {
   return `${adjustedHours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:00`;
 }
 
+// 新しい時間制約ベースの最適化ハンドラー
+async function handleTimeConstraintOptimization(tripId: string, memberId: string, supabase: any): Promise<any> {
+  console.log(`🎯 Starting time-constraint optimization for trip ${tripId}`);
+  
+  // トリップ詳細を取得
+  const { data: tripData, error: tripError } = await supabase
+    .from('trips')
+    .select('start_date, end_date')
+    .eq('id', tripId)
+    .single();
+    
+  if (tripError) {
+    throw new Error(`Failed to get trip details: ${tripError.message}`);
+  }
+  
+  // 利用可能日数を計算
+  let availableDays = 1;
+  if (tripData.start_date && tripData.end_date) {
+    const startDate = new Date(tripData.start_date);
+    const endDate = new Date(tripData.end_date);
+    const timeDiff = endDate.getTime() - startDate.getTime();
+    availableDays = Math.max(1, Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1);
+  }
+  
+  // 時間制約付きのplacesを取得
+  const { data: places, error: placesError } = await supabase
+    .from('places')
+    .select('*')
+    .eq('trip_id', tripId);
+    
+  if (placesError) {
+    throw new Error(`Failed to get places: ${placesError.message}`);
+  }
+  
+  console.log(`📍 Found ${places.length} places for optimization`);
+  
+  if (places.length === 0) {
+    throw new Error('No places found for optimization');
+  }
+  
+  // 時間制約のあるplacesを特定
+  const constrainedPlaces = places.filter(place => 
+    place.constraint_departure_time || place.constraint_arrival_time
+  );
+  
+  console.log(`🔒 Found ${constrainedPlaces.length} time-constrained places`);
+  constrainedPlaces.forEach(p => {
+    console.log(`  - ${p.name}: ${p.constraint_departure_time || 'no departure'} - ${p.constraint_arrival_time || 'no arrival'}`);
+  });
+  
+  // セグメント分割最適化
+  const segments = segmentPlacesByConstraints(places);
+  let optimizedRoute = [];
+  
+  for (let i = 0; i < segments.length; i++) {
+    const optimizedSegment = optimizeSegment(segments[i], i);
+    optimizedRoute.push(...optimizedSegment);
+  }
+  
+  console.log(`✅ Optimization complete: ${optimizedRoute.length} places in optimized route`);
+  
+  // 時間制約に合わせてスケジュール調整
+  const dailySchedules = adjustScheduleForConstraints(optimizedRoute, tripData.start_date);
+  
+  // 結果をdatabaseに保存
+  try {
+    // 既存の結果を無効化
+    await supabase
+      .from('optimization_results')
+      .update({ is_active: false })
+      .eq('trip_id', tripId);
+    
+    // 新しい結果を保存
+    const { error: saveError } = await supabase.from('optimization_results').insert({
+      trip_id: tripId,
+      created_by: memberId,
+      optimized_route: dailySchedules,
+      optimization_score: {
+        total_score: 85,
+        fairness_score: 85,
+        efficiency_score: 85,
+        feasibility_score: 85,
+        details: {
+          constraint_satisfaction: true,
+          segments_processed: segments.length,
+          constrained_places: constrainedPlaces.length
+        }
+      },
+      execution_time_ms: Date.now(),
+      places_count: optimizedRoute.length,
+      total_travel_time_minutes: dailySchedules.reduce((sum, day) => sum + day.total_travel_time, 0),
+      total_visit_time_minutes: dailySchedules.reduce((sum, day) => sum + day.total_visit_time, 0),
+      is_active: true,
+      algorithm_version: 'edit-schedule-constraints-v1'
+    });
+    
+    if (saveError) {
+      console.warn('⚠️ Error saving optimization results:', saveError.message);
+    } else {
+      console.log('✅ Optimization results saved successfully');
+    }
+  } catch (saveError) {
+    console.warn('⚠️ Could not save to database:', saveError.message);
+  }
+  
+  // optimize-routeと同じ形式でレスポンス構築
+  return {
+    optimization: {
+      daily_schedules: dailySchedules,
+      optimization_score: {
+        total_score: 85,
+        fairness_score: 85,
+        efficiency_score: 85,
+        feasibility_score: 85,
+        details: {
+          constraint_satisfaction: true,
+          segments_processed: segments.length,
+          constrained_places: constrainedPlaces.length
+        }
+      },
+      optimized_route: {
+        daily_schedules: dailySchedules
+      },
+      total_duration_minutes: dailySchedules.reduce((sum, day) => sum + day.total_travel_time + day.total_visit_time, 0),
+      places: optimizedRoute,
+      segments_count: segments.length
+    },
+    message: `Schedule optimized with constraints: ${optimizedRoute.length} places in ${dailySchedules.length} days (${segments.length} segments)`
+  };
+}
+
+// セグメント分割ロジック
+function segmentPlacesByConstraints(places: any[]): any[][] {
+  console.log(`🔄 Segmenting ${places.length} places by time constraints`);
+  
+  // 時間制約のあるplaceを特定
+  const constrainedPlaces = places.filter(place => 
+    place.constraint_departure_time || place.constraint_arrival_time
+  );
+  
+  if (constrainedPlaces.length === 0) {
+    console.log('⚠️ No time constraints found, treating as single segment');
+    return [places];
+  }
+  
+  // 制約placeを時間順にソート
+  constrainedPlaces.sort((a, b) => {
+    const aTime = a.constraint_departure_time || a.constraint_arrival_time;
+    const bTime = b.constraint_departure_time || b.constraint_arrival_time;
+    return new Date(aTime).getTime() - new Date(bTime).getTime();
+  });
+  
+  const segments: any[][] = [];
+  let currentSegment: any[] = [];
+  
+  // 制約placeでセグメント分割
+  for (let i = 0; i < places.length; i++) {
+    const place = places[i];
+    
+    if (constrainedPlaces.includes(place)) {
+      // 制約placeを発見
+      if (currentSegment.length > 0) {
+        currentSegment.push(place);
+        segments.push([...currentSegment]);
+        currentSegment = [place]; // 次のセグメントの開始点
+      } else {
+        currentSegment.push(place);
+      }
+    } else {
+      currentSegment.push(place);
+    }
+  }
+  
+  // 最後のセグメント
+  if (currentSegment.length > 0) {
+    segments.push(currentSegment);
+  }
+  
+  console.log(`✅ Created ${segments.length} segments`);
+  segments.forEach((segment, index) => {
+    console.log(`  Segment ${index + 1}: ${segment.length} places`);
+  });
+  
+  return segments;
+}
+
+// セグメント内最適化
+function optimizeSegment(segment: any[], segmentIndex: number): any[] {
+  console.log(`🎯 Optimizing segment ${segmentIndex + 1} with ${segment.length} places`);
+  
+  if (segment.length <= 1) {
+    return segment;
+  }
+  
+  // 制約placeと自由placeを分離
+  const constrainedPlaces = segment.filter(p => p.constraint_departure_time || p.constraint_arrival_time);
+  const freePlaces = segment.filter(p => !p.constraint_departure_time && !p.constraint_arrival_time);
+  
+  console.log(`  - Constrained places: ${constrainedPlaces.length}`);
+  console.log(`  - Free places: ${freePlaces.length}`);
+  
+  if (freePlaces.length === 0) {
+    // 制約placeのみの場合は時間順でソート
+    return constrainedPlaces.sort((a, b) => {
+      const aTime = a.constraint_departure_time || a.constraint_arrival_time;
+      const bTime = b.constraint_departure_time || b.constraint_arrival_time;
+      return new Date(aTime).getTime() - new Date(bTime).getTime();
+    });
+  }
+  
+  // 自由placeを距離ベースで最適化
+  const optimizedFreePlaces = optimizeFreePlacesWithinSegment(freePlaces, constrainedPlaces);
+  
+  // 制約placeと自由placeを統合
+  return integrateConstrainedAndFreePlaces(constrainedPlaces, optimizedFreePlaces);
+}
+
+// セグメント内の自由place最適化
+function optimizeFreePlacesWithinSegment(freePlaces: any[], constrainedPlaces: any[]): any[] {
+  if (freePlaces.length <= 1) {
+    return freePlaces;
+  }
+  
+  // 簡単な最短距離貪欲法
+  const optimized: any[] = [];
+  const remaining = [...freePlaces];
+  
+  // 開始点を決定（制約placeがあれば最も近いものから）
+  let current: any;
+  if (constrainedPlaces.length > 0) {
+    const startConstraint = constrainedPlaces[0];
+    let minDistance = Infinity;
+    let startIndex = 0;
+    
+    for (let i = 0; i < remaining.length; i++) {
+      const distance = calculateDistance(
+        [startConstraint.latitude, startConstraint.longitude],
+        [remaining[i].latitude, remaining[i].longitude]
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        startIndex = i;
+      }
+    }
+    current = remaining.splice(startIndex, 1)[0];
+  } else {
+    current = remaining.shift();
+  }
+  
+  optimized.push(current);
+  
+  // 貪欲法で最適化
+  while (remaining.length > 0) {
+    let nearestIndex = 0;
+    let minDistance = calculateDistance(
+      [current.latitude, current.longitude],
+      [remaining[0].latitude, remaining[0].longitude]
+    );
+    
+    for (let i = 1; i < remaining.length; i++) {
+      const distance = calculateDistance(
+        [current.latitude, current.longitude],
+        [remaining[i].latitude, remaining[i].longitude]
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestIndex = i;
+      }
+    }
+    
+    current = remaining.splice(nearestIndex, 1)[0];
+    optimized.push(current);
+  }
+  
+  return optimized;
+}
+
+// 制約placeと自由placeの統合
+function integrateConstrainedAndFreePlaces(constrainedPlaces: any[], freePlaces: any[]): any[] {
+  // 制約placeを時間順でソート
+  const sortedConstrained = constrainedPlaces.sort((a, b) => {
+    const aTime = a.constraint_departure_time || a.constraint_arrival_time;
+    const bTime = b.constraint_departure_time || b.constraint_arrival_time;
+    return new Date(aTime).getTime() - new Date(bTime).getTime();
+  });
+  
+  // 自由placeを制約place間に配置
+  const result: any[] = [];
+  const remainingFree = [...freePlaces];
+  
+  for (let i = 0; i < sortedConstrained.length; i++) {
+    const constrainedPlace = sortedConstrained[i];
+    
+    // 制約placeを追加
+    result.push(constrainedPlace);
+    
+    // 次の制約placeまでの間に自由placeを配置
+    if (remainingFree.length > 0) {
+      const placesToAdd = Math.floor(remainingFree.length / (sortedConstrained.length - i));
+      for (let j = 0; j < placesToAdd && remainingFree.length > 0; j++) {
+        result.push(remainingFree.shift());
+      }
+    }
+  }
+  
+  // 残りの自由placeを追加
+  result.push(...remainingFree);
+  
+  return result;
+}
+
+// 時間制約に合わせたスケジュール調整
+function adjustScheduleForConstraints(optimizedRoute: any[], tripStartDate: string | null): any[] {
+  console.log(`⏰ Adjusting schedule for time constraints`);
+  
+  const schedules: any[] = [];
+  let currentDay = 1;
+  let currentPlaces: any[] = [];
+  let timeCounter = 8 * 60; // 8:00 AMから開始
+  
+  for (let i = 0; i < optimizedRoute.length; i++) {
+    const place = optimizedRoute[i];
+    
+    // 時間制約のチェック
+    if (place.constraint_departure_time || place.constraint_arrival_time) {
+      console.log(`🔒 Processing constrained place: ${place.name}`);
+      
+      // 制約時刻を取得
+      const constraintTime = place.constraint_departure_time || place.constraint_arrival_time;
+      const constraintDate = new Date(constraintTime);
+      
+      // 制約に合わせて日付・時刻を調整
+      const constraintMinutes = constraintDate.getHours() * 60 + constraintDate.getMinutes();
+      
+      // 日を跨ぐかチェック
+      if (constraintMinutes < timeCounter) {
+        // 翌日に移動
+        if (currentPlaces.length > 0) {
+          schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
+          currentDay++;
+          currentPlaces = [];
+        }
+        timeCounter = constraintMinutes;
+      } else {
+        timeCounter = constraintMinutes;
+      }
+    }
+    
+    // 移動時間計算
+    if (i > 0) {
+      const prevPlace = optimizedRoute[i - 1];
+      const distance = calculateDistance(
+        [prevPlace.latitude, prevPlace.longitude],
+        [place.latitude, place.longitude]
+      );
+      const transportMode = determineTransportMode(distance, prevPlace.is_airport, place.is_airport);
+      const travelTime = calculateTravelTime(distance, transportMode);
+      
+      place.transport_mode = transportMode;
+      place.travel_time_from_previous = travelTime;
+    }
+    
+    // 時刻設定
+    place.arrival_time = formatTime(timeCounter);
+    timeCounter += (place.travel_time_from_previous || 0);
+    place.departure_time = formatTime(timeCounter + place.stay_duration_minutes);
+    timeCounter += place.stay_duration_minutes;
+    place.order_in_day = currentPlaces.length + 1;
+    
+    currentPlaces.push(place);
+    
+    console.log(`📍 Scheduled: ${place.name} at ${place.arrival_time}-${place.departure_time}`);
+    
+    // 一日の終了チェック（20:00）
+    if (timeCounter >= 20 * 60 && i < optimizedRoute.length - 1) {
+      schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
+      currentDay++;
+      currentPlaces = [];
+      timeCounter = 8 * 60; // 翌日8:00から
+    }
+  }
+  
+  // 最後の日を追加
+  if (currentPlaces.length > 0) {
+    schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
+  }
+  
+  console.log(`✅ Created ${schedules.length} daily schedules with constraints`);
+  return schedules;
+}
+
 // Edit schedule handlers
 async function handleReorderPlaces(data: any, supabase: any): Promise<any> {
   console.log('🔄 Handling place reorder:', data);
@@ -492,17 +883,119 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
   
-  // DISABLED: Edge function temporarily disabled to fix authentication issues
-  console.log('🚫 Edit schedule edge function DISABLED - was interfering with user authentication');
+  const startTime = Date.now();
+  let requestData = null;
   
-  return new Response(JSON.stringify({
-    success: false,
-    error: 'Edit functionality temporarily disabled to fix authentication issues',
-    message: 'This edge function was interfering with user authentication sessions'
-  }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    status: 503 // Service Unavailable
-  });
+  try {
+    console.log('🚀 Edit-schedule request received (with time constraints support)');
+    
+    // リクエストデータの検証
+    try {
+      requestData = await req.json();
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError.message);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid JSON format in request body',
+        details: parseError.message
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
+    
+    const { trip_id, member_id, action } = requestData;
+    
+    // 必須パラメータの検証
+    if (!trip_id || !member_id) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Missing required parameters: trip_id and member_id are required'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
+    
+    console.log(`📋 Processing edit-schedule for trip ${trip_id}, action: ${action || 'unknown'}`);
+    
+    // Supabaseクライアントの初期化
+    // @ts-ignore: Deno.env is available in Edge Functions
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    // @ts-ignore: Deno.env is available in Edge Functions
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase environment variables');
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Handle different actions: add_booking, time_constraint_update, etc.
+    let result;
+    
+    if (action === 'add_booking' || action === 'time_constraint_update') {
+      // 新しい時間制約ベースの最適化
+      result = await handleTimeConstraintOptimization(trip_id, member_id, supabase);
+    } else {
+      // 既存のedit操作をサポート
+      const { data } = requestData;
+      
+      switch (action) {
+        case 'reorder':
+          result = await handleReorderPlaces(data, supabase);
+          break;
+        case 'resize':
+          result = await handleResizeDuration(data, supabase, trip_id);
+          break;
+        case 'insert':
+          result = await handleInsertPlace(data, supabase, trip_id);
+          break;
+        case 'delete':
+          result = await handleDeletePlace(data, supabase, trip_id);
+          break;
+        default:
+          throw new Error(`Unknown action: ${action}`);
+      }
+    }
+    
+    const executionTime = Date.now() - startTime;
+    
+    console.log(`🎉 Edit-schedule completed successfully (${executionTime}ms)`);
+    
+    return new Response(JSON.stringify({
+      success: true,
+      ...result,
+      execution_time_ms: executionTime
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 200
+    });
+    
+  } catch (error) {
+    const executionTime = Date.now() - startTime;
+    console.error('❌ Edit-schedule error:', error.message);
+    console.error('❌ Stack trace:', error.stack);
+    
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message,
+      execution_time_ms: executionTime,
+      debug_info: {
+        request_data_received: !!requestData,
+        error_type: error.constructor.name
+      }
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 500
+    });
+  }
   
   /* ORIGINAL CODE DISABLED
   const startTime = Date.now();

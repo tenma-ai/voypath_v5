@@ -286,28 +286,94 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
   }, []);
 
   // Extract places from optimization result with consistent date formatting
+  // 日跨ぎイベント分割ロジック
+  const splitCrossDayEvent = useCallback((event: any, dayIndex: number) => {
+    const startTime = event.arrival_time || event.departure_time || '00:00:00';
+    const endTime = event.departure_time || event.arrival_time || '00:00:00';
+    
+    const startHour = parseInt(startTime.split(':')[0]);
+    const endHour = parseInt(endTime.split(':')[0]);
+    
+    // 日跨ぎ判定: 終了時刻が開始時刻より小さい（例：21:00-01:00）
+    const isCrossDay = endHour < startHour;
+    
+    if (!isCrossDay) {
+      return [{ ...event, is_split: false }];
+    }
+    
+    // 分割イベント作成
+    const part1 = {
+      ...event,
+      departure_time: '23:59:59', // 当日の終了
+      is_split: true,
+      split_part: 'first',
+      original_event_id: event.id || event.place_name,
+      split_note: `continues to next day`
+    };
+    
+    const part2 = {
+      ...event,
+      arrival_time: '00:00:00', // 翌日の開始
+      departure_time: endTime, // 元の終了時刻
+      is_split: true,
+      split_part: 'second',
+      original_event_id: event.id || event.place_name,
+      split_note: `continued from previous day`
+    };
+    
+    return [part1, part2];
+  }, []);
+
   const formatOptimizationResult = useCallback((result: any) => {
     if (!hasUserOptimized || !result?.optimization?.daily_schedules || !currentTrip) {
       return { schedulesByDay: {} };
     }
 
     const schedulesByDay: Record<string, any> = {};
+    const crossDayEvents: any[] = []; // 翌日に継続するイベント
     
-    result.optimization.daily_schedules.forEach((schedule: any) => {
+    result.optimization.daily_schedules.forEach((schedule: any, index: number) => {
       const dayKey = `day-${schedule.day}`;
-      // Use consistent date calculation
       const actualDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
+      
+      let dayPlaces = [...(schedule.scheduled_places || [])];
+      
+      // 前日からの継続イベントを追加
+      const continuedEvents = crossDayEvents.filter(event => event.target_day === schedule.day);
+      dayPlaces.unshift(...continuedEvents);
+      
+      // 日跨ぎイベントの分割処理
+      const processedPlaces: any[] = [];
+      dayPlaces.forEach((place: any) => {
+        const splitEvents = splitCrossDayEvent(place, index);
+        
+        if (splitEvents.length === 2) {
+          // 日跨ぎイベント
+          processedPlaces.push(splitEvents[0]); // 当日部分
+          
+          // 翌日部分を記録
+          const nextDay = schedule.day + 1;
+          crossDayEvents.push({
+            ...splitEvents[1],
+            target_day: nextDay
+          });
+          
+          console.log(`🌙 Split cross-day event: ${place.name || place.place_name} (${place.arrival_time}-${place.departure_time})`);
+        } else {
+          processedPlaces.push(splitEvents[0]); // 通常イベント
+        }
+      });
       
       schedulesByDay[dayKey] = {
         day: schedule.day,
-        date: DateUtils.formatForStorage(actualDate).split('T')[0], // YYYY-MM-DD format
+        date: DateUtils.formatForStorage(actualDate).split('T')[0],
         actualDate: actualDate,
-        places: schedule.scheduled_places || [] // List view shows all places including airports and transport
+        places: processedPlaces
       };
     });
 
     return { schedulesByDay };
-  }, [hasUserOptimized, currentTrip]);
+  }, [hasUserOptimized, currentTrip, splitCrossDayEvent]);
 
   const formattedResult = useMemo(() => formatOptimizationResult(optimizationResult), [formatOptimizationResult, optimizationResult]);
 
@@ -1030,6 +1096,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                                 isEditMode ? 'ring-2 ring-blue-300 ring-opacity-50 cursor-move' : 'cursor-pointer'
                               } ${
                                 dragOverIndex === blockIndex ? 'ring-4 ring-blue-500 ring-opacity-50' : ''
+                              } ${
+                                block.place.is_split ? 'border-l-4 border-l-orange-400' : ''
                               }`}
                               style={{
                                 top: `${topPosition}px`,
@@ -1045,11 +1113,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
                             >
                               <div className="text-xs font-semibold text-gray-900 leading-tight mb-1 truncate">
                                 {block.place.place_name || block.place.name}
+                                {block.place.is_split && (
+                                  <span className="ml-1 text-orange-600 text-xs">
+                                    {block.place.split_part === 'first' ? '(pt.1)' : '(pt.2)'}
+                                  </span>
+                                )}
                               </div>
                               <div className="text-xs text-gray-600 flex items-center">
                                 <Clock className="w-3 h-3 mr-1" />
                                 <span>{formatTime(block.startTime)} - {formatTime(block.endTime)}</span>
                               </div>
+                              {block.place.is_split && block.place.split_note && (
+                                <div className="text-xs text-orange-600 mt-1 italic">
+                                  {block.place.split_note}
+                                </div>
+                              )}
                               
                               {/* Resize handles */}
                               {isEditMode && !isSystemPlace(block.place) && (
