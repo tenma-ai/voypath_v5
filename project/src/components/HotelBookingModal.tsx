@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
-import { X, ExternalLink, Bed, Star, Trash2, Edit, Plus } from 'lucide-react';
+import { X, ExternalLink, Bed, Star, Trash2, Edit, Plus, MapPin, Search } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { DateUtils } from '../utils/DateUtils';
 import { BookingService } from '../services/BookingService';
@@ -50,8 +50,100 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     checkOutTime: '11:00',
     guests: tripMembers?.length || 1,
     pricePerNight: '',
-    rating: 4
+    rating: 4,
+    // Google Maps location data (optional)
+    latitude: null as number | null,
+    longitude: null as number | null,
+    google_place_id: null as string | null
   });
+  
+  // Google Places search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
+
+  // Google Places search function
+  const searchHotels = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      // Check if Google Maps API is loaded
+      if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
+        console.warn('Google Maps API not loaded, search functionality disabled');
+        setSearchResults([]);
+        setSearchLoading(false);
+        return;
+      }
+
+      // Use Google Places API for hotel search
+      const service = new google.maps.places.PlacesService(document.createElement('div'));
+      
+      const request = {
+        query: `${query} hotel`,
+        location: nearbyLocation ? new google.maps.LatLng(nearbyLocation.lat, nearbyLocation.lng) : undefined,
+        radius: 10000, // 10km radius
+        type: 'lodging' as google.maps.places.PlaceType
+      };
+
+      service.textSearch(request, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+          const hotelResults = results.slice(0, 5).map(place => ({
+            place_id: place.place_id,
+            name: place.name,
+            formatted_address: place.formatted_address,
+            geometry: place.geometry,
+            rating: place.rating,
+            price_level: place.price_level,
+            photos: place.photos
+          }));
+          setSearchResults(hotelResults);
+        } else {
+          console.log('No hotel results found:', status);
+          setSearchResults([]);
+        }
+        setSearchLoading(false);
+      });
+    } catch (error) {
+      console.error('Google Places search error:', error);
+      setSearchResults([]);
+      setSearchLoading(false);
+    }
+  };
+
+  // Handle place selection
+  const handlePlaceSelect = (place: any) => {
+    setSelectedPlace(place);
+    setAlreadyBookedData(prev => ({
+      ...prev,
+      hotelName: place.name || '',
+      address: place.formatted_address || '',
+      latitude: place.geometry?.location?.lat() || null,
+      longitude: place.geometry?.location?.lng() || null,
+      google_place_id: place.place_id || null,
+      rating: place.rating || 4
+    }));
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  // Clear place selection
+  const clearPlaceSelection = () => {
+    setSelectedPlace(null);
+    setAlreadyBookedData(prev => ({
+      ...prev,
+      hotelName: '',
+      address: '',
+      latitude: null,
+      longitude: null,
+      google_place_id: null,
+      rating: 4
+    }));
+  };
   const [savedBookings, setSavedBookings] = useState<HotelBooking[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingBooking, setEditingBooking] = useState<HotelBooking | null>(null);
@@ -216,7 +308,11 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
         price_per_night: alreadyBookedData.pricePerNight || undefined,
         rating: alreadyBookedData.rating,
         location: modalContext.location,
-        notes: `Hotel booking in ${extractCityName(nearbyLocation?.name || 'Unknown')}`
+        notes: `Hotel booking in ${extractCityName(nearbyLocation?.name || 'Unknown')}`,
+        // Google Maps location data (optional)
+        latitude: alreadyBookedData.latitude,
+        longitude: alreadyBookedData.longitude,
+        google_place_id: alreadyBookedData.google_place_id
       };
 
       if (editingBooking) {
@@ -243,8 +339,17 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
         checkOutTime: '11:00',
         guests: tripMembers?.length || 1,
         pricePerNight: '',
-        rating: 4
+        rating: 4,
+        // Reset Google Maps location data
+        latitude: null,
+        longitude: null,
+        google_place_id: null
       });
+      
+      // Reset search state
+      setSelectedPlace(null);
+      setSearchQuery('');
+      setSearchResults([]);
 
       // Switch to saved tab to show the saved booking
       setSelectedTab('saved');
@@ -305,6 +410,80 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Google Places search function
+  const searchHotels = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      // Use Google Places API for hotel search
+      const service = new google.maps.places.PlacesService(document.createElement('div'));
+      
+      const request = {
+        query: `${query} hotel`,
+        location: nearbyLocation ? new google.maps.LatLng(nearbyLocation.lat, nearbyLocation.lng) : undefined,
+        radius: 10000, // 10km radius
+        type: 'lodging'
+      };
+
+      service.textSearch(request, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+          const hotelResults = results.slice(0, 5).map(place => ({
+            place_id: place.place_id,
+            name: place.name,
+            formatted_address: place.formatted_address,
+            geometry: place.geometry,
+            rating: place.rating,
+            price_level: place.price_level,
+            photos: place.photos
+          }));
+          setSearchResults(hotelResults);
+        } else {
+          setSearchResults([]);
+        }
+        setSearchLoading(false);
+      });
+    } catch (error) {
+      console.error('Google Places search error:', error);
+      setSearchResults([]);
+      setSearchLoading(false);
+    }
+  };
+
+  // Handle place selection
+  const handlePlaceSelect = (place: any) => {
+    setSelectedPlace(place);
+    setAlreadyBookedData({
+      ...alreadyBookedData,
+      hotelName: place.name || '',
+      address: place.formatted_address || '',
+      latitude: place.geometry?.location?.lat() || null,
+      longitude: place.geometry?.location?.lng() || null,
+      google_place_id: place.place_id || null,
+      rating: place.rating ? Math.round(place.rating) : 4
+    });
+    setSearchQuery(place.name || '');
+    setSearchResults([]);
+  };
+
+  // Clear place selection
+  const clearPlaceSelection = () => {
+    setSelectedPlace(null);
+    setAlreadyBookedData({
+      ...alreadyBookedData,
+      hotelName: '',
+      address: '',
+      latitude: null,
+      longitude: null,
+      google_place_id: null,
+      rating: 4
+    });
+    setSearchQuery('');
   };
 
   const mockHotels = generateMockHotels();
@@ -468,6 +647,105 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
                   {editingBooking ? 'Edit Hotel Booking' : 'Add Hotel Booking'}
                 </h3>
                 <div className="space-y-3 sm:space-y-4">
+                  {/* Google Places Hotel Search (Optional) */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                    <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      Search Hotels (Optional)
+                    </h4>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                      {typeof google !== 'undefined' && google.maps && google.maps.places 
+                        ? 'Search for a specific hotel to automatically fill location details, or skip to enter information manually.'
+                        : 'Google Maps is not available. Please enter hotel information manually.'
+                      }
+                    </p>
+                    <div className="relative">
+                      <div className="flex gap-2">
+                        <div className="flex-1 relative">
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => {
+                              setSearchQuery(e.target.value);
+                              if (e.target.value.length >= 3) {
+                                searchHotels(e.target.value);
+                              } else {
+                                setSearchResults([]);
+                              }
+                            }}
+                            disabled={typeof google === 'undefined' || !google.maps || !google.maps.places}
+                            className={`w-full px-3 py-2 text-sm border border-blue-300 dark:border-blue-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white ${
+                              typeof google === 'undefined' || !google.maps || !google.maps.places 
+                                ? 'opacity-50 cursor-not-allowed' 
+                                : ''
+                            }`}
+                            placeholder={typeof google !== 'undefined' && google.maps && google.maps.places 
+                              ? `Search hotels in ${city}...` 
+                              : 'Google Maps not available'
+                            }
+                          />
+                          {searchLoading && (
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                            </div>
+                          )}
+                        </div>
+                        {selectedPlace && (
+                          <button
+                            onClick={clearPlaceSelection}
+                            className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Search Results */}
+                      {searchResults.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {searchResults.map((place) => (
+                            <button
+                              key={place.place_id}
+                              onClick={() => handlePlaceSelect(place)}
+                              className="w-full px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-slate-700 border-b border-gray-100 dark:border-slate-600 last:border-b-0"
+                            >
+                              <div className="font-medium text-sm text-slate-900 dark:text-white">
+                                {place.name}
+                              </div>
+                              <div className="text-xs text-slate-600 dark:text-slate-400">
+                                {place.formatted_address}
+                              </div>
+                              {place.rating && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                                  <span className="text-xs text-slate-600 dark:text-slate-400">
+                                    {place.rating.toFixed(1)}
+                                  </span>
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Selected Place Display */}
+                      {selectedPlace && (
+                        <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="font-medium text-sm text-green-900 dark:text-green-100">
+                                ✓ {selectedPlace.name}
+                              </div>
+                              <div className="text-xs text-green-700 dark:text-green-300">
+                                {selectedPlace.formatted_address}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Booking Link Field */}
                   <div>
                     <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
