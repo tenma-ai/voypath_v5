@@ -1,5 +1,6 @@
 import { supabase, handleNetworkFailure, resetNetworkFailureCount, retryOperation } from '../lib/supabase';
 import type { Booking, FlightBooking, HotelBooking, TransportBooking } from '../types/booking';
+import { AirportMappingUtils } from '../utils/AirportMappingUtils';
 
 export class BookingService {
   /**
@@ -438,9 +439,11 @@ export class BookingService {
       }
       const arrivalDateTime = `${arrivalDate}T${booking.arrival_time}:00.000Z`;
 
-      // Find departure airport place (flexible search)
+      // Find departure airport place (with airport name normalization)
       let depPlace = null;
       try {
+        console.log(`🔍 Searching for departure airport: "${departureAirport}"`);
+        
         // Try exact match first
         let { data: exactMatch } = await supabase
           .from('places')
@@ -451,6 +454,7 @@ export class BookingService {
         
         if (exactMatch && exactMatch.length > 0) {
           depPlace = exactMatch[0];
+          console.log(`✅ Found exact match for departure: ${depPlace.name}`);
         } else {
           // Try partial match with airport name without codes
           const airportNameOnly = departureAirport.replace(/\s*\([A-Z]{3,4}\)\s*/, '').trim();
@@ -463,15 +467,34 @@ export class BookingService {
           
           if (partialMatch && partialMatch.length > 0) {
             depPlace = partialMatch[0];
+            console.log(`✅ Found partial match for departure: ${depPlace.name}`);
+          } else {
+            // Try reverse search: find places that could be this airport
+            const cityName = AirportMappingUtils.getCityFromAirportName(departureAirport);
+            if (cityName) {
+              let { data: cityMatch } = await supabase
+                .from('places')
+                .select('*')
+                .eq('trip_id', tripId)
+                .ilike('name', `%${cityName}%`)
+                .limit(1);
+              
+              if (cityMatch && cityMatch.length > 0) {
+                depPlace = cityMatch[0];
+                console.log(`✅ Found city match for departure: ${cityName} → ${depPlace.name}`);
+              }
+            }
           }
         }
       } catch (error) {
         console.error(`❌ Error searching for departure airport: ${error}`);
       }
 
-      // Find arrival airport place (flexible search)
+      // Find arrival airport place (with airport name normalization)
       let arrPlace = null;
       try {
+        console.log(`🔍 Searching for arrival airport: "${arrivalAirport}"`);
+        
         // Try exact match first
         let { data: exactMatch } = await supabase
           .from('places')
@@ -482,6 +505,7 @@ export class BookingService {
         
         if (exactMatch && exactMatch.length > 0) {
           arrPlace = exactMatch[0];
+          console.log(`✅ Found exact match for arrival: ${arrPlace.name}`);
         } else {
           // Try partial match with airport name without codes
           const airportNameOnly = arrivalAirport.replace(/\s*\([A-Z]{3,4}\)\s*/, '').trim();
@@ -494,6 +518,23 @@ export class BookingService {
           
           if (partialMatch && partialMatch.length > 0) {
             arrPlace = partialMatch[0];
+            console.log(`✅ Found partial match for arrival: ${arrPlace.name}`);
+          } else {
+            // Try reverse search: find places that could be this airport
+            const cityName = AirportMappingUtils.getCityFromAirportName(arrivalAirport);
+            if (cityName) {
+              let { data: cityMatch } = await supabase
+                .from('places')
+                .select('*')
+                .eq('trip_id', tripId)
+                .ilike('name', `%${cityName}%`)
+                .limit(1);
+              
+              if (cityMatch && cityMatch.length > 0) {
+                arrPlace = cityMatch[0];
+                console.log(`✅ Found city match for arrival: ${cityName} → ${arrPlace.name}`);
+              }
+            }
           }
         }
       } catch (error) {
@@ -581,9 +622,11 @@ export class BookingService {
       }
       const arrivalDateTime = `${arrivalDate}T${booking.arrival_time}:00.000Z`;
 
-      // Find from location place (flexible search)
+      // Find from location place (with airport name normalization)
       let fromPlace = null;
       try {
+        console.log(`🔍 Searching for from location: "${fromLocation}"`);
+        
         // Try exact match first
         let { data: exactMatch } = await supabase
           .from('places')
@@ -594,6 +637,7 @@ export class BookingService {
         
         if (exactMatch && exactMatch.length > 0) {
           fromPlace = exactMatch[0];
+          console.log(`✅ Found exact match for from location: ${fromPlace.name}`);
         } else {
           // Try partial match
           let { data: partialMatch } = await supabase
@@ -605,15 +649,34 @@ export class BookingService {
           
           if (partialMatch && partialMatch.length > 0) {
             fromPlace = partialMatch[0];
+            console.log(`✅ Found partial match for from location: ${fromPlace.name}`);
+          } else {
+            // Try reverse search: find places that could be this airport/location
+            const cityName = AirportMappingUtils.getCityFromAirportName(fromLocation);
+            if (cityName) {
+              let { data: cityMatch } = await supabase
+                .from('places')
+                .select('*')
+                .eq('trip_id', tripId)
+                .ilike('name', `%${cityName}%`)
+                .limit(1);
+              
+              if (cityMatch && cityMatch.length > 0) {
+                fromPlace = cityMatch[0];
+                console.log(`✅ Found city match for from location: ${cityName} → ${fromPlace.name}`);
+              }
+            }
           }
         }
       } catch (error) {
         console.error(`❌ Error searching for from location: ${error}`);
       }
 
-      // Find to location place (flexible search)
+      // Find to location place (with airport name normalization)
       let toPlace = null;
       try {
+        console.log(`🔍 Searching for to location: "${toLocation}"`);
+        
         // Try exact match first
         let { data: exactMatch } = await supabase
           .from('places')
@@ -624,6 +687,7 @@ export class BookingService {
         
         if (exactMatch && exactMatch.length > 0) {
           toPlace = exactMatch[0];
+          console.log(`✅ Found exact match for to location: ${toPlace.name}`);
         } else {
           // Try partial match
           let { data: partialMatch } = await supabase
@@ -635,6 +699,23 @@ export class BookingService {
           
           if (partialMatch && partialMatch.length > 0) {
             toPlace = partialMatch[0];
+            console.log(`✅ Found partial match for to location: ${toPlace.name}`);
+          } else {
+            // Try reverse search: find places that could be this airport/location
+            const cityName = AirportMappingUtils.getCityFromAirportName(toLocation);
+            if (cityName) {
+              let { data: cityMatch } = await supabase
+                .from('places')
+                .select('*')
+                .eq('trip_id', tripId)
+                .ilike('name', `%${cityName}%`)
+                .limit(1);
+              
+              if (cityMatch && cityMatch.length > 0) {
+                toPlace = cityMatch[0];
+                console.log(`✅ Found city match for to location: ${cityName} → ${toPlace.name}`);
+              }
+            }
           }
         }
       } catch (error) {
