@@ -351,8 +351,8 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
               latitude: alreadyBookedData.latitude,
               longitude: alreadyBookedData.longitude,
               address: alreadyBookedData.address,
-              category: 'accommodation',
-              place_type: 'hotel',
+              category: 'tourist_attraction', // Use existing valid category
+              place_type: 'member_wish', // Use valid place_type
               constraint_arrival_time: checkInDateTime,
               constraint_departure_time: checkOutDateTime,
               stay_duration_minutes: Math.max(stayDurationMinutes, 720), // Minimum 12 hours
