@@ -64,10 +64,14 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   
   // Extract default times from timeSlot or use default values
   const getDefaultTimes = () => {
+    console.log('🔍 TransportBookingModal timeSlot:', timeSlot);
+    console.log('🔍 TransportBookingModal dayData:', dayData);
     if (timeSlot && timeSlot.includes('-')) {
       const [startTime, endTime] = timeSlot.split('-');
+      console.log('✅ Using timeSlot times:', { startTime: startTime.trim(), endTime: endTime.trim() });
       return { departureTime: startTime.trim(), arrivalTime: endTime.trim() };
     }
+    console.log('⚠️ Using default times: 09:00-11:00');
     return { departureTime: '09:00', arrivalTime: '11:00' };
   };
   
@@ -76,20 +80,25 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   // Calculate actual departure date
   const getDepartureDate = () => {
     if (dayData?.date) {
+      console.log('✅ Using dayData.date:', dayData.date);
       return new Date(dayData.date);
     }
     if (currentTrip && dayData?.day) {
       try {
-        return DateUtils.calculateTripDate(currentTrip, dayData.day);
+        const calculatedDate = DateUtils.calculateTripDate(currentTrip, dayData.day);
+        console.log('✅ Using calculated trip date:', calculatedDate);
+        return calculatedDate;
       } catch (error) {
         console.warn('Could not calculate trip date:', error);
       }
     }
+    console.log('⚠️ Using today\'s date as fallback');
     return new Date();
   };
 
   const departureDate = getDepartureDate();
   const dateStr = departureDate.toISOString().split('T')[0];
+  console.log('📅 Final dateStr for TransportBookingModal:', dateStr);
   
   const [bookingData, setBookingData] = useState({
     bookingLink: '',
@@ -305,6 +314,11 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
 
     if (!bookingData.departureTime) {
       alert('Please specify departure time');
+      return;
+    }
+
+    if (!bookingData.arrivalTime) {
+      alert('Please specify arrival time');
       return;
     }
 
@@ -807,13 +821,14 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Arrival Time
+                      Arrival Time *
                     </label>
                     <input
                       type="time"
                       value={bookingData.arrivalTime}
                       onChange={(e) => setBookingData({ ...bookingData, arrivalTime: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
                     />
                   </div>
 

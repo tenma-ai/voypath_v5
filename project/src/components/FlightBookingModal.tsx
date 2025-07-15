@@ -33,10 +33,14 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   
   // Extract default times from timeSlot or use default values
   const getDefaultTimes = () => {
+    console.log('🔍 FlightBookingModal timeSlot:', timeSlot);
+    console.log('🔍 FlightBookingModal dayData:', dayData);
     if (timeSlot && timeSlot.includes('-')) {
       const [startTime, endTime] = timeSlot.split('-');
+      console.log('✅ Using timeSlot times:', { startTime: startTime.trim(), endTime: endTime.trim() });
       return { departureTime: startTime.trim(), arrivalTime: endTime.trim() };
     }
+    console.log('⚠️ Using default times: 09:00-11:00');
     return { departureTime: '09:00', arrivalTime: '11:00' };
   };
   
@@ -45,20 +49,25 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   // Calculate actual departure date
   const getDepartureDate = () => {
     if (dayData?.date) {
+      console.log('✅ Using dayData.date:', dayData.date);
       return new Date(dayData.date);
     }
     if (currentTrip && dayData?.day) {
       try {
-        return DateUtils.calculateTripDate(currentTrip, dayData.day);
+        const calculatedDate = DateUtils.calculateTripDate(currentTrip, dayData.day);
+        console.log('✅ Using calculated trip date:', calculatedDate);
+        return calculatedDate;
       } catch (error) {
         console.warn('Could not calculate trip date:', error);
       }
     }
+    console.log('⚠️ Using today\'s date as fallback');
     return new Date();
   };
 
   const departureDate = getDepartureDate();
   const dateStr = departureDate.toISOString().split('T')[0];
+  console.log('📅 Final dateStr for FlightBookingModal:', dateStr);
 
   const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
@@ -220,6 +229,11 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
       return;
     }
 
+    if (!alreadyBookedData.arrivalTime) {
+      alert('Please specify arrival time');
+      return;
+    }
+
     setLoading(true);
     try {
       const flightData = {
@@ -228,7 +242,7 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
         departure_date: alreadyBookedData.departureDate,
         arrival_date: alreadyBookedData.arrivalDate,
         departure_time: alreadyBookedData.departureTime,
-        arrival_time: alreadyBookedData.arrivalTime || undefined,
+        arrival_time: alreadyBookedData.arrivalTime,
         price: alreadyBookedData.price || undefined,
         passengers: alreadyBookedData.passengers,
         route: modalContext.route,
@@ -561,13 +575,14 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Arrival Time (Optional)
+                        Arrival Time *
                       </label>
                       <input
                         type="time"
                         value={alreadyBookedData.arrivalTime}
                         onChange={(e) => setAlreadyBookedData({ ...alreadyBookedData, arrivalTime: e.target.value })}
                         className="w-full px-3 py-3 sm:py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                        required
                       />
                     </div>
                   </div>
