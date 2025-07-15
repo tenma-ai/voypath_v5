@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
-import { X, Plane, ExternalLink, Trash2, Edit } from 'lucide-react';
+import { X, Plane, ExternalLink, Trash2, Edit, Plus } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { DateUtils } from '../utils/DateUtils';
 import { BookingService } from '../services/BookingService';
@@ -282,7 +282,24 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
     }
   };
 
-  // Removed handleAddToTrip function - bookings should remain separate from places
+  const handleAddToTrip = async (booking: FlightBooking) => {
+    if (!currentTrip?.id || !user?.id) {
+      alert('Please login to add booking to trip');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await BookingService.addToTrip(currentTrip.id, user.id, booking);
+      alert('Flight booking added to trip! The schedule will be updated to accommodate the flight times.');
+      onClose();
+    } catch (error) {
+      console.error('Failed to add booking to trip:', error);
+      alert('Failed to add booking to trip. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const mockFlights = generateMockFlights(fromIATA, toIATA);
 
@@ -625,6 +642,13 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
                                   <ExternalLink className="w-3 h-3" /> Book
                                 </button>
                               )}
+                              <button
+                                onClick={() => handleAddToTrip(booking)}
+                                disabled={loading}
+                                className="px-2 py-2 sm:px-3 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-medium flex items-center justify-center gap-1"
+                              >
+                                <Plus className="w-3 h-3" /> Add to Trip
+                              </button>
                               <button
                                 onClick={() => handleEditBooking(booking)}
                                 className="px-2 py-2 sm:px-3 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"

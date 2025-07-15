@@ -232,9 +232,154 @@ function formatTime(minutes: number): string {
   return `${adjustedHours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:00`;
 }
 
+// Convert booking to place constraints
+async function processBookingToConstraints(booking: any, tripId: string, memberId: string, supabase: any): Promise<void> {
+  console.log(`🔄 Processing ${booking.booking_type} booking to constraints`);
+  
+  if (booking.booking_type === 'flight') {
+    // For flights, create constraints on departure and arrival airports
+    const routeParts = (booking.route || '').split(' → ');
+    if (routeParts.length >= 2) {
+      const departureAirport = routeParts[0].trim();
+      const arrivalAirport = routeParts[1].trim();
+      
+      // Find or create departure airport place
+      let { data: depPlace } = await supabase
+        .from('places')
+        .select('*')
+        .eq('trip_id', tripId)
+        .eq('name', departureAirport)
+        .eq('is_airport', true)
+        .single();
+        
+      if (!depPlace) {
+        console.log(`Creating departure airport place: ${departureAirport}`);
+        // Create airport place if it doesn't exist
+        // This is a simplified approach - in production, you'd want to get lat/lng from booking data
+      }
+      
+      // Find or create arrival airport place
+      let { data: arrPlace } = await supabase
+        .from('places')
+        .select('*')
+        .eq('trip_id', tripId)
+        .eq('name', arrivalAirport)
+        .eq('is_airport', true)
+        .single();
+        
+      if (!arrPlace) {
+        console.log(`Creating arrival airport place: ${arrivalAirport}`);
+        // Create airport place if it doesn't exist
+      }
+      
+      // Add time constraints based on flight times (properly formatted ISO datetime)
+      if (depPlace && booking.departure_time && booking.departure_date) {
+        // Create proper ISO datetime string with timezone
+        const constraintTime = `${booking.departure_date}T${booking.departure_time}:00.000Z`;
+        await supabase
+          .from('places')
+          .update({ constraint_departure_time: constraintTime })
+          .eq('id', depPlace.id);
+        console.log(`✅ Set departure constraint: ${constraintTime}`);
+      }
+      
+      if (arrPlace && booking.arrival_time && booking.departure_date) {
+        // Handle arrival time (might be next day for overnight flights)
+        let arrivalDate = booking.departure_date;
+        
+        // Check if arrival time is earlier than departure time (next day flight)
+        if (booking.departure_time && booking.arrival_time) {
+          const depHour = parseInt(booking.departure_time.split(':')[0]);
+          const arrHour = parseInt(booking.arrival_time.split(':')[0]);
+          
+          // If arrival time is much earlier than departure, assume next day
+          if (arrHour < depHour && (depHour - arrHour) > 12) {
+            const nextDay = new Date(booking.departure_date);
+            nextDay.setDate(nextDay.getDate() + 1);
+            arrivalDate = nextDay.toISOString().split('T')[0];
+          }
+        }
+        
+        const constraintTime = `${arrivalDate}T${booking.arrival_time}:00.000Z`;
+        await supabase
+          .from('places')
+          .update({ constraint_arrival_time: constraintTime })
+          .eq('id', arrPlace.id);
+        console.log(`✅ Set arrival constraint: ${constraintTime}`);
+      }
+    }
+  } else if (booking.booking_type === 'hotel') {
+    // For hotels, create a hotel place with time constraints if location data exists
+    if (booking.latitude && booking.longitude) {
+      const { error: insertError } = await supabase
+        .from('places')
+        .insert({
+          trip_id: tripId,
+          user_id: memberId,
+          name: booking.hotel_name || 'Hotel',
+          latitude: booking.latitude,
+          longitude: booking.longitude,
+          address: booking.address,
+          category: 'hotel',
+          constraint_arrival_time: booking.check_in_date && booking.check_in_time ? 
+            `${booking.check_in_date}T${booking.check_in_time}:00.000Z` : null,
+          constraint_departure_time: booking.check_out_date && booking.check_out_time ? 
+            `${booking.check_out_date}T${booking.check_out_time}:00.000Z` : null,
+          stay_duration_minutes: 720, // 12 hours default hotel stay
+          source: 'booking_import'
+        });
+        
+      if (insertError) {
+        console.warn('Could not create hotel place:', insertError.message);
+      } else {
+        console.log(`✅ Created hotel place with constraints`);
+      }
+    }
+  } else if (booking.booking_type === 'car' || booking.booking_type === 'walking') {
+    // For transport, create constraints on the endpoint places based on route
+    const routeParts = (booking.route || '').split(' → ');
+    if (routeParts.length >= 2) {
+      const fromPlace = routeParts[0].trim();
+      const toPlace = routeParts[1].trim();
+      
+      // Find places by name and add constraints
+      const { data: places } = await supabase
+        .from('places')
+        .select('*')
+        .eq('trip_id', tripId)
+        .in('name', [fromPlace, toPlace]);
+        
+      for (const place of places || []) {
+        if (place.name === fromPlace && booking.departure_time && booking.departure_date) {
+          const constraintTime = `${booking.departure_date}T${booking.departure_time}:00.000Z`;
+          await supabase
+            .from('places')
+            .update({ constraint_departure_time: constraintTime })
+            .eq('id', place.id);
+          console.log(`✅ Set transport departure constraint: ${constraintTime}`);
+        }
+        
+        if (place.name === toPlace && booking.arrival_time && booking.departure_date) {
+          const constraintTime = `${booking.departure_date}T${booking.arrival_time}:00.000Z`;
+          await supabase
+            .from('places')
+            .update({ constraint_arrival_time: constraintTime })
+            .eq('id', place.id);
+          console.log(`✅ Set transport arrival constraint: ${constraintTime}`);
+        }
+      }
+    }
+  }
+}
+
 // 新しい時間制約ベースの最適化ハンドラー
-async function handleTimeConstraintOptimization(tripId: string, memberId: string, supabase: any): Promise<any> {
+async function handleTimeConstraintOptimization(tripId: string, memberId: string, supabase: any, booking?: any): Promise<any> {
   console.log(`🎯 Starting time-constraint optimization for trip ${tripId}`);
+  
+  // If booking data is provided, process it first
+  if (booking) {
+    await processBookingToConstraints(booking, tripId, memberId, supabase);
+  }
   
   // トリップ詳細を取得
   const { data: tripData, error: tripError } = await supabase
@@ -543,46 +688,158 @@ function integrateConstrainedAndFreePlaces(constrainedPlaces: any[], freePlaces:
   return result;
 }
 
-// 時間制約に合わせたスケジュール調整
-function adjustScheduleForConstraints(optimizedRoute: any[], tripStartDate: string | null): any[] {
-  console.log(`⏰ Adjusting schedule for time constraints`);
+// Calculate day number from constraint date and trip start date
+function calculateDayNumberFromConstraint(constraintISO: string, tripStartDate: string | null): number {
+  if (!tripStartDate) return 1;
   
-  const schedules: any[] = [];
-  let currentDay = 1;
-  let currentPlaces: any[] = [];
-  let timeCounter = 8 * 60; // 8:00 AMから開始
+  const constraintDate = new Date(constraintISO);
+  const startDate = new Date(tripStartDate);
   
-  for (let i = 0; i < optimizedRoute.length; i++) {
-    const place = optimizedRoute[i];
-    
-    // 時間制約のチェック
-    if (place.constraint_departure_time || place.constraint_arrival_time) {
-      console.log(`🔒 Processing constrained place: ${place.name}`);
-      
-      // 制約時刻を取得
-      const constraintTime = place.constraint_departure_time || place.constraint_arrival_time;
-      const constraintDate = new Date(constraintTime);
-      
-      // 制約に合わせて日付・時刻を調整
-      const constraintMinutes = constraintDate.getHours() * 60 + constraintDate.getMinutes();
-      
-      // 日を跨ぐかチェック
-      if (constraintMinutes < timeCounter) {
-        // 翌日に移動
-        if (currentPlaces.length > 0) {
-          schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
-          currentDay++;
-          currentPlaces = [];
-        }
-        timeCounter = constraintMinutes;
-      } else {
-        timeCounter = constraintMinutes;
-      }
+  // Calculate days difference
+  const timeDiff = constraintDate.getTime() - startDate.getTime();
+  const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+  
+  return Math.max(1, daysDiff + 1);
+}
+
+// Extract time from constraint datetime as HH:mm:ss
+function extractTimeFromConstraint(constraintISO: string): string {
+  const constraintDate = new Date(constraintISO);
+  const hours = constraintDate.getHours().toString().padStart(2, '0');
+  const minutes = constraintDate.getMinutes().toString().padStart(2, '0');
+  const seconds = constraintDate.getSeconds().toString().padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+// Check if time is beyond 20:00 (requires splitting)
+function requiresTimeSplitting(timeStr: string): boolean {
+  const hours = parseInt(timeStr.split(':')[0]);
+  return hours >= 21; // 21:00以降は分割が必要
+}
+
+// Split cross-day events (like 21:00-01:00 flights)
+function splitCrossDayEvent(place: any, constraintTime: string, dayNumber: number, tripStartDate: string | null): any[] {
+  const timeStr = extractTimeFromConstraint(constraintTime);
+  
+  if (!requiresTimeSplitting(timeStr)) {
+    // No splitting needed
+    return [{
+      ...place,
+      constraint_day: dayNumber,
+      constraint_time: timeStr
+    }];
+  }
+  
+  // Split into two parts
+  const isDeparture = !!place.constraint_departure_time;
+  
+  return [
+    {
+      ...place,
+      name: `${place.name} (Part 1)`,
+      constraint_day: dayNumber,
+      constraint_time: timeStr,
+      arrival_time: isDeparture ? timeStr : place.arrival_time,
+      departure_time: "23:59:59", // End of day
+      is_split: true,
+      split_part: "first",
+      original_place_id: place.id || place.name
+    },
+    {
+      ...place,
+      name: `${place.name} (Part 2)`,
+      constraint_day: dayNumber + 1,
+      constraint_time: "00:00:00",
+      arrival_time: "00:00:00", // Start of next day
+      departure_time: isDeparture ? place.arrival_time : "01:00:00", // Assume 1-hour default
+      is_split: true,
+      split_part: "second",
+      original_place_id: place.id || place.name
     }
+  ];
+}
+
+// 時間制約に合わせたスケジュール調整（optimization_result互換）
+function adjustScheduleForConstraints(optimizedRoute: any[], tripStartDate: string | null): any[] {
+  console.log(`⏰ Adjusting schedule for constraints with date handling`);
+  
+  // Group places by day based on constraints
+  const dailyPlaces = new Map<number, any[]>();
+  
+  for (const place of optimizedRoute) {
+    let targetDay = 1; // Default to day 1
     
-    // 移動時間計算
+    // Check for time constraints
+    if (place.constraint_departure_time || place.constraint_arrival_time) {
+      const constraintTime = place.constraint_departure_time || place.constraint_arrival_time;
+      targetDay = calculateDayNumberFromConstraint(constraintTime, tripStartDate);
+      
+      console.log(`🔒 Constrained place: ${place.name} → Day ${targetDay} at ${extractTimeFromConstraint(constraintTime)}`);
+      
+      // Handle cross-day events (like 21:00-01:00 flights)
+      const splitPlaces = splitCrossDayEvent(place, constraintTime, targetDay, tripStartDate);
+      
+      for (const splitPlace of splitPlaces) {
+        const day = splitPlace.constraint_day;
+        if (!dailyPlaces.has(day)) {
+          dailyPlaces.set(day, []);
+        }
+        dailyPlaces.get(day)!.push(splitPlace);
+      }
+    } else {
+      // Free places go to earliest available day
+      if (!dailyPlaces.has(targetDay)) {
+        dailyPlaces.set(targetDay, []);
+      }
+      dailyPlaces.get(targetDay)!.push(place);
+    }
+  }
+  
+  // Create daily schedules in optimization_result format
+  const schedules: any[] = [];
+  const sortedDays = Array.from(dailyPlaces.keys()).sort((a, b) => a - b);
+  
+  for (const dayNumber of sortedDays) {
+    const dayPlaces = dailyPlaces.get(dayNumber)!;
+    const daySchedule = createOptimizationResultDay(dayNumber, dayPlaces, tripStartDate);
+    schedules.push(daySchedule);
+  }
+  
+  console.log(`✅ Created ${schedules.length} daily schedules with constraint handling`);
+  return schedules;
+}
+
+// Create optimization_result compatible day schedule
+function createOptimizationResultDay(dayNumber: number, places: any[], tripStartDate: string | null): any {
+  // Calculate absolute date for this day
+  let dayDate = '2025-07-15'; // Default fallback
+  if (tripStartDate) {
+    const startDate = new Date(tripStartDate);
+    const targetDate = new Date(startDate);
+    targetDate.setDate(startDate.getDate() + dayNumber - 1);
+    dayDate = targetDate.toISOString().split('T')[0];
+  }
+  
+  // Process places with time assignment
+  let timeCounter = 8 * 60; // Start at 8:00 AM
+  const scheduledPlaces = [];
+  
+  // Sort places by constraint time first, then by order
+  const sortedPlaces = places.sort((a, b) => {
+    if (a.constraint_time && b.constraint_time) {
+      return a.constraint_time.localeCompare(b.constraint_time);
+    }
+    if (a.constraint_time) return -1;
+    if (b.constraint_time) return 1;
+    return 0;
+  });
+  
+  for (let i = 0; i < sortedPlaces.length; i++) {
+    const place = sortedPlaces[i];
+    
+    // Calculate travel time from previous place
     if (i > 0) {
-      const prevPlace = optimizedRoute[i - 1];
+      const prevPlace = sortedPlaces[i - 1];
       const distance = calculateDistance(
         [prevPlace.latitude, prevPlace.longitude],
         [place.latitude, place.longitude]
@@ -592,35 +849,51 @@ function adjustScheduleForConstraints(optimizedRoute: any[], tripStartDate: stri
       
       place.transport_mode = transportMode;
       place.travel_time_from_previous = travelTime;
+      
+      // Add travel time to counter for free places
+      if (!place.constraint_time) {
+        timeCounter += travelTime;
+      }
     }
     
-    // 時刻設定
-    place.arrival_time = formatTime(timeCounter);
-    timeCounter += (place.travel_time_from_previous || 0);
-    place.departure_time = formatTime(timeCounter + place.stay_duration_minutes);
-    timeCounter += place.stay_duration_minutes;
-    place.order_in_day = currentPlaces.length + 1;
-    
-    currentPlaces.push(place);
-    
-    console.log(`📍 Scheduled: ${place.name} at ${place.arrival_time}-${place.departure_time}`);
-    
-    // 一日の終了チェック（20:00）
-    if (timeCounter >= 20 * 60 && i < optimizedRoute.length - 1) {
-      schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
-      currentDay++;
-      currentPlaces = [];
-      timeCounter = 8 * 60; // 翌日8:00から
+    // Handle constrained places
+    if (place.constraint_time) {
+      const constraintHours = parseInt(place.constraint_time.split(':')[0]);
+      const constraintMinutes = parseInt(place.constraint_time.split(':')[1]);
+      const constraintTotalMinutes = constraintHours * 60 + constraintMinutes;
+      
+      // Set exact constraint times
+      place.arrival_time = place.constraint_time;
+      timeCounter = constraintTotalMinutes + (place.stay_duration_minutes || 60);
+      place.departure_time = formatTime(timeCounter);
+    } else {
+      // Handle free places
+      place.arrival_time = formatTime(timeCounter);
+      timeCounter += (place.stay_duration_minutes || 60);
+      place.departure_time = formatTime(timeCounter);
     }
+    
+    // Set other properties
+    place.day_number = dayNumber;
+    place.order_in_day = i + 1;
+    
+    scheduledPlaces.push(place);
+    
+    console.log(`📍 Day ${dayNumber}: ${place.name} at ${place.arrival_time}-${place.departure_time}`);
   }
   
-  // 最後の日を追加
-  if (currentPlaces.length > 0) {
-    schedules.push(createDaySchedule(currentDay, currentPlaces, tripStartDate));
-  }
+  // Calculate totals
+  const totalTravelTime = scheduledPlaces.reduce((sum, p) => sum + (p.travel_time_from_previous || 0), 0);
+  const totalVisitTime = scheduledPlaces.reduce((sum, p) => sum + (p.stay_duration_minutes || 60), 0);
   
-  console.log(`✅ Created ${schedules.length} daily schedules with constraints`);
-  return schedules;
+  return {
+    day: dayNumber,
+    date: dayDate,
+    scheduled_places: scheduledPlaces,
+    total_travel_time: totalTravelTime,
+    total_visit_time: totalVisitTime,
+    meal_breaks: []
+  };
 }
 
 // Edit schedule handlers
@@ -936,7 +1209,8 @@ Deno.serve(async (req) => {
     
     if (action === 'add_booking' || action === 'time_constraint_update') {
       // 新しい時間制約ベースの最適化
-      result = await handleTimeConstraintOptimization(trip_id, member_id, supabase);
+      const { booking } = requestData;
+      result = await handleTimeConstraintOptimization(trip_id, member_id, supabase, booking);
     } else {
       // 既存のedit操作をサポート
       const { data } = requestData;

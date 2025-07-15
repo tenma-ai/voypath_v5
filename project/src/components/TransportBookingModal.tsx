@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog } from '@headlessui/react';
 import { motion } from 'framer-motion';
-import { X, MapPin, ExternalLink, Trash2, Edit, Car, Clock, Route, Search, Plane } from 'lucide-react';
+import { X, MapPin, ExternalLink, Trash2, Edit, Car, Clock, Route, Search, Plane, Plus } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { DateUtils } from '../utils/DateUtils';
 import { BookingService } from '../services/BookingService';
@@ -368,6 +368,25 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
     } catch (error) {
       console.error('Failed to delete booking:', error);
       alert('Failed to delete booking. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddToTrip = async (booking: TransportBooking) => {
+    if (!currentTrip?.id || !user?.id) {
+      alert('Please login to add booking to trip');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await BookingService.addToTrip(currentTrip.id, user.id, booking);
+      alert('Transport booking added to trip! The schedule will be updated to accommodate the transport times.');
+      onClose();
+    } catch (error) {
+      console.error('Failed to add booking to trip:', error);
+      alert('Failed to add booking to trip. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -909,6 +928,14 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
                                 <ExternalLink className="w-3 h-3" /> Book
                               </button>
                             )}
+                            <button
+                              onClick={() => handleAddToTrip(booking)}
+                              disabled={loading}
+                              className="px-2 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-medium flex items-center gap-1"
+                              title="Add to trip"
+                            >
+                              <Plus className="w-3 h-3" /> Add to Trip
+                            </button>
                             <button
                               onClick={() => handleEditBooking(booking)}
                               className="px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-xs font-medium flex items-center gap-1"

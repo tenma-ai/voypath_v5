@@ -277,4 +277,40 @@ export class BookingService {
   static async saveTransportBooking(transportData: Omit<TransportBooking, 'id' | 'created_at' | 'updated_at'>): Promise<TransportBooking> {
     return this.saveBooking(transportData) as Promise<TransportBooking>;
   }
+
+  /**
+   * Add a booking to trip - converts booking to time constraints and triggers edit-schedule
+   */
+  static async addToTrip(tripId: string, userId: string, booking: Booking): Promise<void> {
+    try {
+      console.log('🔍 Adding booking to trip:', {
+        bookingType: booking.booking_type,
+        tripId: tripId.substring(0, 8) + '...',
+        userId: userId.substring(0, 8) + '...'
+      });
+
+      // Call the edit-schedule Edge Function with the booking data
+      const { data, error } = await supabase.functions.invoke('edit-schedule', {
+        body: {
+          trip_id: tripId,
+          member_id: userId,
+          action: 'add_booking',
+          booking: booking
+        }
+      });
+
+      if (error) {
+        console.error('❌ Failed to add booking to trip:', error);
+        throw new Error(`Failed to add booking to trip: ${error.message}`);
+      }
+
+      console.log('✅ Booking successfully added to trip');
+      resetNetworkFailureCount();
+
+    } catch (error) {
+      console.error('🚨 BookingService.addToTrip failed:', error);
+      await handleNetworkFailure(error);
+      throw error;
+    }
+  }
 }
