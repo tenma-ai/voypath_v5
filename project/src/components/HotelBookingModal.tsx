@@ -51,6 +51,28 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   
   const defaultTimes = getDefaultTimes();
   
+  // Calculate actual check-in date
+  const getCheckInDate = () => {
+    if (dayData?.date) {
+      return new Date(dayData.date);
+    }
+    if (currentTrip && dayData?.day) {
+      try {
+        return DateUtils.calculateTripDate(currentTrip, dayData.day);
+      } catch (error) {
+        console.warn('Could not calculate trip date:', error);
+      }
+    }
+    return new Date();
+  };
+
+  const checkInDate = getCheckInDate();
+  const checkOutDate = new Date(checkInDate);
+  checkOutDate.setDate(checkOutDate.getDate() + 1);
+
+  const checkInDateStr = checkInDate.toISOString().split('T')[0];
+  const checkOutDateStr = checkOutDate.toISOString().split('T')[0];
+  
   const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
   const [alreadyBookedData, setAlreadyBookedData] = useState({
     bookingLink: '',
@@ -159,28 +181,6 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
   const [savedBookings, setSavedBookings] = useState<HotelBooking[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingBooking, setEditingBooking] = useState<HotelBooking | null>(null);
-
-  // Calculate actual check-in date
-  const getCheckInDate = () => {
-    if (dayData?.date) {
-      return new Date(dayData.date);
-    }
-    if (currentTrip && dayData?.day) {
-      try {
-        return DateUtils.calculateTripDate(currentTrip, dayData.day);
-      } catch (error) {
-        console.warn('Could not calculate trip date:', error);
-      }
-    }
-    return new Date();
-  };
-
-  const checkInDate = getCheckInDate();
-  const checkOutDate = new Date(checkInDate);
-  checkOutDate.setDate(checkOutDate.getDate() + 1);
-
-  const checkInDateStr = checkInDate.toISOString().split('T')[0];
-  const checkOutDateStr = checkOutDate.toISOString().split('T')[0];
 
   // Modal context for filtering bookings
   const modalContext = {
