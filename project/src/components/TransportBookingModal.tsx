@@ -73,6 +73,24 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   
   const defaultTimes = getDefaultTimes();
   
+  // Calculate actual departure date
+  const getDepartureDate = () => {
+    if (dayData?.date) {
+      return new Date(dayData.date);
+    }
+    if (currentTrip && dayData?.day) {
+      try {
+        return DateUtils.calculateTripDate(currentTrip, dayData.day);
+      } catch (error) {
+        console.warn('Could not calculate trip date:', error);
+      }
+    }
+    return new Date();
+  };
+
+  const departureDate = getDepartureDate();
+  const dateStr = departureDate.toISOString().split('T')[0];
+  
   const [bookingData, setBookingData] = useState({
     bookingLink: '',
     routeInfo: '',
@@ -94,24 +112,6 @@ const TransportBookingModal: React.FC<TransportBookingModalProps> = ({
   const [savedBookings, setSavedBookings] = useState<TransportBooking[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingBooking, setEditingBooking] = useState<TransportBooking | null>(null);
-
-  // Calculate actual departure date
-  const getDepartureDate = () => {
-    if (dayData?.date) {
-      return new Date(dayData.date);
-    }
-    if (currentTrip && dayData?.day) {
-      try {
-        return DateUtils.calculateTripDate(currentTrip, dayData.day);
-      } catch (error) {
-        console.warn('Could not calculate trip date:', error);
-      }
-    }
-    return new Date();
-  };
-
-  const departureDate = getDepartureDate();
-  const dateStr = departureDate.toISOString().split('T')[0];
 
   // Modal context for filtering bookings
   const modalContext = {

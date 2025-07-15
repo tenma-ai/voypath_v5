@@ -42,22 +42,6 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
   
   const defaultTimes = getDefaultTimes();
   
-  const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
-  const [alreadyBookedData, setAlreadyBookedData] = useState({
-    bookingLink: '',
-    flightNumber: '',
-    departureDate: dateStr,
-    arrivalDate: dateStr,
-    departureTime: defaultTimes.departureTime,
-    arrivalTime: defaultTimes.arrivalTime,
-    price: '',
-    passengers: tripMembers?.length || 1
-  });
-  const [savedBookings, setSavedBookings] = useState<FlightBooking[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [editingBooking, setEditingBooking] = useState<FlightBooking | null>(null);
-  
-
   // Calculate actual departure date
   const getDepartureDate = () => {
     if (dayData?.date) {
@@ -75,6 +59,21 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
 
   const departureDate = getDepartureDate();
   const dateStr = departureDate.toISOString().split('T')[0];
+
+  const [selectedTab, setSelectedTab] = useState<'search' | 'already' | 'saved'>('search');
+  const [alreadyBookedData, setAlreadyBookedData] = useState({
+    bookingLink: '',
+    flightNumber: '',
+    departureDate: dateStr,
+    arrivalDate: dateStr,
+    departureTime: defaultTimes.departureTime,
+    arrivalTime: defaultTimes.arrivalTime,
+    price: '',
+    passengers: tripMembers?.length || 1
+  });
+  const [savedBookings, setSavedBookings] = useState<FlightBooking[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<FlightBooking | null>(null);
 
   // Modal context for filtering bookings
   const modalContext = {
