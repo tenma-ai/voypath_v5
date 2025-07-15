@@ -5,6 +5,7 @@ import { X, ExternalLink, Bed, Star, Trash2, Edit, Plus, MapPin, Search } from '
 import { useStore } from '../store/useStore';
 import { DateUtils } from '../utils/DateUtils';
 import { BookingService } from '../services/BookingService';
+import { supabase } from '../lib/supabase';
 import type { HotelBooking } from '../types/booking';
 
 interface HotelBookingModalProps {
@@ -125,7 +126,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
       latitude: place.geometry?.location?.lat() || null,
       longitude: place.geometry?.location?.lng() || null,
       google_place_id: place.place_id || null,
-      rating: place.rating || 4
+      rating: Math.round(Number(place.rating) || 4) // Ensure integer rating
     }));
     setSearchQuery('');
     setSearchResults([]);
@@ -296,6 +297,7 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
 
     setLoading(true);
     try {
+      // Prepare data for bookings table (compatible info only)
       const hotelData = {
         booking_link: alreadyBookedData.bookingLink || undefined,
         hotel_name: alreadyBookedData.hotelName || undefined,
@@ -306,10 +308,12 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
         check_out_date: alreadyBookedData.checkOut || checkOutDateStr,
         guests: alreadyBookedData.guests,
         price_per_night: alreadyBookedData.pricePerNight || undefined,
-        rating: alreadyBookedData.rating,
+        rating: Math.round(Number(alreadyBookedData.rating) || 4),
         location: modalContext.location,
-        notes: `Hotel booking in ${extractCityName(nearbyLocation?.name || 'Unknown')}`,
-        // Google Maps location data (optional)
+        notes: alreadyBookedData.google_place_id 
+          ? `Hotel booking from Google Maps: ${alreadyBookedData.hotelName || 'Hotel'}`
+          : `Hotel booking in ${extractCityName(nearbyLocation?.name || 'Unknown')}`,
+        // Include Google Maps data only if database schema supports it
         latitude: alreadyBookedData.latitude,
         longitude: alreadyBookedData.longitude,
         google_place_id: alreadyBookedData.google_place_id
@@ -322,7 +326,48 @@ const HotelBookingModal: React.FC<HotelBookingModalProps> = ({
         });
         setEditingBooking(null);
       } else {
+        // Save to bookings table (for UI display and management)
         await BookingService.saveHotelBooking(currentTrip.id, user.id, hotelData);
+        
+        // If Google Maps location data exists, also save as time-constrained place
+        if (alreadyBookedData.latitude && alreadyBookedData.longitude && alreadyBookedData.google_place_id) {
+          console.log('🏨 Saving hotel as time-constrained place with Google Maps data');
+          
+          // Create ISO datetime strings for constraints
+          const checkInDateTime = `${alreadyBookedData.checkIn || checkInDateStr}T${alreadyBookedData.checkInTime}:00.000Z`;
+          const checkOutDateTime = `${alreadyBookedData.checkOut || checkOutDateStr}T${alreadyBookedData.checkOutTime}:00.000Z`;
+          
+          // Calculate stay duration in minutes
+          const checkInTime = new Date(checkInDateTime);
+          const checkOutTime = new Date(checkOutDateTime);
+          const stayDurationMinutes = Math.round((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60));
+          
+          const { error: placeError } = await supabase
+            .from('places')
+            .insert({
+              trip_id: currentTrip.id,
+              user_id: user.id,
+              name: alreadyBookedData.hotelName || 'Selected Hotel',
+              latitude: alreadyBookedData.latitude,
+              longitude: alreadyBookedData.longitude,
+              address: alreadyBookedData.address,
+              category: 'accommodation',
+              place_type: 'hotel',
+              constraint_arrival_time: checkInDateTime,
+              constraint_departure_time: checkOutDateTime,
+              stay_duration_minutes: Math.max(stayDurationMinutes, 720), // Minimum 12 hours
+              wish_level: 5, // High priority for booked hotels
+              source: 'google_maps_booking',
+              google_place_id: alreadyBookedData.google_place_id,
+              notes: `Hotel booking: ${alreadyBookedData.hotelName || 'Hotel'}`
+            });
+            
+          if (placeError) {
+            console.warn('⚠️ Could not save hotel as place:', placeError.message);
+          } else {
+            console.log('✅ Hotel saved as time-constrained place for optimization');
+          }
+        }
       }
 
       // Reload bookings
