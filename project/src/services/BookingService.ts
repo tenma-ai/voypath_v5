@@ -287,11 +287,12 @@ export class BookingService {
   }
 
   /**
-   * Add a booking to trip - converts booking to time constraints and triggers edit-schedule
+   * Add a booking to trip - converts booking to time constraints 
+   * NOTE: edit-schedule triggering is currently DISABLED for testing
    */
   static async addToTrip(tripId: string, userId: string, booking: Booking): Promise<void> {
     try {
-      console.log('🔍 Adding booking to trip:', {
+      console.log('🔍 Adding booking to trip (edit-schedule trigger DISABLED):', {
         bookingType: booking.booking_type,
         tripId: tripId.substring(0, 8) + '...',
         userId: userId.substring(0, 8) + '...'
@@ -307,7 +308,10 @@ export class BookingService {
         throw new Error(`Unsupported booking type: ${booking.booking_type}`);
       }
 
-      console.log('✅ Booking successfully added to trip');
+      // TODO: Add edit-schedule trigger here when ready
+      // await this.triggerEditSchedule(tripId, userId);
+
+      console.log('✅ Booking successfully added to trip (constraints saved to database)');
       resetNetworkFailureCount();
 
     } catch (error) {
