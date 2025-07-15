@@ -30,16 +30,16 @@ optimize-route → optimization_result (store) → calendar timeline view
 
 #### 提案する流れ（「ハッキング」アプローチ）
 ```
-add bookings → saved in database → add to trip → edit_schedule実行
-edit_schedule → optimization_result (store置き換え) → calendar timeline view
+add bookings → saved in bookings table → add to trip → placesテーブルに制約追加 → edit_schedule実行
+edit_schedule → placesテーブルから制約込みデータ取得 → optimization_result (store置き換え) → calendar timeline view
 ```
 
 ### 重要な設計原則
 
 #### 1. 時間固定対象の明確化
-- **フライト**: 両端の空港place時刻を固定
-- **car/walking**: 両端のplace時刻を固定（移動手段自体ではなく）
-- **ホテル**: 一般的なplaceとして扱い + 時間制約追加
+- **フライト**: 両端の空港place時刻を固定（既存のplacesテーブルの制約カラム更新）
+- **car/walking**: 両端のplace時刻を固定（既存のplacesテーブルの制約カラム更新）
+- **ホテル**: 新しい制約付きplaceとしてplacesテーブルに追加
 
 #### 2. データ互換性の維持
 ```typescript
@@ -280,8 +280,10 @@ ADD COLUMN google_place_id TEXT;
 
 ### Step 4: Frontend統合
 **BookingService拡張**:
-- add to trip機能追加
-- edit-schedule API呼び出し
+- add to trip機能追加（placesテーブル制約カラム更新）
+- フライト・car・walking：既存place制約更新
+- ホテル：新規place追加
+- edit-schedule API呼び出し（制約情報は渡さない）
 
 **Google Maps API統合**:
 - ホテル検索ボックス
@@ -305,7 +307,11 @@ ADD COLUMN google_place_id TEXT;
 
 ### 4. ホテル二重管理の複雑性
 **懸念**: bookingテーブルとplaceテーブルの同期問題
-**対策**: 明確な責任分離（booking=UI、place=最適化）、削除時の連携
+**対策**: 
+- booking=UI表示・管理用
+- place=最適化計算用（constraint付き）
+- 削除時：bookingテーブルとplacesテーブル両方から削除
+- place.source='booking'で識別
 
 ### 5. 日付跨ぎの処理
 **懸念**: 21:00-01:00フライトの日付計算とカレンダー表示
