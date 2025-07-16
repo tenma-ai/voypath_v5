@@ -307,6 +307,19 @@ export class BookingService {
         throw new Error(`Unsupported booking type: ${booking.booking_type}`);
       }
 
+      // Set is_added_to_trip = true for the booking
+      const { error: updateError } = await supabase
+        .from('bookings')
+        .update({ is_added_to_trip: true })
+        .eq('id', booking.id);
+
+      if (updateError) {
+        console.error('🚨 Failed to update is_added_to_trip flag:', updateError);
+        throw new Error(`Failed to update booking status: ${updateError.message}`);
+      }
+
+      console.log('✅ Booking marked as added to trip (is_added_to_trip = true)');
+
       // NOTE: edit-schedule optimization is DISABLED - replaced with adopt-booking function
       // await this.triggerEditSchedule(tripId, userId);  // DISABLED
       
