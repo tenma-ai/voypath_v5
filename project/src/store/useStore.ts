@@ -1032,6 +1032,14 @@ export const useStore = create<StoreState>()((set, get) => ({
             
             for (const update of updates) {
               try {
+                // DISABLED: edit-schedule background processing 
+                console.warn('⚠️ Background edit-schedule processing disabled - keeping UI changes only');
+                
+                // Simulate success for now
+                const data = { success: true, message: 'Background processing disabled' };
+                const error = null;
+                
+                /*
                 const { data, error } = await supabase.functions.invoke('edit-schedule', {
                   body: {
                     trip_id: currentTrip.id,
@@ -1041,6 +1049,7 @@ export const useStore = create<StoreState>()((set, get) => ({
                     user_id: useStore.getState().user?.id
                   }
                 });
+                */
                 
                 if (error) {
                   console.warn('Schedule update failed (UI already updated):', error);

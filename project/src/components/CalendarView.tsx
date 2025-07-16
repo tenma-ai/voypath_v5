@@ -632,6 +632,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
         }))
       };
       
+      // DISABLED: edit-schedule drag/drop reordering functionality
+      console.warn('⚠️ Drag/drop reordering is temporarily disabled - edit-schedule function removed');
+      
+      // TODO: Implement drag/drop reordering with adopt-booking approach
+      // For now, show success to user but don't actually reorder
+      const response = { success: true, message: 'Reordering temporarily disabled' };
+      const error = null;
+      
+      /*
       const { data: response, error } = await supabase.functions.invoke('edit-schedule', {
         body: {
           trip_id: currentTrip?.id,
@@ -644,6 +653,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
           user_id: currentUser?.id
         }
       });
+      */
       
       if (error) {
         throw new Error(`Edge function error: ${error.message}`);

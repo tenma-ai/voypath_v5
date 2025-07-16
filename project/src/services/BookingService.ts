@@ -307,9 +307,9 @@ export class BookingService {
         throw new Error(`Unsupported booking type: ${booking.booking_type}`);
       }
 
-      // Trigger edit-schedule optimization after adding constraints
-      // TEMPORARILY DISABLED for testing add to trip functionality
-      // await this.triggerEditSchedule(tripId, userId);
+      // NOTE: edit-schedule optimization is DISABLED - will be replaced with adopt-booking function
+      // await this.triggerEditSchedule(tripId, userId);  // DISABLED
+      // TODO: Replace with adopt-booking function call when implemented
 
       console.log('✅ Booking successfully added to trip (constraints saved to database)');
       resetNetworkFailureCount();
@@ -851,9 +851,15 @@ export class BookingService {
   }
 
   /**
-   * Trigger edit-schedule optimization after adding time constraints
+   * DISABLED: Legacy edit-schedule optimization - replaced with adopt-booking approach
    */
   static async triggerEditSchedule(tripId: string, userId: string): Promise<void> {
+    console.log('⚠️  triggerEditSchedule is DISABLED - edit-schedule function no longer used');
+    console.log('📋 Booking constraints saved to database, awaiting adopt-booking implementation');
+    return;
+    
+    // DISABLED CODE - kept for reference
+    /*
     try {
       console.log('🚀 Triggering edit-schedule optimization...', {
         tripId: tripId.substring(0, 8) + '...',
@@ -889,5 +895,6 @@ export class BookingService {
       // Don't throw error - allow booking to be saved even if optimization fails
       console.warn('⚠️ Booking was saved but schedule optimization failed. You can manually trigger optimization later.');
     }
+    */
   }
 }
