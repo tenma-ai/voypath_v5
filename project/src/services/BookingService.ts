@@ -307,9 +307,11 @@ export class BookingService {
         throw new Error(`Unsupported booking type: ${booking.booking_type}`);
       }
 
-      // NOTE: edit-schedule optimization is DISABLED - will be replaced with adopt-booking function
+      // NOTE: edit-schedule optimization is DISABLED - replaced with adopt-booking function
       // await this.triggerEditSchedule(tripId, userId);  // DISABLED
-      // TODO: Replace with adopt-booking function call when implemented
+      
+      // Trigger adopt-booking function to integrate booking into schedule
+      await this.triggerAdoptBooking(tripId, userId);
 
       console.log('✅ Booking successfully added to trip (constraints saved to database)');
       resetNetworkFailureCount();
@@ -896,5 +898,47 @@ export class BookingService {
       console.warn('⚠️ Booking was saved but schedule optimization failed. You can manually trigger optimization later.');
     }
     */
+  }
+
+  /**
+   * Trigger adopt-booking optimization after adding booking to trip
+   */
+  static async triggerAdoptBooking(tripId: string, userId: string): Promise<void> {
+    try {
+      console.log('🚀 Triggering adopt-booking optimization...', {
+        tripId: tripId.substring(0, 8) + '...',
+        userId: userId.substring(0, 8) + '...'
+      });
+
+      const { data, error } = await supabase.functions.invoke('adopt-booking', {
+        body: {
+          trip_id: tripId,
+          user_id: userId,
+          action: 'adopt_bookings'
+        }
+      });
+
+      if (error) {
+        console.error('🚨 adopt-booking function error:', error);
+        throw new Error(`Adopt-booking optimization failed: ${error.message}`);
+      }
+
+      if (!data?.success) {
+        console.error('🚨 adopt-booking optimization failed:', data);
+        throw new Error(`Adopt-booking optimization failed: ${data?.error || 'Unknown error'}`);
+      }
+
+      console.log('✅ Adopt-booking optimization completed successfully', {
+        bookingsAdopted: data.data?.bookings_adopted,
+        placesCount: data.data?.places_count,
+        placesDeleted: data.data?.places_deleted,
+        executionTime: data.data?.execution_time_ms
+      });
+
+    } catch (error) {
+      console.error('🚨 triggerAdoptBooking failed:', error);
+      // Don't throw error - allow booking to be saved even if optimization fails
+      console.warn('⚠️ Booking was saved but schedule optimization failed. You can manually trigger optimization later.');
+    }
   }
 }
