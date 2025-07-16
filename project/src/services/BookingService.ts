@@ -29,13 +29,11 @@ export class BookingService {
       }
 
       const { data, error } = await retryOperation(async () => {
+        // Ensure no id is included in the insert (let database generate it)
+        const { id, created_at, updated_at, ...bookingData } = booking as any;
         return await supabase
           .from('bookings')
-          .insert({
-            ...booking,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
+          .insert(bookingData)
           .select()
           .single();
       });
@@ -310,7 +308,8 @@ export class BookingService {
       }
 
       // Trigger edit-schedule optimization after adding constraints
-      await this.triggerEditSchedule(tripId, userId);
+      // TEMPORARILY DISABLED for testing add to trip functionality
+      // await this.triggerEditSchedule(tripId, userId);
 
       console.log('✅ Booking successfully added to trip (constraints saved to database)');
       resetNetworkFailureCount();

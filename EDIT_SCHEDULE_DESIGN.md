@@ -2,7 +2,9 @@
 
 ## 🎯 概要
 edit-schedule Edge Functionは、時間制約のあるbooking（フライト・car・walking・ホテル）をtripに追加し、既存のscheduleを更新する機能です。
-
+流れとしては
+add bookings → saved in bookings table → add to trip → フライト・transportationなら両端のplacesテーブルに制約追加/hotelなら時間制約付きplaceとしてplacesテーブルに追加 → edit_schedule実行
+edit_schedule → placesテーブルから制約込みデータ取得 → optimization_result (store置き換え) → calendar timeline view
 ## 📋 基本仕様
 
 ### 入力データ (BookingService.addToTrip から)
