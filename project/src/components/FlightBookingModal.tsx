@@ -322,12 +322,20 @@ const FlightBookingModal: React.FC<FlightBookingModalProps> = ({
 
     setLoading(true);
     try {
-      await BookingService.addToTrip(currentTrip.id, user.id, booking);
-      alert('Flight booking added to trip! The schedule will be updated to accommodate the flight times.');
+      // Step 1: Save booking to bookings table
+      console.log('📝 Saving flight booking to database...');
+      const savedBooking = await BookingService.saveBooking(booking);
+      console.log('✅ Flight booking saved successfully:', savedBooking.id);
+
+      // Step 2: Add booking to trip (creates airport constraints + triggers edit-schedule)
+      console.log('🎯 Adding flight booking to trip as airport constraints...');
+      await BookingService.addToTrip(currentTrip.id, user.id, savedBooking);
+      
+      alert('Flight booking saved and added to trip! The schedule will be updated to accommodate the flight times.');
       onClose();
     } catch (error) {
-      console.error('Failed to add booking to trip:', error);
-      alert('Failed to add booking to trip. Please try again.');
+      console.error('Failed to save or add booking to trip:', error);
+      alert(`Failed to process booking: ${error.message}. Please try again.`);
     } finally {
       setLoading(false);
     }

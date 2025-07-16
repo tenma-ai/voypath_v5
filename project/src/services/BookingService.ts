@@ -590,8 +590,77 @@ export class BookingService {
         console.warn(`⚠️ Arrival airport place not found: ${arrivalAirport}`);
       }
 
-      if (!depPlace && !arrPlace) {
-        throw new Error(`No airport places found in trip for route: ${booking.route}. Please add airports to your trip first.`);
+      // 空港placeが見つからない場合は自動作成
+      if (!depPlace) {
+        console.log(`🔧 Creating departure airport place: ${departureAirport}`);
+        const depPlaceData = {
+          trip_id: tripId,
+          user_id: userId,
+          name: departureAirport,
+          category: 'transportation',
+          place_type: 'system_airport',
+          source: 'google_maps_booking',
+          constraint_departure_time: departureDateTime,
+          is_multi_day_booking: isMultiDay,
+          wish_level: 5,
+          stay_duration_minutes: 90, // Airport processing time
+          notes: `Auto-created departure airport for flight: ${booking.route}`
+        };
+
+        // Try to get coordinates from airport code if available
+        const airportCode = departureAirport.match(/\(([A-Z]{3,4})\)/)?.[1];
+        if (airportCode) {
+          depPlaceData.airport_code = airportCode;
+        }
+
+        const { data: newDepPlace, error: depCreateError } = await supabase
+          .from('places')
+          .insert(depPlaceData)
+          .select()
+          .single();
+
+        if (depCreateError) {
+          console.warn(`⚠️ Could not create departure airport place: ${depCreateError.message}`);
+        } else {
+          console.log(`✅ Created departure airport place: ${departureAirport}`);
+          depPlace = newDepPlace;
+        }
+      }
+
+      if (!arrPlace) {
+        console.log(`🔧 Creating arrival airport place: ${arrivalAirport}`);
+        const arrPlaceData = {
+          trip_id: tripId,
+          user_id: userId,
+          name: arrivalAirport,
+          category: 'transportation',
+          place_type: 'system_airport',
+          source: 'google_maps_booking',
+          constraint_arrival_time: arrivalDateTime,
+          is_multi_day_booking: isMultiDay,
+          wish_level: 5,
+          stay_duration_minutes: 90, // Airport processing time
+          notes: `Auto-created arrival airport for flight: ${booking.route}`
+        };
+
+        // Try to get coordinates from airport code if available
+        const airportCode = arrivalAirport.match(/\(([A-Z]{3,4})\)/)?.[1];
+        if (airportCode) {
+          arrPlaceData.airport_code = airportCode;
+        }
+
+        const { data: newArrPlace, error: arrCreateError } = await supabase
+          .from('places')
+          .insert(arrPlaceData)
+          .select()
+          .single();
+
+        if (arrCreateError) {
+          console.warn(`⚠️ Could not create arrival airport place: ${arrCreateError.message}`);
+        } else {
+          console.log(`✅ Created arrival airport place: ${arrivalAirport}`);
+          arrPlace = newArrPlace;
+        }
       }
 
       console.log('✅ Flight constraints successfully added to airport places');
