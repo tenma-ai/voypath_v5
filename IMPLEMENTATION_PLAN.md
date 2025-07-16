@@ -73,7 +73,7 @@ interface OptimizationResult {
 セグメント3: (F固定から) → G → H
 ```
 
-- 各セグメント内でoptimize-routeと同じ最適化ロジック
+- 各セグメント内でoptimize-routeと同じ最適化ロジック*交通手段も忘れずに！！＊
 - セグメント間の順序は固定
 - 収まらない場所は削除
 - 時間固定placeの時刻制約を満たすよう全体調整
