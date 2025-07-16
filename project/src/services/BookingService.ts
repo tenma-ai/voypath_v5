@@ -309,8 +309,8 @@ export class BookingService {
         throw new Error(`Unsupported booking type: ${booking.booking_type}`);
       }
 
-      // TODO: Add edit-schedule trigger here when ready
-      // await this.triggerEditSchedule(tripId, userId);
+      // Trigger edit-schedule optimization after adding constraints
+      await this.triggerEditSchedule(tripId, userId);
 
       console.log('✅ Booking successfully added to trip (constraints saved to database)');
       resetNetworkFailureCount();
@@ -358,6 +358,9 @@ export class BookingService {
       const checkInTime = new Date(checkInDateTime);
       const checkOutTime = new Date(checkOutDateTime);
       const stayDurationMinutes = Math.round((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60));
+      
+      // Check if this is a multi-day booking
+      const isMultiDay = booking.check_in_date !== booking.check_out_date;
 
       // Insert hotel as time-constrained place
       const placeData = {
@@ -370,6 +373,7 @@ export class BookingService {
         constraint_arrival_time: checkInDateTime,
         constraint_departure_time: checkOutDateTime,
         stay_duration_minutes: Math.max(stayDurationMinutes, 720), // Minimum 12 hours
+        is_multi_day_booking: isMultiDay, // 🔥 Multi-day flag for edit-schedule processing
         wish_level: 5, // High priority for booked hotels
         source: booking.google_place_id ? 'google_maps_booking' : 'manual_booking',
         notes: `Hotel booking: ${booking.hotel_name || 'Hotel'} | Context: ${modalContext}`
@@ -438,6 +442,13 @@ export class BookingService {
         }
       }
       const arrivalDateTime = `${arrivalDate}T${booking.arrival_time}:00.000Z`;
+      const isMultiDay = booking.departure_date !== arrivalDate;
+
+      console.log('🎯 Flight constraint times:', {
+        departure: departureDateTime,
+        arrival: arrivalDateTime,
+        isMultiDay: isMultiDay
+      });
 
       // Find departure airport place (with airport name normalization)
       let depPlace = null;
@@ -545,7 +556,10 @@ export class BookingService {
       if (depPlace) {
         const { error: depError } = await supabase
           .from('places')
-          .update({ constraint_departure_time: departureDateTime })
+          .update({ 
+            constraint_departure_time: departureDateTime,
+            is_multi_day_booking: isMultiDay 
+          })
           .eq('id', depPlace.id);
         
         if (depError) {
@@ -561,7 +575,10 @@ export class BookingService {
       if (arrPlace) {
         const { error: arrError } = await supabase
           .from('places')
-          .update({ constraint_arrival_time: arrivalDateTime })
+          .update({ 
+            constraint_arrival_time: arrivalDateTime,
+            is_multi_day_booking: isMultiDay 
+          })
           .eq('id', arrPlace.id);
         
         if (arrError) {
@@ -762,6 +779,47 @@ export class BookingService {
     } catch (error) {
       console.error(`🚨 addTransportToTrip failed:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Trigger edit-schedule optimization after adding time constraints
+   */
+  static async triggerEditSchedule(tripId: string, userId: string): Promise<void> {
+    try {
+      console.log('🚀 Triggering edit-schedule optimization...', {
+        tripId: tripId.substring(0, 8) + '...',
+        userId: userId.substring(0, 8) + '...'
+      });
+
+      const { data, error } = await supabase.functions.invoke('edit-schedule', {
+        body: {
+          trip_id: tripId,
+          member_id: userId,
+          action: 'optimize_with_constraints'
+        }
+      });
+
+      if (error) {
+        console.error('🚨 edit-schedule function error:', error);
+        throw new Error(`Edit-schedule optimization failed: ${error.message}`);
+      }
+
+      if (!data?.success) {
+        console.error('🚨 edit-schedule optimization failed:', data);
+        throw new Error(`Edit-schedule optimization failed: ${data?.error || 'Unknown error'}`);
+      }
+
+      console.log('✅ Edit-schedule optimization completed successfully', {
+        placesCount: data.places_count,
+        totalScore: data.optimization_score?.total_score,
+        executionTime: data.execution_time_ms
+      });
+
+    } catch (error) {
+      console.error('🚨 triggerEditSchedule failed:', error);
+      // Don't throw error - allow booking to be saved even if optimization fails
+      console.warn('⚠️ Booking was saved but schedule optimization failed. You can manually trigger optimization later.');
     }
   }
 }

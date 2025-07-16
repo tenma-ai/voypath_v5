@@ -13,6 +13,65 @@ import FlightBookingModal from './FlightBookingModal';
 import TransportBookingModal from './TransportBookingModal';
 import { supabase } from '../lib/supabase';
 
+// 🔥 edit-schedule仮想分割place統合ユーティリティ
+function mergeVirtualSplitsForUI(places: any[]): any[] {
+  const mergedPlaces: any[] = [];
+  const splitGroups = new Map<string, any[]>();
+  
+  // 分割placeをoriginal_place_idでグループ化
+  places.forEach(place => {
+    if (place.is_virtual_split && place.original_place_id) {
+      if (!splitGroups.has(place.original_place_id)) {
+        splitGroups.set(place.original_place_id, []);
+      }
+      splitGroups.get(place.original_place_id)!.push(place);
+    } else {
+      mergedPlaces.push(place);
+    }
+  });
+  
+  // 分割されたplaceを統合
+  splitGroups.forEach((splits, originalId) => {
+    if (splits.length > 1) {
+      // 複数の分割を統合して単一placeとして表示
+      const firstSplit = splits[0];
+      const lastSplit = splits[splits.length - 1];
+      
+      const mergedPlace = {
+        ...firstSplit,
+        id: originalId, // 元IDに戻す
+        is_virtual_split: false, // 統合済みフラグ
+        arrival_time: firstSplit.arrival_time,
+        departure_time: lastSplit.departure_time,
+        stay_duration_minutes: splits.reduce((sum, split) => sum + (split.stay_duration_minutes || 0), 0),
+        notes: firstSplit.notes?.replace(/\| Context:.*$/, '') || firstSplit.name, // コンテキスト情報をクリーン
+        merged_from_splits: splits, // UI用分割情報
+        constraint_arrival_time: firstSplit.constraint_arrival_time,
+        constraint_departure_time: lastSplit.constraint_departure_time,
+        // 日跨ぎ期間表示用
+        display_segments: splits.map((split, index) => ({
+          day_index: split.split_day_index || index + 1,
+          arrival_time: split.arrival_time,
+          departure_time: split.departure_time,
+          duration_minutes: split.stay_duration_minutes
+        }))
+      };
+      
+      mergedPlaces.push(mergedPlace);
+    } else {
+      // 単一の分割はそのまま追加（original_place_idに戻す）
+      const singleSplit = splits[0];
+      mergedPlaces.push({
+        ...singleSplit,
+        id: originalId,
+        is_virtual_split: false
+      });
+    }
+  });
+  
+  return mergedPlaces;
+}
+
 interface CalendarViewProps {
   optimizationResult?: any;
 }
@@ -337,6 +396,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ optimizationResult }) => {
       const actualDate = DateUtils.calculateTripDate(currentTrip, schedule.day);
       
       let dayPlaces = [...(schedule.scheduled_places || [])];
+      
+      // 🔥 edit-schedule仮想分割place統合処理
+      dayPlaces = mergeVirtualSplitsForUI(dayPlaces);
       
       // 前日からの継続イベントを追加
       const continuedEvents = crossDayEvents.filter(event => event.target_day === schedule.day);
