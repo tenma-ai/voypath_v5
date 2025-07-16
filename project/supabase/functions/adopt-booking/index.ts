@@ -528,17 +528,36 @@ Deno.serve(async (req) => {
       .select('*')
       .eq('trip_id', trip_id)
       .eq('is_added_to_trip', true)
-      .order('departure_date', { ascending: true });
+      .order('created_at', { ascending: true });
 
     if (bookingsError) {
+      console.error('🚨 Bookings query error:', bookingsError);
       throw new Error(`Failed to fetch bookings: ${bookingsError.message}`);
     }
 
+    console.log(`📋 Bookings query result:`, {
+      trip_id,
+      addedBookings: addedBookings?.length || 0,
+      bookings: addedBookings
+    });
+
     if (!addedBookings || addedBookings.length === 0) {
+      // Get all bookings for debugging
+      const { data: allBookings } = await supabase
+        .from('bookings')
+        .select('id, booking_type, is_added_to_trip, trip_id')
+        .eq('trip_id', trip_id);
+      
+      console.error('🚨 No added bookings found. All bookings for trip:', allBookings);
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'No bookings found with is_added_to_trip=true' 
+          error: 'No bookings found with is_added_to_trip=true',
+          debug: {
+            trip_id,
+            all_bookings: allBookings
+          }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
